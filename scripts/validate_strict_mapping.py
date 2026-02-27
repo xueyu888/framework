@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +13,9 @@ REGISTRY_PATH = REPO_ROOT / "standards/mapping_registry.json"
 
 
 REQUIRED_LEVELS = ("L0", "L1", "L2", "L3")
+ASSIGN_CALL_PATTERN = re.compile(
+    r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\(\s*$"
+)
 
 
 def load_registry() -> dict:
@@ -116,6 +121,7 @@ def validate_mapping_content(registry: dict) -> list[str]:
     l2_text = read_text(l2_doc)
 
     code_cache: dict[Path, str] = {}
+    ast_cache: dict[Path, ast.AST] = {}
 
     for item in registry["mappings"]:
         map_id = item["id"]
@@ -138,11 +144,78 @@ def validate_mapping_content(registry: dict) -> list[str]:
             file_path = REPO_ROOT / file_name
             if file_path not in code_cache:
                 code_cache[file_path] = read_text(file_path)
+            if file_path.suffix == ".py" and file_path not in ast_cache:
+                ast_cache[file_path] = ast.parse(code_cache[file_path], filename=file_name)
 
-            if symbol not in code_cache[file_path]:
+            if not symbol_exists(symbol, file_path, code_cache[file_path], ast_cache.get(file_path)):
                 errors.append(f"{map_id}: symbol '{symbol}' not found in {file_name}")
 
     return errors
+
+
+def symbol_exists(
+    symbol: str,
+    file_path: Path,
+    source_text: str,
+    parsed_ast: ast.AST | None,
+) -> bool:
+    # Non-Python files still use text matching.
+    if file_path.suffix != ".py" or parsed_ast is None:
+        return symbol in source_text
+
+    symbol = symbol.strip()
+
+    if symbol.startswith("class "):
+        class_name = symbol[len("class ") :].strip()
+        return python_class_exists(parsed_ast, class_name)
+
+    if symbol.startswith("def "):
+        func_part = symbol[len("def ") :].strip()
+        func_name = func_part.split("(", 1)[0].strip()
+        return python_function_exists(parsed_ast, func_name)
+
+    assign_call_match = ASSIGN_CALL_PATTERN.match(symbol)
+    if assign_call_match:
+        target_name = assign_call_match.group(1)
+        func_name = assign_call_match.group(2)
+        return python_assign_call_exists(parsed_ast, target_name, func_name)
+
+    return symbol in source_text
+
+
+def python_class_exists(tree: ast.AST, class_name: str) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            return True
+    return False
+
+
+def python_function_exists(tree: ast.AST, func_name: str) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func_name:
+            return True
+    return False
+
+
+def python_assign_call_exists(tree: ast.AST, target_name: str, func_name: str) -> bool:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+
+        if not node.targets:
+            continue
+        first_target = node.targets[0]
+        if not isinstance(first_target, ast.Name) or first_target.id != target_name:
+            continue
+
+        if not isinstance(node.value, ast.Call):
+            continue
+
+        called = node.value.func
+        if isinstance(called, ast.Name) and called.id == func_name:
+            return True
+
+    return False
 
 
 def validate_change_propagation(registry: dict, changed_files: set[str]) -> list[str]:
@@ -185,6 +258,11 @@ def main() -> int:
         action="store_true",
         help="validate top-down change propagation on current git diff",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="output result as JSON",
+    )
     args = parser.parse_args()
 
     try:
@@ -206,7 +284,18 @@ def main() -> int:
         changed = collect_changed_files()
         errors.extend(validate_change_propagation(registry, changed))
 
-    if errors:
+    passed = len(errors) == 0
+    result_payload = {
+        "passed": passed,
+        "checked_changes": args.check_changes,
+        "errors": errors,
+    }
+
+    if args.json:
+        print(json.dumps(result_payload, ensure_ascii=False))
+        return 0 if passed else 1
+
+    if not passed:
         print("[FAIL] strict mapping validation failed:")
         for issue in errors:
             print(f"- {issue}")

@@ -16,6 +16,11 @@ uv run python scripts/validate_strict_mapping.py
 uv run python scripts/validate_strict_mapping.py --check-changes
 ```
 
+## VSCode 插件雏形
+- 位置：`tools/vscode/strict-mapping-guard`
+- 作用：保存文件后自动运行严格映射校验，并在 Problems 面板报警
+- 手动命令：`Strict Mapping: Validate Now`
+
 ## 运行
 ```bash
 uv sync
