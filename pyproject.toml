@@ -1,0 +1,10 @@
+[project]
+name = "shelf"
+version = "0.1.0"
+description = "Logic-consistent shelf framework with executable Python reference implementation."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false

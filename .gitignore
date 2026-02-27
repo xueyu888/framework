@@ -1,6 +1,10 @@
-# Codex workspace
-.codex/**
+# Python cache
+__pycache__/
+*.pyc
+.venv/
 
-# Allow shared prompts (safe, review before commit)
-!.codex/prompts/
-!.codex/prompts/*.md
+# Local temporary files
+*~
+*.swp
+*.swo
+.DS_Store
