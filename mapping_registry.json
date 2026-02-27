@@ -1,61 +1,58 @@
 {
   "levels": {
-    "L0": ["framework_design_standard.md"],
-    "L1": ["shelf_framework_standard.md"],
-    "L2": [
+    "L0": ["standards_tree.md"],
+    "L1": [
+      "framework_design_standard.md",
+      "traceability_standard.md",
+      "reducibility_standard.md",
+      "AGENTS.md"
+    ],
+    "L2": ["shelf_framework_standard.md"],
+    "L3": [
       "shelf_framework.py",
       "main.py",
       "scripts/validate_strict_mapping.py",
+      "docs/logic_record.json",
       "mapping_registry.json"
-    ],
-    "L3": ["docs/logic_record.json"]
+    ]
   },
   "top_down_update_rules": [
     {
       "from": "L0",
-      "must_update": ["L1", "L2"]
+      "must_update": ["L1", "L2", "L3"]
     },
     {
       "from": "L1",
-      "must_update": ["L2"]
+      "must_update": ["L2", "L3"]
+    },
+    {
+      "from": "L2",
+      "must_update": ["L3"]
     }
   ],
   "reverse_validation_rules": [
     {
-      "from": "L2",
-      "require_validation_command": "uv run python scripts/validate_strict_mapping.py --check-changes"
-    },
-    {
       "from": "L3",
-      "require_validation_command": "uv run python scripts/validate_strict_mapping.py"
+      "require_validation_command": "uv run python scripts/validate_strict_mapping.py --check-changes"
     }
   ],
   "mappings": [
     {
-      "id": "MAP-STRICT",
-      "l0_anchor": "## 0. 治理地位与多级严格映射（强制）",
-      "l1_anchor": "## 8. 变更规则（强制）",
-      "l2_symbols": [
-        {"file": "shelf_framework.py", "symbol": "STRICT_MAPPING_LEVEL"},
-        {"file": "shelf_framework.py", "symbol": "def strict_mapping_meta("},
-        {"file": "main.py", "symbol": "\"strict_mapping\": strict_mapping_meta()"},
-        {"file": "scripts/validate_strict_mapping.py", "symbol": "def validate_change_propagation("}
-      ]
-    },
-    {
       "id": "MAP-G",
-      "l0_anchor": "`G` Goal",
-      "l1_anchor": "## 1. 领域目标（G）",
-      "l2_symbols": [
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_anchor": "## 1. 目标（Goal）",
+      "l2_anchor": "## 1. 目标（Goal）",
+      "impl_symbols": [
         {"file": "shelf_framework.py", "symbol": "class Goal"},
         {"file": "main.py", "symbol": "goal = Goal("}
       ]
     },
     {
       "id": "MAP-B",
-      "l0_anchor": "`B` Boundary",
-      "l1_anchor": "## 2. 领域边界（B）",
-      "l2_symbols": [
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_anchor": "## 2. 边界定义（Boundary）",
+      "impl_symbols": [
         {"file": "shelf_framework.py", "symbol": "class BoundaryDefinition"},
         {"file": "shelf_framework.py", "symbol": "class Space3D"},
         {"file": "shelf_framework.py", "symbol": "class Opening2D"},
@@ -64,43 +61,35 @@
     },
     {
       "id": "MAP-M",
-      "l0_anchor": "`M` Module",
-      "l1_anchor": "## 3. 领域模块（M）",
-      "l2_symbols": [
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_anchor": "## 3. 模块（最小可行基，Module）",
+      "l2_anchor": "## 3. 模块（最小可行基，Module）",
+      "impl_symbols": [
         {"file": "shelf_framework.py", "symbol": "class Module"},
         {"file": "shelf_framework.py", "symbol": "MODULE_ROLE"}
       ]
     },
     {
-      "id": "MAP-R",
-      "l0_anchor": "`R` Rule",
-      "l1_anchor": "## 4. 领域规则（R）",
-      "l2_symbols": [
+      "id": "MAP-COMBINATION",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_anchor": "## 4. 组合原则（Combination Principles）",
+      "impl_symbols": [
         {"file": "shelf_framework.py", "symbol": "class Rule"},
         {"file": "shelf_framework.py", "symbol": "class CombinationRules"},
         {"file": "shelf_framework.py", "symbol": "def default()"}
       ]
     },
     {
-      "id": "MAP-HV",
-      "l0_anchor": "`H` Hypothesis",
-      "l1_anchor": "## 5. 领域假设与验证（H/V）",
-      "l2_symbols": [
-        {"file": "shelf_framework.py", "symbol": "class Hypothesis"},
+      "id": "MAP-V",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
         {"file": "shelf_framework.py", "symbol": "class VerificationInput"},
         {"file": "shelf_framework.py", "symbol": "class VerificationResult"},
-        {"file": "shelf_framework.py", "symbol": "def verify("}
-      ]
-    },
-    {
-      "id": "MAP-C",
-      "l0_anchor": "`C` Conclusion",
-      "l1_anchor": "## 6. 结论与逻辑记录（C）",
-      "l2_symbols": [
-        {"file": "shelf_framework.py", "symbol": "class LogicStep"},
-        {"file": "shelf_framework.py", "symbol": "class LogicRecord"},
-        {"file": "main.py", "symbol": "def build_logic_record("},
-        {"file": "main.py", "symbol": "logic_record.export_json(\"docs/logic_record.json\")"}
+        {"file": "shelf_framework.py", "symbol": "def verify("},
+        {"file": "main.py", "symbol": "verification_result = verify("}
       ]
     }
   ]

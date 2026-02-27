@@ -10,6 +10,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = REPO_ROOT / "mapping_registry.json"
 
 
+REQUIRED_LEVELS = ("L0", "L1", "L2", "L3")
+
+
 def load_registry() -> dict:
     if not REGISTRY_PATH.exists():
         raise FileNotFoundError(f"missing mapping registry: {REGISTRY_PATH}")
@@ -55,16 +58,17 @@ def validate_registry_structure(registry: dict) -> list[str]:
     if not isinstance(levels, dict):
         return ["mapping_registry.json: levels must be an object"]
 
-    for level in ("L0", "L1", "L2", "L3"):
+    for level in REQUIRED_LEVELS:
         files = levels.get(level)
         if not isinstance(files, list) or not files:
             errors.append(f"mapping_registry.json: {level} must map to a non-empty file list")
 
-    mapping_ids: set[str] = set()
     mappings = registry.get("mappings", [])
     if not isinstance(mappings, list) or not mappings:
         errors.append("mapping_registry.json: mappings must be a non-empty list")
         return errors
+
+    mapping_ids: set[str] = set()
 
     for item in mappings:
         map_id = item.get("id")
@@ -75,14 +79,13 @@ def validate_registry_structure(registry: dict) -> list[str]:
             errors.append(f"mapping_registry.json: duplicate mapping id: {map_id}")
         mapping_ids.add(map_id)
 
-        if not item.get("l0_anchor"):
-            errors.append(f"{map_id}: missing l0_anchor")
-        if not item.get("l1_anchor"):
-            errors.append(f"{map_id}: missing l1_anchor")
+        for key in ("l0_anchor", "l1_anchor", "l2_anchor"):
+            if not item.get(key):
+                errors.append(f"{map_id}: missing {key}")
 
-        symbols = item.get("l2_symbols")
+        symbols = item.get("impl_symbols")
         if not isinstance(symbols, list) or not symbols:
-            errors.append(f"{map_id}: l2_symbols must be non-empty list")
+            errors.append(f"{map_id}: impl_symbols must be non-empty list")
 
     return errors
 
@@ -92,9 +95,11 @@ def validate_mapping_content(registry: dict) -> list[str]:
 
     l0_doc = REPO_ROOT / registry["levels"]["L0"][0]
     l1_doc = REPO_ROOT / registry["levels"]["L1"][0]
+    l2_doc = REPO_ROOT / registry["levels"]["L2"][0]
 
     l0_text = read_text(l0_doc)
     l1_text = read_text(l1_doc)
+    l2_text = read_text(l2_doc)
 
     code_cache: dict[Path, str] = {}
 
@@ -105,13 +110,15 @@ def validate_mapping_content(registry: dict) -> list[str]:
             errors.append(f"{map_id}: l0_anchor not found in {l0_doc.name}")
         if item["l1_anchor"] not in l1_text:
             errors.append(f"{map_id}: l1_anchor not found in {l1_doc.name}")
+        if item["l2_anchor"] not in l2_text:
+            errors.append(f"{map_id}: l2_anchor not found in {l2_doc.name}")
 
-        for symbol_ref in item["l2_symbols"]:
+        for symbol_ref in item["impl_symbols"]:
             file_name = symbol_ref.get("file")
             symbol = symbol_ref.get("symbol")
 
             if not file_name or not symbol:
-                errors.append(f"{map_id}: invalid l2 symbol ref: {symbol_ref}")
+                errors.append(f"{map_id}: invalid impl symbol ref: {symbol_ref}")
                 continue
 
             file_path = REPO_ROOT / file_name
@@ -134,7 +141,6 @@ def validate_change_propagation(registry: dict, changed_files: set[str]) -> list
     def touched(level: str) -> bool:
         return bool(changed_files.intersection(level_files[level]))
 
-    # Top-down: higher level changed => lower levels must also change.
     for rule in registry.get("top_down_update_rules", []):
         src = rule.get("from")
         targets = rule.get("must_update", [])
@@ -147,12 +153,10 @@ def validate_change_propagation(registry: dict, changed_files: set[str]) -> list
                         f"change propagation violation: {src} changed but {target} not updated"
                     )
 
-    # Bottom-up: lower level changed => must run validation (this command is the validation).
-    reverse_rules = registry.get("reverse_validation_rules", [])
-    for rule in reverse_rules:
+    for rule in registry.get("reverse_validation_rules", []):
         src = rule.get("from")
         if src in level_files and touched(src):
-            # No extra error needed; executing this script is the required validation.
+            # Running this script itself is the reverse validation requirement.
             pass
 
     return errors
