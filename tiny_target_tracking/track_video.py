@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import csv
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -140,7 +141,7 @@ def _draw_overlay(
     est_xy: tuple[float, float] | None,
     pred_xy: tuple[float, float] | None,
     gate_radius: int,
-    trail: deque[tuple[int, int]],
+    trail: deque[tuple[int, int, int]],
     candidates: list[tuple[float, float, int, int]],
     gt_row: dict[str, float | bool] | None,
 ) -> np.ndarray:
@@ -161,10 +162,13 @@ def _draw_overlay(
             cv2.LINE_AA,
         )
 
-    # Trajectory.
-    if len(trail) >= 2:
-        pts = np.array(list(trail), dtype=np.int32).reshape(-1, 1, 2)
-        cv2.polylines(vis, [pts], False, (0, 230, 120), 1, cv2.LINE_AA)
+    # Trajectory: smooth connected curve through tracked points.
+    if state.status == "TRACKED" and len(trail) >= 2:
+        raw_points = [(float(x), float(y)) for _, x, y in trail]
+        smooth_points = _catmull_rom_spline(raw_points, samples_per_segment=10)
+        if smooth_points.size > 0:
+            pts = np.round(smooth_points).astype(np.int32).reshape(-1, 1, 2)
+            cv2.polylines(vis, [pts], False, (255, 0, 0), 2, cv2.LINE_AA)
 
     # Current estimate.
     if est_xy is not None:
@@ -184,6 +188,54 @@ def _draw_overlay(
     cv2.putText(vis, f"Missed: {state.missed}", (18, 84), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (235, 245, 255), 2, cv2.LINE_AA)
 
     return vis
+
+
+def _catmull_rom_spline(
+    points: list[tuple[float, float]],
+    samples_per_segment: int = 10,
+) -> np.ndarray:
+    if len(points) < 2:
+        return np.empty((0, 2), dtype=np.float32)
+    if len(points) == 2:
+        return np.array(points, dtype=np.float32)
+
+    # Centripetal Catmull-Rom (alpha=0.5) reduces overshoot on uneven point spacing.
+    def _tj(ti: float, pa: np.ndarray, pb: np.ndarray, alpha: float = 0.5) -> float:
+        d = float(np.linalg.norm(pb - pa))
+        return ti + max(1e-6, d) ** alpha
+
+    out: list[np.ndarray] = []
+    pts = [np.array(p, dtype=np.float32) for p in points]
+    n = len(pts)
+    for i in range(n - 1):
+        p1 = pts[i]
+        p2 = pts[i + 1]
+        if float(np.linalg.norm(p2 - p1)) < 1e-6:
+            continue
+
+        # Endpoint extrapolation avoids degenerate duplicate control points.
+        p0 = pts[i - 1] if i > 0 else (2.0 * p1 - p2)
+        p3 = pts[i + 2] if i + 2 < n else (2.0 * p2 - p1)
+
+        t0 = 0.0
+        t1 = _tj(t0, p0, p1)
+        t2 = _tj(t1, p1, p2)
+        t3 = _tj(t2, p2, p3)
+
+        ts = np.linspace(t1, t2, samples_per_segment, endpoint=False, dtype=np.float32)
+        for t in ts:
+            a1 = (t1 - t) / (t1 - t0) * p0 + (t - t0) / (t1 - t0) * p1
+            a2 = (t2 - t) / (t2 - t1) * p1 + (t - t1) / (t2 - t1) * p2
+            a3 = (t3 - t) / (t3 - t2) * p2 + (t - t2) / (t3 - t2) * p3
+
+            b1 = (t2 - t) / (t2 - t0) * a1 + (t - t0) / (t2 - t0) * a2
+            b2 = (t3 - t) / (t3 - t1) * a2 + (t - t1) / (t3 - t1) * a3
+
+            c = (t2 - t) / (t2 - t1) * b1 + (t - t1) / (t2 - t1) * b2
+            out.append(c)
+
+    out.append(pts[-1])
+    return np.vstack(out).astype(np.float32) if out else np.array(points, dtype=np.float32)
 
 
 def track_video(args: argparse.Namespace) -> None:
@@ -216,7 +268,10 @@ def track_video(args: argparse.Namespace) -> None:
 
     kf = _create_kalman()
     state = TrackerState()
-    trail: deque[tuple[int, int]] = deque(maxlen=args.trail_len)
+    trail: deque[tuple[int, int, int]] = deque(maxlen=args.trail_len)
+    frame_rows: list[dict[str, float | int | bool | str]] = []
+    reacquire_pending_xy: tuple[float, float] | None = None
+    reacquire_pending_count = 0
 
     frame_idx = 0
     expected_area = max(1, args.point_size * args.point_size)
@@ -236,6 +291,8 @@ def track_video(args: argparse.Namespace) -> None:
 
         pred_xy: tuple[float, float] | None = None
         est_xy: tuple[float, float] | None = None
+        selected_xy: tuple[float, float] | None = None
+        raw_selected_xy: tuple[float, float] | None = None
         current_gate = args.gate_radius
 
         if not state.initialized:
@@ -247,14 +304,15 @@ def track_video(args: argparse.Namespace) -> None:
                 state.status = "TRACKED"
                 state.missed = 0
                 est_xy = (first[0], first[1])
+                selected_xy = (first[0], first[1])
                 state.last_estimate = est_xy
-                trail.append((int(round(est_xy[0])), int(round(est_xy[1]))))
+                trail.append((frame_idx, int(round(est_xy[0])), int(round(est_xy[1]))))
             else:
                 state.status = "LOST"
         else:
             pred = kf.predict()
             pred_xy = (float(pred[0, 0]), float(pred[1, 0]))
-            current_gate = args.gate_radius + min(90, state.missed * 2)
+            current_gate = args.gate_radius + min(args.gate_expand_cap, state.missed * args.gate_expand_per_miss)
             selected = _select_candidate(
                 candidates,
                 pred_xy,
@@ -267,12 +325,42 @@ def track_video(args: argparse.Namespace) -> None:
                     candidates,
                     key=lambda c: c[3] - abs(c[2] - expected_area) * 12.0,
                 )
+            selected_for_update = None
             if selected is not None:
-                meas = np.array([[selected[0]], [selected[1]]], dtype=np.float32)
+                raw_selected_xy = (selected[0], selected[1])
+                need_confirm = state.status == "LOST" or state.missed >= args.reacquire_confirm_after_missed
+                if need_confirm:
+                    if reacquire_pending_xy is None:
+                        reacquire_pending_xy = raw_selected_xy
+                        reacquire_pending_count = 1
+                    else:
+                        pending_dist = float(np.hypot(raw_selected_xy[0] - reacquire_pending_xy[0], raw_selected_xy[1] - reacquire_pending_xy[1]))
+                        if pending_dist <= args.reacquire_confirm_radius:
+                            reacquire_pending_xy = raw_selected_xy
+                            reacquire_pending_count += 1
+                        else:
+                            reacquire_pending_xy = raw_selected_xy
+                            reacquire_pending_count = 1
+                    if reacquire_pending_count >= args.reacquire_confirm_frames:
+                        selected_for_update = selected
+                        reacquire_pending_xy = None
+                        reacquire_pending_count = 0
+                else:
+                    selected_for_update = selected
+                    reacquire_pending_xy = None
+                    reacquire_pending_count = 0
+            else:
+                reacquire_pending_xy = None
+                reacquire_pending_count = 0
+
+            if selected_for_update is not None:
+                meas = np.array([[selected_for_update[0]], [selected_for_update[1]]], dtype=np.float32)
                 corr = kf.correct(meas)
                 est_xy = (float(corr[0, 0]), float(corr[1, 0]))
+                selected_xy = (selected_for_update[0], selected_for_update[1])
                 state.missed = 0
                 state.status = "TRACKED"
+                trail.append((frame_idx, int(round(est_xy[0])), int(round(est_xy[1]))))
             else:
                 state.missed += 1
                 est_xy = pred_xy
@@ -280,12 +368,47 @@ def track_video(args: argparse.Namespace) -> None:
 
             if est_xy is not None:
                 state.last_estimate = est_xy
-                trail.append((int(round(est_xy[0])), int(round(est_xy[1]))))
 
         if state.last_estimate is not None and est_xy is None:
             est_xy = state.last_estimate
 
         gt_row = gt_map.get(frame_idx) if gt_map is not None else None
+        row: dict[str, float | int | bool | str] = {
+            "frame": frame_idx,
+            "status": state.status,
+            "missed": state.missed,
+            "candidate_count": len(candidates),
+            "gate_radius": float(current_gate),
+        }
+        if pred_xy is not None:
+            row["pred_x"] = float(pred_xy[0])
+            row["pred_y"] = float(pred_xy[1])
+        if selected_xy is not None:
+            row["meas_x"] = float(selected_xy[0])
+            row["meas_y"] = float(selected_xy[1])
+        if raw_selected_xy is not None:
+            row["raw_meas_x"] = float(raw_selected_xy[0])
+            row["raw_meas_y"] = float(raw_selected_xy[1])
+        if est_xy is not None:
+            row["est_x"] = float(est_xy[0])
+            row["est_y"] = float(est_xy[1])
+        row["reacquire_pending_count"] = reacquire_pending_count
+        row["reacquire_pending"] = bool(reacquire_pending_xy is not None)
+        if reacquire_pending_xy is not None:
+            row["reacquire_pending_x"] = float(reacquire_pending_xy[0])
+            row["reacquire_pending_y"] = float(reacquire_pending_xy[1])
+        if gt_row is not None:
+            gt_x = float(gt_row["x"])
+            gt_y = float(gt_row["y"])
+            row["gt_x"] = gt_x
+            row["gt_y"] = gt_y
+            row["gt_occluded"] = bool(gt_row.get("occluded", False))
+            if est_xy is not None:
+                row["err_to_gt"] = float(np.hypot(est_xy[0] - gt_x, est_xy[1] - gt_y))
+            if selected_xy is not None:
+                row["meas_err_to_gt"] = float(np.hypot(selected_xy[0] - gt_x, selected_xy[1] - gt_y))
+        frame_rows.append(row)
+
         vis = _draw_overlay(
             frame=frame,
             frame_idx=frame_idx,
@@ -312,6 +435,36 @@ def track_video(args: argparse.Namespace) -> None:
     writer.release()
     print(f"[ok] wrote {args.output}")
 
+    if args.dump_track_json:
+        dump_path = Path(args.dump_track_json)
+        dump_path.parent.mkdir(parents=True, exist_ok=True)
+        dump_path.write_text(
+            json.dumps(
+                {
+                    "input": str(input_path),
+                    "output": str(args.output),
+                    "rows": frame_rows,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"[ok] wrote {dump_path}")
+
+    if args.dump_track_csv:
+        csv_path = Path(args.dump_track_csv)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        keys: set[str] = set()
+        for r in frame_rows:
+            keys.update(r.keys())
+        columns = ["frame", "status", "missed", "candidate_count", "gate_radius"] + sorted(k for k in keys if k not in {"frame", "status", "missed", "candidate_count", "gate_radius"})
+        with csv_path.open("w", newline="", encoding="utf-8") as f:
+            writer_csv = csv.DictWriter(f, fieldnames=columns)
+            writer_csv.writeheader()
+            writer_csv.writerows(frame_rows)
+        print(f"[ok] wrote {csv_path}")
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Track tiny target in synthetic sea-sky video.")
@@ -320,9 +473,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--point_size", type=int, default=2, choices=[1, 2, 3])
     parser.add_argument("--fps", type=float, default=60.0, help="output fps, <=0 means keep source fps")
     parser.add_argument("--gate_radius", type=int, default=15)
+    parser.add_argument("--gate_expand_per_miss", type=float, default=1.0, help="gate expansion amount per missed frame")
+    parser.add_argument("--gate_expand_cap", type=float, default=20.0, help="max additional gate expansion")
     parser.add_argument("--max_missed", type=int, default=60)
     parser.add_argument("--trail_len", type=int, default=180)
     parser.add_argument("--intensity_threshold", type=int, default=165)
+    parser.add_argument("--reacquire_confirm_after_missed", type=int, default=10, help="require confirmation after this many consecutive misses")
+    parser.add_argument("--reacquire_confirm_frames", type=int, default=3, help="consecutive frames needed to confirm reacquire")
+    parser.add_argument("--reacquire_confirm_radius", type=float, default=4.0, help="max distance between consecutive reacquire candidates")
+    parser.add_argument("--dump_track_json", default="", help="optional path to dump per-frame tracking records (.json)")
+    parser.add_argument("--dump_track_csv", default="", help="optional path to dump per-frame tracking records (.csv)")
     return parser
 
 
