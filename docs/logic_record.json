@@ -2,25 +2,25 @@
   "steps": [
     {
       "step_id": "G",
-      "label": "goal",
+      "label": "目标",
       "depends_on": [],
       "evidence": {
-        "statement": "Increase storage access efficiency per footprint area"
+        "statement": "在单位占地面积下提升置物与取放效率"
       }
     },
     {
       "step_id": "B1",
-      "label": "layers",
+      "label": "层数",
       "depends_on": [
         "G"
       ],
       "evidence": {
-        "N": 4
+        "N": 2
       }
     },
     {
       "step_id": "B2",
-      "label": "payload",
+      "label": "载荷",
       "depends_on": [
         "G"
       ],
@@ -30,47 +30,47 @@
     },
     {
       "step_id": "B3",
-      "label": "space",
+      "label": "空间",
       "depends_on": [
         "G"
       ],
       "evidence": {
         "S": {
-          "width": 80.0,
-          "depth": 35.0,
-          "height": 30.0
+          "width": 2.0,
+          "depth": 2.0,
+          "height": 1.0
         }
       }
     },
     {
       "step_id": "B4",
-      "label": "opening",
+      "label": "开口",
       "depends_on": [
         "G"
       ],
       "evidence": {
         "O": {
-          "width": 65.0,
-          "height": 28.0
+          "width": 2.0,
+          "height": 1.0
         }
       }
     },
     {
       "step_id": "B5",
-      "label": "footprint",
+      "label": "占地",
       "depends_on": [
         "G"
       ],
       "evidence": {
         "A": {
-          "width": 90.0,
-          "depth": 40.0
+          "width": 2.0,
+          "depth": 2.0
         }
       }
     },
     {
       "step_id": "M1",
-      "label": "rod",
+      "label": "杆",
       "depends_on": [
         "B1",
         "B2"
@@ -79,16 +79,15 @@
     },
     {
       "step_id": "M2",
-      "label": "connector",
+      "label": "连接件",
       "depends_on": [
-        "B1",
-        "B4"
+        "M1"
       ],
       "evidence": {}
     },
     {
       "step_id": "M3",
-      "label": "panel",
+      "label": "隔板",
       "depends_on": [
         "B2",
         "B3"
@@ -97,7 +96,7 @@
     },
     {
       "step_id": "R1",
-      "label": "no isolated module",
+      "label": "模块集合不应孤立",
       "depends_on": [
         "M1",
         "M2",
@@ -107,24 +106,44 @@
     },
     {
       "step_id": "R2",
-      "label": "connector is mandatory",
+      "label": "连接件由杆与隔板接触自动派生",
       "depends_on": [
-        "M2"
+        "M1",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R3",
+      "label": "杆不可悬浮且隔板需要四角支撑",
+      "depends_on": [
+        "M1",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R5",
+      "label": "顶层至少包含一个隔板单元",
+      "depends_on": [
+        "M3"
       ],
       "evidence": {}
     },
     {
       "step_id": "H1",
-      "label": "efficiency improves under valid constraints",
+      "label": "在有效约束下效率应提升",
       "depends_on": [
         "R1",
-        "R2"
+        "R2",
+        "R3",
+        "R5"
       ],
       "evidence": {}
     },
     {
       "step_id": "V1",
-      "label": "verify hypothesis",
+      "label": "验证假设",
       "depends_on": [
         "H1"
       ],
@@ -134,7 +153,7 @@
     },
     {
       "step_id": "C",
-      "label": "conclusion",
+      "label": "结论",
       "depends_on": [
         "V1"
       ],

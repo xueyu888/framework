@@ -62,15 +62,15 @@ class BoundaryDefinition:
         errors: list[str] = []
 
         if self.layers_n <= 0:
-            errors.append("layers_n must be > 0")
+            errors.append("layers_n 必须 > 0")
         if self.payload_p_per_layer <= 0:
-            errors.append("payload_p_per_layer must be > 0")
+            errors.append("payload_p_per_layer 必须 > 0")
         if not self.space_s_per_layer.is_valid():
-            errors.append("space_s_per_layer must be positive on all dimensions")
+            errors.append("space_s_per_layer 的各维度必须为正数")
         if not self.opening_o.is_valid():
-            errors.append("opening_o must be positive on all dimensions")
+            errors.append("opening_o 的各维度必须为正数")
         if not self.footprint_a.is_valid():
-            errors.append("footprint_a must be positive on all dimensions")
+            errors.append("footprint_a 的各维度必须为正数")
 
         return (len(errors) == 0, errors)
 
@@ -91,9 +91,9 @@ class Module(str, Enum):
 
 
 MODULE_ROLE: dict[Module, str] = {
-    Module.ROD: "load-bearing support",
-    Module.CONNECTOR: "joint between structural members",
-    Module.PANEL: "placement surface",
+    Module.ROD: "承重支撑",
+    Module.CONNECTOR: "结构连接接口",
+    Module.PANEL: "承载平面",
 }
 
 
@@ -133,19 +133,36 @@ class CombinationRules:
 
         return valid
 
+    def evaluate(self, combo: set[Module]) -> tuple[bool, list[str]]:
+        failed: list[str] = []
+        for rule in self.rules:
+            if not rule.check(combo):
+                failed.append(f"{rule.rule_id}: {rule.description}")
+        return (len(failed) == 0, failed)
+
     @staticmethod
     def default() -> "CombinationRules":
         return CombinationRules(
             rules=[
                 Rule(
                     rule_id="R1",
-                    description="module set must not be isolated",
+                    description="模块集合不得孤立（至少包含 2 个模块）",
                     validator=lambda combo: len(combo) >= 2,
                 ),
                 Rule(
                     rule_id="R2",
-                    description="connector must exist in every usable combination",
+                    description="可用组合必须包含连接件（由杆-隔板接触自动派生）",
                     validator=lambda combo: Module.CONNECTOR in combo,
+                ),
+                Rule(
+                    rule_id="R3",
+                    description="隔板必须由杆支撑（几何细则由主评估器判定）",
+                    validator=lambda combo: Module.PANEL not in combo or Module.ROD in combo,
+                ),
+                Rule(
+                    rule_id="R5",
+                    description="顶层必须至少包含一个隔板",
+                    validator=lambda combo: Module.PANEL in combo,
                 ),
             ]
         )
@@ -191,9 +208,9 @@ def verify(payload: VerificationInput) -> VerificationResult:
     reasons: list[str] = []
     reasons.extend(boundary_errors)
     if not combination_valid:
-        reasons.append("combo is not in valid combinations")
+        reasons.append("组合不在有效组合集合中")
     if not efficiency_improved:
-        reasons.append("target_efficiency must be > baseline_efficiency")
+        reasons.append("target_efficiency 必须 > baseline_efficiency")
 
     return VerificationResult(
         boundary_valid=boundary_valid,

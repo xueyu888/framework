@@ -44,3 +44,13 @@ bash scripts/configure_branch_protection.sh rdshr/shelf main
 uv sync
 uv run python src/main.py
 ```
+
+## 启动前端
+先生成最新可视化产物，再启动本地静态服务：
+```bash
+uv run python src/main.py
+uv run python -m http.server 8765 --directory docs
+```
+
+浏览器访问：
+`http://127.0.0.1:8765/shelf_visualization_dashboard.html`
