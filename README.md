@@ -44,3 +44,17 @@ bash scripts/configure_branch_protection.sh rdshr/shelf main
 uv sync
 uv run python src/main.py
 ```
+
+## 启动与访问（当前方式）
+1. 生成最新置物架数据与页面：
+```bash
+uv run python src/main.py
+```
+2. 启动本地预览服务（默认 8000 端口）：
+```bash
+uv run python src/main.py --serve --port 8000
+```
+3. 浏览器打开：
+```text
+http://127.0.0.1:8000/shelf_2x2x2_viewer.html
+```

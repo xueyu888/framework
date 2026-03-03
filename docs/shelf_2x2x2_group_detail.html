@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2x2x2 网格置物架 - 分组详情</title>
+  <style>
+    :root {
+      --bg: #efe8d7;
+      --ink: #142127;
+      --card: #fcfaf4;
+      --line: #c9c0af;
+      --accent: #0b6b61;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: radial-gradient(circle at 15% 18%, #e5ddc9 0%, transparent 42%), var(--bg);
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+    .layout {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 12px;
+      padding: 12px;
+      min-height: 100vh;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+      padding: 12px;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .back-link {
+      border: 1px solid #c7d4cf;
+      border-radius: 6px;
+      background: #e9f4f1;
+      color: #11483f;
+      text-decoration: none;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .title {
+      font-size: 18px;
+      margin: 0;
+    }
+    .meta {
+      font-size: 12px;
+      color: #35565e;
+      margin-top: 6px;
+    }
+    .viewer-canvas {
+      width: 100%;
+      height: clamp(340px, 52vh, 700px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8f6ef;
+      display: block;
+    }
+    .table-card {
+      max-height: 34vh;
+      min-height: 220px;
+      overflow: auto;
+    }
+    .variant-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .variant-table th, .variant-table td {
+      border: 1px solid var(--line);
+      padding: 6px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    .variant-row {
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    .variant-row:hover {
+      background: #eef7f4;
+    }
+    .variant-row.selected {
+      background: #dff0ea;
+      outline: 2px solid #58b7a8;
+      outline-offset: -2px;
+    }
+    .variant-table th {
+      background: #f0ebde;
+      color: #284852;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .mini-top {
+      width: 60px;
+      height: 60px;
+      border: 1px solid #d5ccbc;
+      border-radius: 4px;
+      background: #f8f6ef;
+    }
+    .eff-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      border: 1px solid transparent;
+      line-height: 1.4;
+    }
+    .eff-pass {
+      background: #e8f7f2;
+      color: #0f766e;
+      border-color: #99d8cc;
+    }
+    .eff-fail {
+      background: #fff1e8;
+      color: #b45309;
+      border-color: #f0bd93;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="card head">
+      <div>
+        <h1 class="title" id="title">分组详情</h1>
+        <div class="meta" id="meta"></div>
+      </div>
+      <a class="back-link" href="./shelf_2x2x2_viewer.html">返回分组列表</a>
+    </section>
+    <section class="card">
+      <canvas id="group-scene" class="viewer-canvas"></canvas>
+    </section>
+    <section class="card table-card">
+      <table class="variant-table">
+        <thead>
+          <tr>
+            <th>结构ID</th>
+            <th>模块数量</th>
+            <th>单位效率</th>
+            <th>俯视图(2x2)</th>
+          </tr>
+        </thead>
+        <tbody id="variant-body"></tbody>
+      </table>
+    </section>
+  </div>
+  <script type="module">
+    const data = await fetch("./shelf_2x2x2.json").then(r => r.json());
+    const THREE = await import("./vendor/three.module.js");
+    const controlsModule = await import("./vendor/OrbitControls.js");
+    const OrbitControls = controlsModule.OrbitControls;
+
+    const params = new URLSearchParams(window.location.search);
+    const targetKey = params.get("group_key");
+    const groups = data.grouped_shelves;
+    const group = groups.find(g => g.group_key === targetKey) || groups[0];
+    const maxRows = data.max_boundary.rows;
+    const maxCols = data.max_boundary.cols;
+
+    function computeProjectionCountsFromCells(shelf) {
+      const counts = Array.from({ length: maxRows }, () => Array(maxCols).fill(0));
+      for (const cell of (shelf.occupied_cells || [])) {
+        if (cell.row >= 0 && cell.row < maxRows && cell.col >= 0 && cell.col < maxCols) {
+          counts[cell.row][cell.col] += 1;
+        }
+      }
+      return counts;
+    }
+
+    const title = document.getElementById("title");
+    const meta = document.getElementById("meta");
+    title.textContent = group ? `分组详情: ${group.group_name}` : "分组详情";
+    meta.textContent = group
+      ? `结构数: ${group.count} | 杆:${group.module_counts.rod} 连接接口:${group.module_counts.connector} 隔板:${group.module_counts.panel}`
+      : "没有可显示的分组";
+
+    function colorByProjectionCount(count, absoluteMaxCount) {
+      if (count <= 0) return "#d1d5db";
+      const clamped = Math.min(count, absoluteMaxCount);
+      const t = absoluteMaxCount <= 1 ? 1 : (clamped - 1) / (absoluteMaxCount - 1);
+      const light = 78 - Math.round(t * 42);
+      return `hsl(173, 74%, ${light}%)`;
+    }
+
+    function drawTopView(canvas, topView, projectionCounts) {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const rows = topView.length;
+      const cols = topView[0].length;
+      const pad = 8;
+      const w = canvas.width;
+      const h = canvas.height;
+      const cw = (w - pad * 2) / cols;
+      const ch = (h - pad * 2) / rows;
+      const absoluteMaxCount = Math.max(1, data.max_boundary.levels);
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#f8f6ef";
+      ctx.fillRect(0, 0, w, h);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const count = projectionCounts?.[r]?.[c] ?? (topView[r][c] ? 1 : 0);
+          ctx.fillStyle = colorByProjectionCount(count, absoluteMaxCount);
+          ctx.fillRect(pad + c * cw + 2, pad + r * ch + 2, cw - 4, ch - 4);
+          if (count > 0) {
+            ctx.strokeStyle = "rgba(20,33,39,0.42)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(pad + c * cw + 2.5, pad + r * ch + 2.5, cw - 5, ch - 5);
+          }
+        }
+      }
+    }
+
+    const variantBody = document.getElementById("variant-body");
+    if (group) {
+      group.shelves.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.className = "variant-row";
+        tr.dataset.variantId = item.variant_id;
+        const t1 = document.createElement("td");
+        t1.textContent = item.variant_id;
+        const t2 = document.createElement("td");
+        const mc = item.module_counts;
+        const eff = item.storage_efficiency || { score: 0, pass: false };
+        t2.textContent = `杆:${mc.rod} 连接接口:${mc.connector} 隔板:${mc.panel}`;
+        const tEff = document.createElement("td");
+        const effText = document.createElement("span");
+        effText.textContent = Number(eff.score).toFixed(2);
+        const effBadge = document.createElement("span");
+        effBadge.className = `eff-badge ${eff.pass ? "eff-pass" : "eff-fail"}`;
+        effBadge.textContent = eff.pass ? "通过" : "不通过";
+        tEff.appendChild(effText);
+        tEff.appendChild(effBadge);
+        const t3 = document.createElement("td");
+        const mini = document.createElement("canvas");
+        mini.width = 60;
+        mini.height = 60;
+        mini.className = "mini-top";
+        const counts = item.top_view_projection_counts || computeProjectionCountsFromCells(item);
+        drawTopView(mini, item.top_view, counts);
+        t3.appendChild(mini);
+        tr.appendChild(t1);
+        tr.appendChild(t2);
+        tr.appendChild(tEff);
+        tr.appendChild(t3);
+        variantBody.appendChild(tr);
+      });
+    }
+
+    const sceneCanvas = document.getElementById("group-scene");
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf4f2eb);
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 4000);
+    // Keep shelf "upright" by treating z-axis as screen-up in the default view.
+    camera.up.set(0, 0, 1);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, canvas: sceneCanvas });
+    renderer.shadowMap.enabled = true;
+    const controls = new OrbitControls(camera, sceneCanvas);
+    controls.enableDamping = true;
+    const stageGroup = new THREE.Group();
+    scene.add(stageGroup);
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xbcb6ac, 0.85);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.85);
+    dir.position.set(320, -260, 420);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    scene.add(dir);
+
+    const rodMat = new THREE.MeshStandardMaterial({ color: 0x8f9ba3, roughness: 0.25, metalness: 0.85 });
+    const connectorMat = new THREE.MeshStandardMaterial({ color: 0x49545c, roughness: 0.35, metalness: 0.55 });
+    const panelMat = new THREE.MeshStandardMaterial({ color: 0xbd8a5a, roughness: 0.7, metalness: 0.08 });
+    const shelfRenderMap = new Map();
+    let cameraAnim = null;
+    let selectedVariantId = null;
+    let focusDistance = 220;
+
+    function fitRendererToCanvas() {
+      const width = sceneCanvas.clientWidth;
+      const height = sceneCanvas.clientHeight;
+      if (width === 0 || height === 0) return;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+
+    function addShelfMeshes(parent, shelf, offsetX, offsetY) {
+      const shelfRoot = new THREE.Group();
+      parent.add(shelfRoot);
+      const cellW = 32;
+      const cellD = 32;
+      const cellH = 32;
+      const maxRows = data.max_boundary.rows;
+      const maxCols = data.max_boundary.cols;
+      const originX = offsetX - (maxCols * cellD) / 2;
+      const originY = offsetY - (maxRows * cellW) / 2;
+      const originZ = 0;
+
+      const occupied = shelf.occupied_cells.map((c) => ({ row: c.row, col: c.col, level: c.level }));
+      const derived = shelf.derived_structure || { rod_segments: [], required_connectors: [] };
+      const hasRod = shelf.combo.includes("rod");
+      const hasPanel = shelf.combo.includes("panel");
+      const hasConnector = shelf.combo.includes("connector");
+      const rodRadius = 1.1;
+      const connectorRadius = 1.8;
+
+      function addCylinderBetween(a, b, radius, mat, part) {
+        const av = new THREE.Vector3(a.x, a.y, a.z);
+        const bv = new THREE.Vector3(b.x, b.y, b.z);
+        const len = av.distanceTo(bv);
+        if (len < 0.001) return;
+        const geom = new THREE.CylinderGeometry(radius, radius, len, 14);
+        const mesh = new THREE.Mesh(geom, mat.clone());
+        mesh.userData.part = part;
+        mesh.position.copy(av.clone().add(bv).multiplyScalar(0.5));
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bv.clone().sub(av).normalize());
+        mesh.castShadow = true;
+        shelfRoot.add(mesh);
+      }
+
+      if (hasRod) {
+        for (const seg of derived.rod_segments) {
+          const x = originX + seg.col_edge * cellD;
+          const y = originY + seg.row_edge * cellW;
+          const z0 = originZ + seg.level * cellH;
+          const z1 = originZ + (seg.level + 1) * cellH;
+          addCylinderBetween({ x, y, z: z0 }, { x, y, z: z1 }, rodRadius, rodMat, "rod");
+        }
+      }
+
+      if (hasConnector) {
+        for (const p of derived.required_connectors) {
+          const joint = new THREE.Mesh(new THREE.SphereGeometry(connectorRadius, 12, 12), connectorMat.clone());
+          joint.position.set(
+            originX + p.col_edge * cellD,
+            originY + p.row_edge * cellW,
+            originZ + p.z * cellH
+          );
+          joint.userData.part = "connector";
+          joint.castShadow = true;
+          shelfRoot.add(joint);
+        }
+      }
+
+      for (const cell of occupied) {
+        if (hasPanel) {
+          const x = originX + cell.col * cellD;
+          const y = originY + cell.row * cellW;
+          const z = originZ + cell.level * cellH;
+          const boardThickness = 2.2;
+          const board = new THREE.Mesh(
+            new THREE.BoxGeometry(cellD * 0.9, cellW * 0.9, boardThickness),
+            panelMat.clone()
+          );
+          board.userData.part = "panel";
+          board.position.set(x + cellD / 2, y + cellW / 2, z + cellH - boardThickness / 2);
+          board.castShadow = true;
+          board.receiveShadow = true;
+          shelfRoot.add(board);
+        }
+      }
+
+      const bbox = new THREE.Box3().setFromObject(shelfRoot);
+      const center = bbox.getCenter(new THREE.Vector3());
+      const size = bbox.getSize(new THREE.Vector3());
+      return { root: shelfRoot, center, size };
+    }
+
+    function setVariantSelection(variantId) {
+      selectedVariantId = variantId;
+      document.querySelectorAll(".variant-row").forEach((row) => {
+        row.classList.toggle("selected", row.dataset.variantId === variantId);
+      });
+      for (const [id, info] of shelfRenderMap.entries()) {
+        const isActive = id === variantId;
+        info.root.traverse((obj) => {
+          if (!obj.isMesh || !obj.material) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          const part = obj.userData.part || "rod";
+          for (const mat of mats) {
+            if ("transparent" in mat) mat.transparent = false;
+            if ("opacity" in mat) mat.opacity = 1.0;
+            if ("depthWrite" in mat) mat.depthWrite = true;
+            if ("color" in mat) {
+              if (isActive) {
+                if (part === "rod") mat.color.set(0x0f172a);
+                else if (part === "connector") mat.color.set(0x22c55e);
+                else if (part === "panel") mat.color.set(0xf59e0b);
+              } else {
+                if (part === "rod") mat.color.set(0x9ca3af);
+                else if (part === "connector") mat.color.set(0xd1d5db);
+                else if (part === "panel") mat.color.set(0xe5e7eb);
+              }
+            }
+            if ("emissive" in mat) {
+              mat.emissive.set(isActive ? 0x111827 : 0x000000);
+              mat.emissiveIntensity = isActive ? 0.08 : 0.0;
+            }
+          }
+        });
+      }
+      const hit = shelfRenderMap.get(variantId);
+      if (!hit) return;
+      const target = hit.center.clone();
+      const nextPosition = target.clone().add(new THREE.Vector3(0, -focusDistance, focusDistance * 0.55));
+      cameraAnim = {
+        start: performance.now(),
+        duration: 420,
+        fromPos: camera.position.clone(),
+        toPos: nextPosition,
+        fromTarget: controls.target.clone(),
+        toTarget: target,
+      };
+    }
+
+    function bindVariantListInteraction() {
+      document.querySelectorAll(".variant-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          setVariantSelection(row.dataset.variantId);
+        });
+      });
+    }
+
+    function updateCameraAnimation(nowMs) {
+      if (!cameraAnim) return;
+      const elapsed = nowMs - cameraAnim.start;
+      const t = Math.max(0, Math.min(1, elapsed / cameraAnim.duration));
+      const eased = 1 - Math.pow(1 - t, 3);
+      camera.position.lerpVectors(cameraAnim.fromPos, cameraAnim.toPos, eased);
+      controls.target.lerpVectors(cameraAnim.fromTarget, cameraAnim.toTarget, eased);
+      if (t >= 1) {
+        cameraAnim = null;
+      }
+    }
+
+    if (group) {
+      const count = group.shelves.length;
+      const cols = Math.ceil(Math.sqrt(count));
+      const rows = Math.ceil(count / cols);
+      const gapX = 150;
+      const gapY = 150;
+      group.shelves.forEach((shelf, idx) => {
+        const r = Math.floor(idx / cols);
+        const c = idx % cols;
+        const ox = (c - (cols - 1) / 2) * gapX;
+        const oy = (r - (rows - 1) / 2) * gapY;
+        const renderInfo = addShelfMeshes(stageGroup, shelf, ox, oy);
+        shelfRenderMap.set(shelf.variant_id, renderInfo);
+      });
+
+      const span = Math.max(cols * gapX, rows * gapY);
+      const eye = Math.max(280, span * 1.1);
+      focusDistance = Math.max(130, eye * 0.55);
+      // Default to a straight, upright front view (not oblique).
+      camera.position.set(0, -eye, eye * 0.5);
+      controls.target.set(0, 0, 32);
+      controls.update();
+      bindVariantListInteraction();
+      if (group.shelves.length > 0) {
+        setVariantSelection(group.shelves[0].variant_id);
+      }
+    }
+
+    function animate(nowMs) {
+      fitRendererToCanvas();
+      updateCameraAnimation(nowMs);
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    window.addEventListener("resize", fitRendererToCanvas);
+    animate();
+  </script>
+</body>
+</html>

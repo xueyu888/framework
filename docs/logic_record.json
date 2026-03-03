@@ -5,7 +5,7 @@
       "label": "goal",
       "depends_on": [],
       "evidence": {
-        "statement": "Increase storage access efficiency per footprint area"
+        "statement": "Enumerate all valid grid shelves within 2x2x2 max boundary"
       }
     },
     {
@@ -15,7 +15,7 @@
         "G"
       ],
       "evidence": {
-        "N": 4
+        "N": 2
       }
     },
     {
@@ -114,11 +114,108 @@
       "evidence": {}
     },
     {
+      "step_id": "R3",
+      "label": "rod must be vertical",
+      "depends_on": [
+        "M1"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R4",
+      "label": "rod-rod horizontal relation",
+      "depends_on": [
+        "M1"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R5",
+      "label": "rod-panel perpendicular relation",
+      "depends_on": [
+        "M1",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R6",
+      "label": "rod must link 4 corners of each face",
+      "depends_on": [
+        "M1"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R7",
+      "label": "rod and panel are mandatory",
+      "depends_on": [
+        "M1",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R8",
+      "label": "panel corners must have connectors",
+      "depends_on": [
+        "M2",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R9",
+      "label": "top occupied level in each column must have panel",
+      "depends_on": [
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R10",
+      "label": "upper occupied cells must have support below",
+      "depends_on": [
+        "M1",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R11",
+      "label": "connector only on connected rod endpoints; free endpoints must not have connector",
+      "depends_on": [
+        "M1",
+        "M2",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
+      "step_id": "R12",
+      "label": "shape dedup uses row/col planar rotation only; level axis must stay fixed",
+      "depends_on": [
+        "M1",
+        "M3"
+      ],
+      "evidence": {}
+    },
+    {
       "step_id": "H1",
-      "label": "efficiency improves under valid constraints",
+      "label": "all grid variants under max boundary are valid",
       "depends_on": [
         "R1",
-        "R2"
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10",
+        "R11",
+        "R12"
       ],
       "evidence": {}
     },

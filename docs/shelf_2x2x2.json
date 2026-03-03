@@ -1,0 +1,4713 @@
+{
+  "goal": {
+    "statement": "Enumerate all valid grid shelves within 2x2x2 max boundary"
+  },
+  "boundary": {
+    "layers_n": 2,
+    "payload_p_per_layer": 30.0,
+    "space_s_per_layer": {
+      "width": 80.0,
+      "depth": 35.0,
+      "height": 30.0
+    },
+    "opening_o": {
+      "width": 65.0,
+      "height": 28.0
+    },
+    "footprint_a": {
+      "width": 90.0,
+      "depth": 40.0
+    }
+  },
+  "max_boundary": {
+    "rows": 2,
+    "cols": 2,
+    "levels": 2
+  },
+  "strict_mapping": {
+    "level": "L3",
+    "registry": "standards/L3/mapping_registry.json",
+    "validation_command": "uv run python scripts/validate_strict_mapping.py --check-changes"
+  },
+  "all_combinations": [
+    {
+      "combo": [],
+      "valid": false
+    },
+    {
+      "combo": [
+        "rod"
+      ],
+      "valid": false
+    },
+    {
+      "combo": [
+        "connector"
+      ],
+      "valid": false
+    },
+    {
+      "combo": [
+        "panel"
+      ],
+      "valid": false
+    },
+    {
+      "combo": [
+        "connector",
+        "rod"
+      ],
+      "valid": false
+    },
+    {
+      "combo": [
+        "panel",
+        "rod"
+      ],
+      "valid": false
+    },
+    {
+      "combo": [
+        "connector",
+        "panel"
+      ],
+      "valid": false
+    },
+    {
+      "combo": [
+        "connector",
+        "panel",
+        "rod"
+      ],
+      "valid": true
+    }
+  ],
+  "valid_combinations": [
+    [
+      "connector",
+      "panel",
+      "rod"
+    ]
+  ],
+  "instance_2layer_max_4cells": {
+    "variant_id": "grid_2x2x2__connector-panel-rod__m255",
+    "dims": {
+      "rows": 2,
+      "cols": 2,
+      "levels": 2
+    },
+    "combo": [
+      "connector",
+      "panel",
+      "rod"
+    ],
+    "module_counts": {
+      "rod": 18,
+      "connector": 18,
+      "panel": 8
+    },
+    "occupied_cells": [
+      {
+        "row": 0,
+        "col": 0,
+        "level": 0
+      },
+      {
+        "row": 0,
+        "col": 0,
+        "level": 1
+      },
+      {
+        "row": 0,
+        "col": 1,
+        "level": 0
+      },
+      {
+        "row": 0,
+        "col": 1,
+        "level": 1
+      },
+      {
+        "row": 1,
+        "col": 0,
+        "level": 0
+      },
+      {
+        "row": 1,
+        "col": 0,
+        "level": 1
+      },
+      {
+        "row": 1,
+        "col": 1,
+        "level": 0
+      },
+      {
+        "row": 1,
+        "col": 1,
+        "level": 1
+      }
+    ],
+    "derived_structure": {
+      "rod_segments": [
+        {
+          "row_edge": 0,
+          "col_edge": 0,
+          "level": 0
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 0,
+          "level": 1
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 1,
+          "level": 0
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 1,
+          "level": 1
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 2,
+          "level": 0
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 2,
+          "level": 1
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 0,
+          "level": 0
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 0,
+          "level": 1
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 1,
+          "level": 0
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 1,
+          "level": 1
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 2,
+          "level": 0
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 2,
+          "level": 1
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 0,
+          "level": 0
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 0,
+          "level": 1
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 1,
+          "level": 0
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 1,
+          "level": 1
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 2,
+          "level": 0
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 2,
+          "level": 1
+        }
+      ],
+      "required_connectors": [
+        {
+          "row_edge": 0,
+          "col_edge": 0,
+          "z": 1
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 0,
+          "z": 2
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 1,
+          "z": 1
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 1,
+          "z": 2
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 2,
+          "z": 1
+        },
+        {
+          "row_edge": 0,
+          "col_edge": 2,
+          "z": 2
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 0,
+          "z": 1
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 0,
+          "z": 2
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 1,
+          "z": 1
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 1,
+          "z": 2
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 2,
+          "z": 1
+        },
+        {
+          "row_edge": 1,
+          "col_edge": 2,
+          "z": 2
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 0,
+          "z": 1
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 0,
+          "z": 2
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 1,
+          "z": 1
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 1,
+          "z": 2
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 2,
+          "z": 1
+        },
+        {
+          "row_edge": 2,
+          "col_edge": 2,
+          "z": 2
+        }
+      ]
+    },
+    "top_view": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "top_view_projection_counts": [
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "storage_efficiency": {
+      "baseline": 1.0,
+      "score": 2.0,
+      "raw": 2.0,
+      "pass": true,
+      "panel_count": 8,
+      "footprint_cells": 4
+    }
+  },
+  "rule_statistics": {
+    "scope": "enumerated_variants_after_shape_dedup",
+    "total": 45,
+    "pass_count": 20,
+    "fail_count": 25
+  },
+  "total_shelves": 20,
+  "grouped_shelves": [
+    {
+      "group_key": "rod=4,connector=4,panel=1",
+      "group_name": "杆4 / 连接接口4 / 隔板1",
+      "module_counts": {
+        "rod": 4,
+        "connector": 4,
+        "panel": 1
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_1x1x1__connector-panel-rod__m1",
+          "dims": {
+            "rows": 1,
+            "cols": 1,
+            "levels": 1
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 4,
+            "connector": 4,
+            "panel": 1
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.0,
+            "raw": 1.0,
+            "pass": false,
+            "panel_count": 1,
+            "footprint_cells": 1
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=6,connector=6,panel=2",
+      "group_name": "杆6 / 连接接口6 / 隔板2",
+      "module_counts": {
+        "rod": 6,
+        "connector": 6,
+        "panel": 2
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_1x2x1__connector-panel-rod__m5",
+          "dims": {
+            "rows": 1,
+            "cols": 2,
+            "levels": 1
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 6,
+            "connector": 6,
+            "panel": 2
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.0,
+            "raw": 1.0,
+            "pass": false,
+            "panel_count": 2,
+            "footprint_cells": 2
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=8,connector=8,panel=2",
+      "group_name": "杆8 / 连接接口8 / 隔板2",
+      "module_counts": {
+        "rod": 8,
+        "connector": 8,
+        "panel": 2
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_1x1x2__connector-panel-rod__m3",
+          "dims": {
+            "rows": 1,
+            "cols": 1,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 8,
+            "connector": 8,
+            "panel": 2
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 2.0,
+            "raw": 2.0,
+            "pass": true,
+            "panel_count": 2,
+            "footprint_cells": 1
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=8,connector=8,panel=3",
+      "group_name": "杆8 / 连接接口8 / 隔板3",
+      "module_counts": {
+        "rod": 8,
+        "connector": 8,
+        "panel": 3
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x1__connector-panel-rod__m21",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 1
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 8,
+            "connector": 8,
+            "panel": 3
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.0,
+            "raw": 1.0,
+            "pass": false,
+            "panel_count": 3,
+            "footprint_cells": 3
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=9,connector=9,panel=4",
+      "group_name": "杆9 / 连接接口9 / 隔板4",
+      "module_counts": {
+        "rod": 9,
+        "connector": 9,
+        "panel": 4
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x1__connector-panel-rod__m85",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 1
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 9,
+            "connector": 9,
+            "panel": 4
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.0,
+            "raw": 1.0,
+            "pass": false,
+            "panel_count": 4,
+            "footprint_cells": 4
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=10,connector=10,panel=3",
+      "group_name": "杆10 / 连接接口10 / 隔板3",
+      "module_counts": {
+        "rod": 10,
+        "connector": 10,
+        "panel": 3
+      },
+      "count": 2,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "count": 2
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_1x2x2__connector-panel-rod__m7",
+          "dims": {
+            "rows": 1,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 10,
+            "connector": 10,
+            "panel": 3
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.5,
+            "raw": 1.5,
+            "pass": true,
+            "panel_count": 3,
+            "footprint_cells": 2
+          }
+        },
+        {
+          "variant_id": "grid_1x2x2__connector-panel-rod__m13",
+          "dims": {
+            "rows": 1,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 10,
+            "connector": 10,
+            "panel": 3
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.5,
+            "raw": 1.5,
+            "pass": true,
+            "panel_count": 3,
+            "footprint_cells": 2
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=12,connector=12,panel=4",
+      "group_name": "杆12 / 连接接口12 / 隔板4",
+      "module_counts": {
+        "rod": 12,
+        "connector": 12,
+        "panel": 4
+      },
+      "count": 4,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "count": 3
+        },
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_1x2x2__connector-panel-rod__m15",
+          "dims": {
+            "rows": 1,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 12,
+            "connector": 12,
+            "panel": 4
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              2
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 2.0,
+            "raw": 2.0,
+            "pass": true,
+            "panel_count": 4,
+            "footprint_cells": 2
+          }
+        },
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m23",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 12,
+            "connector": 12,
+            "panel": 4
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.3333,
+            "raw": 1.3333,
+            "pass": true,
+            "panel_count": 4,
+            "footprint_cells": 3
+          }
+        },
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m29",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 12,
+            "connector": 12,
+            "panel": 4
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.3333,
+            "raw": 1.3333,
+            "pass": true,
+            "panel_count": 4,
+            "footprint_cells": 3
+          }
+        },
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m53",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 12,
+            "connector": 12,
+            "panel": 4
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.3333,
+            "raw": 1.3333,
+            "pass": true,
+            "panel_count": 4,
+            "footprint_cells": 3
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=13,connector=13,panel=5",
+      "group_name": "杆13 / 连接接口13 / 隔板5",
+      "module_counts": {
+        "rod": 13,
+        "connector": 13,
+        "panel": 5
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m87",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 13,
+            "connector": 13,
+            "panel": 5
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.25,
+            "raw": 1.25,
+            "pass": true,
+            "panel_count": 5,
+            "footprint_cells": 4
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=14,connector=14,panel=5",
+      "group_name": "杆14 / 连接接口14 / 隔板5",
+      "module_counts": {
+        "rod": 14,
+        "connector": 14,
+        "panel": 5
+      },
+      "count": 2,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "count": 2
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m31",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 14,
+            "connector": 14,
+            "panel": 5
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.6667,
+            "raw": 1.6667,
+            "pass": true,
+            "panel_count": 5,
+            "footprint_cells": 3
+          }
+        },
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m55",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 14,
+            "connector": 14,
+            "panel": 5
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.6667,
+            "raw": 1.6667,
+            "pass": true,
+            "panel_count": 5,
+            "footprint_cells": 3
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=15,connector=15,panel=5",
+      "group_name": "杆15 / 连接接口15 / 隔板5",
+      "module_counts": {
+        "rod": 15,
+        "connector": 15,
+        "panel": 5
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m61",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 15,
+            "connector": 15,
+            "panel": 5
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.6667,
+            "raw": 1.6667,
+            "pass": true,
+            "panel_count": 5,
+            "footprint_cells": 3
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=15,connector=15,panel=6",
+      "group_name": "杆15 / 连接接口15 / 隔板6",
+      "module_counts": {
+        "rod": 15,
+        "connector": 15,
+        "panel": 6
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m95",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 15,
+            "connector": 15,
+            "panel": 6
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              2
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.5,
+            "raw": 1.5,
+            "pass": true,
+            "panel_count": 6,
+            "footprint_cells": 4
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=16,connector=16,panel=6",
+      "group_name": "杆16 / 连接接口16 / 隔板6",
+      "module_counts": {
+        "rod": 16,
+        "connector": 16,
+        "panel": 6
+      },
+      "count": 2,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "count": 1
+        },
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m63",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 16,
+            "connector": 16,
+            "panel": 6
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 2.0,
+            "raw": 2.0,
+            "pass": true,
+            "panel_count": 6,
+            "footprint_cells": 3
+          }
+        },
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m125",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 16,
+            "connector": 16,
+            "panel": 6
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.5,
+            "raw": 1.5,
+            "pass": true,
+            "panel_count": 6,
+            "footprint_cells": 4
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=17,connector=17,panel=7",
+      "group_name": "杆17 / 连接接口17 / 隔板7",
+      "module_counts": {
+        "rod": 17,
+        "connector": 17,
+        "panel": 7
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m127",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 17,
+            "connector": 17,
+            "panel": 7
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 0
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 0
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 1
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              2
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 1.75,
+            "raw": 1.75,
+            "pass": true,
+            "panel_count": 7,
+            "footprint_cells": 4
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rod=18,connector=18,panel=8",
+      "group_name": "杆18 / 连接接口18 / 隔板8",
+      "module_counts": {
+        "rod": 18,
+        "connector": 18,
+        "panel": 8
+      },
+      "count": 1,
+      "top_view_groups": [
+        {
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "count": 1
+        }
+      ],
+      "shelves": [
+        {
+          "variant_id": "grid_2x2x2__connector-panel-rod__m255",
+          "dims": {
+            "rows": 2,
+            "cols": 2,
+            "levels": 2
+          },
+          "combo": [
+            "connector",
+            "panel",
+            "rod"
+          ],
+          "module_counts": {
+            "rod": 18,
+            "connector": 18,
+            "panel": 8
+          },
+          "occupied_cells": [
+            {
+              "row": 0,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 0,
+              "col": 1,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 0,
+              "level": 1
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 0
+            },
+            {
+              "row": 1,
+              "col": 1,
+              "level": 1
+            }
+          ],
+          "derived_structure": {
+            "rod_segments": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "level": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 0
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "level": 1
+              }
+            ],
+            "required_connectors": [
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 0,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 1,
+                "col_edge": 2,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 0,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 1,
+                "z": 2
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 1
+              },
+              {
+                "row_edge": 2,
+                "col_edge": 2,
+                "z": 2
+              }
+            ]
+          },
+          "top_view": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "top_view_projection_counts": [
+            [
+              2,
+              2
+            ],
+            [
+              2,
+              2
+            ]
+          ],
+          "storage_efficiency": {
+            "baseline": 1.0,
+            "score": 2.0,
+            "raw": 2.0,
+            "pass": true,
+            "panel_count": 8,
+            "footprint_cells": 4
+          }
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "boundary_valid": true,
+    "combination_valid": true,
+    "geometry_valid": true,
+    "efficiency_improved": true,
+    "passed": true,
+    "reasons": []
+  },
+  "logic_record_path": "docs/logic_record.json"
+}

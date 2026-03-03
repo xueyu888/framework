@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2x2x2 网格置物架 - 分组列表</title>
+  <style>
+    :root {
+      --bg: #efe8d7;
+      --ink: #142127;
+      --card: #fcfaf4;
+      --line: #c9c0af;
+      --accent: #0b6b61;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: radial-gradient(circle at 15% 18%, #e5ddc9 0%, transparent 42%), var(--bg);
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+    .wrap {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+      padding: 14px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+    .meta {
+      font-size: 12px;
+      color: #35565e;
+      margin-bottom: 10px;
+    }
+    .group-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .group-table th, .group-table td {
+      border: 1px solid var(--line);
+      padding: 6px;
+      vertical-align: middle;
+      text-align: left;
+    }
+    .group-table thead th {
+      background: #f0ebde;
+      color: #284852;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .name-link {
+      display: inline-block;
+      width: 100%;
+      border: 1px solid #c7d4cf;
+      border-radius: 6px;
+      background: #e9f4f1;
+      text-align: left;
+      padding: 4px 6px;
+      color: #11483f;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .topviews-cell {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+      gap: 4px;
+      min-width: 180px;
+    }
+    .topviews-cell canvas {
+      width: 44px;
+      height: 44px;
+      border: 1px solid #d5ccbc;
+      border-radius: 4px;
+      background: #f8f6ef;
+    }
+    .chart-wrap {
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8f6ef;
+      padding: 8px;
+    }
+    #efficiency-chart {
+      width: 100%;
+      height: 320px;
+      display: block;
+    }
+    #rule-pass-fail-chart {
+      width: 100%;
+      height: 220px;
+      display: block;
+    }
+    @media (max-width: 960px) {
+      .group-table { font-size: 11px; }
+      .topviews-cell { min-width: 150px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card">
+      <h1>2x2x2 网格置物架 - 分组列表</h1>
+      <div class="meta" id="meta"></div>
+      <div class="chart-wrap">
+        <canvas id="efficiency-chart" width="1200" height="320"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="rule-pass-fail-chart" width="1200" height="220"></canvas>
+      </div>
+      <table class="group-table">
+        <thead>
+          <tr>
+            <th>分组名称</th>
+            <th>模块和数量</th>
+            <th>分组全部俯视图(2x2)</th>
+            <th>结构数</th>
+          </tr>
+        </thead>
+        <tbody id="group-table-body"></tbody>
+      </table>
+    </section>
+  </div>
+  <script type="module">
+    const data = await fetch("./shelf_2x2x2.json").then(r => r.json());
+    const groups = data.grouped_shelves;
+    const meta = document.getElementById("meta");
+    const maxRows = data.max_boundary.rows;
+    const maxCols = data.max_boundary.cols;
+
+    function computeProjectionCountsFromCells(shelf) {
+      const counts = Array.from({ length: maxRows }, () => Array(maxCols).fill(0));
+      for (const cell of (shelf.occupied_cells || [])) {
+        if (cell.row >= 0 && cell.row < maxRows && cell.col >= 0 && cell.col < maxCols) {
+          counts[cell.row][cell.col] += 1;
+        }
+      }
+      return counts;
+    }
+    meta.textContent = `最大边界: ${data.max_boundary.rows}x${data.max_boundary.cols}x${data.max_boundary.levels} | 合规置物架总数: ${data.total_shelves}`;
+
+    const tableBody = document.getElementById("group-table-body");
+
+    function colorByProjectionCount(count, absoluteMaxCount) {
+      if (count <= 0) return "#d1d5db";
+      const clamped = Math.min(count, absoluteMaxCount);
+      const t = absoluteMaxCount <= 1 ? 1 : (clamped - 1) / (absoluteMaxCount - 1);
+      const light = 78 - Math.round(t * 42);
+      return `hsl(173, 74%, ${light}%)`;
+    }
+
+    function drawTopView(canvas, topView, projectionCounts) {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const rows = topView.length;
+      const cols = topView[0].length;
+      const pad = 8;
+      const w = canvas.width;
+      const h = canvas.height;
+      const cw = (w - pad * 2) / cols;
+      const ch = (h - pad * 2) / rows;
+      const absoluteMaxCount = Math.max(1, data.max_boundary.levels);
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#f8f6ef";
+      ctx.fillRect(0, 0, w, h);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const count = projectionCounts?.[r]?.[c] ?? (topView[r][c] ? 1 : 0);
+          ctx.fillStyle = colorByProjectionCount(count, absoluteMaxCount);
+          ctx.fillRect(pad + c * cw + 2, pad + r * ch + 2, cw - 4, ch - 4);
+          if (count > 0) {
+            ctx.strokeStyle = "rgba(20,33,39,0.42)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(pad + c * cw + 2.5, pad + r * ch + 2.5, cw - 5, ch - 5);
+          }
+        }
+      }
+    }
+
+    function renderGroupRows() {
+      tableBody.innerHTML = "";
+      groups.forEach((group) => {
+        const tr = document.createElement("tr");
+
+        const tdName = document.createElement("td");
+        const link = document.createElement("a");
+        link.className = "name-link";
+        link.textContent = group.group_name;
+        link.href = `./shelf_2x2x2_group_detail.html?group_key=${encodeURIComponent(group.group_key)}`;
+        tdName.appendChild(link);
+
+        const tdModules = document.createElement("td");
+        const m = group.module_counts;
+        tdModules.textContent = `杆:${m.rod} 连接接口:${m.connector} 隔板:${m.panel}`;
+
+        const tdTopView = document.createElement("td");
+        const topviewsWrap = document.createElement("div");
+        topviewsWrap.className = "topviews-cell";
+        group.shelves.forEach((shelf) => {
+          const mini = document.createElement("canvas");
+          mini.width = 44;
+          mini.height = 44;
+          const counts = shelf.top_view_projection_counts || computeProjectionCountsFromCells(shelf);
+          drawTopView(mini, shelf.top_view, counts);
+          mini.title = shelf.variant_id;
+          topviewsWrap.appendChild(mini);
+        });
+        tdTopView.appendChild(topviewsWrap);
+
+        const tdCount = document.createElement("td");
+        tdCount.textContent = String(group.count);
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdModules);
+        tr.appendChild(tdTopView);
+        tr.appendChild(tdCount);
+        tableBody.appendChild(tr);
+      });
+    }
+
+    function drawEfficiencyChart() {
+      const canvas = document.getElementById("efficiency-chart");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const shelves = groups.flatMap((g) => g.shelves || []);
+      const n = shelves.length;
+      const w = canvas.width;
+      const h = canvas.height;
+      const padL = 72;
+      const padR = 18;
+      const padT = 20;
+      const padB = 108;
+      const plotW = Math.max(1, w - padL - padR);
+      const plotH = Math.max(1, h - padT - padB);
+      const maxValue = Math.max(2, ...shelves.map((s) => s.storage_efficiency?.score ?? 0), 1);
+      const gap = 4;
+      const barW = Math.max(2, Math.floor((plotW - Math.max(0, n - 1) * gap) / Math.max(1, n)));
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#f8f6ef";
+      ctx.fillRect(0, 0, w, h);
+
+      // axis
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, padT);
+      ctx.lineTo(padL, padT + plotH);
+      ctx.lineTo(w - padR, padT + plotH);
+      ctx.stroke();
+
+      // y ticks + grid
+      const tickCount = 5;
+      ctx.font = "11px sans-serif";
+      for (let i = 0; i <= tickCount; i++) {
+        const v = (maxValue / tickCount) * i;
+        const y = padT + plotH - (v / maxValue) * plotH;
+        ctx.strokeStyle = "rgba(71,85,105,0.22)";
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(w - padR, y);
+        ctx.stroke();
+        ctx.fillStyle = "#334155";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(v.toFixed(1), padL - 8, y);
+      }
+
+      // y axis label
+      ctx.save();
+      ctx.translate(20, padT + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("效率", 0, 0);
+      ctx.restore();
+
+      shelves.forEach((shelf, i) => {
+        const score = shelf.storage_efficiency?.score ?? 0;
+        const isPass = shelf.storage_efficiency?.pass === true;
+        const bh = Math.max(1, (score / maxValue) * plotH);
+        const x = padL + i * (barW + gap);
+        const y = padT + plotH - bh;
+        ctx.fillStyle = isPass ? "#0f766e" : "#b45309";
+        ctx.fillRect(x, y, barW, bh);
+      });
+
+      // x labels: structure id
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "10px sans-serif";
+      shelves.forEach((shelf, i) => {
+        const x = padL + i * (barW + gap) + barW / 2;
+        const y = padT + plotH + 8;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(-Math.PI / 4);
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.fillText(shelf.variant_id, 0, 0);
+        ctx.restore();
+      });
+
+      // baseline should be on top of bars and visually clear
+      const yBase = padT + plotH - (1 / maxValue) * plotH;
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([7, 4]);
+      ctx.beginPath();
+      ctx.moveTo(padL, yBase);
+      ctx.lineTo(w - padR, yBase);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#dc2626";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("基线 = 1", padL + 6, yBase - 3);
+    }
+
+    function drawRulePassFailChart() {
+      const canvas = document.getElementById("rule-pass-fail-chart");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const shelves = groups.flatMap((g) => g.shelves || []);
+      const passCount = shelves.filter((s) => s.storage_efficiency?.pass === true).length;
+      const failCount = shelves.length - passCount;
+      const labels = ["符合规则(>1)", "不符合规则(<=1)"];
+      const values = [passCount, failCount];
+      const colors = ["#0f766e", "#b45309"];
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const padL = 68;
+      const padR = 22;
+      const padT = 18;
+      const padB = 48;
+      const plotW = Math.max(1, w - padL - padR);
+      const plotH = Math.max(1, h - padT - padB);
+      const maxValue = Math.max(1, ...values);
+      const n = values.length;
+      const gap = 48;
+      const barW = Math.min(180, Math.max(32, Math.floor((plotW - gap * (n - 1)) / n)));
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#f8f6ef";
+      ctx.fillRect(0, 0, w, h);
+
+      // axes
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, padT);
+      ctx.lineTo(padL, padT + plotH);
+      ctx.lineTo(w - padR, padT + plotH);
+      ctx.stroke();
+
+      // y ticks
+      const ticks = Math.min(5, Math.max(1, maxValue));
+      ctx.font = "11px sans-serif";
+      for (let i = 0; i <= ticks; i++) {
+        const v = (maxValue / ticks) * i;
+        const y = padT + plotH - (v / maxValue) * plotH;
+        ctx.strokeStyle = "rgba(71,85,105,0.22)";
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(w - padR, y);
+        ctx.stroke();
+        ctx.fillStyle = "#334155";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(Math.round(v)), padL - 8, y);
+      }
+
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("当前展示结构规则统计", padL, 2);
+
+      const totalBarsW = n * barW + (n - 1) * gap;
+      const startX = padL + (plotW - totalBarsW) / 2;
+      for (let i = 0; i < n; i++) {
+        const value = values[i];
+        const x = startX + i * (barW + gap);
+        const bh = (value / maxValue) * plotH;
+        const y = padT + plotH - bh;
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(x, y, barW, bh);
+        ctx.fillStyle = "#1f2937";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(String(value), x + barW / 2, y - 4);
+        ctx.textBaseline = "top";
+        ctx.fillText(labels[i], x + barW / 2, padT + plotH + 8);
+      }
+    }
+
+    drawEfficiencyChart();
+    drawRulePassFailChart();
+    renderGroupRows();
+  </script>
+</body>
+</html>
