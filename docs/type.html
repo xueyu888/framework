@@ -948,6 +948,10 @@ input[type="range"] {
 
 const report = window.__SHELF_REPORT__ || {};
 const variantMap = report.variants || {};
+const variantRuleCache = {};
+Object.keys(variantMap).forEach((key) => {
+  variantRuleCache[key] = "11111";
+});
 const profiles = (report.boundary_profiles || []).slice();
 const params = new URLSearchParams(location.search);
 const RULE_DEFS = [
@@ -1058,12 +1062,12 @@ function parseVariantKey(key) {
   };
 }
 
-async function ensureVariantGenerated(area, layers) {
+async function ensureVariantGenerated(area, layers, ruleMask) {
   const key = `A${area}_N${layers}`;
-  if (variantMap[key]) {
+  if (variantMap[key] && variantRuleCache[key] === ruleMask) {
     return key;
   }
-  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}`;
+  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}&rr=${encodeURIComponent(ruleMask)}`;
   const resp = await fetch(url, { method: "GET" });
   if (!resp.ok) {
     const text = await resp.text();
@@ -1074,6 +1078,7 @@ async function ensureVariantGenerated(area, layers) {
     throw new Error("invalid variant payload");
   }
   variantMap[payload.key] = payload.variant;
+  variantRuleCache[payload.key] = payload.rule_mask || ruleMask;
   if (payload.profile && !profiles.some((item) => item.key === payload.profile.key)) {
     profiles.push(payload.profile);
   }
@@ -2130,7 +2135,7 @@ function wireEvents() {
       return;
     }
     try {
-      currentVariantKey = await ensureVariantGenerated(area, layers);
+      currentVariantKey = await ensureVariantGenerated(area, layers, encodeRuleMask(state.rules));
     } catch (err) {
       window.alert(`生成失败: ${String(err && err.message ? err.message : err)}`);
       return;
@@ -2331,9 +2336,26 @@ function wireEvents() {
   attachCanvasInteractions("compare-canvas");
 }
 
-syncCameraControls();
-wireEvents();
-renderAll();
+async function initPage() {
+  const parsed = parseVariantKey(currentVariantKey) || parseVariantKey(fallbackVariantKey());
+  if (parsed) {
+    try {
+      currentVariantKey = await ensureVariantGenerated(
+        parsed.area,
+        parsed.layers,
+        encodeRuleMask(state.rules),
+      );
+    } catch (_err) {
+      currentVariantKey = fallbackVariantKey();
+    }
+  }
+  refreshVariantContext(false);
+  syncCameraControls();
+  wireEvents();
+  renderAll();
+}
+
+initPage();
 
   </script>
 </body>

@@ -1270,6 +1270,10 @@ def render_groups_page(report_payload: dict[str, Any]) -> str:
     script = """
 const report = window.__SHELF_REPORT__ || {};
 const variantMap = report.variants || {};
+const variantRuleCache = {};
+Object.keys(variantMap).forEach((key) => {
+  variantRuleCache[key] = "11111";
+});
 const profiles = (report.boundary_profiles || []).slice();
 const params = new URLSearchParams(location.search);
 const RULE_DEFS = [
@@ -1373,12 +1377,12 @@ function parseVariantKey(key) {
   };
 }
 
-async function ensureVariantGenerated(area, layers) {
+async function ensureVariantGenerated(area, layers, ruleMask) {
   const key = `A${area}_N${layers}`;
-  if (variantMap[key]) {
+  if (variantMap[key] && variantRuleCache[key] === ruleMask) {
     return key;
   }
-  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}`;
+  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}&rr=${encodeURIComponent(ruleMask)}`;
   const resp = await fetch(url, { method: "GET" });
   if (!resp.ok) {
     const text = await resp.text();
@@ -1389,6 +1393,7 @@ async function ensureVariantGenerated(area, layers) {
     throw new Error("invalid variant payload");
   }
   variantMap[payload.key] = payload.variant;
+  variantRuleCache[payload.key] = payload.rule_mask || ruleMask;
   if (payload.profile && !profiles.some((item) => item.key === payload.profile.key)) {
     profiles.push(payload.profile);
   }
@@ -1557,27 +1562,32 @@ function renderRuleLab() {
   }).join("");
 
   host.querySelectorAll("input[data-rule]").forEach((node) => {
-    node.addEventListener("change", () => {
+    node.addEventListener("change", async () => {
       const id = node.getAttribute("data-rule");
       state.rules[id] = node.checked;
+      const parsed = parseVariantKey(state.variant);
+      if (parsed) {
+        try {
+          await ensureVariantGenerated(parsed.area, parsed.layers, encodeRuleMask(state.rules));
+        } catch (err) {
+          window.alert(`规则重算失败: ${String(err && err.message ? err.message : err)}`);
+          state.rules[id] = !node.checked;
+          node.checked = state.rules[id];
+          return;
+        }
+      }
       renderAll();
     });
   });
 
-  const strictPassed = state.evaluated.filter((item) => item.status === "passed").length;
   const current = summaryCurrent();
-  const unlocked = Math.max(0, current.total - strictPassed);
   const disabled = RULE_DEFS.filter((rule) => !state.rules[rule.id]);
-  const riskByRule = disabled.map((rule) => {
-    const count = state.evaluated.filter((item) => item.runtime_status === "passed" && item.runtime_failed_rules.includes(rule.id)).length;
-    return `${rule.id}风险样本=${count}`;
-  });
+  const mask = encodeRuleMask(state.rules);
 
   document.getElementById("rule-impact").innerHTML = [
-    `全规则组合=${strictPassed}`,
+    `规则掩码=${mask}`,
     `当前规则组合=${current.total}`,
-    `新增组合=${unlocked}`,
-    ...riskByRule,
+    `候选池=${current.raw_pool}`,
   ].map((text) => `<span class=\"chip\">${text}</span>`).join("");
 
   document.getElementById("rule-note").textContent = disabled.length
@@ -1724,7 +1734,7 @@ document.getElementById("apply-boundary").addEventListener("click", async () => 
     return;
   }
   try {
-    state.variant = await ensureVariantGenerated(area, layers);
+    state.variant = await ensureVariantGenerated(area, layers, encodeRuleMask(state.rules));
   } catch (err) {
     window.alert(`生成失败: ${String(err && err.message ? err.message : err)}`);
     return;
@@ -1733,10 +1743,10 @@ document.getElementById("apply-boundary").addEventListener("click", async () => 
 });
 
 async function bootstrap() {
-  const parsed = parseVariantKey(state.variant);
-  if (!variantMap[state.variant] && parsed) {
+  const parsed = parseVariantKey(state.variant) || parseVariantKey(fallbackVariantKey());
+  if (parsed) {
     try {
-      state.variant = await ensureVariantGenerated(parsed.area, parsed.layers);
+      state.variant = await ensureVariantGenerated(parsed.area, parsed.layers, encodeRuleMask(state.rules));
     } catch (_err) {
       state.variant = fallbackVariantKey();
     }
@@ -1792,6 +1802,10 @@ def render_group_page(report_payload: dict[str, Any]) -> str:
     script = """
 const report = window.__SHELF_REPORT__ || {};
 const variantMap = report.variants || {};
+const variantRuleCache = {};
+Object.keys(variantMap).forEach((key) => {
+  variantRuleCache[key] = "11111";
+});
 const profiles = (report.boundary_profiles || []).slice();
 const params = new URLSearchParams(location.search);
 const RULE_DEFS = [
@@ -1884,12 +1898,12 @@ function parseVariantKey(key) {
   };
 }
 
-async function ensureVariantGenerated(area, layers) {
+async function ensureVariantGenerated(area, layers, ruleMask) {
   const key = `A${area}_N${layers}`;
-  if (variantMap[key]) {
+  if (variantMap[key] && variantRuleCache[key] === ruleMask) {
     return key;
   }
-  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}`;
+  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}&rr=${encodeURIComponent(ruleMask)}`;
   const resp = await fetch(url, { method: "GET" });
   if (!resp.ok) {
     const text = await resp.text();
@@ -1900,6 +1914,7 @@ async function ensureVariantGenerated(area, layers) {
     throw new Error("invalid variant payload");
   }
   variantMap[payload.key] = payload.variant;
+  variantRuleCache[payload.key] = payload.rule_mask || ruleMask;
   if (payload.profile && !profiles.some((item) => item.key === payload.profile.key)) {
     profiles.push(payload.profile);
   }
@@ -2151,7 +2166,7 @@ document.getElementById("apply-boundary").addEventListener("click", async () => 
   }
   let nextVariant = state.variant;
   try {
-    nextVariant = await ensureVariantGenerated(area, layers);
+    nextVariant = await ensureVariantGenerated(area, layers, encodeRuleMask(state.rules));
   } catch (err) {
     window.alert(`生成失败: ${String(err && err.message ? err.message : err)}`);
     return;
@@ -2164,10 +2179,10 @@ document.getElementById("apply-boundary").addEventListener("click", async () => 
 });
 
 async function pageInit() {
-  const parsed = parseVariantKey(state.variant);
-  if (!variantMap[state.variant] && parsed) {
+  const parsed = parseVariantKey(state.variant) || parseVariantKey(fallbackVariantKey());
+  if (parsed) {
     try {
-      state.variant = await ensureVariantGenerated(parsed.area, parsed.layers);
+      state.variant = await ensureVariantGenerated(parsed.area, parsed.layers, encodeRuleMask(state.rules));
     } catch (_err) {
       state.variant = fallbackVariantKey();
     }
@@ -2295,6 +2310,10 @@ def render_type_page(report_payload: dict[str, Any]) -> str:
     script = """
 const report = window.__SHELF_REPORT__ || {};
 const variantMap = report.variants || {};
+const variantRuleCache = {};
+Object.keys(variantMap).forEach((key) => {
+  variantRuleCache[key] = "11111";
+});
 const profiles = (report.boundary_profiles || []).slice();
 const params = new URLSearchParams(location.search);
 const RULE_DEFS = [
@@ -2405,12 +2424,12 @@ function parseVariantKey(key) {
   };
 }
 
-async function ensureVariantGenerated(area, layers) {
+async function ensureVariantGenerated(area, layers, ruleMask) {
   const key = `A${area}_N${layers}`;
-  if (variantMap[key]) {
+  if (variantMap[key] && variantRuleCache[key] === ruleMask) {
     return key;
   }
-  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}`;
+  const url = `/api/variant?area=${encodeURIComponent(area)}&layers=${encodeURIComponent(layers)}&rr=${encodeURIComponent(ruleMask)}`;
   const resp = await fetch(url, { method: "GET" });
   if (!resp.ok) {
     const text = await resp.text();
@@ -2421,6 +2440,7 @@ async function ensureVariantGenerated(area, layers) {
     throw new Error("invalid variant payload");
   }
   variantMap[payload.key] = payload.variant;
+  variantRuleCache[payload.key] = payload.rule_mask || ruleMask;
   if (payload.profile && !profiles.some((item) => item.key === payload.profile.key)) {
     profiles.push(payload.profile);
   }
@@ -3477,7 +3497,7 @@ function wireEvents() {
       return;
     }
     try {
-      currentVariantKey = await ensureVariantGenerated(area, layers);
+      currentVariantKey = await ensureVariantGenerated(area, layers, encodeRuleMask(state.rules));
     } catch (err) {
       window.alert(`生成失败: ${String(err && err.message ? err.message : err)}`);
       return;
@@ -3678,9 +3698,26 @@ function wireEvents() {
   attachCanvasInteractions("compare-canvas");
 }
 
-syncCameraControls();
-wireEvents();
-renderAll();
+async function initPage() {
+  const parsed = parseVariantKey(currentVariantKey) || parseVariantKey(fallbackVariantKey());
+  if (parsed) {
+    try {
+      currentVariantKey = await ensureVariantGenerated(
+        parsed.area,
+        parsed.layers,
+        encodeRuleMask(state.rules),
+      );
+    } catch (_err) {
+      currentVariantKey = fallbackVariantKey();
+    }
+  }
+  refreshVariantContext(false);
+  syncCameraControls();
+  wireEvents();
+  renderAll();
+}
+
+initPage();
 """
 
     return render_page("Shelf Type 3D", body, script)

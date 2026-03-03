@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -54,10 +55,66 @@ CANDIDATE_COMBO = {Module.ROD, Module.CONNECTOR, Module.PANEL}
 CACHE: dict[str, dict[str, Any]] = {}
 
 
-def _build_variant(area: int, layers: int) -> dict[str, Any]:
+def _decode_rule_mask(raw: str | None) -> dict[str, bool]:
+    bits = (raw or "11111").strip()
+    if len(bits) < 5 or any(ch not in {"0", "1"} for ch in bits):
+        bits = "11111"
+    return {
+        "B2": bits[0] == "1",
+        "C2": bits[1] == "1",
+        "C3": bits[2] == "1",
+        "C4": bits[3] == "1",
+        "EFF": bits[4] == "1",
+    }
+
+
+def _encode_rule_mask(flags: dict[str, bool]) -> str:
+    return "".join(
+        "1" if flags.get(code, True) else "0"
+        for code in ("B2", "C2", "C3", "C4", "EFF")
+    )
+
+
+def _passes_rule_mask(
+    type_item: dict[str, Any],
+    area: int,
+    baseline_efficiency: float,
+    flags: dict[str, bool],
+) -> bool:
+    verification = type_item.get("verification", {})
+    if not verification.get("boundary_valid", True):
+        return False
+    if not verification.get("combination_valid", True):
+        return False
+
+    checks = type_item.get("structural_checks", {})
+    if flags.get("B2", True) and not checks.get("B2_fixed_footprint", True):
+        return False
+    if flags.get("C2", True) and not checks.get("C2_support_continuity", True):
+        return False
+    if flags.get("C3", True) and not checks.get("C3_center_projection_stable", True):
+        return False
+    if flags.get("C4", True) and not checks.get("C4_upper_layer_engaged", True):
+        return False
+
+    if flags.get("EFF", True):
+        active_cells_per_layer = type_item.get("active_cells_per_layer") or []
+        base_cells = int(active_cells_per_layer[0]) if active_cells_per_layer else 0
+        denominator = area if flags.get("B2", True) else max(1, base_cells)
+        runtime_efficiency = float(type_item.get("total_active_cells", 0)) / float(
+            denominator
+        )
+        if runtime_efficiency <= baseline_efficiency:
+            return False
+
+    return True
+
+
+def _build_variant(area: int, layers: int, rule_mask: str) -> dict[str, Any]:
     key = variant_key(area, layers)
-    if key in CACHE:
-        return CACHE[key]
+    cache_key = f"{key}|rr={rule_mask}"
+    if cache_key in CACHE:
+        return CACHE[cache_key]
 
     grid_width, grid_depth = infer_grid_dimensions(area)
     boundary = BoundaryDefinition(
@@ -77,9 +134,25 @@ def _build_variant(area: int, layers: int) -> dict[str, Any]:
         combo=CANDIDATE_COMBO,
     )
     specs_payload = [item.to_dict() for item in specs]
+    flags = _decode_rule_mask(rule_mask)
+    filtered_types: list[dict[str, Any]] = []
+    for item in specs_payload:
+        if not _passes_rule_mask(
+            item,
+            area=area,
+            baseline_efficiency=meta["baseline_efficiency"],
+            flags=flags,
+        ):
+            continue
+        normalized = copy.deepcopy(item)
+        normalized["status"] = "passed"
+        if isinstance(normalized.get("verification"), dict):
+            normalized["verification"]["passed"] = True
+            normalized["verification"]["reasons"] = []
+        filtered_types.append(normalized)
 
-    if specs:
-        sample_checks = specs[0].structural_checks
+    if filtered_types:
+        sample_checks = filtered_types[0].get("structural_checks", {})
     else:
         sample_masks = ((1 << meta["cell_count"]) - 1,)
         sample_checks = {
@@ -114,7 +187,7 @@ def _build_variant(area: int, layers: int) -> dict[str, Any]:
         hypothesis=HYPOTHESIS,
         candidate_combo=CANDIDATE_COMBO,
         valid_combos=VALID_COMBOS,
-        types=specs_payload,
+        types=filtered_types,
         meta=meta,
         verification_result=verification_result.to_dict(),
     )
@@ -133,10 +206,11 @@ def _build_variant(area: int, layers: int) -> dict[str, Any]:
 
     payload = {
         "key": key,
+        "rule_mask": _encode_rule_mask(flags),
         "profile": profile,
         "variant": variant_payload,
     }
-    CACHE[key] = payload
+    CACHE[cache_key] = payload
     return payload
 
 
@@ -171,7 +245,8 @@ class ShelfHandler(SimpleHTTPRequestHandler):
                 query = parse_qs(parsed.query)
                 area = _parse_positive_int(query, "area")
                 layers = _parse_positive_int(query, "layers")
-                payload = _build_variant(area, layers)
+                rule_mask = (query.get("rr") or ["11111"])[0]
+                payload = _build_variant(area, layers, rule_mask=rule_mask)
                 self._write_json(HTTPStatus.OK, payload)
             except ValueError as err:
                 self._write_json(
@@ -205,4 +280,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
