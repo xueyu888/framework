@@ -24,6 +24,7 @@ const state = {
     useR6: true,
     maxPanels: null,
     maxRods: null,
+    maxModules: null,
   },
   enumerationCache: new Map(),
 };
@@ -95,6 +96,7 @@ function tDescription(text) {
 function tReason(text) {
   if (text.startsWith("panel count exceeds limit")) return "隔板数量超过配置上限";
   if (text.startsWith("rod count exceeds limit")) return "杆数量超过配置上限";
+  if (text.startsWith("module count exceeds limit")) return "模块总数超过配置上限";
   return I18N.reason[text] || text;
 }
 
@@ -162,6 +164,7 @@ function readRuleConfigFromUI() {
     useR6: document.getElementById("ruleR6")?.checked ?? true,
     maxPanels: parsePositiveIntOrNull(document.getElementById("maxPanelInput")?.value),
     maxRods: parsePositiveIntOrNull(document.getElementById("maxRodInput")?.value),
+    maxModules: parsePositiveIntOrNull(document.getElementById("maxModuleInput")?.value),
   };
 }
 
@@ -203,15 +206,6 @@ function buildEnumerationDomain() {
     });
   });
 
-  // Add one non-vertical rod candidate so R6 toggle has visible impact.
-  rods.push({
-    id: `R${String(rodIndex).padStart(3, "0")}`,
-    from: slot.get("0-0-0"),
-    to: slot.get("1-0-0"),
-    role: "beam",
-  });
-  rodIndex += 1;
-
   const panelSize = [round3(xValues[1] - xValues[0]), 0.05, round3(zValues[1] - zValues[0])];
   const panelCenterX = round3((xValues[1] + xValues[0]) * 0.5);
   const panelCenterZ = round3((zValues[1] + zValues[0]) * 0.5);
@@ -229,20 +223,6 @@ function buildEnumerationDomain() {
       ],
       role: "storage_surface",
     });
-  });
-
-  // Add one non-horizontal panel candidate so R5 toggle has visible impact.
-  panels.push({
-    id: `P${String(yValues.length).padStart(3, "0")}`,
-    center: [panelCenterX, round3((yValues[0] + yValues[1]) * 0.5 - 0.03), panelCenterZ],
-    size: [...panelSize],
-    supports: [
-      slot.get("0-0-0"),
-      slot.get("1-0-0"),
-      slot.get("0-1-1"),
-      slot.get("1-1-1"),
-    ],
-    role: "storage_surface",
   });
 
   return { connectors, rods, panels };
@@ -546,6 +526,11 @@ function validateCombinationByConfig(item, config) {
   const nodeMap = buildNodeMap(graph);
   const reasons = [];
 
+  const moduleCount = (graph.nodes || []).length + (graph.rods || []).length + (graph.panels || []).length;
+  if (config.maxModules !== null && moduleCount > config.maxModules) {
+    reasons.push(`module count exceeds limit: ${moduleCount} > ${config.maxModules}`);
+  }
+
   if (config.maxPanels !== null && (graph.panels || []).length > config.maxPanels) {
     reasons.push(`panel count exceeds limit: ${(graph.panels || []).length} > ${config.maxPanels}`);
   }
@@ -820,6 +805,9 @@ function runConfiguredCombination() {
         (panel.supports || []).forEach((id) => requiredConnectorIds.add(id));
       });
 
+      const minModuleCount = requiredConnectorIds.size + selectedRods.length + selectedPanels.length;
+      if (state.ruleConfig.maxModules !== null && minModuleCount > state.ruleConfig.maxModules) continue;
+
       const optionalConnectorIds = connectorIds.filter((id) => !requiredConnectorIds.has(id));
       const onlyRequiredConnectors = state.ruleConfig.useR4 || state.ruleConfig.useR1;
       const optionalMaskCount = onlyRequiredConnectors ? 1 : (1 << optionalConnectorIds.length);
@@ -830,6 +818,8 @@ function runConfiguredCombination() {
           if (((optionalMask >> idx) & 1) === 1) selectedConnectorIds.add(id);
         }
         if (state.ruleConfig.useR2 && selectedConnectorIds.size === 0) continue;
+        const totalModuleCount = selectedConnectorIds.size + selectedRods.length + selectedPanels.length;
+        if (state.ruleConfig.maxModules !== null && totalModuleCount > state.ruleConfig.maxModules) continue;
 
         const graph = materializeGraphFromSelection(
           domain,
@@ -1184,6 +1174,13 @@ function renderList() {
     metrics.appendChild(createElement("span", "", `隔板数：${item.graph.panels.length}`));
     metrics.appendChild(createElement("span", "", `杆数：${item.graph.rods.length}`));
     metrics.appendChild(createElement("span", "", `连接接口数：${item.graph.nodes.length}`));
+    metrics.appendChild(
+      createElement(
+        "span",
+        "",
+        `模块总数：${item.graph.panels.length + item.graph.rods.length + item.graph.nodes.length}`
+      )
+    );
     card.appendChild(metrics);
 
     card.addEventListener("click", () => {
@@ -1207,6 +1204,7 @@ function renderActiveMetrics(item) {
     ["隔板数", String(item.graph.panels.length)],
     ["杆数", String(item.graph.rods.length)],
     ["连接接口数", String(item.graph.nodes.length)],
+    ["模块总数", String(item.graph.panels.length + item.graph.rods.length + item.graph.nodes.length)],
     ["隔板投影面积和", fmt(item.metrics.panel_projection_area_sum ?? item.metrics.storage_surface, 3)],
     ["占地投影边界面积", fmt(item.metrics.footprint_projection_boundary_area ?? item.metrics.footprint_area, 3)],
   ];
