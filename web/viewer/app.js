@@ -179,6 +179,27 @@ function forEachCombination(items, pickCount, onPick, start = 0, picked = []) {
   }
 }
 
+function forEachMultisetCounts(typeCount, totalPick, onPick) {
+  if (typeCount < 0 || totalPick < 0) return;
+  if (typeCount === 0) {
+    if (totalPick === 0) onPick([]);
+    return;
+  }
+  const counts = Array(typeCount).fill(0);
+  const dfs = (index, remaining) => {
+    if (index === typeCount - 1) {
+      counts[index] = remaining;
+      onPick([...counts]);
+      return;
+    }
+    for (let value = 0; value <= remaining; value += 1) {
+      counts[index] = value;
+      dfs(index + 1, remaining - value);
+    }
+  };
+  dfs(0, totalPick);
+}
+
 function connectorPositionByIndex(index, total) {
   const ringWidth = Math.max(2, Math.ceil(Math.sqrt(total)));
   const x = (index % ringWidth) * 0.9;
@@ -779,32 +800,41 @@ function runConfiguredCombination() {
     const panelSupportCandidates = allPanelSupportSets(connectorCount);
 
     for (let rodCount = 0; rodCount <= remainingAfterConnector; rodCount += 1) {
-      if (rodCount > pairCandidates.length) break;
       const remainingAfterRod = remainingAfterConnector - rodCount;
 
       for (let panelCount = 0; panelCount <= remainingAfterRod; panelCount += 1) {
-        if (panelCount > panelSupportCandidates.length) break;
-
         // R4 lower bound prune: each connector must have at least 2 incidences.
         // Rod contributes 2 incidences; panel contributes at least 2 incidences.
         if (state.ruleConfig.useR4 && (rodCount + panelCount < connectorCount)) continue;
 
-        forEachCombination(pairCandidates, rodCount, (rodPairs) => {
+        forEachMultisetCounts(pairCandidates.length, rodCount, (rodTypeCounts) => {
+          const rodPairs = [];
           const rodIncidence = Array(connectorCount).fill(0);
-          rodPairs.forEach((pair) => {
-            rodIncidence[pair[0]] += 1;
-            rodIncidence[pair[1]] += 1;
+          rodTypeCounts.forEach((count, typeIdx) => {
+            if (!count) return;
+            const pair = pairCandidates[typeIdx];
+            rodIncidence[pair[0]] += count;
+            rodIncidence[pair[1]] += count;
+            for (let i = 0; i < count; i += 1) {
+              rodPairs.push([pair[0], pair[1]]);
+            }
           });
 
-          forEachCombination(panelSupportCandidates, panelCount, (panelSupports) => {
+          forEachMultisetCounts(panelSupportCandidates.length, panelCount, (panelTypeCounts) => {
             const totalModules = connectorCount + rodCount + panelCount;
             if (totalModules > maxModules) return;
 
+            const panelSupports = [];
             const panelIncidence = Array(connectorCount).fill(0);
-            panelSupports.forEach((supports) => {
-              supports.forEach((connectorIdx) => {
-                panelIncidence[connectorIdx] += 1;
+            panelTypeCounts.forEach((count, typeIdx) => {
+              if (!count) return;
+              const supportSet = panelSupportCandidates[typeIdx];
+              supportSet.forEach((connectorIdx) => {
+                panelIncidence[connectorIdx] += count;
               });
+              for (let i = 0; i < count; i += 1) {
+                panelSupports.push([...supportSet]);
+              }
             });
 
             if (state.ruleConfig.useR4) {
