@@ -22,11 +22,9 @@ const state = {
     useR4: true,
     useR5: true,
     useR6: true,
-    maxPanels: null,
-    maxRods: null,
     maxModules: null,
   },
-  enumerationCache: new Map(),
+  enumerationRuns: 0,
 };
 
 const I18N = {
@@ -94,8 +92,6 @@ function tDescription(text) {
 }
 
 function tReason(text) {
-  if (text.startsWith("panel count exceeds limit")) return "隔板数量超过配置上限";
-  if (text.startsWith("rod count exceeds limit")) return "杆数量超过配置上限";
   if (text.startsWith("module count exceeds limit")) return "模块总数超过配置上限";
   return I18N.reason[text] || text;
 }
@@ -162,8 +158,6 @@ function readRuleConfigFromUI() {
     useR4: document.getElementById("ruleR4")?.checked ?? true,
     useR5: document.getElementById("ruleR5")?.checked ?? true,
     useR6: document.getElementById("ruleR6")?.checked ?? true,
-    maxPanels: parsePositiveIntOrNull(document.getElementById("maxPanelInput")?.value),
-    maxRods: parsePositiveIntOrNull(document.getElementById("maxRodInput")?.value),
     maxModules: parsePositiveIntOrNull(document.getElementById("maxModuleInput")?.value),
   };
 }
@@ -531,13 +525,6 @@ function validateCombinationByConfig(item, config) {
     reasons.push(`module count exceeds limit: ${moduleCount} > ${config.maxModules}`);
   }
 
-  if (config.maxPanels !== null && (graph.panels || []).length > config.maxPanels) {
-    reasons.push(`panel count exceeds limit: ${(graph.panels || []).length} > ${config.maxPanels}`);
-  }
-  if (config.maxRods !== null && (graph.rods || []).length > config.maxRods) {
-    reasons.push(`rod count exceeds limit: ${(graph.rods || []).length} > ${config.maxRods}`);
-  }
-
   if (config.useR2 && (!graph.nodes || graph.nodes.length === 0)) {
     reasons.push("module combination violates R2: connector module is required");
   }
@@ -758,26 +745,7 @@ function buildRuntimeSummary(items, referenceSummary, ruleConfig, meta = {}) {
 
 function runConfiguredCombination() {
   state.ruleConfig = readRuleConfigFromUI();
-  const cacheKey = JSON.stringify(state.ruleConfig);
-  if (state.enumerationCache.has(cacheKey)) {
-    const cached = state.enumerationCache.get(cacheKey);
-    state.combinations = cached.combinations;
-    state.summary = cached.summary;
-    state.searchKeyword = "";
-    const searchInput = document.getElementById("searchInput");
-    if (searchInput) searchInput.value = "";
-    renderGlobalStats(state.summary);
-    renderOverviewHighlights(state.summary);
-    updateDonut(state.summary);
-    drawHistogram(state.summary);
-    drawFamilyBars(state.summary);
-    const histogramSubtitle = document.getElementById("histogramSubtitle");
-    if (histogramSubtitle) {
-      histogramSubtitle.textContent = `${state.summary.total_combinations} 种分型的目标分数区间分布`;
-    }
-    applyFilters(true);
-    return;
-  }
+  state.enumerationRuns += 1;
   const baseline = Number(state.baseSummary?.standard_profile?.baseline_efficiency ?? state.baseSummary?.baseline_score ?? 1);
   const domain = buildEnumerationDomain();
   const connectorIds = domain.connectors.map((node) => node.id);
@@ -790,11 +758,9 @@ function runConfiguredCombination() {
 
   for (let rodMask = 0; rodMask < (1 << rodCount); rodMask += 1) {
     const selectedRods = domain.rods.filter((_, idx) => ((rodMask >> idx) & 1) === 1);
-    if (state.ruleConfig.maxRods !== null && selectedRods.length > state.ruleConfig.maxRods) continue;
 
     for (let panelMask = 0; panelMask < (1 << panelCount); panelMask += 1) {
       const selectedPanels = domain.panels.filter((_, idx) => ((panelMask >> idx) & 1) === 1);
-      if (state.ruleConfig.maxPanels !== null && selectedPanels.length > state.ruleConfig.maxPanels) continue;
 
       const requiredConnectorIds = new Set();
       selectedRods.forEach((rod) => {
@@ -874,6 +840,7 @@ function runConfiguredCombination() {
   });
   const elapsedMs = Math.round(performance.now() - t0);
   state.summary.enumeration_elapsed_ms = elapsedMs;
+  state.summary.enumeration_run_id = state.enumerationRuns;
   state.searchKeyword = "";
   const searchInput = document.getElementById("searchInput");
   if (searchInput) searchInput.value = "";
@@ -886,10 +853,6 @@ function runConfiguredCombination() {
   if (histogramSubtitle) {
     histogramSubtitle.textContent = `${state.summary.total_combinations} 种分型的目标分数区间分布`;
   }
-  state.enumerationCache.set(cacheKey, {
-    combinations: state.combinations,
-    summary: state.summary,
-  });
   applyFilters(true);
 }
 
@@ -1099,6 +1062,7 @@ function renderGlobalStats(summary) {
   stats.innerHTML = "";
   const items = [
     ["总组合数", summary.total_combinations],
+    ["穷举批次", summary.enumeration_run_id ?? 0],
     ["规则候选", summary.raw_candidates ?? "-"],
     ["通过率", `${fmt((summary.pass_rate || 0) * 100, 1)}%`],
     ["均值效率", fmt(summary.score_avg ?? 0, 3)],
