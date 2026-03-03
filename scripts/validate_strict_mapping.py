@@ -167,6 +167,7 @@ def discover_domain_standards() -> list[str]:
     return [
         path.relative_to(REPO_ROOT).as_posix()
         for path in sorted(standards_dir.glob("*.md"))
+        if path.name.lower() != "readme.md"
     ]
 
 

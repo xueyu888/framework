@@ -3,71 +3,243 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Shelf Combos 3D (Local)</title>
+  <title>Shelf Combos 3D (Load Qualification)</title>
   <style>
     html, body {
       margin: 0;
       height: 100%;
       font-family: Arial, sans-serif;
-      background: #f6f7fb;
+      background: #f3f4f6;
     }
     #app {
       display: grid;
-      grid-template-columns: 380px 1fr;
+      grid-template-columns: 430px 1fr;
       height: 100%;
     }
     #panel {
-      padding: 14px;
+      padding: 12px;
       background: #ffffff;
-      border-right: 1px solid #d6d8e1;
+      border-right: 1px solid #d1d5db;
       overflow: auto;
     }
     #viewer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 290px;
+      gap: 0;
+      overflow: hidden;
+      background: #f3f4f6;
+    }
+    #stage {
       position: relative;
       overflow: hidden;
+      min-width: 0;
     }
     #cv {
       width: 100%;
       height: 100%;
       display: block;
-      background: #f6f7fb;
+      background: #eef0f4;
+    }
+    #faultPane {
+      border-left: 1px solid #d1d5db;
+      background: #f8fafc;
+      padding: 12px;
+      overflow: auto;
+    }
+    #faultBox {
+      display: none;
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      border-radius: 8px;
+      padding: 10px;
+      color: #7f1d1d;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    #faultBox h4 {
+      margin: 0 0 6px 0;
+      font-size: 13px;
+      color: #991b1b;
+    }
+    #faultBox ul {
+      margin: 6px 0 0 16px;
+      padding: 0;
+    }
+    #faultHint {
+      color: #475569;
+      font-size: 12px;
+      line-height: 1.4;
     }
     .row { margin-bottom: 10px; }
+    .row-tight { margin-bottom: 6px; }
     .mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 12px;
       white-space: pre-wrap;
     }
-    button { padding: 6px 10px; margin-right: 6px; }
-    select { width: 100%; padding: 6px; }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .grid3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .section {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px;
+      background: #fafafa;
+    }
+    .label {
+      font-size: 12px;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #fff;
+    }
+    button { cursor: pointer; }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .legend {
+      height: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: linear-gradient(to right, #ffffff 0%, #ffeb3b 60%, #ff9800 80%, #dc2626 100%);
+    }
   </style>
 </head>
 <body>
 <div id="app">
   <div id="panel">
-    <h3 style="margin: 0 0 10px 0;">Shelf 3D Combos (Rotation-Dedup)</h3>
+    <h3 style="margin: 0 0 8px 0;">Shelf 3D Load Qualification</h3>
     <div class="row">N=2, x=30, y=30, h=30</div>
     <div class="row">Unique combos: <b>33</b></div>
-    <div class="row">
-      <button id="prevBtn">Prev</button>
-      <button id="nextBtn">Next</button>
-      <button id="fitBtn">Fit</button>
+
+    <div class="row section">
+      <div class="actions">
+        <button id="prevBtn">Prev</button>
+        <button id="nextBtn">Next</button>
+        <button id="fitBtn">Fit</button>
+      </div>
+      <div class="row-tight" style="margin-top:8px;">
+        <select id="comboSelect"></select>
+      </div>
     </div>
-    <div class="row">
-      <select id="comboSelect"></select>
+
+    <div class="row section">
+      <div style="font-weight:600; margin-bottom:8px;">Load Cubes</div>
+      <div class="grid3">
+        <div>
+          <div class="label">Cube count</div>
+          <input id="cubeCount" type="number" />
+        </div>
+        <div>
+          <div class="label">Active cube</div>
+          <select id="cubeIndex"></select>
+        </div>
+        <div>
+          <div class="label">Layer</div>
+          <input id="cubeLayer" type="number" />
+        </div>
+      </div>
+      <div class="grid3" style="margin-top:6px;">
+        <div>
+          <div class="label">Weight</div>
+          <input id="cubeWeight" type="number" />
+        </div>
+        <div>
+          <div class="label">Size z</div>
+          <input id="cubeSizeZ" type="number" />
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:6px;">
+        <div>
+          <div class="label">Size x</div>
+          <input id="cubeSizeX" type="number" />
+        </div>
+        <div>
+          <div class="label">Size y</div>
+          <input id="cubeSizeY" type="number" />
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:6px;">
+        <div>
+          <div class="label">Center x</div>
+          <input id="cubePosX" type="number" />
+        </div>
+        <div>
+          <div class="label">Center y</div>
+          <input id="cubePosY" type="number" />
+        </div>
+      </div>
     </div>
+
+    <div class="row section">
+      <div style="font-weight:600; margin-bottom:8px;">External Base Capacities</div>
+      <div class="grid2">
+        <div>
+          <div class="label">Rod cap</div>
+          <input id="capRod" type="number" />
+        </div>
+        <div>
+          <div class="label">Panel cap</div>
+          <input id="capPanel" type="number" />
+        </div>
+        <div>
+          <div class="label">Connector cap</div>
+          <input id="capConnector" type="number" />
+        </div>
+        <div>
+          <div class="label">Board cap</div>
+          <input id="capBoard" type="number" />
+        </div>
+        <div>
+          <div class="label">Board defl cap</div>
+          <input id="capBoardDeflect" type="number" />
+        </div>
+        <div style="display:flex; align-items:end;">
+          <button id="resetCapsBtn">Reset Caps</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row section">
+      <div class="label" style="margin-bottom:6px;">Stress legend (white -> red)</div>
+      <div class="legend"></div>
+      <div style="font-size:12px;color:#4b5563;margin-top:4px;">utilization: 0.0 -> 1.0+ (closer to limit = redder)</div>
+    </div>
+
     <div class="row mono" id="status" style="color:#b91c1c;">Initializing viewer...</div>
     <div class="row mono" id="info"></div>
-    <div class="row" style="font-size:12px;color:#555;">
-      Left-drag: rotate | Wheel: zoom | Right-drag: pan
+    <div class="row" style="font-size:12px;color:#4b5563;">
+      Left-drag: rotate | Left-drag cube: move x/y | Wheel: zoom | Right-drag: pan
     </div>
   </div>
-  <div id="viewer"><canvas id="cv"></canvas></div>
+  <div id="viewer">
+    <div id="stage"><canvas id="cv"></canvas></div>
+    <div id="faultPane">
+      <div id="faultHint">No overload detected. Add/move cubes or reduce capacities to trigger failure diagnostics.</div>
+      <div id="faultBox"></div>
+    </div>
+  </div>
 </div>
 
 <script id="combo-data" type="application/json">[{"combo_id": "CASE-01", "label": "L1(R:none|P:back-front) L2(R:none|P:back-front)", "equivalent_count": 2, "equivalent_members": ["L1(R:none|P:back-front) L2(R:none|P:back-front)", "L1(R:none|P:left-right) L2(R:none|P:left-right)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}], "obj": "CASE-01.obj", "preview_png": "CASE-01.png"}, {"combo_id": "CASE-02", "label": "L1(R:none|P:back-front) L2(R:none|P:left-right)", "equivalent_count": 2, "equivalent_members": ["L1(R:none|P:back-front) L2(R:none|P:left-right)", "L1(R:none|P:left-right) L2(R:none|P:back-front)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": [], "support_panels": ["left", "right"], "open_sides": ["front", "back"]}], "obj": "CASE-02.obj", "preview_png": "CASE-02.png"}, {"combo_id": "CASE-03", "label": "L1(R:none|P:back-front) L2(R:BL|P:front-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:none|P:back-front) L2(R:BL|P:front-right)", "L1(R:none|P:back-front) L2(R:FR|P:back-left)", "L1(R:none|P:left-right) L2(R:BR|P:front-left)", "L1(R:none|P:left-right) L2(R:FL|P:back-right)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}], "obj": "CASE-03.obj", "preview_png": "CASE-03.png"}, {"combo_id": "CASE-04", "label": "L1(R:none|P:back-front) L2(R:BL-BR|P:front)", "equivalent_count": 4, "equivalent_members": ["L1(R:none|P:back-front) L2(R:BL-BR|P:front)", "L1(R:none|P:back-front) L2(R:FL-FR|P:back)", "L1(R:none|P:left-right) L2(R:BL-FL|P:right)", "L1(R:none|P:left-right) L2(R:BR-FR|P:left)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}], "obj": "CASE-04.obj", "preview_png": "CASE-04.png"}, {"combo_id": "CASE-05", "label": "L1(R:none|P:back-front) L2(R:BL-BR-FL-FR|P:none)", "equivalent_count": 2, "equivalent_members": ["L1(R:none|P:back-front) L2(R:BL-BR-FL-FR|P:none)", "L1(R:none|P:left-right) L2(R:BL-BR-FL-FR|P:none)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}], "obj": "CASE-05.obj", "preview_png": "CASE-05.png"}, {"combo_id": "CASE-06", "label": "L1(R:none|P:back-front) L2(R:BL-FL|P:right)", "equivalent_count": 4, "equivalent_members": ["L1(R:none|P:back-front) L2(R:BL-FL|P:right)", "L1(R:none|P:back-front) L2(R:BR-FR|P:left)", "L1(R:none|P:left-right) L2(R:BL-BR|P:front)", "L1(R:none|P:left-right) L2(R:FL-FR|P:back)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": ["BL", "FL"], "support_panels": ["right"], "open_sides": ["front", "back", "left"]}], "obj": "CASE-06.obj", "preview_png": "CASE-06.png"}, {"combo_id": "CASE-07", "label": "L1(R:none|P:back-front) L2(R:BR|P:front-left)", "equivalent_count": 4, "equivalent_members": ["L1(R:none|P:back-front) L2(R:BR|P:front-left)", "L1(R:none|P:back-front) L2(R:FL|P:back-right)", "L1(R:none|P:left-right) L2(R:BL|P:front-right)", "L1(R:none|P:left-right) L2(R:FR|P:back-left)"], "layers": [{"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}, {"rods": ["BR"], "support_panels": ["front", "left"], "open_sides": ["right", "back"]}], "obj": "CASE-07.obj", "preview_png": "CASE-07.png"}, {"combo_id": "CASE-08", "label": "L1(R:BL|P:front-right) L2(R:none|P:back-front)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:none|P:back-front)", "L1(R:BR|P:front-left) L2(R:none|P:left-right)", "L1(R:FL|P:back-right) L2(R:none|P:left-right)", "L1(R:FR|P:back-left) L2(R:none|P:back-front)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}], "obj": "CASE-08.obj", "preview_png": "CASE-08.png"}, {"combo_id": "CASE-09", "label": "L1(R:BL|P:front-right) L2(R:none|P:left-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:none|P:left-right)", "L1(R:BR|P:front-left) L2(R:none|P:back-front)", "L1(R:FL|P:back-right) L2(R:none|P:back-front)", "L1(R:FR|P:back-left) L2(R:none|P:left-right)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": [], "support_panels": ["left", "right"], "open_sides": ["front", "back"]}], "obj": "CASE-09.obj", "preview_png": "CASE-09.png"}, {"combo_id": "CASE-10", "label": "L1(R:BL|P:front-right) L2(R:BL|P:front-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:BL|P:front-right)", "L1(R:BR|P:front-left) L2(R:BR|P:front-left)", "L1(R:FL|P:back-right) L2(R:FL|P:back-right)", "L1(R:FR|P:back-left) L2(R:FR|P:back-left)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}], "obj": "CASE-10.obj", "preview_png": "CASE-10.png"}, {"combo_id": "CASE-11", "label": "L1(R:BL|P:front-right) L2(R:BL-BR|P:front)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:BL-BR|P:front)", "L1(R:BR|P:front-left) L2(R:BR-FR|P:left)", "L1(R:FL|P:back-right) L2(R:BL-FL|P:right)", "L1(R:FR|P:back-left) L2(R:FL-FR|P:back)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}], "obj": "CASE-11.obj", "preview_png": "CASE-11.png"}, {"combo_id": "CASE-12", "label": "L1(R:BL|P:front-right) L2(R:BL-BR-FL-FR|P:none)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:BL-BR-FL-FR|P:none)", "L1(R:BR|P:front-left) L2(R:BL-BR-FL-FR|P:none)", "L1(R:FL|P:back-right) L2(R:BL-BR-FL-FR|P:none)", "L1(R:FR|P:back-left) L2(R:BL-BR-FL-FR|P:none)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}], "obj": "CASE-12.obj", "preview_png": "CASE-12.png"}, {"combo_id": "CASE-13", "label": "L1(R:BL|P:front-right) L2(R:BL-FL|P:right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:BL-FL|P:right)", "L1(R:BR|P:front-left) L2(R:BL-BR|P:front)", "L1(R:FL|P:back-right) L2(R:FL-FR|P:back)", "L1(R:FR|P:back-left) L2(R:BR-FR|P:left)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["BL", "FL"], "support_panels": ["right"], "open_sides": ["front", "back", "left"]}], "obj": "CASE-13.obj", "preview_png": "CASE-13.png"}, {"combo_id": "CASE-14", "label": "L1(R:BL|P:front-right) L2(R:BR|P:front-left)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:BR|P:front-left)", "L1(R:BR|P:front-left) L2(R:FR|P:back-left)", "L1(R:FL|P:back-right) L2(R:BL|P:front-right)", "L1(R:FR|P:back-left) L2(R:FL|P:back-right)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["BR"], "support_panels": ["front", "left"], "open_sides": ["right", "back"]}], "obj": "CASE-14.obj", "preview_png": "CASE-14.png"}, {"combo_id": "CASE-15", "label": "L1(R:BL|P:front-right) L2(R:BR-FR|P:left)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:BR-FR|P:left)", "L1(R:BR|P:front-left) L2(R:FL-FR|P:back)", "L1(R:FL|P:back-right) L2(R:BL-BR|P:front)", "L1(R:FR|P:back-left) L2(R:BL-FL|P:right)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["BR", "FR"], "support_panels": ["left"], "open_sides": ["front", "right", "back"]}], "obj": "CASE-15.obj", "preview_png": "CASE-15.png"}, {"combo_id": "CASE-16", "label": "L1(R:BL|P:front-right) L2(R:FL|P:back-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:FL|P:back-right)", "L1(R:BR|P:front-left) L2(R:BL|P:front-right)", "L1(R:FL|P:back-right) L2(R:FR|P:back-left)", "L1(R:FR|P:back-left) L2(R:BR|P:front-left)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["FL"], "support_panels": ["back", "right"], "open_sides": ["front", "left"]}], "obj": "CASE-16.obj", "preview_png": "CASE-16.png"}, {"combo_id": "CASE-17", "label": "L1(R:BL|P:front-right) L2(R:FL-FR|P:back)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:FL-FR|P:back)", "L1(R:BR|P:front-left) L2(R:BL-FL|P:right)", "L1(R:FL|P:back-right) L2(R:BR-FR|P:left)", "L1(R:FR|P:back-left) L2(R:BL-BR|P:front)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["FL", "FR"], "support_panels": ["back"], "open_sides": ["front", "right", "left"]}], "obj": "CASE-17.obj", "preview_png": "CASE-17.png"}, {"combo_id": "CASE-18", "label": "L1(R:BL|P:front-right) L2(R:FR|P:back-left)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL|P:front-right) L2(R:FR|P:back-left)", "L1(R:BR|P:front-left) L2(R:FL|P:back-right)", "L1(R:FL|P:back-right) L2(R:BR|P:front-left)", "L1(R:FR|P:back-left) L2(R:BL|P:front-right)"], "layers": [{"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}, {"rods": ["FR"], "support_panels": ["back", "left"], "open_sides": ["front", "right"]}], "obj": "CASE-18.obj", "preview_png": "CASE-18.png"}, {"combo_id": "CASE-19", "label": "L1(R:BL-BR|P:front) L2(R:none|P:back-front)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:none|P:back-front)", "L1(R:BL-FL|P:right) L2(R:none|P:left-right)", "L1(R:BR-FR|P:left) L2(R:none|P:left-right)", "L1(R:FL-FR|P:back) L2(R:none|P:back-front)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}], "obj": "CASE-19.obj", "preview_png": "CASE-19.png"}, {"combo_id": "CASE-20", "label": "L1(R:BL-BR|P:front) L2(R:none|P:left-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:none|P:left-right)", "L1(R:BL-FL|P:right) L2(R:none|P:back-front)", "L1(R:BR-FR|P:left) L2(R:none|P:back-front)", "L1(R:FL-FR|P:back) L2(R:none|P:left-right)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": [], "support_panels": ["left", "right"], "open_sides": ["front", "back"]}], "obj": "CASE-20.obj", "preview_png": "CASE-20.png"}, {"combo_id": "CASE-21", "label": "L1(R:BL-BR|P:front) L2(R:BL|P:front-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:BL|P:front-right)", "L1(R:BL-FL|P:right) L2(R:FL|P:back-right)", "L1(R:BR-FR|P:left) L2(R:BR|P:front-left)", "L1(R:FL-FR|P:back) L2(R:FR|P:back-left)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}], "obj": "CASE-21.obj", "preview_png": "CASE-21.png"}, {"combo_id": "CASE-22", "label": "L1(R:BL-BR|P:front) L2(R:BL-BR|P:front)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:BL-BR|P:front)", "L1(R:BL-FL|P:right) L2(R:BL-FL|P:right)", "L1(R:BR-FR|P:left) L2(R:BR-FR|P:left)", "L1(R:FL-FR|P:back) L2(R:FL-FR|P:back)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}], "obj": "CASE-22.obj", "preview_png": "CASE-22.png"}, {"combo_id": "CASE-23", "label": "L1(R:BL-BR|P:front) L2(R:BL-BR-FL-FR|P:none)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:BL-BR-FL-FR|P:none)", "L1(R:BL-FL|P:right) L2(R:BL-BR-FL-FR|P:none)", "L1(R:BR-FR|P:left) L2(R:BL-BR-FL-FR|P:none)", "L1(R:FL-FR|P:back) L2(R:BL-BR-FL-FR|P:none)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}], "obj": "CASE-23.obj", "preview_png": "CASE-23.png"}, {"combo_id": "CASE-24", "label": "L1(R:BL-BR|P:front) L2(R:BL-FL|P:right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:BL-FL|P:right)", "L1(R:BL-FL|P:right) L2(R:FL-FR|P:back)", "L1(R:BR-FR|P:left) L2(R:BL-BR|P:front)", "L1(R:FL-FR|P:back) L2(R:BR-FR|P:left)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["BL", "FL"], "support_panels": ["right"], "open_sides": ["front", "back", "left"]}], "obj": "CASE-24.obj", "preview_png": "CASE-24.png"}, {"combo_id": "CASE-25", "label": "L1(R:BL-BR|P:front) L2(R:BR|P:front-left)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:BR|P:front-left)", "L1(R:BL-FL|P:right) L2(R:BL|P:front-right)", "L1(R:BR-FR|P:left) L2(R:FR|P:back-left)", "L1(R:FL-FR|P:back) L2(R:FL|P:back-right)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["BR"], "support_panels": ["front", "left"], "open_sides": ["right", "back"]}], "obj": "CASE-25.obj", "preview_png": "CASE-25.png"}, {"combo_id": "CASE-26", "label": "L1(R:BL-BR|P:front) L2(R:BR-FR|P:left)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:BR-FR|P:left)", "L1(R:BL-FL|P:right) L2(R:BL-BR|P:front)", "L1(R:BR-FR|P:left) L2(R:FL-FR|P:back)", "L1(R:FL-FR|P:back) L2(R:BL-FL|P:right)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["BR", "FR"], "support_panels": ["left"], "open_sides": ["front", "right", "back"]}], "obj": "CASE-26.obj", "preview_png": "CASE-26.png"}, {"combo_id": "CASE-27", "label": "L1(R:BL-BR|P:front) L2(R:FL|P:back-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:FL|P:back-right)", "L1(R:BL-FL|P:right) L2(R:FR|P:back-left)", "L1(R:BR-FR|P:left) L2(R:BL|P:front-right)", "L1(R:FL-FR|P:back) L2(R:BR|P:front-left)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["FL"], "support_panels": ["back", "right"], "open_sides": ["front", "left"]}], "obj": "CASE-27.obj", "preview_png": "CASE-27.png"}, {"combo_id": "CASE-28", "label": "L1(R:BL-BR|P:front) L2(R:FL-FR|P:back)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:FL-FR|P:back)", "L1(R:BL-FL|P:right) L2(R:BR-FR|P:left)", "L1(R:BR-FR|P:left) L2(R:BL-FL|P:right)", "L1(R:FL-FR|P:back) L2(R:BL-BR|P:front)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["FL", "FR"], "support_panels": ["back"], "open_sides": ["front", "right", "left"]}], "obj": "CASE-28.obj", "preview_png": "CASE-28.png"}, {"combo_id": "CASE-29", "label": "L1(R:BL-BR|P:front) L2(R:FR|P:back-left)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR|P:front) L2(R:FR|P:back-left)", "L1(R:BL-FL|P:right) L2(R:BR|P:front-left)", "L1(R:BR-FR|P:left) L2(R:FL|P:back-right)", "L1(R:FL-FR|P:back) L2(R:BL|P:front-right)"], "layers": [{"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}, {"rods": ["FR"], "support_panels": ["back", "left"], "open_sides": ["front", "right"]}], "obj": "CASE-29.obj", "preview_png": "CASE-29.png"}, {"combo_id": "CASE-30", "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:none|P:back-front)", "equivalent_count": 2, "equivalent_members": ["L1(R:BL-BR-FL-FR|P:none) L2(R:none|P:back-front)", "L1(R:BL-BR-FL-FR|P:none) L2(R:none|P:left-right)"], "layers": [{"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}, {"rods": [], "support_panels": ["back", "front"], "open_sides": ["right", "left"]}], "obj": "CASE-30.obj", "preview_png": "CASE-30.png"}, {"combo_id": "CASE-31", "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:BL|P:front-right)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR-FL-FR|P:none) L2(R:BL|P:front-right)", "L1(R:BL-BR-FL-FR|P:none) L2(R:BR|P:front-left)", "L1(R:BL-BR-FL-FR|P:none) L2(R:FL|P:back-right)", "L1(R:BL-BR-FL-FR|P:none) L2(R:FR|P:back-left)"], "layers": [{"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}, {"rods": ["BL"], "support_panels": ["front", "right"], "open_sides": ["back", "left"]}], "obj": "CASE-31.obj", "preview_png": "CASE-31.png"}, {"combo_id": "CASE-32", "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR|P:front)", "equivalent_count": 4, "equivalent_members": ["L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR|P:front)", "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-FL|P:right)", "L1(R:BL-BR-FL-FR|P:none) L2(R:BR-FR|P:left)", "L1(R:BL-BR-FL-FR|P:none) L2(R:FL-FR|P:back)"], "layers": [{"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}, {"rods": ["BL", "BR"], "support_panels": ["front"], "open_sides": ["right", "back", "left"]}], "obj": "CASE-32.obj", "preview_png": "CASE-32.png"}, {"combo_id": "CASE-33", "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR-FL-FR|P:none)", "equivalent_count": 1, "equivalent_members": ["L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR-FL-FR|P:none)"], "layers": [{"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}, {"rods": ["BL", "BR", "FL", "FR"], "support_panels": [], "open_sides": ["front", "right", "back", "left"]}], "obj": "CASE-33.obj", "preview_png": "CASE-33.png"}]</script>
 <script>
 let combos = [];
+const EXTERNAL_DEFAULTS = {"rod_capacity": 60.0, "support_panel_capacity": 90.0, "connector_capacity": 45.0, "board_capacity": 120.0, "board_deflection_capacity": 100.0};
 const statusEl = document.getElementById('status');
 function showStatus(msg, isError) {
   if (!statusEl) return;
@@ -86,6 +258,7 @@ window.addEventListener('error', function (e) {
 
 const N = 2, X = 30, Y = 30, H = 30;
 const TOTAL_H = N * H;
+const CORNERS = ['FL', 'FR', 'BL', 'BR'];
 const sideCorners = {
   front: ['FL', 'FR'],
   back: ['BL', 'BR'],
@@ -102,6 +275,27 @@ const cornerXY = {
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const viewer = document.getElementById('viewer');
+const stage = document.getElementById('stage');
+const faultBox = document.getElementById('faultBox');
+const faultHint = document.getElementById('faultHint');
+
+const controls = {
+  cubeCount: document.getElementById('cubeCount'),
+  cubeIndex: document.getElementById('cubeIndex'),
+  cubeLayer: document.getElementById('cubeLayer'),
+  cubeWeight: document.getElementById('cubeWeight'),
+  cubeSizeX: document.getElementById('cubeSizeX'),
+  cubeSizeY: document.getElementById('cubeSizeY'),
+  cubeSizeZ: document.getElementById('cubeSizeZ'),
+  cubePosX: document.getElementById('cubePosX'),
+  cubePosY: document.getElementById('cubePosY'),
+  capRod: document.getElementById('capRod'),
+  capPanel: document.getElementById('capPanel'),
+  capConnector: document.getElementById('capConnector'),
+  capBoard: document.getElementById('capBoard'),
+  capBoardDeflect: document.getElementById('capBoardDeflect'),
+  resetCapsBtn: document.getElementById('resetCapsBtn'),
+};
 
 let yaw = -0.9;
 let pitch = 0.55;
@@ -109,20 +303,95 @@ let zoom = 8.2;
 let panX = 0;
 let panY = 0;
 let current = 0;
+let lastEval = null;
+let faultMarkers = [];
+
+function makeDefaultCube() {
+  return {
+    layer: 1,
+    weight: 20.0,
+    sizeX: Math.max(4.0, X * 0.35),
+    sizeY: Math.max(4.0, Y * 0.35),
+    sizeZ: Math.max(4.0, H * 0.45),
+    posX: X / 2,
+    posY: Y / 2,
+  };
+}
+
+let loadState = {
+  cubes: [makeDefaultCube()],
+  activeCube: 0,
+  caps: {
+    rod: EXTERNAL_DEFAULTS.rod_capacity,
+    panel: EXTERNAL_DEFAULTS.support_panel_capacity,
+    connector: EXTERNAL_DEFAULTS.connector_capacity,
+    board: EXTERNAL_DEFAULTS.board_capacity,
+    boardDeflect: EXTERNAL_DEFAULTS.board_deflection_capacity,
+  },
+};
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function num(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function add(map, key, value) {
+  map[key] = (map[key] || 0) + value;
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function getActiveCube() {
+  if (!loadState.cubes.length) loadState.cubes.push(makeDefaultCube());
+  loadState.activeCube = clamp(loadState.activeCube, 0, loadState.cubes.length - 1);
+  return loadState.cubes[loadState.activeCube];
+}
+
+function stressRgb(util) {
+  const u = Math.max(0, util);
+  let c0 = [255, 255, 255];
+  let c1 = [255, 255, 255];
+  let t = 0;
+  if (u <= 0.6) {
+    c0 = [255, 255, 255];
+    c1 = [255, 235, 59];
+    t = u / 0.6;
+  } else if (u <= 0.8) {
+    c0 = [255, 235, 59];
+    c1 = [245, 158, 11];
+    t = (u - 0.6) / 0.2;
+  } else if (u <= 1.0) {
+    c0 = [245, 158, 11];
+    c1 = [220, 38, 38];
+    t = (u - 0.8) / 0.2;
+  } else {
+    c0 = [220, 38, 38];
+    c1 = [127, 29, 29];
+    t = clamp((u - 1.0) / 0.5, 0, 1);
+  }
+  return [
+    Math.round(lerp(c0[0], c1[0], t)),
+    Math.round(lerp(c0[1], c1[1], t)),
+    Math.round(lerp(c0[2], c1[2], t)),
+  ];
+}
+
+function stressColor(util, alpha) {
+  const rgb = stressRgb(util);
+  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
+}
 
 function fitView() {
-  const w = Math.max(1, viewer.clientWidth);
-  const h = Math.max(1, viewer.clientHeight);
+  const w = Math.max(1, stage.clientWidth);
+  const h = Math.max(1, stage.clientHeight);
   const modelSize = Math.max(X, Y, TOTAL_H, 1);
-  zoom = Math.max(2.0, Math.min(40.0, Math.min(w, h) * 0.55 / modelSize));
+  zoom = Math.max(2.0, Math.min(40.0, Math.min(w, h) * 0.52 / modelSize));
   panX = 0;
   panY = 0;
 }
 
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
-  const w = viewer.clientWidth;
-  const h = viewer.clientHeight;
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
   cv.width = Math.max(1, Math.floor(w * dpr));
   cv.height = Math.max(1, Math.floor(h * dpr));
   cv.style.width = w + 'px';
@@ -151,42 +420,47 @@ function rotatePoint(p) {
 
 function project(p) {
   const [x, y, z] = rotatePoint(p);
-  const w = viewer.clientWidth;
-  const h = viewer.clientHeight;
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
   const cx = w * 0.5 + panX;
   const cy = h * 0.5 + panY;
   return [cx + x * zoom, cy - y * zoom, z];
 }
 
-function buildRods(combo) {
+function segmentRods(combo) {
   const rods = { FL: [], FR: [], BL: [], BR: [] };
-  for (const c of ['FL', 'FR', 'BL', 'BR']) {
+  for (const c of CORNERS) {
     const segs = [];
     for (let i = 0; i < combo.layers.length; i++) {
-      if (combo.layers[i].rods.includes(c)) segs.push([i * H, (i + 1) * H]);
+      if (combo.layers[i].rods.includes(c)) segs.push([i * H, (i + 1) * H, i + 1]);
     }
     segs.sort((a, b) => a[0] - b[0]);
-    if (!segs.length) continue;
-    let a0 = segs[0][0], a1 = segs[0][1];
-    for (let i = 1; i < segs.length; i++) {
-      const b0 = segs[i][0], b1 = segs[i][1];
-      if (Math.abs(a1 - b0) < 1e-9) a1 = b1;
-      else { rods[c].push([a0, a1]); a0 = b0; a1 = b1; }
-    }
-    rods[c].push([a0, a1]);
+    rods[c] = segs;
   }
   return rods;
 }
 
 function panelQuad(side, z0, z1) {
-  const c = sideCorners[side];
-  const p0 = cornerXY[c[0]];
-  const p1 = cornerXY[c[1]];
+  const pair = sideCorners[side];
+  const p0 = cornerXY[pair[0]];
+  const p1 = cornerXY[pair[1]];
   return [
     [p0[0], p0[1], z0],
     [p1[0], p1[1], z0],
     [p1[0], p1[1], z1],
     [p0[0], p0[1], z1],
+  ];
+}
+
+function cubeQuads(bounds, z0, z1) {
+  const x0 = bounds.x0, x1 = bounds.x1, y0 = bounds.y0, y1 = bounds.y1;
+  return [
+    [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]],
+    [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]],
+    [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]],
+    [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]],
+    [[x1, y1, z0], [x0, y1, z0], [x0, y1, z1], [x1, y1, z1]],
+    [[x0, y1, z0], [x0, y0, z0], [x0, y0, z1], [x0, y1, z1]],
   ];
 }
 
@@ -196,21 +470,372 @@ function drawFace(points3, fill, stroke) {
   return { pts, zAvg, fill, stroke };
 }
 
+function layerPanelSidesTouchingCorner(layer, corner) {
+  const out = [];
+  for (const side of layer.support_panels) {
+    const pair = sideCorners[side];
+    if (pair[0] === corner || pair[1] === corner) out.push(side);
+  }
+  return out;
+}
+
+function pointCornerWeights(px, py) {
+  const u = clamp(px / X, 0, 1);
+  const v = clamp(py / Y, 0, 1);
+  return {
+    FL: (1 - u) * (1 - v),
+    FR: u * (1 - v),
+    BL: (1 - u) * v,
+    BR: u * v,
+  };
+}
+
+function cubeBounds(state) {
+  const sx = clamp(state.sizeX, 0.5, X);
+  const sy = clamp(state.sizeY, 0.5, Y);
+  const cx = clamp(state.posX, sx / 2, X - sx / 2);
+  const cy = clamp(state.posY, sy / 2, Y - sy / 2);
+  return {
+    x0: cx - sx / 2,
+    x1: cx + sx / 2,
+    y0: cy - sy / 2,
+    y1: cy + sy / 2,
+    sx,
+    sy,
+    cx,
+    cy,
+  };
+}
+
+function evaluateLoad(combo, state) {
+  const boardDemand = {};
+  const rodDemand = {};
+  const panelDemand = {};
+  const connectorDemand = {};
+  const pathIssues = [];
+  const eps = 1e-9;
+
+  for (let cubeIdx = 0; cubeIdx < state.cubes.length; cubeIdx++) {
+    const cube = state.cubes[cubeIdx];
+    const layer = clamp(Math.round(cube.layer), 1, N);
+    const weight = Math.max(0, cube.weight);
+    const bounds = cubeBounds(cube);
+
+    const samples = [
+      [bounds.x0, bounds.y0],
+      [bounds.x1, bounds.y0],
+      [bounds.x0, bounds.y1],
+      [bounds.x1, bounds.y1],
+    ];
+    let incoming = { FL: 0, FR: 0, BL: 0, BR: 0 };
+    for (const p of samples) {
+      const w = pointCornerWeights(p[0], p[1]);
+      incoming.FL += weight * 0.25 * w.FL;
+      incoming.FR += weight * 0.25 * w.FR;
+      incoming.BL += weight * 0.25 * w.BL;
+      incoming.BR += weight * 0.25 * w.BR;
+    }
+
+    add(boardDemand, `L${layer}`, weight);
+
+    for (let lv = layer; lv >= 1; lv--) {
+      const lp = combo.layers[lv - 1];
+      const nextIncoming = { FL: 0, FR: 0, BL: 0, BR: 0 };
+      for (const corner of CORNERS) {
+        const load = incoming[corner] || 0;
+        if (load <= eps) continue;
+        add(connectorDemand, `L${lv}:${corner}`, load);
+
+        const channels = [];
+        if (lp.rods.includes(corner)) {
+          channels.push({ kind: 'rod', id: corner, cap: state.caps.rod });
+        }
+        for (const side of layerPanelSidesTouchingCorner(lp, corner)) {
+          channels.push({ kind: 'panel', id: side, cap: state.caps.panel / 2 });
+        }
+
+        if (!channels.length) {
+          pathIssues.push(`[C${cubeIdx + 1}] No support at L${lv}:${corner} for load=${load.toFixed(2)}`);
+          continue;
+        }
+
+        const capSum = channels.reduce((s, it) => s + Math.max(it.cap, eps), 0);
+        for (const ch of channels) {
+          const share = load * Math.max(ch.cap, eps) / capSum;
+          if (ch.kind === 'rod') {
+            add(rodDemand, `L${lv}:${ch.id}`, share);
+            if (lv > 1) add(nextIncoming, ch.id, share);
+          } else {
+            add(panelDemand, `L${lv}:${ch.id}`, share);
+            if (lv > 1) {
+              const pair = sideCorners[ch.id];
+              add(nextIncoming, pair[0], share * 0.5);
+              add(nextIncoming, pair[1], share * 0.5);
+            }
+          }
+        }
+      }
+      incoming = nextIncoming;
+    }
+  }
+
+  const rodUtil = {};
+  const panelUtil = {};
+  const connectorUtil = {};
+  const boardUtil = {};
+  const boardDeflectionUtil = {};
+  let maxUtil = 0;
+  const critical = [];
+
+  function pushUtil(type, key, util) {
+    if (!Number.isFinite(util)) return;
+    critical.push({ type, key, util });
+    if (util > maxUtil) maxUtil = util;
+  }
+
+  for (const key in rodDemand) {
+    const util = rodDemand[key] / Math.max(state.caps.rod, eps);
+    rodUtil[key] = util;
+    pushUtil('rod', key, util);
+  }
+  for (const key in panelDemand) {
+    const util = panelDemand[key] / Math.max(state.caps.panel, eps);
+    panelUtil[key] = util;
+    pushUtil('panel', key, util);
+  }
+  for (const key in connectorDemand) {
+    const util = connectorDemand[key] / Math.max(state.caps.connector, eps);
+    connectorUtil[key] = util;
+    pushUtil('connector', key, util);
+  }
+  for (const key in boardDemand) {
+    const util = boardDemand[key] / Math.max(state.caps.board, eps);
+    boardUtil[key] = util;
+    pushUtil('board', key, util);
+    const utilDef = boardDemand[key] / Math.max(state.caps.boardDeflect, eps);
+    boardDeflectionUtil[key] = utilDef;
+    pushUtil('board_deflect', key, utilDef);
+  }
+
+  critical.sort((a, b) => b.util - a.util);
+  const pass = pathIssues.length === 0 && maxUtil <= 1.0;
+
+  return {
+    boardDemand,
+    rodDemand,
+    panelDemand,
+    connectorDemand,
+    rodUtil,
+    panelUtil,
+    connectorUtil,
+    boardUtil,
+    boardDeflectionUtil,
+    pathIssues,
+    maxUtil,
+    pass,
+    critical: critical.slice(0, 6),
+  };
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function parseLayerCornerKey(key) {
+  const m = /^L(\d+):([A-Z]{2})$/.exec(String(key));
+  if (!m) return null;
+  return { layer: clamp(Number(m[1]), 1, N), corner: m[2] };
+}
+
+function parseLayerSideKey(key) {
+  const m = /^L(\d+):(front|back|left|right)$/.exec(String(key));
+  if (!m) return null;
+  return { layer: clamp(Number(m[1]), 1, N), side: m[2] };
+}
+
+function parseLayerOnlyKey(key) {
+  const m = /^L(\d+)$/.exec(String(key));
+  if (!m) return null;
+  return { layer: clamp(Number(m[1]), 1, N) };
+}
+
+function overloadAnchor(type, key) {
+  if (type === 'rod') {
+    const info = parseLayerCornerKey(key);
+    if (!info || !cornerXY[info.corner]) return null;
+    return [cornerXY[info.corner][0], cornerXY[info.corner][1], (info.layer - 0.5) * H];
+  }
+  if (type === 'panel') {
+    const info = parseLayerSideKey(key);
+    if (!info || !sideCorners[info.side]) return null;
+    const pair = sideCorners[info.side];
+    const p0 = cornerXY[pair[0]], p1 = cornerXY[pair[1]];
+    return [(p0[0] + p1[0]) * 0.5, (p0[1] + p1[1]) * 0.5, (info.layer - 0.5) * H];
+  }
+  if (type === 'connector') {
+    const info = parseLayerCornerKey(key);
+    if (!info || !cornerXY[info.corner]) return null;
+    return [cornerXY[info.corner][0], cornerXY[info.corner][1], info.layer * H];
+  }
+  if (type === 'board' || type === 'board_deflect') {
+    const info = parseLayerOnlyKey(key);
+    if (!info) return null;
+    if (type === 'board_deflect') {
+      return [X * 0.62, Y * 0.38, info.layer * H];
+    }
+    return [X * 0.5, Y * 0.5, info.layer * H];
+  }
+  return null;
+}
+
+function collectOverloadedBases(ev, state) {
+  const out = [];
+  function collect(type, label, demandMap, cap) {
+    const safeCap = Math.max(cap, 1e-9);
+    for (const key in demandMap) {
+      const demand = Number(demandMap[key] || 0);
+      const util = demand / safeCap;
+      if (util > 1.0 + 1e-9) {
+        out.push({ type, label, key, demand, cap: safeCap, util, anchor: overloadAnchor(type, key) });
+      }
+    }
+  }
+  collect('rod', 'Rod', ev.rodDemand, state.caps.rod);
+  collect('panel', 'Support panel', ev.panelDemand, state.caps.panel);
+  collect('connector', 'Connector', ev.connectorDemand, state.caps.connector);
+  collect('board', 'Shelf board', ev.boardDemand, state.caps.board);
+  collect('board_deflect', 'Board deflection', ev.boardDemand, state.caps.boardDeflect);
+  out.sort((a, b) => b.util - a.util);
+  return out;
+}
+
+function renderFaultBox(ev) {
+  if (!faultBox || !faultHint) return;
+  const overloads = collectOverloadedBases(ev, loadState);
+  const hasFailure = overloads.length > 0 || ev.pathIssues.length > 0;
+  faultMarkers = [];
+  if (!hasFailure) {
+    faultBox.style.display = 'none';
+    faultBox.innerHTML = '';
+    faultHint.style.display = 'block';
+    return;
+  }
+  faultHint.style.display = 'none';
+  faultBox.style.display = 'block';
+
+  const html = [];
+  html.push('<h4>Failure Diagnostics</h4>');
+  html.push('<div><b>Status:</b> FAIL</div>');
+  html.push(`<div><b>Max utilization:</b> ${ev.maxUtil.toFixed(3)}</div>`);
+  if (ev.pathIssues.length) {
+    html.push('<div style="margin-top:6px;"><b>Load path issues:</b></div><ul>');
+    for (const issue of ev.pathIssues.slice(0, 4)) {
+      html.push(`<li>${escapeHtml(issue)}</li>`);
+    }
+    if (ev.pathIssues.length > 4) {
+      html.push(`<li>...and ${ev.pathIssues.length - 4} more</li>`);
+    }
+    html.push('</ul>');
+  }
+  if (overloads.length) {
+    const shown = overloads.slice(0, 8);
+    faultMarkers = shown
+      .map((item, idx) => ({ ...item, markerId: idx + 1 }))
+      .filter((item) => Array.isArray(item.anchor) && item.anchor.length === 3);
+    html.push('<div style="margin-top:6px;"><b>Overloaded bases (current load / limit):</b></div><ul>');
+    for (const item of shown) {
+      const marker = faultMarkers.find((m) => m.type === item.type && m.key === item.key);
+      const badge = marker
+        ? `<span style="display:inline-block;min-width:18px;padding:0 5px;height:18px;line-height:18px;border-radius:10px;background:#991b1b;color:#fff;font-size:11px;text-align:center;margin-right:6px;">#${marker.markerId}</span>`
+        : '';
+      html.push(
+        `<li>${badge}${escapeHtml(item.label)} ${escapeHtml(item.key)}: ${item.demand.toFixed(2)} / ${item.cap.toFixed(2)} (util=${item.util.toFixed(3)})</li>`
+      );
+    }
+    if (overloads.length > 8) {
+      html.push(`<li>...and ${overloads.length - 8} more</li>`);
+    }
+    html.push('</ul>');
+    if (faultMarkers.length) {
+      html.push('<div style="margin-top:6px;color:#7f1d1d;">Matching thin leader lines are drawn in the 3D stage with the same #id.</div>');
+    }
+  }
+  faultBox.innerHTML = html.join('');
+}
+
+function drawFaultLeaderLines() {
+  if (!faultMarkers.length) return;
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
+  ctx.save();
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let i = 0; i < faultMarkers.length; i++) {
+    const item = faultMarkers[i];
+    if (!Array.isArray(item.anchor) || item.anchor.length !== 3) continue;
+    const p = project(item.anchor);
+    const edgeY = clamp(28 + i * 24, 14, h - 14);
+    const edgeX = w - 2;
+    const knotX = w - 30;
+    const knotY = edgeY;
+
+    ctx.strokeStyle = 'rgba(153,27,27,0.95)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p[0], p[1]);
+    ctx.lineTo(knotX, knotY);
+    ctx.lineTo(edgeX, edgeY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.98)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(153,27,27,0.95)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const bx = knotX - 12;
+    ctx.beginPath();
+    ctx.arc(bx, knotY, 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(153,27,27,0.98)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,1)';
+    ctx.fillText(String(item.markerId), bx, knotY + 0.2);
+  }
+  ctx.restore();
+}
+
 function draw() {
-  const w = viewer.clientWidth;
-  const h = viewer.clientHeight;
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
   ctx.clearRect(0, 0, w, h);
 
   const combo = combos[current];
   if (!combo) return;
+  const evaluation = evaluateLoad(combo, loadState);
+  lastEval = evaluation;
+  renderFaultBox(evaluation);
 
   const faces = [];
 
   for (let level = 1; level <= N; level++) {
     const z = level * H;
+    const util = Math.max(
+      evaluation.boardUtil[`L${level}`] || 0,
+      evaluation.boardDeflectionUtil[`L${level}`] || 0
+    );
     faces.push(drawFace(
       [[0,0,z], [X,0,z], [X,Y,z], [0,Y,z]],
-      'rgba(59,130,246,0.30)', 'rgba(30,64,175,0.90)'
+      stressColor(util, 0.82), 'rgba(75,85,99,0.95)'
     ));
   }
 
@@ -218,12 +843,21 @@ function draw() {
     const layer = combo.layers[i];
     const z0 = i * H;
     const z1 = (i + 1) * H;
-    const alpha = 0.45;
-    const red = 245 - (i % 4) * 8;
-    const green = 158 - (i % 4) * 14;
-    const blue = 11 + (i % 4) * 12;
-    for (const s of layer.support_panels) {
-      faces.push(drawFace(panelQuad(s, z0, z1), `rgba(${red},${green},${blue},${alpha})`, 'rgba(154,52,18,0.95)'));
+    for (const side of layer.support_panels) {
+      const util = evaluation.panelUtil[`L${i + 1}:${side}`] || 0;
+      faces.push(drawFace(panelQuad(side, z0, z1), stressColor(util, 0.70), 'rgba(75,85,99,0.95)'));
+    }
+  }
+
+  for (let i = 0; i < loadState.cubes.length; i++) {
+    const cube = loadState.cubes[i];
+    const b = cubeBounds(cube);
+    const cubeZ0 = clamp(Math.round(cube.layer), 1, N) * H;
+    const cubeZ1 = cubeZ0 + clamp(cube.sizeZ, 0.5, H * 2.0);
+    const fill = i === loadState.activeCube ? 'rgba(30,64,175,0.24)' : 'rgba(30,64,175,0.14)';
+    const stroke = i === loadState.activeCube ? 'rgba(30,64,175,1.0)' : 'rgba(30,64,175,0.70)';
+    for (const quad of cubeQuads(b, cubeZ0, cubeZ1)) {
+      faces.push(drawFace(quad, fill, stroke));
     }
   }
 
@@ -240,12 +874,14 @@ function draw() {
     ctx.stroke();
   }
 
-  const rods = buildRods(combo);
-  ctx.strokeStyle = 'rgba(17,24,39,1)';
-  ctx.lineWidth = 3;
-  for (const c of ['FL', 'FR', 'BL', 'BR']) {
-    const xy = cornerXY[c];
-    for (const seg of rods[c]) {
+  const rods = segmentRods(combo);
+  ctx.lineWidth = 4;
+  for (const corner of CORNERS) {
+    const xy = cornerXY[corner];
+    for (const seg of rods[corner]) {
+      const layer = seg[2];
+      const util = evaluation.rodUtil[`L${layer}:${corner}`] || 0;
+      ctx.strokeStyle = stressColor(util, 1.0);
       const p0 = project([xy[0], xy[1], seg[0]]);
       const p1 = project([xy[0], xy[1], seg[1]]);
       ctx.beginPath();
@@ -254,6 +890,29 @@ function draw() {
       ctx.stroke();
     }
   }
+
+  // Connector nodes (all three bases visualized).
+  for (let lv = 1; lv <= N; lv++) {
+    const layer = combo.layers[lv - 1];
+    for (const corner of CORNERS) {
+      const touched = layer.rods.includes(corner) || layer.support_panels.some((side) => {
+        const pair = sideCorners[side];
+        return pair[0] === corner || pair[1] === corner;
+      });
+      if (!touched) continue;
+      const util = evaluation.connectorUtil[`L${lv}:${corner}`] || 0;
+      const p = project([cornerXY[corner][0], cornerXY[corner][1], lv * H]);
+      ctx.beginPath();
+      ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = stressColor(util, 1.0);
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(17,24,39,0.95)';
+      ctx.stroke();
+    }
+  }
+
+  drawFaultLeaderLines();
 }
 
 function refreshInfo() {
@@ -262,17 +921,197 @@ function refreshInfo() {
     document.getElementById('info').textContent = '';
     return;
   }
+  const ev = lastEval || evaluateLoad(combo, loadState);
+  const active = getActiveCube();
   const lines = [
-    combo.combo_id,
-    combo.label,
-    'equivalent_count=' + combo.equivalent_count
+    combo.combo_id + '  ' + combo.label,
+    'equivalent_count=' + combo.equivalent_count,
+    `cube_count=${loadState.cubes.length}, active=C${loadState.activeCube + 1}`,
+    `active_cube(layer=${Math.round(active.layer)}, size=[${active.sizeX.toFixed(2)},${active.sizeY.toFixed(2)},${active.sizeZ.toFixed(2)}], center=[${active.posX.toFixed(2)},${active.posY.toFixed(2)}], weight=${active.weight.toFixed(2)})`,
+    `caps(rod=${loadState.caps.rod.toFixed(2)}, panel=${loadState.caps.panel.toFixed(2)}, connector=${loadState.caps.connector.toFixed(2)}, board=${loadState.caps.board.toFixed(2)}, boardDeflect=${loadState.caps.boardDeflect.toFixed(2)})`,
+    `qualification=${ev.pass ? 'PASS' : 'FAIL'} max_util=${ev.maxUtil.toFixed(3)}`,
   ];
-  for (let i = 0; i < combo.layers.length; i++) {
-    const layer = combo.layers[i];
-    lines.push(`L${i + 1} rods=` + JSON.stringify(layer.rods));
-    lines.push(`L${i + 1} panels=` + JSON.stringify(layer.support_panels));
+  if (ev.pathIssues.length) {
+    lines.push('path_issues=' + ev.pathIssues.join(' | '));
+  }
+  if (ev.critical.length) {
+    lines.push('critical=' + ev.critical.map((it) => `${it.type}:${it.key}:${it.util.toFixed(3)}`).join(' | '));
   }
   document.getElementById('info').textContent = lines.join('\n');
+}
+
+function syncControlsFromState() {
+  const active = getActiveCube();
+  controls.cubeCount.value = String(loadState.cubes.length);
+  controls.cubeLayer.value = String(Math.round(active.layer));
+  controls.cubeWeight.value = active.weight.toFixed(2);
+  controls.cubeSizeX.value = active.sizeX.toFixed(2);
+  controls.cubeSizeY.value = active.sizeY.toFixed(2);
+  controls.cubeSizeZ.value = active.sizeZ.toFixed(2);
+  controls.cubePosX.value = active.posX.toFixed(2);
+  controls.cubePosY.value = active.posY.toFixed(2);
+  controls.capRod.value = loadState.caps.rod.toFixed(2);
+  controls.capPanel.value = loadState.caps.panel.toFixed(2);
+  controls.capConnector.value = loadState.caps.connector.toFixed(2);
+  controls.capBoard.value = loadState.caps.board.toFixed(2);
+  controls.capBoardDeflect.value = loadState.caps.boardDeflect.toFixed(2);
+  syncCubeIndexOptions();
+}
+
+function normalizeCube(cube) {
+  cube.layer = clamp(Math.round(cube.layer), 1, N);
+  cube.weight = Math.max(0, cube.weight);
+  cube.sizeX = clamp(cube.sizeX, 0.5, X);
+  cube.sizeY = clamp(cube.sizeY, 0.5, Y);
+  cube.sizeZ = clamp(cube.sizeZ, 0.5, H * 2.0);
+  cube.posX = clamp(cube.posX, cube.sizeX / 2, X - cube.sizeX / 2);
+  cube.posY = clamp(cube.posY, cube.sizeY / 2, Y - cube.sizeY / 2);
+}
+
+function normalizeState() {
+  if (!loadState.cubes.length) loadState.cubes.push(makeDefaultCube());
+  loadState.activeCube = clamp(Math.round(loadState.activeCube), 0, loadState.cubes.length - 1);
+  for (const cube of loadState.cubes) normalizeCube(cube);
+  loadState.caps.rod = Math.max(1e-6, loadState.caps.rod);
+  loadState.caps.panel = Math.max(1e-6, loadState.caps.panel);
+  loadState.caps.connector = Math.max(1e-6, loadState.caps.connector);
+  loadState.caps.board = Math.max(1e-6, loadState.caps.board);
+  loadState.caps.boardDeflect = Math.max(1e-6, loadState.caps.boardDeflect);
+}
+
+function ensureCubeCount(targetCount) {
+  const want = clamp(Math.round(targetCount), 1, 12);
+  while (loadState.cubes.length < want) {
+    const newCube = makeDefaultCube();
+    newCube.layer = clamp(loadState.cubes.length + 1, 1, N);
+    loadState.cubes.push(newCube);
+  }
+  while (loadState.cubes.length > want) {
+    loadState.cubes.pop();
+  }
+  loadState.activeCube = clamp(loadState.activeCube, 0, loadState.cubes.length - 1);
+}
+
+function syncCubeIndexOptions() {
+  const sel = controls.cubeIndex;
+  const prev = loadState.activeCube;
+  sel.innerHTML = '';
+  for (let i = 0; i < loadState.cubes.length; i++) {
+    const op = document.createElement('option');
+    op.value = String(i);
+    op.textContent = `C${i + 1}`;
+    sel.appendChild(op);
+  }
+  loadState.activeCube = clamp(prev, 0, loadState.cubes.length - 1);
+  sel.value = String(loadState.activeCube);
+}
+
+function onControlInput() {
+  ensureCubeCount(num(controls.cubeCount.value, loadState.cubes.length));
+  loadState.activeCube = clamp(num(controls.cubeIndex.value, loadState.activeCube), 0, loadState.cubes.length - 1);
+  const active = getActiveCube();
+  active.layer = num(controls.cubeLayer.value, active.layer);
+  active.weight = num(controls.cubeWeight.value, active.weight);
+  active.sizeX = num(controls.cubeSizeX.value, active.sizeX);
+  active.sizeY = num(controls.cubeSizeY.value, active.sizeY);
+  active.sizeZ = num(controls.cubeSizeZ.value, active.sizeZ);
+  active.posX = num(controls.cubePosX.value, active.posX);
+  active.posY = num(controls.cubePosY.value, active.posY);
+  loadState.caps.rod = num(controls.capRod.value, loadState.caps.rod);
+  loadState.caps.panel = num(controls.capPanel.value, loadState.caps.panel);
+  loadState.caps.connector = num(controls.capConnector.value, loadState.caps.connector);
+  loadState.caps.board = num(controls.capBoard.value, loadState.caps.board);
+  loadState.caps.boardDeflect = num(controls.capBoardDeflect.value, loadState.caps.boardDeflect);
+  normalizeState();
+  syncControlsFromState();
+  draw();
+  refreshInfo();
+}
+
+function initControls() {
+  controls.cubeCount.min = '1';
+  controls.cubeCount.max = '12';
+  controls.cubeCount.step = '1';
+  controls.cubeLayer.min = '1';
+  controls.cubeLayer.max = String(N);
+  controls.cubeLayer.step = '1';
+  controls.cubeWeight.min = '0';
+  controls.cubeWeight.step = '1';
+  controls.cubeSizeX.min = '0.5';
+  controls.cubeSizeX.max = String(X);
+  controls.cubeSizeX.step = '0.5';
+  controls.cubeSizeY.min = '0.5';
+  controls.cubeSizeY.max = String(Y);
+  controls.cubeSizeY.step = '0.5';
+  controls.cubeSizeZ.min = '0.5';
+  controls.cubeSizeZ.max = String(H * 2.0);
+  controls.cubeSizeZ.step = '0.5';
+  controls.cubePosX.min = '0';
+  controls.cubePosX.max = String(X);
+  controls.cubePosX.step = '0.5';
+  controls.cubePosY.min = '0';
+  controls.cubePosY.max = String(Y);
+  controls.cubePosY.step = '0.5';
+
+  for (const key of ['capRod', 'capPanel', 'capConnector', 'capBoard', 'capBoardDeflect']) {
+    controls[key].min = '0.001';
+    controls[key].step = '0.5';
+  }
+
+  const inputIds = [
+    'cubeCount', 'cubeLayer', 'cubeWeight', 'cubeSizeX', 'cubeSizeY', 'cubeSizeZ', 'cubePosX', 'cubePosY',
+    'capRod', 'capPanel', 'capConnector', 'capBoard', 'capBoardDeflect',
+  ];
+  for (const id of inputIds) {
+    controls[id].addEventListener('input', onControlInput);
+    controls[id].addEventListener('change', onControlInput);
+  }
+  controls.cubeIndex.addEventListener('change', onControlInput);
+  controls.resetCapsBtn.addEventListener('click', () => {
+    loadState.caps = {
+      rod: EXTERNAL_DEFAULTS.rod_capacity,
+      panel: EXTERNAL_DEFAULTS.support_panel_capacity,
+      connector: EXTERNAL_DEFAULTS.connector_capacity,
+      board: EXTERNAL_DEFAULTS.board_capacity,
+      boardDeflect: EXTERNAL_DEFAULTS.board_deflection_capacity,
+    };
+    normalizeState();
+    syncControlsFromState();
+    draw();
+    refreshInfo();
+  });
+
+  normalizeState();
+  syncControlsFromState();
+}
+
+function activeCubeCenterProjected() {
+  const active = getActiveCube();
+  const z0 = clamp(Math.round(active.layer), 1, N) * H;
+  const z1 = z0 + clamp(active.sizeZ, 0.5, H * 2.0);
+  return project([active.posX, active.posY, (z0 + z1) * 0.5]);
+}
+
+function pickCubeAtScreen(clientX, clientY) {
+  const rect = cv.getBoundingClientRect();
+  const lx = clientX - rect.left;
+  const ly = clientY - rect.top;
+  let best = -1;
+  let bestD2 = 1e18;
+  for (let i = 0; i < loadState.cubes.length; i++) {
+    const cube = loadState.cubes[i];
+    const z0 = clamp(Math.round(cube.layer), 1, N) * H;
+    const z1 = z0 + clamp(cube.sizeZ, 0.5, H * 2.0);
+    const c = project([cube.posX, cube.posY, (z0 + z1) * 0.5]);
+    const dx = lx - c[0];
+    const dy = ly - c[1];
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = i;
+    }
+  }
+  return bestD2 <= 20 * 20 ? best : -1;
 }
 
 function renderCurrent() {
@@ -283,11 +1122,11 @@ function renderCurrent() {
   }
   const sel = document.getElementById('comboSelect');
   sel.value = String(current);
-  refreshInfo();
   draw();
+  refreshInfo();
 }
 
-try {
+  try {
   const sel = document.getElementById('comboSelect');
   combos.forEach((c, idx) => {
     const op = document.createElement('option');
@@ -320,7 +1159,19 @@ try {
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
   cv.addEventListener('mousedown', (e) => {
     dragging = true;
-    mode = (e.button === 2) ? 'pan' : 'rotate';
+    if (e.button === 2) {
+      mode = 'pan';
+    } else {
+      const picked = pickCubeAtScreen(e.clientX, e.clientY);
+      if (picked >= 0) {
+        loadState.activeCube = picked;
+        mode = 'cube';
+        syncControlsFromState();
+        refreshInfo();
+      } else {
+        mode = 'rotate';
+      }
+    }
     lastX = e.clientX;
     lastY = e.clientY;
   });
@@ -335,9 +1186,21 @@ try {
       yaw += dx * 0.008;
       pitch += dy * 0.008;
       pitch = Math.max(-1.4, Math.min(1.4, pitch));
-    } else {
+    } else if (mode === 'pan') {
       panX += dx;
       panY += dy;
+    } else if (mode === 'cube') {
+      const active = getActiveCube();
+      const rx = dx / Math.max(zoom, 1e-6);
+      const ry = -dy / Math.max(zoom, 1e-6);
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const worldDx = rx * cy + ry * sy;
+      const worldDy = -rx * sy + ry * cy;
+      active.posX += worldDx;
+      active.posY += worldDy;
+      normalizeCube(active);
+      syncControlsFromState();
+      refreshInfo();
     }
     draw();
   });
@@ -348,10 +1211,11 @@ try {
     draw();
   }, { passive: false });
 
+  initControls();
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
   renderCurrent();
-  showStatus('Viewer ready. combos=' + combos.length, false);
+  showStatus('Viewer ready. Drag cube to move x/y. External properties enabled. combos=' + combos.length, false);
 } catch (err) {
   showStatus('Viewer init failed: ' + String(err), true);
 }

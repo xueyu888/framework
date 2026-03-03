@@ -164,7 +164,7 @@
       "l1_anchor": "## 3. 模块（最小可行基，Module）",
       "l2_file": "standards/L2/置物架框架标准.md",
       "l2_anchor": "## 3. 模块（最小可行基，Module）",
-      "sync_note": "L2 module role descriptions refined; L3 symbols unchanged",
+      "sync_note": "L2 keeps the three bases unchanged and injects load capacities via external property set for decoupled load-bearing evaluation",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -184,7 +184,7 @@
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
       "l2_file": "standards/L2/置物架框架标准.md",
       "l2_anchor": "## 4. 组合原则（Combination Principles）",
-      "sync_note": "L2 unified R1-R7 rules map to single-shelf rod support, four-corner panel support, connectivity, and boundary-constrained load path in L3",
+      "sync_note": "L2 keeps geometric legality in R1-R7 and moves load-capacity checks to qualification outputs (utilization/pass-fail) under external properties",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -248,7 +248,7 @@
       "l1_anchor": "## 5. 验证（Verification）",
       "l2_file": "standards/L2/置物架框架标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
-      "sync_note": "L2 verification conditions map to boundary + unified R1-R7 checks with explicit failure reasons",
+      "sync_note": "L2 verification now separates legality vs qualification and requires load-bearing pass criteria under configurable external properties and load case",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",

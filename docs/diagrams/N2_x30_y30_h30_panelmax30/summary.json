@@ -6,8 +6,17 @@
     "h": 30.0,
     "side_panel_height_max": 30.0,
     "rod_length_unlimited": true,
-    "payload_ignored": true,
-    "opening_ignored": true
+    "payload_is_qualification_only": true,
+    "opening_ignored": true,
+    "external_property_defaults": {
+      "rod_capacity": 60.0,
+      "support_panel_capacity": 90.0,
+      "connector_capacity": 45.0,
+      "board_capacity": 120.0,
+      "board_deflection_capacity": 100.0
+    },
+    "load_model": "engineering_approximation",
+    "interactive_cube_enabled": true
   },
   "rule_interpretation": {
     "single_layer_patterns": 11,
@@ -15,7 +24,8 @@
     "dedup": "rotation equivalence around vertical axis (0/90/180/270 deg)",
     "R2": "per layer E_total=4 with E(rod)=1 and E(panel)=2, shared panel corner counted once; full-corner coverage",
     "R4_note": "90-degree panel-panel connection is allowed but does not relax corner support completeness",
-    "R7": "per layer at least one side open"
+    "R7": "per layer at least one side open",
+    "load_qualification": "load pass/fail and utilization are evaluated from external base capacities; not used to filter combo legality"
   },
   "raw_combo_count": 121,
   "unique_combo_count_after_rotation_dedup": 33,
