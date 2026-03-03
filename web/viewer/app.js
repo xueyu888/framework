@@ -5,6 +5,7 @@ const COMBINATIONS_URL = "../../artifacts/combinations.json";
 const SUMMARY_URL = "../../artifacts/summary.json";
 
 const state = {
+  baseCombinations: [],
   combinations: [],
   summary: null,
   filtered: [],
@@ -13,6 +14,16 @@ const state = {
   activePage: "page-overview",
   searchKeyword: "",
   passFilter: "all",
+  ruleConfig: {
+    useR1: true,
+    useR2: true,
+    useR3: true,
+    useR4: true,
+    useR5: true,
+    useR6: true,
+    maxPanels: null,
+    maxRods: null,
+  },
 };
 
 const I18N = {
@@ -80,6 +91,8 @@ function tDescription(text) {
 }
 
 function tReason(text) {
+  if (text.startsWith("panel count exceeds limit")) return "隔板数量超过配置上限";
+  if (text.startsWith("rod count exceeds limit")) return "杆数量超过配置上限";
   return I18N.reason[text] || text;
 }
 
@@ -119,6 +132,364 @@ function detectFailureStages(item) {
   }
 
   return [...stages];
+}
+
+function buildNodeMap(graph) {
+  const map = new Map();
+  for (const node of graph.nodes || []) {
+    map.set(node.id, node.position);
+  }
+  return map;
+}
+
+function parsePositiveIntOrNull(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num < 0) return null;
+  return Math.floor(num);
+}
+
+function readRuleConfigFromUI() {
+  return {
+    useR1: document.getElementById("ruleR1")?.checked ?? true,
+    useR2: document.getElementById("ruleR2")?.checked ?? true,
+    useR3: document.getElementById("ruleR3")?.checked ?? true,
+    useR4: document.getElementById("ruleR4")?.checked ?? true,
+    useR5: document.getElementById("ruleR5")?.checked ?? true,
+    useR6: document.getElementById("ruleR6")?.checked ?? true,
+    maxPanels: parsePositiveIntOrNull(document.getElementById("maxPanelInput")?.value),
+    maxRods: parsePositiveIntOrNull(document.getElementById("maxRodInput")?.value),
+  };
+}
+
+function isRodVertical(rod, nodeMap) {
+  const a = nodeMap.get(rod.from);
+  const b = nodeMap.get(rod.to);
+  if (!a || !b) return false;
+  const sameX = Math.abs(a[0] - b[0]) <= 1e-6;
+  const sameZ = Math.abs(a[2] - b[2]) <= 1e-6;
+  const diffY = Math.abs(a[1] - b[1]) > 1e-6;
+  return sameX && sameZ && diffY;
+}
+
+function isPanelHorizontal(panel, nodeMap) {
+  const supports = panel.supports || [];
+  if (!supports.length) return false;
+  const yValues = new Set();
+  for (const support of supports) {
+    const pos = nodeMap.get(support);
+    if (!pos) return false;
+    yValues.add(Number(pos[1]).toFixed(6));
+  }
+  return yValues.size === 1;
+}
+
+function isModuleGraphConnected(graph) {
+  const connectorIds = (graph.nodes || []).map((node) => node.id);
+  const rods = graph.rods || [];
+  const panels = graph.panels || [];
+
+  const moduleNodes = [];
+  connectorIds.forEach((id) => moduleNodes.push(`C:${id}`));
+  rods.forEach((_, idx) => moduleNodes.push(`R:${idx}`));
+  panels.forEach((_, idx) => moduleNodes.push(`P:${idx}`));
+
+  if (!moduleNodes.length) return false;
+
+  const adj = new Map(moduleNodes.map((id) => [id, new Set()]));
+  rods.forEach((rod, idx) => {
+    const rid = `R:${idx}`;
+    const ca = `C:${rod.from}`;
+    const cb = `C:${rod.to}`;
+    if (adj.has(ca)) {
+      adj.get(rid).add(ca);
+      adj.get(ca).add(rid);
+    }
+    if (adj.has(cb)) {
+      adj.get(rid).add(cb);
+      adj.get(cb).add(rid);
+    }
+  });
+  panels.forEach((panel, idx) => {
+    const pid = `P:${idx}`;
+    for (const support of panel.supports || []) {
+      const cid = `C:${support}`;
+      if (!adj.has(cid)) continue;
+      adj.get(pid).add(cid);
+      adj.get(cid).add(pid);
+    }
+  });
+
+  const stack = [moduleNodes[0]];
+  const visited = new Set();
+  while (stack.length) {
+    const current = stack.pop();
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const next of adj.get(current) || []) {
+      if (!visited.has(next)) stack.push(next);
+    }
+  }
+
+  return visited.size === moduleNodes.length;
+}
+
+function validateCombinationByConfig(item, config) {
+  const graph = item.graph;
+  const nodeMap = buildNodeMap(graph);
+  const reasons = [];
+
+  if (config.maxPanels !== null && (graph.panels || []).length > config.maxPanels) {
+    reasons.push(`panel count exceeds limit: ${(graph.panels || []).length} > ${config.maxPanels}`);
+  }
+  if (config.maxRods !== null && (graph.rods || []).length > config.maxRods) {
+    reasons.push(`rod count exceeds limit: ${(graph.rods || []).length} > ${config.maxRods}`);
+  }
+
+  if (config.useR2 && (!graph.nodes || graph.nodes.length === 0)) {
+    reasons.push("module combination violates R2: connector module is required");
+  }
+
+  if (config.useR3) {
+    for (const rod of graph.rods || []) {
+      if (!nodeMap.has(rod.from) || !nodeMap.has(rod.to)) {
+        reasons.push("module combination violates R3: rod must connect through connector nodes");
+        break;
+      }
+    }
+    if (!reasons.some((text) => text.includes("R3"))) {
+      for (const panel of graph.panels || []) {
+        const supports = panel.supports || [];
+        if (!supports.length || supports.some((id) => !nodeMap.has(id))) {
+          reasons.push("module combination violates R3: panel must connect through connector nodes");
+          break;
+        }
+      }
+    }
+  }
+
+  if (config.useR4) {
+    const counts = new Map();
+    for (const node of graph.nodes || []) counts.set(node.id, 0);
+    for (const rod of graph.rods || []) {
+      if (counts.has(rod.from)) counts.set(rod.from, counts.get(rod.from) + 1);
+      if (counts.has(rod.to)) counts.set(rod.to, counts.get(rod.to) + 1);
+    }
+    for (const panel of graph.panels || []) {
+      for (const support of panel.supports || []) {
+        if (counts.has(support)) counts.set(support, counts.get(support) + 1);
+      }
+    }
+    const hasWeakConnector = [...counts.values()].some((count) => count < 2);
+    if (hasWeakConnector) {
+      reasons.push("module combination violates R4: connector must connect at least two modules");
+    }
+  }
+
+  if (config.useR5) {
+    for (const panel of graph.panels || []) {
+      if (!isPanelHorizontal(panel, nodeMap)) {
+        reasons.push("module combination violates R5: panel must be horizontal");
+        break;
+      }
+    }
+  }
+
+  if (config.useR6) {
+    for (const rod of graph.rods || []) {
+      if (!isRodVertical(rod, nodeMap)) {
+        reasons.push("module combination violates R6: rod must be vertical");
+        break;
+      }
+    }
+  }
+
+  if (config.useR1 && !isModuleGraphConnected(graph)) {
+    reasons.push("module combination violates R1: module graph is disconnected");
+  }
+
+  return {
+    pass: reasons.length === 0,
+    reasons,
+  };
+}
+
+function evaluateByThreeStages(item, config, summary) {
+  const baseline = Number(summary?.standard_profile?.baseline_efficiency ?? summary?.baseline_score ?? 1);
+  const boundaryLimit = summary?.standard_profile?.boundary_limit_a;
+  const reasons = [];
+  const warnings = [];
+
+  const combination = validateCombinationByConfig(item, config);
+  if (!combination.pass) {
+    return {
+      combination_valid: false,
+      boundary_valid: null,
+      goal_passed: null,
+      open_style_valid: null,
+      efficiency_valid: null,
+      passed: false,
+      failed_stage: "combination",
+      reasons: combination.reasons,
+      warnings,
+    };
+  }
+
+  const footprint = Number(item.metrics.footprint_projection_boundary_area ?? item.metrics.footprint_area ?? 0);
+  let boundaryValid = true;
+  if (typeof boundaryLimit === "number" && Number.isFinite(boundaryLimit)) {
+    if (footprint > boundaryLimit) {
+      boundaryValid = false;
+      reasons.push("footprint area exceeds boundary A");
+    }
+  } else {
+    warnings.push("boundary A is not concretely specified in standard; boundary stage is pass-through");
+  }
+  if (!boundaryValid) {
+    return {
+      combination_valid: true,
+      boundary_valid: false,
+      goal_passed: null,
+      open_style_valid: null,
+      efficiency_valid: null,
+      passed: false,
+      failed_stage: "boundary",
+      reasons,
+      warnings,
+    };
+  }
+
+  const targetEfficiency = Number(item.metrics.target_efficiency ?? item.metrics.goal_score ?? 0);
+  const openStyleValid = true;
+  const efficiencyValid = targetEfficiency > baseline;
+  if (!openStyleValid) reasons.push("open-style goal not satisfied");
+  if (!efficiencyValid) reasons.push("target efficiency does not exceed baseline efficiency");
+
+  if (reasons.length) {
+    return {
+      combination_valid: true,
+      boundary_valid: true,
+      goal_passed: false,
+      open_style_valid: openStyleValid,
+      efficiency_valid: efficiencyValid,
+      passed: false,
+      failed_stage: "goal",
+      reasons,
+      warnings,
+    };
+  }
+
+  return {
+    combination_valid: true,
+    boundary_valid: true,
+    goal_passed: true,
+    open_style_valid: true,
+    efficiency_valid: true,
+    passed: true,
+    failed_stage: null,
+    reasons: [],
+    warnings,
+  };
+}
+
+function buildRuntimeSummary(items, referenceSummary, ruleConfig) {
+  const total = items.length;
+  const passed = items.filter((item) => item.validation?.passed).length;
+  const failed = total - passed;
+  const scores = items.map((item) => Number(item.metrics.goal_score ?? item.metrics.target_efficiency ?? 0));
+  const scoreMin = scores.length ? Math.min(...scores) : 0;
+  const scoreMax = scores.length ? Math.max(...scores) : 0;
+  const scoreAvg = scores.length ? scores.reduce((acc, value) => acc + value, 0) / scores.length : 0;
+
+  const bins = 8;
+  const width = scoreMax > scoreMin ? (scoreMax - scoreMin) / bins : 1;
+  const scoreDistribution = [];
+  for (let idx = 0; idx < bins; idx += 1) {
+    const lower = scoreMax > scoreMin ? scoreMin + idx * width : scoreMin + idx;
+    const upper = scoreMax > scoreMin ? lower + width : lower + 1;
+    const countInBin = scores.filter((score) => (
+      score >= lower && (score < upper || (idx === bins - 1 && score <= upper))
+    )).length;
+    scoreDistribution.push({
+      bin: idx + 1,
+      range: [Number(lower.toFixed(3)), Number(upper.toFixed(3))],
+      count: countInBin,
+    });
+  }
+
+  const familyMap = new Map();
+  for (const item of items) {
+    const key = item.family;
+    if (!familyMap.has(key)) {
+      familyMap.set(key, {
+        family: item.family,
+        label: item.family_label,
+        count: 0,
+        passed: 0,
+        failed: 0,
+        scoreSum: 0,
+      });
+    }
+    const record = familyMap.get(key);
+    record.count += 1;
+    record.scoreSum += Number(item.metrics.goal_score ?? item.metrics.target_efficiency ?? 0);
+    if (item.validation?.passed) record.passed += 1;
+    else record.failed += 1;
+  }
+
+  const families = [...familyMap.values()].map((record) => ({
+    family: record.family,
+    label: record.label,
+    count: record.count,
+    passed: record.passed,
+    failed: record.failed,
+    pass_rate: Number((record.passed / Math.max(1, record.count)).toFixed(3)),
+    avg_score: Number((record.scoreSum / Math.max(1, record.count)).toFixed(3)),
+  }));
+
+  return {
+    ...referenceSummary,
+    total_combinations: total,
+    passed,
+    failed,
+    pass_rate: Number((passed / Math.max(1, total)).toFixed(3)),
+    score_min: Number(scoreMin.toFixed(3)),
+    score_max: Number(scoreMax.toFixed(3)),
+    score_avg: Number(scoreAvg.toFixed(3)),
+    score_distribution: scoreDistribution,
+    families,
+    active_rule_config: { ...ruleConfig },
+  };
+}
+
+function runConfiguredCombination() {
+  state.ruleConfig = readRuleConfigFromUI();
+  const evaluated = [];
+  for (const item of state.baseCombinations) {
+    const validation = evaluateByThreeStages(item, state.ruleConfig, state.summary);
+    if (!validation.combination_valid) continue;
+    evaluated.push({
+      ...item,
+      validation,
+    });
+  }
+
+  state.combinations = evaluated;
+  state.summary = buildRuntimeSummary(evaluated, state.summary, state.ruleConfig);
+  state.searchKeyword = "";
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) searchInput.value = "";
+  renderGlobalStats(state.summary);
+  renderOverviewHighlights(state.summary);
+  updateDonut(state.summary);
+  drawHistogram(state.summary);
+  drawFamilyBars(state.summary);
+  const histogramSubtitle = document.getElementById("histogramSubtitle");
+  if (histogramSubtitle) {
+    histogramSubtitle.textContent = `${state.summary.total_combinations} 种分型的目标分数区间分布`;
+  }
+  applyFilters(true);
 }
 
 class ShelfViewer {
@@ -370,6 +741,7 @@ function renderList() {
 
   if (!state.filtered.length) {
     list.appendChild(createElement("p", "", "没有匹配的组合。"));
+    document.getElementById("listHint").textContent = `显示 0 / 共 ${state.combinations.length}`;
     return;
   }
 
@@ -652,6 +1024,13 @@ function bindEvents() {
     button.addEventListener("click", () => switchPage(button.dataset.page));
   });
 
+  const applyRuleBtn = document.getElementById("applyRuleBtn");
+  if (applyRuleBtn) {
+    applyRuleBtn.addEventListener("click", () => {
+      runConfiguredCombination();
+    });
+  }
+
   document.getElementById("prevBtn").addEventListener("click", () => {
     if (!state.filtered.length) return;
     state.activeIndex = (state.activeIndex - 1 + state.filtered.length) % state.filtered.length;
@@ -699,23 +1078,16 @@ async function main() {
 
   try {
     const data = await loadData();
-    state.combinations = data.combinations;
+    state.baseCombinations = data.combinations;
+    state.combinations = [];
     state.summary = data.summary;
-    state.filtered = [...state.combinations];
+    state.filtered = [];
     state.searchKeyword = "";
     state.passFilter = "all";
 
-    renderGlobalStats(state.summary);
-    renderOverviewHighlights(state.summary);
-    updateDonut(state.summary);
-    drawHistogram(state.summary);
-    drawFamilyBars(state.summary);
-    const histogramSubtitle = document.getElementById("histogramSubtitle");
-    if (histogramSubtitle) {
-      histogramSubtitle.textContent = `${state.summary.total_combinations} 种分型的目标分数区间分布`;
-    }
     bindEvents();
     setPassFilter("all");
+    runConfiguredCombination();
     switchPage("page-overview");
   } catch (error) {
     console.error(error);

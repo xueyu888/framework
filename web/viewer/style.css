@@ -347,8 +347,84 @@ body {
   padding: 12px;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto 1fr;
   gap: 10px;
+}
+
+.rule-config {
+  border: 1px solid rgba(17, 39, 54, 0.15);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  display: grid;
+  gap: 8px;
+}
+
+.rule-config-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-config-head h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.apply-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f6fcfb;
+  background: linear-gradient(130deg, var(--accent), #2b7a8c);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.apply-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 14px rgba(14, 98, 110, 0.25);
+}
+
+.rule-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.rule-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #223542;
+}
+
+.rule-limits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rule-limits label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.rule-limits input {
+  width: 100%;
+  border: 1px solid rgba(16, 39, 56, 0.15);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 12px;
 }
 
 .search-input input {
