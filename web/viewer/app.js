@@ -166,87 +166,90 @@ function round3(value) {
   return Number(Number(value).toFixed(3));
 }
 
-function buildEnumerationDomain() {
-  const xValues = [0.0, 1.2];
-  const zValues = [0.0, 0.62];
-  const yValues = [0.36, 0.78];
-
-  const connectors = [];
-  const slot = new Map();
-
-  let nodeIndex = 0;
-  yValues.forEach((y, iy) => {
-    zValues.forEach((z, iz) => {
-      xValues.forEach((x, ix) => {
-        const id = `N${String(nodeIndex).padStart(3, "0")}`;
-        nodeIndex += 1;
-        connectors.push({ id, position: [round3(x), round3(y), round3(z)] });
-        slot.set(`${ix}-${iz}-${iy}`, id);
-      });
-    });
-  });
-
-  const rods = [];
-  let rodIndex = 0;
-  zValues.forEach((_, iz) => {
-    xValues.forEach((__, ix) => {
-      rods.push({
-        id: `R${String(rodIndex).padStart(3, "0")}`,
-        from: slot.get(`${ix}-${iz}-0`),
-        to: slot.get(`${ix}-${iz}-1`),
-        role: "vertical",
-      });
-      rodIndex += 1;
-    });
-  });
-
-  const panelSize = [round3(xValues[1] - xValues[0]), 0.05, round3(zValues[1] - zValues[0])];
-  const panelCenterX = round3((xValues[1] + xValues[0]) * 0.5);
-  const panelCenterZ = round3((zValues[1] + zValues[0]) * 0.5);
-  const panels = [];
-  yValues.forEach((y, iy) => {
-    panels.push({
-      id: `P${String(iy).padStart(3, "0")}`,
-      center: [panelCenterX, round3(y - 0.03), panelCenterZ],
-      size: [...panelSize],
-      supports: [
-        slot.get(`0-0-${iy}`),
-        slot.get(`1-0-${iy}`),
-        slot.get(`0-1-${iy}`),
-        slot.get(`1-1-${iy}`),
-      ],
-      role: "storage_surface",
-    });
-  });
-
-  return { connectors, rods, panels };
+function forEachCombination(items, pickCount, onPick, start = 0, picked = []) {
+  if (pickCount === 0) {
+    onPick([...picked]);
+    return;
+  }
+  if (start >= items.length) return;
+  for (let i = start; i <= items.length - pickCount; i += 1) {
+    picked.push(items[i]);
+    forEachCombination(items, pickCount - 1, onPick, i + 1, picked);
+    picked.pop();
+  }
 }
 
-function materializeGraphFromSelection(domain, selectedConnectorIds, selectedRods, selectedPanels) {
-  const nodeSet = new Set(selectedConnectorIds);
-  const nodes = domain.connectors
-    .filter((node) => nodeSet.has(node.id))
-    .map((node) => ({ id: node.id, position: [...node.position] }));
+function connectorPositionByIndex(index, total) {
+  const ringWidth = Math.max(2, Math.ceil(Math.sqrt(total)));
+  const x = (index % ringWidth) * 0.9;
+  const z = Math.floor(index / ringWidth) * 0.72;
+  const y = ((index % 2) * 0.42) + 0.36;
+  return [round3(x), round3(y), round3(z)];
+}
 
-  const rods = selectedRods
-    .filter((rod) => nodeSet.has(rod.from) && nodeSet.has(rod.to))
-    .map((rod) => ({ from: rod.from, to: rod.to, role: rod.role || "support" }));
+function materializeTopologicalGraph(connectorCount, rodPairs, panelSupports) {
+  const connectorIds = [...Array(connectorCount)].map((_, idx) => `N${String(idx).padStart(3, "0")}`);
+  const idByIndex = new Map(connectorIds.map((id, idx) => [idx, id]));
+  const nodes = connectorIds.map((id, idx) => ({
+    id,
+    position: connectorPositionByIndex(idx, connectorCount),
+  }));
 
-  const panels = selectedPanels
-    .map((panel) => {
-      const supports = (panel.supports || []).filter((id) => nodeSet.has(id));
-      if (supports.length < 2) return null;
-      return {
-        id: panel.id,
-        center: [...panel.center],
-        size: [...panel.size],
-        supports: [...new Set(supports)].sort(),
-        role: panel.role || "storage_surface",
-      };
-    })
-    .filter(Boolean);
+  const rods = rodPairs.map((pair) => ({
+    from: idByIndex.get(pair[0]),
+    to: idByIndex.get(pair[1]),
+    role: "support",
+    orientation: "vertical",
+  }));
+
+  const panels = panelSupports.map((supports, idx) => {
+    const supportIds = [...new Set(supports.map((support) => idByIndex.get(support)))];
+    const supportNodes = supportIds.map((id) => nodes.find((node) => node.id === id)).filter(Boolean);
+    const xs = supportNodes.map((node) => node.position[0]);
+    const ys = supportNodes.map((node) => node.position[1]);
+    const zs = supportNodes.map((node) => node.position[2]);
+    const minX = xs.length ? Math.min(...xs) : 0;
+    const maxX = xs.length ? Math.max(...xs) : 1;
+    const minZ = zs.length ? Math.min(...zs) : 0;
+    const maxZ = zs.length ? Math.max(...zs) : 0.6;
+    const centerX = round3((minX + maxX) * 0.5);
+    const centerY = round3((ys.length ? (ys.reduce((a, b) => a + b, 0) / ys.length) : 0.36) - 0.03);
+    const centerZ = round3((minZ + maxZ) * 0.5);
+    const sizeX = round3(Math.max(0.45, (maxX - minX) + 0.42));
+    const sizeZ = round3(Math.max(0.32, (maxZ - minZ) + 0.3));
+
+    return {
+      id: `P${String(idx).padStart(3, "0")}`,
+      center: [centerX, centerY, centerZ],
+      size: [sizeX, 0.05, sizeZ],
+      supports: supportIds.sort(),
+      role: "storage_surface",
+      orientation: "horizontal",
+    };
+  });
 
   return { nodes, rods, panels };
+}
+
+function allConnectorPairs(connectorCount) {
+  const pairs = [];
+  for (let i = 0; i < connectorCount; i += 1) {
+    for (let j = i + 1; j < connectorCount; j += 1) {
+      pairs.push([i, j]);
+    }
+  }
+  return pairs;
+}
+
+function allPanelSupportSets(connectorCount) {
+  const indices = [...Array(connectorCount).keys()];
+  const sets = [];
+  for (let size = 2; size <= connectorCount; size += 1) {
+    forEachCombination(indices, size, (picked) => {
+      sets.push([...picked]);
+    });
+  }
+  return sets;
 }
 
 function hashText(text) {
@@ -517,7 +520,6 @@ function isModuleGraphConnected(graph) {
 
 function validateCombinationByConfig(item, config) {
   const graph = item.graph;
-  const nodeMap = buildNodeMap(graph);
   const reasons = [];
 
   const moduleCount = (graph.nodes || []).length + (graph.rods || []).length + (graph.panels || []).length;
@@ -530,6 +532,7 @@ function validateCombinationByConfig(item, config) {
   }
 
   if (config.useR3) {
+    const nodeMap = buildNodeMap(graph);
     for (const rod of graph.rods || []) {
       if (!nodeMap.has(rod.from) || !nodeMap.has(rod.to)) {
         reasons.push("module combination violates R3: rod must connect through connector nodes");
@@ -567,7 +570,7 @@ function validateCombinationByConfig(item, config) {
 
   if (config.useR5) {
     for (const panel of graph.panels || []) {
-      if (!isPanelHorizontal(panel, nodeMap)) {
+      if ((panel.orientation || "horizontal") !== "horizontal") {
         reasons.push("module combination violates R5: panel must be horizontal");
         break;
       }
@@ -576,7 +579,7 @@ function validateCombinationByConfig(item, config) {
 
   if (config.useR6) {
     for (const rod of graph.rods || []) {
-      if (!isRodVertical(rod, nodeMap)) {
+      if ((rod.orientation || "vertical") !== "vertical") {
         reasons.push("module combination violates R6: rod must be vertical");
         break;
       }
@@ -746,60 +749,81 @@ function buildRuntimeSummary(items, referenceSummary, ruleConfig, meta = {}) {
 function runConfiguredCombination() {
   state.ruleConfig = readRuleConfigFromUI();
   state.enumerationRuns += 1;
+  if (state.ruleConfig.maxModules === null || state.ruleConfig.maxModules <= 0) {
+    state.combinations = [];
+    state.summary = buildRuntimeSummary([], state.baseSummary || state.summary, state.ruleConfig, {
+      rawCandidates: 0,
+      generationStrategy: "rule_driven_enumeration",
+    });
+    state.summary.enumeration_elapsed_ms = 0;
+    state.summary.enumeration_run_id = state.enumerationRuns;
+    document.getElementById("listHint").textContent = "请先填写最大模块总数，再点击按配置组合。";
+    renderGlobalStats(state.summary);
+    renderOverviewHighlights(state.summary);
+    updateDonut(state.summary);
+    drawHistogram(state.summary);
+    drawFamilyBars(state.summary);
+    applyFilters(true);
+    return;
+  }
+
   const baseline = Number(state.baseSummary?.standard_profile?.baseline_efficiency ?? state.baseSummary?.baseline_score ?? 1);
-  const domain = buildEnumerationDomain();
-  const connectorIds = domain.connectors.map((node) => node.id);
   const representatives = new Map();
   let rawCandidates = 0;
   const t0 = performance.now();
+  const maxModules = state.ruleConfig.maxModules;
 
-  const rodCount = domain.rods.length;
-  const panelCount = domain.panels.length;
+  for (let connectorCount = 1; connectorCount <= maxModules; connectorCount += 1) {
+    const remainingAfterConnector = maxModules - connectorCount;
+    const pairCandidates = allConnectorPairs(connectorCount);
+    const panelSupportCandidates = allPanelSupportSets(connectorCount);
 
-  for (let rodMask = 0; rodMask < (1 << rodCount); rodMask += 1) {
-    const selectedRods = domain.rods.filter((_, idx) => ((rodMask >> idx) & 1) === 1);
+    for (let rodCount = 0; rodCount <= remainingAfterConnector; rodCount += 1) {
+      if (rodCount > pairCandidates.length) break;
+      const remainingAfterRod = remainingAfterConnector - rodCount;
 
-    for (let panelMask = 0; panelMask < (1 << panelCount); panelMask += 1) {
-      const selectedPanels = domain.panels.filter((_, idx) => ((panelMask >> idx) & 1) === 1);
+      for (let panelCount = 0; panelCount <= remainingAfterRod; panelCount += 1) {
+        if (panelCount > panelSupportCandidates.length) break;
 
-      const requiredConnectorIds = new Set();
-      selectedRods.forEach((rod) => {
-        requiredConnectorIds.add(rod.from);
-        requiredConnectorIds.add(rod.to);
-      });
-      selectedPanels.forEach((panel) => {
-        (panel.supports || []).forEach((id) => requiredConnectorIds.add(id));
-      });
+        // R4 lower bound prune: each connector must have at least 2 incidences.
+        // Rod contributes 2 incidences; panel contributes at least 2 incidences.
+        if (state.ruleConfig.useR4 && (rodCount + panelCount < connectorCount)) continue;
 
-      const minModuleCount = requiredConnectorIds.size + selectedRods.length + selectedPanels.length;
-      if (state.ruleConfig.maxModules !== null && minModuleCount > state.ruleConfig.maxModules) continue;
+        forEachCombination(pairCandidates, rodCount, (rodPairs) => {
+          const rodIncidence = Array(connectorCount).fill(0);
+          rodPairs.forEach((pair) => {
+            rodIncidence[pair[0]] += 1;
+            rodIncidence[pair[1]] += 1;
+          });
 
-      const optionalConnectorIds = connectorIds.filter((id) => !requiredConnectorIds.has(id));
-      const onlyRequiredConnectors = state.ruleConfig.useR4 || state.ruleConfig.useR1;
-      const optionalMaskCount = onlyRequiredConnectors ? 1 : (1 << optionalConnectorIds.length);
-      for (let optionalMask = 0; optionalMask < optionalMaskCount; optionalMask += 1) {
-        const selectedConnectorIds = new Set(requiredConnectorIds);
-        for (let idx = 0; idx < optionalConnectorIds.length; idx += 1) {
-          const id = optionalConnectorIds[idx];
-          if (((optionalMask >> idx) & 1) === 1) selectedConnectorIds.add(id);
-        }
-        if (state.ruleConfig.useR2 && selectedConnectorIds.size === 0) continue;
-        const totalModuleCount = selectedConnectorIds.size + selectedRods.length + selectedPanels.length;
-        if (state.ruleConfig.maxModules !== null && totalModuleCount > state.ruleConfig.maxModules) continue;
+          forEachCombination(panelSupportCandidates, panelCount, (panelSupports) => {
+            const totalModules = connectorCount + rodCount + panelCount;
+            if (totalModules > maxModules) return;
 
-        const graph = materializeGraphFromSelection(
-          domain,
-          [...selectedConnectorIds].sort(),
-          selectedRods,
-          selectedPanels,
-        );
-        const comboCheck = validateCombinationByConfig({ graph }, state.ruleConfig);
-        if (!comboCheck.pass) continue;
-        rawCandidates += 1;
+            const panelIncidence = Array(connectorCount).fill(0);
+            panelSupports.forEach((supports) => {
+              supports.forEach((connectorIdx) => {
+                panelIncidence[connectorIdx] += 1;
+              });
+            });
 
-        const signature = computeTopologySignature(graph);
-        if (representatives.has(signature)) continue;
-        representatives.set(signature, graph);
+            if (state.ruleConfig.useR4) {
+              for (let idx = 0; idx < connectorCount; idx += 1) {
+                if ((rodIncidence[idx] + panelIncidence[idx]) < 2) return;
+              }
+            }
+
+            const graph = materializeTopologicalGraph(connectorCount, rodPairs, panelSupports);
+            const comboCheck = validateCombinationByConfig({ graph }, state.ruleConfig);
+            if (!comboCheck.pass) return;
+
+            rawCandidates += 1;
+            const signature = computeTopologySignature(graph);
+            if (!representatives.has(signature)) {
+              representatives.set(signature, graph);
+            }
+          });
+        });
       }
     }
   }
