@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>L1-L3 分层组成树</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --line: #4062bb;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --l1: #e0f2fe;
+      --l2: #ede9fe;
+      --l3: #ecfdf5;
+      --stroke: #b6c3de;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: radial-gradient(circle at top, #ffffff 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .wrap {
+      max-width: 1480px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 18px 18px 8px;
+      box-shadow: 0 10px 26px rgba(28, 44, 84, 0.08);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .sub {
+      margin: 8px 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #374151;
+      background: #f8fafc;
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .chart {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px dashed #d2dcf0;
+      background: #fcfdff;
+    }
+
+    svg {
+      width: 1460px;
+      height: 780px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .lvl-label {
+      font-weight: 700;
+      font-size: 16px;
+      fill: #334155;
+    }
+
+    .node {
+      stroke: #8da2ce;
+      stroke-width: 1.2;
+      rx: 12;
+    }
+
+    .node-text {
+      font-size: 15px;
+      font-weight: 600;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      fill: #0f172a;
+    }
+
+    .edge {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 2;
+      opacity: 0.9;
+    }
+
+    .note {
+      margin: 12px 2px 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      body { padding: 12px; }
+      .wrap { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>L1-L3 分层组成树</h1>
+    <div class="sub">方向说明：箭头从下往上，表示“底层 M 组成上层 M”。</div>
+
+    <div class="legend">
+      <span class="tag"><i class="dot" style="background:#e0f2fe"></i>L1（上层）</span>
+      <span class="tag"><i class="dot" style="background:#ede9fe"></i>L2（中层）</span>
+      <span class="tag"><i class="dot" style="background:#ecfdf5"></i>L3（底层）</span>
+    </div>
+
+    <div class="chart">
+      <svg viewBox="0 0 1460 780" role="img" aria-label="L1-L3 分层组成树图">
+        <defs>
+          <marker id="arrowUp" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4062bb"></path>
+          </marker>
+        </defs>
+
+        <text class="lvl-label" x="34" y="124">L1</text>
+        <text class="lvl-label" x="34" y="352">L2</text>
+        <text class="lvl-label" x="34" y="580">L3</text>
+
+        <!-- edges: L3 -> L2 -->
+        <path class="edge" marker-end="url(#arrowUp)" d="M125 600 L250 410" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M265 600 L250 410" />
+
+        <path class="edge" marker-end="url(#arrowUp)" d="M405 600 L500 410" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M545 600 L500 410" />
+
+        <path class="edge" marker-end="url(#arrowUp)" d="M775 600 L900 410" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M915 600 L900 410" />
+
+        <path class="edge" marker-end="url(#arrowUp)" d="M1055 600 L1150 410" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M1195 600 L1150 410" />
+
+        <!-- edges: L2 -> L1 -->
+        <path class="edge" marker-end="url(#arrowUp)" d="M250 380 L500 180" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M500 380 L500 180" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M900 380 L980 180" />
+        <path class="edge" marker-end="url(#arrowUp)" d="M1150 380 L980 180" />
+
+        <!-- L1 nodes -->
+        <rect class="node" x="420" y="120" width="160" height="60" fill="#e0f2fe" />
+        <text class="node-text" x="500" y="150">M1</text>
+
+        <rect class="node" x="900" y="120" width="160" height="60" fill="#e0f2fe" />
+        <text class="node-text" x="980" y="150">M2</text>
+
+        <!-- L2 nodes -->
+        <rect class="node" x="170" y="350" width="160" height="60" fill="#ede9fe" />
+        <text class="node-text" x="250" y="380">M1.1</text>
+
+        <rect class="node" x="420" y="350" width="160" height="60" fill="#ede9fe" />
+        <text class="node-text" x="500" y="380">M1.2</text>
+
+        <rect class="node" x="820" y="350" width="160" height="60" fill="#ede9fe" />
+        <text class="node-text" x="900" y="380">M2.1</text>
+
+        <rect class="node" x="1070" y="350" width="160" height="60" fill="#ede9fe" />
+        <text class="node-text" x="1150" y="380">M2.2</text>
+
+        <!-- L3 nodes -->
+        <rect class="node" x="45" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="125" y="630">M1.1.a</text>
+
+        <rect class="node" x="185" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="265" y="630">M1.1.b</text>
+
+        <rect class="node" x="325" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="405" y="630">M1.2.a</text>
+
+        <rect class="node" x="465" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="545" y="630">M1.2.b</text>
+
+        <rect class="node" x="695" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="775" y="630">M2.1.a</text>
+
+        <rect class="node" x="835" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="915" y="630">M2.1.b</text>
+
+        <rect class="node" x="975" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="1055" y="630">M2.2.a</text>
+
+        <rect class="node" x="1115" y="600" width="160" height="60" fill="#ecfdf5" />
+        <text class="node-text" x="1195" y="630">M2.2.b</text>
+      </svg>
+    </div>
+
+    <div class="note">如果你要换成你项目真实命名（比如 L1/L2/L3 对应规范条目和具体 M 名称），我可以直接替换并自动生成同风格图。</div>
+  </div>
+</body>
+</html>
