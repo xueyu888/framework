@@ -1,0 +1,10 @@
+[project]
+name = "frontend-spec-project"
+version = "0.1.0"
+description = "Frontend-only standards framework bootstrap"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false

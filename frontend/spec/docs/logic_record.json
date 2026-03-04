@@ -1,0 +1,56 @@
+{
+  "goal": "Improve frontend experience and conversion efficiency",
+  "boundary": {
+    "device": "desktop+mobile",
+    "browser": "last 2 major versions",
+    "network": "3G and above",
+    "data_scale": "table<=2000 rows; chart<=5000 points",
+    "latency_budget_ms": 300
+  },
+  "rules": [
+    {
+      "id": "R1",
+      "desc": "page must compose page/business/base layers"
+    },
+    {
+      "id": "R2",
+      "desc": "business component must not directly depend on route object"
+    },
+    {
+      "id": "R3",
+      "desc": "base component must be domain-agnostic"
+    },
+    {
+      "id": "R4",
+      "desc": "async state must include loading/success/error/empty"
+    },
+    {
+      "id": "R5",
+      "desc": "critical interactions must be keyboard accessible"
+    },
+    {
+      "id": "R6",
+      "desc": "use design token for core styles"
+    },
+    {
+      "id": "R7",
+      "desc": "key user journey must have analytics events"
+    },
+    {
+      "id": "R8",
+      "desc": "errors must provide recoverable actions"
+    },
+    {
+      "id": "R9",
+      "desc": "list/chart must enforce data boundary"
+    },
+    {
+      "id": "R10",
+      "desc": "all rules must be decidable with failure reasons"
+    }
+  ],
+  "verification": {
+    "passed": true,
+    "reasons": []
+  }
+}
