@@ -186,9 +186,9 @@ def canonical_key_under_rotation(combo: Combo) -> ComboKey:
 def combo_label(combo: Combo) -> str:
     labels: list[str] = []
     for idx, layer in enumerate(combo.layers, start=1):
-        rods = "-".join(layer.rods) if layer.rods else "none"
-        panels = "-".join(layer.side_panels) if layer.side_panels else "none"
-        labels.append(f"L{idx}(R:{rods}|P:{panels})")
+        rods = "-".join(layer.rods) if layer.rods else "无"
+        panels = "-".join(layer.side_panels) if layer.side_panels else "无"
+        labels.append(f"第{idx}层(杆:{rods}|支撑板:{panels})")
     return " ".join(labels)
 
 
@@ -373,35 +373,48 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
     combos_json = json.dumps(items, ensure_ascii=False)
     ext_props_json = json.dumps(DEFAULT_EXTERNAL_PROPERTIES, ensure_ascii=False)
     return """<!doctype html>
-<html lang=\"en\">
+<html lang=\"zh-CN\">
 <head>
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>Shelf Combos 3D (Load Qualification)</title>
+  <title>置物架组合 3D 可视化（承载评估）</title>
   <style>
+    :root {
+      --bg-a: #eaf0f8;
+      --bg-b: #dce6f3;
+      --card: rgba(255,255,255,0.92);
+      --line: #d8e0ea;
+      --text: #1f2937;
+      --sub: #4b5563;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #b91c1c;
+    }
     html, body {
       margin: 0;
       height: 100%;
-      font-family: Arial, sans-serif;
-      background: #f3f4f6;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background: radial-gradient(circle at 16% 18%, var(--bg-a), var(--bg-b));
+      color: var(--text);
     }
     #app {
       display: grid;
-      grid-template-columns: 430px 1fr;
+      grid-template-columns: 460px 1fr;
       height: 100%;
     }
     #panel {
-      padding: 12px;
-      background: #ffffff;
-      border-right: 1px solid #d1d5db;
+      padding: 14px 14px 22px;
+      background: var(--card);
+      border-right: 1px solid var(--line);
       overflow: auto;
+      backdrop-filter: blur(3px);
     }
     #viewer {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 290px;
       gap: 0;
       overflow: hidden;
-      background: #f3f4f6;
+      background: linear-gradient(180deg, #edf2f9 0%, #e7edf7 100%);
     }
     #stage {
       position: relative;
@@ -412,11 +425,11 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
       width: 100%;
       height: 100%;
       display: block;
-      background: #eef0f4;
+      background: linear-gradient(180deg, #eef3fa 0%, #e8eef8 100%);
     }
     #faultPane {
-      border-left: 1px solid #d1d5db;
-      background: #f8fafc;
+      border-left: 1px solid var(--line);
+      background: rgba(248, 250, 252, 0.88);
       padding: 12px;
       overflow: auto;
     }
@@ -424,15 +437,16 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
       display: none;
       border: 1px solid #fecaca;
       background: #fef2f2;
-      border-radius: 8px;
-      padding: 10px;
+      border-radius: 12px;
+      padding: 12px;
       color: #7f1d1d;
       font-size: 12px;
       line-height: 1.45;
+      box-shadow: 0 6px 20px rgba(153, 27, 27, 0.12);
     }
     #faultBox h4 {
       margin: 0 0 6px 0;
-      font-size: 13px;
+      font-size: 14px;
       color: #991b1b;
     }
     #faultBox ul {
@@ -443,6 +457,10 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
       color: #475569;
       font-size: 12px;
       line-height: 1.4;
+      background: #ffffff;
+      border: 1px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 10px;
     }
     .row { margin-bottom: 10px; }
     .row-tight { margin-bottom: 6px; }
@@ -462,10 +480,11 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
       gap: 6px;
     }
     .section {
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 8px;
-      background: #fafafa;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
     }
     .label {
       font-size: 12px;
@@ -475,12 +494,22 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
     input, select, button {
       width: 100%;
       box-sizing: border-box;
-      padding: 6px 8px;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
+      padding: 7px 9px;
+      border: 1px solid #bfccdd;
+      border-radius: 8px;
       background: #fff;
+      color: var(--text);
     }
-    button { cursor: pointer; }
+    button {
+      cursor: pointer;
+      border-color: #9fb5d4;
+      background: linear-gradient(180deg, #ffffff, #edf4ff);
+      transition: all 0.18s ease;
+    }
+    button:hover {
+      border-color: #7ea1d0;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+    }
     .actions {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -488,24 +517,69 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
     }
     .legend {
       height: 10px;
-      border: 1px solid #d1d5db;
+      border: 1px solid #c9d4e3;
       border-radius: 6px;
       background: linear-gradient(to right, #ffffff 0%, #ffeb3b 60%, #ff9800 80%, #dc2626 100%);
+    }
+    .title {
+      margin: 0 0 10px 0;
+      font-size: 19px;
+      letter-spacing: 0.2px;
+      color: #0f172a;
+    }
+    .subline {
+      color: var(--sub);
+      font-size: 12px;
+    }
+    .meta {
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid #d8e2f0;
+      border-radius: 10px;
+      background: #f7faff;
+    }
+    @media (max-width: 1200px) {
+      #app {
+        grid-template-columns: 1fr;
+      }
+      #viewer {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 60vh;
+      }
+      #faultPane {
+        border-left: none;
+        border-top: 1px solid var(--line);
+      }
     }
   </style>
 </head>
 <body>
 <div id=\"app\">
   <div id=\"panel\">
-    <h3 style=\"margin: 0 0 8px 0;\">Shelf 3D Load Qualification</h3>
-    <div class=\"row\">N=__N__, x=__X__, y=__Y__, h=__H__</div>
-    <div class=\"row\">Unique combos: <b>__COUNT__</b></div>
+    <h3 class=\"title\">置物架 3D 承载评估</h3>
+    <div class=\"row meta\" id=\"sceneMeta\">N=__N__, x=__X__, y=__Y__, h=__H__</div>
+    <div class=\"row meta\">去重后组合数：<b>__COUNT__</b></div>
+
+    <div class=\"row section\">
+      <div style=\"font-weight:600; margin-bottom:8px;\">横向拼接参数</div>
+      <div class=\"grid2\">
+        <div>
+          <div class=\"label\">nx（X 方向）</div>
+          <input id=\"nxCount\" type=\"number\" />
+        </div>
+        <div>
+          <div class=\"label\">ny（Y 方向）</div>
+          <input id=\"nyCount\" type=\"number\" />
+        </div>
+      </div>
+      <div class=\"subline\" id=\"tileInfo\" style=\"margin-top:6px;\">总单元数：1</div>
+    </div>
 
     <div class=\"row section\">
       <div class=\"actions\">
-        <button id=\"prevBtn\">Prev</button>
-        <button id=\"nextBtn\">Next</button>
-        <button id=\"fitBtn\">Fit</button>
+        <button id=\"prevBtn\">上一个</button>
+        <button id=\"nextBtn\">下一个</button>
+        <button id=\"fitBtn\">自适应</button>
       </div>
       <div class=\"row-tight\" style=\"margin-top:8px;\">
         <select id=\"comboSelect\"></select>
@@ -513,98 +587,98 @@ def build_interactive_html(items: list[dict], n: int, x: float, y: float, h: flo
     </div>
 
     <div class=\"row section\">
-      <div style=\"font-weight:600; margin-bottom:8px;\">Load Cubes</div>
+      <div style=\"font-weight:600; margin-bottom:8px;\">载荷方块</div>
       <div class=\"grid3\">
         <div>
-          <div class=\"label\">Cube count</div>
+          <div class=\"label\">方块数量</div>
           <input id=\"cubeCount\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Active cube</div>
+          <div class=\"label\">当前方块</div>
           <select id=\"cubeIndex\"></select>
         </div>
         <div>
-          <div class=\"label\">Layer</div>
+          <div class=\"label\">层号</div>
           <input id=\"cubeLayer\" type=\"number\" />
         </div>
       </div>
       <div class=\"grid3\" style=\"margin-top:6px;\">
         <div>
-          <div class=\"label\">Weight</div>
+          <div class=\"label\">重量</div>
           <input id=\"cubeWeight\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Size z</div>
+          <div class=\"label\">尺寸 z</div>
           <input id=\"cubeSizeZ\" type=\"number\" />
         </div>
       </div>
       <div class=\"grid2\" style=\"margin-top:6px;\">
         <div>
-          <div class=\"label\">Size x</div>
+          <div class=\"label\">尺寸 x</div>
           <input id=\"cubeSizeX\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Size y</div>
+          <div class=\"label\">尺寸 y</div>
           <input id=\"cubeSizeY\" type=\"number\" />
         </div>
       </div>
       <div class=\"grid2\" style=\"margin-top:6px;\">
         <div>
-          <div class=\"label\">Center x</div>
+          <div class=\"label\">中心 x</div>
           <input id=\"cubePosX\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Center y</div>
+          <div class=\"label\">中心 y</div>
           <input id=\"cubePosY\" type=\"number\" />
         </div>
       </div>
     </div>
 
     <div class=\"row section\">
-      <div style=\"font-weight:600; margin-bottom:8px;\">External Base Capacities</div>
+      <div style=\"font-weight:600; margin-bottom:8px;\">外部基承载参数</div>
       <div class=\"grid2\">
         <div>
-          <div class=\"label\">Rod cap</div>
+          <div class=\"label\">杆容量</div>
           <input id=\"capRod\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Panel cap</div>
+          <div class=\"label\">支撑板容量</div>
           <input id=\"capPanel\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Connector cap</div>
+          <div class=\"label\">连接件容量</div>
           <input id=\"capConnector\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Board cap</div>
+          <div class=\"label\">层板容量</div>
           <input id=\"capBoard\" type=\"number\" />
         </div>
         <div>
-          <div class=\"label\">Board defl cap</div>
+          <div class=\"label\">层板挠度容量</div>
           <input id=\"capBoardDeflect\" type=\"number\" />
         </div>
         <div style=\"display:flex; align-items:end;\">
-          <button id=\"resetCapsBtn\">Reset Caps</button>
+          <button id=\"resetCapsBtn\">恢复默认容量</button>
         </div>
       </div>
     </div>
 
     <div class=\"row section\">
-      <div class=\"label\" style=\"margin-bottom:6px;\">Stress legend (white -> red)</div>
+      <div class=\"label\" style=\"margin-bottom:6px;\">受力图例（白 -> 红）</div>
       <div class=\"legend\"></div>
-      <div style=\"font-size:12px;color:#4b5563;margin-top:4px;\">utilization: 0.0 -> 1.0+ (closer to limit = redder)</div>
+      <div style=\"font-size:12px;color:#4b5563;margin-top:4px;\">利用率：0.0 -> 1.0+（越接近极限越红）</div>
     </div>
 
-    <div class=\"row mono\" id=\"status\" style=\"color:#b91c1c;\">Initializing viewer...</div>
+    <div class=\"row mono\" id=\"status\" style=\"color:#b91c1c;\">正在初始化可视化...</div>
     <div class=\"row mono\" id=\"info\"></div>
     <div class=\"row\" style=\"font-size:12px;color:#4b5563;\">
-      Left-drag: rotate | Left-drag cube: move x/y | Wheel: zoom | Right-drag: pan
+      左键拖动：旋转 | 左键拖动方块：移动 x/y | 滚轮：缩放 | 右键拖动：平移
     </div>
   </div>
   <div id=\"viewer\">
     <div id=\"stage\"><canvas id=\"cv\"></canvas></div>
     <div id=\"faultPane\">
-      <div id=\"faultHint\">No overload detected. Add/move cubes or reduce capacities to trigger failure diagnostics.</div>
+      <div id=\"faultHint\">当前未检测到超限。可通过增加方块重量、调整位置或降低容量参数触发故障诊断。</div>
       <div id=\"faultBox\"></div>
     </div>
   </div>
@@ -624,10 +698,10 @@ try {
   const raw = document.getElementById('combo-data').textContent || '[]';
   combos = JSON.parse(raw);
 } catch (err) {
-  showStatus('Failed to parse combo JSON: ' + String(err), true);
+  showStatus('组合数据解析失败：' + String(err), true);
 }
 window.addEventListener('error', function (e) {
-  showStatus('JS error: ' + String(e.message) + ' @' + String(e.lineno) + ':' + String(e.colno), true);
+  showStatus('页面脚本错误：' + String(e.message) + ' @' + String(e.lineno) + ':' + String(e.colno), true);
 });
 
 const N = __N__, X = __X__, Y = __Y__, H = __H__;
@@ -654,6 +728,10 @@ const faultBox = document.getElementById('faultBox');
 const faultHint = document.getElementById('faultHint');
 
 const controls = {
+  sceneMeta: document.getElementById('sceneMeta'),
+  tileInfo: document.getElementById('tileInfo'),
+  nxCount: document.getElementById('nxCount'),
+  nyCount: document.getElementById('nyCount'),
   cubeCount: document.getElementById('cubeCount'),
   cubeIndex: document.getElementById('cubeIndex'),
   cubeLayer: document.getElementById('cubeLayer'),
@@ -693,6 +771,10 @@ function makeDefaultCube() {
 }
 
 let loadState = {
+  layout: {
+    nx: 1,
+    ny: 1,
+  },
   cubes: [makeDefaultCube()],
   activeCube: 0,
   caps: {
@@ -703,6 +785,19 @@ let loadState = {
     boardDeflect: EXTERNAL_DEFAULTS.board_deflection_capacity,
   },
 };
+
+function sceneWidth() {
+  return X * Math.max(1, Math.round(loadState.layout.nx || 1));
+}
+function sceneDepth() {
+  return Y * Math.max(1, Math.round(loadState.layout.ny || 1));
+}
+function cellTag(ix, iy) {
+  return `C${ix + 1}-${iy + 1}`;
+}
+function keyInCell(ix, iy, localKey) {
+  return `${cellTag(ix, iy)}|${localKey}`;
+}
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function num(v, fallback) {
@@ -756,7 +851,7 @@ function stressColor(util, alpha) {
 function fitView() {
   const w = Math.max(1, stage.clientWidth);
   const h = Math.max(1, stage.clientHeight);
-  const modelSize = Math.max(X, Y, TOTAL_H, 1);
+  const modelSize = Math.max(sceneWidth(), sceneDepth(), TOTAL_H, 1);
   zoom = Math.max(2.0, Math.min(40.0, Math.min(w, h) * 0.52 / modelSize));
   panX = 0;
   panY = 0;
@@ -776,8 +871,8 @@ function resizeCanvas() {
 }
 
 function rotatePoint(p) {
-  const x0 = p[0] - X / 2;
-  const y0 = p[1] - Y / 2;
+  const x0 = p[0] - sceneWidth() / 2;
+  const y0 = p[1] - sceneDepth() / 2;
   const z0 = p[2] - TOTAL_H / 2;
 
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -814,15 +909,15 @@ function segmentRods(combo) {
   return rods;
 }
 
-function panelQuad(side, z0, z1) {
+function panelQuad(side, z0, z1, ox, oy) {
   const pair = sideCorners[side];
   const p0 = cornerXY[pair[0]];
   const p1 = cornerXY[pair[1]];
   return [
-    [p0[0], p0[1], z0],
-    [p1[0], p1[1], z0],
-    [p1[0], p1[1], z1],
-    [p0[0], p0[1], z1],
+    [ox + p0[0], oy + p0[1], z0],
+    [ox + p1[0], oy + p1[1], z0],
+    [ox + p1[0], oy + p1[1], z1],
+    [ox + p0[0], oy + p0[1], z1],
   ];
 }
 
@@ -865,10 +960,12 @@ function pointCornerWeights(px, py) {
 }
 
 function cubeBounds(state) {
-  const sx = clamp(state.sizeX, 0.5, X);
-  const sy = clamp(state.sizeY, 0.5, Y);
-  const cx = clamp(state.posX, sx / 2, X - sx / 2);
-  const cy = clamp(state.posY, sy / 2, Y - sy / 2);
+  const sw = sceneWidth();
+  const sd = sceneDepth();
+  const sx = clamp(state.sizeX, 0.5, Math.max(0.5, Math.min(X, sw)));
+  const sy = clamp(state.sizeY, 0.5, Math.max(0.5, Math.min(Y, sd)));
+  const cx = clamp(state.posX, sx / 2, sw - sx / 2);
+  const cy = clamp(state.posY, sy / 2, sd - sy / 2);
   return {
     x0: cx - sx / 2,
     x1: cx + sx / 2,
@@ -889,17 +986,44 @@ function evaluateLoad(combo, state) {
   const pathIssues = [];
   const eps = 1e-9;
 
+  function locateCellForBounds(bounds) {
+    const nx = Math.max(1, Math.round(state.layout.nx));
+    const ny = Math.max(1, Math.round(state.layout.ny));
+    const ix = clamp(Math.floor(bounds.cx / X), 0, nx - 1);
+    const iy = clamp(Math.floor(bounds.cy / Y), 0, ny - 1);
+    const ox = ix * X;
+    const oy = iy * Y;
+    let x0 = clamp(bounds.x0 - ox, 0, X);
+    let x1 = clamp(bounds.x1 - ox, 0, X);
+    let y0 = clamp(bounds.y0 - oy, 0, Y);
+    let y1 = clamp(bounds.y1 - oy, 0, Y);
+    if (x1 - x0 < 1e-3) {
+      x0 = clamp(bounds.cx - ox - 0.25, 0, X);
+      x1 = clamp(x0 + 0.5, 0, X);
+    }
+    if (y1 - y0 < 1e-3) {
+      y0 = clamp(bounds.cy - oy - 0.25, 0, Y);
+      y1 = clamp(y0 + 0.5, 0, Y);
+    }
+    return { ix, iy, local: { x0, x1, y0, y1 } };
+  }
+
   for (let cubeIdx = 0; cubeIdx < state.cubes.length; cubeIdx++) {
     const cube = state.cubes[cubeIdx];
     const layer = clamp(Math.round(cube.layer), 1, N);
     const weight = Math.max(0, cube.weight);
     const bounds = cubeBounds(cube);
+    const located = locateCellForBounds(bounds);
+    const ix = located.ix;
+    const iy = located.iy;
+    const local = located.local;
+    const ctag = cellTag(ix, iy);
 
     const samples = [
-      [bounds.x0, bounds.y0],
-      [bounds.x1, bounds.y0],
-      [bounds.x0, bounds.y1],
-      [bounds.x1, bounds.y1],
+      [local.x0, local.y0],
+      [local.x1, local.y0],
+      [local.x0, local.y1],
+      [local.x1, local.y1],
     ];
     let incoming = { FL: 0, FR: 0, BL: 0, BR: 0 };
     for (const p of samples) {
@@ -910,7 +1034,7 @@ function evaluateLoad(combo, state) {
       incoming.BR += weight * 0.25 * w.BR;
     }
 
-    add(boardDemand, `L${layer}`, weight);
+    add(boardDemand, keyInCell(ix, iy, `L${layer}`), weight);
 
     for (let lv = layer; lv >= 1; lv--) {
       const lp = combo.layers[lv - 1];
@@ -918,7 +1042,7 @@ function evaluateLoad(combo, state) {
       for (const corner of CORNERS) {
         const load = incoming[corner] || 0;
         if (load <= eps) continue;
-        add(connectorDemand, `L${lv}:${corner}`, load);
+        add(connectorDemand, keyInCell(ix, iy, `L${lv}:${corner}`), load);
 
         const channels = [];
         if (lp.rods.includes(corner)) {
@@ -929,7 +1053,7 @@ function evaluateLoad(combo, state) {
         }
 
         if (!channels.length) {
-          pathIssues.push(`[C${cubeIdx + 1}] No support at L${lv}:${corner} for load=${load.toFixed(2)}`);
+          pathIssues.push(`[方块${cubeIdx + 1}][${ctag}] L${lv}:${corner} 无支撑，load=${load.toFixed(2)}`);
           continue;
         }
 
@@ -937,10 +1061,10 @@ function evaluateLoad(combo, state) {
         for (const ch of channels) {
           const share = load * Math.max(ch.cap, eps) / capSum;
           if (ch.kind === 'rod') {
-            add(rodDemand, `L${lv}:${ch.id}`, share);
+            add(rodDemand, keyInCell(ix, iy, `L${lv}:${ch.id}`), share);
             if (lv > 1) add(nextIncoming, ch.id, share);
           } else {
-            add(panelDemand, `L${lv}:${ch.id}`, share);
+            add(panelDemand, keyInCell(ix, iy, `L${lv}:${ch.id}`), share);
             if (lv > 1) {
               const pair = sideCorners[ch.id];
               add(nextIncoming, pair[0], share * 0.5);
@@ -1018,49 +1142,65 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
-function parseLayerCornerKey(key) {
-  const m = /^L(\\d+):([A-Z]{2})$/.exec(String(key));
+function splitCellPrefixedKey(key) {
+  const m = /^(?:C(\\d+)-(\\d+)\\|)?(.+)$/.exec(String(key));
   if (!m) return null;
-  return { layer: clamp(Number(m[1]), 1, N), corner: m[2] };
+  return {
+    ix: clamp((Number(m[1] || 1) - 1), 0, Math.max(0, Math.round(loadState.layout.nx) - 1)),
+    iy: clamp((Number(m[2] || 1) - 1), 0, Math.max(0, Math.round(loadState.layout.ny) - 1)),
+    local: m[3],
+  };
+}
+
+function parseLayerCornerKey(key) {
+  const part = splitCellPrefixedKey(key);
+  if (!part) return null;
+  const m = /^L(\\d+):([A-Z]{2})$/.exec(part.local);
+  if (!m) return null;
+  return { ix: part.ix, iy: part.iy, layer: clamp(Number(m[1]), 1, N), corner: m[2] };
 }
 
 function parseLayerSideKey(key) {
-  const m = /^L(\\d+):(front|back|left|right)$/.exec(String(key));
+  const part = splitCellPrefixedKey(key);
+  if (!part) return null;
+  const m = /^L(\\d+):(front|back|left|right)$/.exec(part.local);
   if (!m) return null;
-  return { layer: clamp(Number(m[1]), 1, N), side: m[2] };
+  return { ix: part.ix, iy: part.iy, layer: clamp(Number(m[1]), 1, N), side: m[2] };
 }
 
 function parseLayerOnlyKey(key) {
-  const m = /^L(\\d+)$/.exec(String(key));
+  const part = splitCellPrefixedKey(key);
+  if (!part) return null;
+  const m = /^L(\\d+)$/.exec(part.local);
   if (!m) return null;
-  return { layer: clamp(Number(m[1]), 1, N) };
+  return { ix: part.ix, iy: part.iy, layer: clamp(Number(m[1]), 1, N) };
 }
 
 function overloadAnchor(type, key) {
   if (type === 'rod') {
     const info = parseLayerCornerKey(key);
     if (!info || !cornerXY[info.corner]) return null;
-    return [cornerXY[info.corner][0], cornerXY[info.corner][1], (info.layer - 0.5) * H];
+    return [info.ix * X + cornerXY[info.corner][0], info.iy * Y + cornerXY[info.corner][1], (info.layer - 0.5) * H];
   }
   if (type === 'panel') {
     const info = parseLayerSideKey(key);
     if (!info || !sideCorners[info.side]) return null;
     const pair = sideCorners[info.side];
     const p0 = cornerXY[pair[0]], p1 = cornerXY[pair[1]];
-    return [(p0[0] + p1[0]) * 0.5, (p0[1] + p1[1]) * 0.5, (info.layer - 0.5) * H];
+    return [info.ix * X + (p0[0] + p1[0]) * 0.5, info.iy * Y + (p0[1] + p1[1]) * 0.5, (info.layer - 0.5) * H];
   }
   if (type === 'connector') {
     const info = parseLayerCornerKey(key);
     if (!info || !cornerXY[info.corner]) return null;
-    return [cornerXY[info.corner][0], cornerXY[info.corner][1], info.layer * H];
+    return [info.ix * X + cornerXY[info.corner][0], info.iy * Y + cornerXY[info.corner][1], info.layer * H];
   }
   if (type === 'board' || type === 'board_deflect') {
     const info = parseLayerOnlyKey(key);
     if (!info) return null;
     if (type === 'board_deflect') {
-      return [X * 0.62, Y * 0.38, info.layer * H];
+      return [info.ix * X + X * 0.62, info.iy * Y + Y * 0.38, info.layer * H];
     }
-    return [X * 0.5, Y * 0.5, info.layer * H];
+    return [info.ix * X + X * 0.5, info.iy * Y + Y * 0.5, info.layer * H];
   }
   return null;
 }
@@ -1077,11 +1217,11 @@ function collectOverloadedBases(ev, state) {
       }
     }
   }
-  collect('rod', 'Rod', ev.rodDemand, state.caps.rod);
-  collect('panel', 'Support panel', ev.panelDemand, state.caps.panel);
-  collect('connector', 'Connector', ev.connectorDemand, state.caps.connector);
-  collect('board', 'Shelf board', ev.boardDemand, state.caps.board);
-  collect('board_deflect', 'Board deflection', ev.boardDemand, state.caps.boardDeflect);
+  collect('rod', '杆', ev.rodDemand, state.caps.rod);
+  collect('panel', '支撑板', ev.panelDemand, state.caps.panel);
+  collect('connector', '连接件', ev.connectorDemand, state.caps.connector);
+  collect('board', '层板', ev.boardDemand, state.caps.board);
+  collect('board_deflect', '层板挠度', ev.boardDemand, state.caps.boardDeflect);
   out.sort((a, b) => b.util - a.util);
   return out;
 }
@@ -1101,16 +1241,16 @@ function renderFaultBox(ev) {
   faultBox.style.display = 'block';
 
   const html = [];
-  html.push('<h4>Failure Diagnostics</h4>');
-  html.push('<div><b>Status:</b> FAIL</div>');
-  html.push(`<div><b>Max utilization:</b> ${ev.maxUtil.toFixed(3)}</div>`);
+  html.push('<h4>故障诊断</h4>');
+  html.push('<div><b>状态：</b>不合格</div>');
+  html.push(`<div><b>最大利用率：</b>${ev.maxUtil.toFixed(3)}</div>`);
   if (ev.pathIssues.length) {
-    html.push('<div style=\"margin-top:6px;\"><b>Load path issues:</b></div><ul>');
+    html.push('<div style=\"margin-top:6px;\"><b>传力路径问题：</b></div><ul>');
     for (const issue of ev.pathIssues.slice(0, 4)) {
       html.push(`<li>${escapeHtml(issue)}</li>`);
     }
     if (ev.pathIssues.length > 4) {
-      html.push(`<li>...and ${ev.pathIssues.length - 4} more</li>`);
+      html.push(`<li>...其余 ${ev.pathIssues.length - 4} 条</li>`);
     }
     html.push('</ul>');
   }
@@ -1119,7 +1259,7 @@ function renderFaultBox(ev) {
     faultMarkers = shown
       .map((item, idx) => ({ ...item, markerId: idx + 1 }))
       .filter((item) => Array.isArray(item.anchor) && item.anchor.length === 3);
-    html.push('<div style=\"margin-top:6px;\"><b>Overloaded bases (current load / limit):</b></div><ul>');
+    html.push('<div style=\"margin-top:6px;\"><b>超限基（当前承载 / 限值）：</b></div><ul>');
     for (const item of shown) {
       const marker = faultMarkers.find((m) => m.type === item.type && m.key === item.key);
       const badge = marker
@@ -1130,11 +1270,11 @@ function renderFaultBox(ev) {
       );
     }
     if (overloads.length > 8) {
-      html.push(`<li>...and ${overloads.length - 8} more</li>`);
+      html.push(`<li>...其余 ${overloads.length - 8} 项</li>`);
     }
     html.push('</ul>');
     if (faultMarkers.length) {
-      html.push('<div style=\"margin-top:6px;color:#7f1d1d;\">Matching thin leader lines are drawn in the 3D stage with the same #id.</div>');
+      html.push('<div style=\"margin-top:6px;color:#7f1d1d;\">3D 视图中的同编号细引线与本列表一一对应。</div>');
     }
   }
   faultBox.innerHTML = html.join('');
@@ -1145,7 +1285,7 @@ function drawFaultLeaderLines() {
   const w = stage.clientWidth;
   const h = stage.clientHeight;
   ctx.save();
-  ctx.font = '11px Arial, sans-serif';
+  ctx.font = '11px "Segoe UI", "Microsoft YaHei", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -1200,26 +1340,34 @@ function draw() {
   renderFaultBox(evaluation);
 
   const faces = [];
+  const nx = Math.max(1, Math.round(loadState.layout.nx));
+  const ny = Math.max(1, Math.round(loadState.layout.ny));
 
-  for (let level = 1; level <= N; level++) {
-    const z = level * H;
-    const util = Math.max(
-      evaluation.boardUtil[`L${level}`] || 0,
-      evaluation.boardDeflectionUtil[`L${level}`] || 0
-    );
-    faces.push(drawFace(
-      [[0,0,z], [X,0,z], [X,Y,z], [0,Y,z]],
-      stressColor(util, 0.82), 'rgba(75,85,99,0.95)'
-    ));
-  }
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      const ox = ix * X;
+      const oy = iy * Y;
+      for (let level = 1; level <= N; level++) {
+        const z = level * H;
+        const util = Math.max(
+          evaluation.boardUtil[keyInCell(ix, iy, `L${level}`)] || 0,
+          evaluation.boardDeflectionUtil[keyInCell(ix, iy, `L${level}`)] || 0
+        );
+        faces.push(drawFace(
+          [[ox, oy, z], [ox + X, oy, z], [ox + X, oy + Y, z], [ox, oy + Y, z]],
+          stressColor(util, 0.82), 'rgba(75,85,99,0.95)'
+        ));
+      }
 
-  for (let i = 0; i < combo.layers.length; i++) {
-    const layer = combo.layers[i];
-    const z0 = i * H;
-    const z1 = (i + 1) * H;
-    for (const side of layer.support_panels) {
-      const util = evaluation.panelUtil[`L${i + 1}:${side}`] || 0;
-      faces.push(drawFace(panelQuad(side, z0, z1), stressColor(util, 0.70), 'rgba(75,85,99,0.95)'));
+      for (let i = 0; i < combo.layers.length; i++) {
+        const layer = combo.layers[i];
+        const z0 = i * H;
+        const z1 = (i + 1) * H;
+        for (const side of layer.support_panels) {
+          const util = evaluation.panelUtil[keyInCell(ix, iy, `L${i + 1}:${side}`)] || 0;
+          faces.push(drawFace(panelQuad(side, z0, z1, ox, oy), stressColor(util, 0.70), 'rgba(75,85,99,0.95)'));
+        }
+      }
     }
   }
 
@@ -1250,39 +1398,51 @@ function draw() {
 
   const rods = segmentRods(combo);
   ctx.lineWidth = 4;
-  for (const corner of CORNERS) {
-    const xy = cornerXY[corner];
-    for (const seg of rods[corner]) {
-      const layer = seg[2];
-      const util = evaluation.rodUtil[`L${layer}:${corner}`] || 0;
-      ctx.strokeStyle = stressColor(util, 1.0);
-      const p0 = project([xy[0], xy[1], seg[0]]);
-      const p1 = project([xy[0], xy[1], seg[1]]);
-      ctx.beginPath();
-      ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-      ctx.stroke();
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      const ox = ix * X;
+      const oy = iy * Y;
+      for (const corner of CORNERS) {
+        const xy = cornerXY[corner];
+        for (const seg of rods[corner]) {
+          const layer = seg[2];
+          const util = evaluation.rodUtil[keyInCell(ix, iy, `L${layer}:${corner}`)] || 0;
+          ctx.strokeStyle = stressColor(util, 1.0);
+          const p0 = project([ox + xy[0], oy + xy[1], seg[0]]);
+          const p1 = project([ox + xy[0], oy + xy[1], seg[1]]);
+          ctx.beginPath();
+          ctx.moveTo(p0[0], p0[1]);
+          ctx.lineTo(p1[0], p1[1]);
+          ctx.stroke();
+        }
+      }
     }
   }
 
   // Connector nodes (all three bases visualized).
-  for (let lv = 1; lv <= N; lv++) {
-    const layer = combo.layers[lv - 1];
-    for (const corner of CORNERS) {
-      const touched = layer.rods.includes(corner) || layer.support_panels.some((side) => {
-        const pair = sideCorners[side];
-        return pair[0] === corner || pair[1] === corner;
-      });
-      if (!touched) continue;
-      const util = evaluation.connectorUtil[`L${lv}:${corner}`] || 0;
-      const p = project([cornerXY[corner][0], cornerXY[corner][1], lv * H]);
-      ctx.beginPath();
-      ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
-      ctx.fillStyle = stressColor(util, 1.0);
-      ctx.fill();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(17,24,39,0.95)';
-      ctx.stroke();
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      const ox = ix * X;
+      const oy = iy * Y;
+      for (let lv = 1; lv <= N; lv++) {
+        const layer = combo.layers[lv - 1];
+        for (const corner of CORNERS) {
+          const touched = layer.rods.includes(corner) || layer.support_panels.some((side) => {
+            const pair = sideCorners[side];
+            return pair[0] === corner || pair[1] === corner;
+          });
+          if (!touched) continue;
+          const util = evaluation.connectorUtil[keyInCell(ix, iy, `L${lv}:${corner}`)] || 0;
+          const p = project([ox + cornerXY[corner][0], oy + cornerXY[corner][1], lv * H]);
+          ctx.beginPath();
+          ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+          ctx.fillStyle = stressColor(util, 1.0);
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(17,24,39,0.95)';
+          ctx.stroke();
+        }
+      }
     }
   }
 
@@ -1299,23 +1459,35 @@ function refreshInfo() {
   const active = getActiveCube();
   const lines = [
     combo.combo_id + '  ' + combo.label,
-    'equivalent_count=' + combo.equivalent_count,
-    `cube_count=${loadState.cubes.length}, active=C${loadState.activeCube + 1}`,
-    `active_cube(layer=${Math.round(active.layer)}, size=[${active.sizeX.toFixed(2)},${active.sizeY.toFixed(2)},${active.sizeZ.toFixed(2)}], center=[${active.posX.toFixed(2)},${active.posY.toFixed(2)}], weight=${active.weight.toFixed(2)})`,
-    `caps(rod=${loadState.caps.rod.toFixed(2)}, panel=${loadState.caps.panel.toFixed(2)}, connector=${loadState.caps.connector.toFixed(2)}, board=${loadState.caps.board.toFixed(2)}, boardDeflect=${loadState.caps.boardDeflect.toFixed(2)})`,
-    `qualification=${ev.pass ? 'PASS' : 'FAIL'} max_util=${ev.maxUtil.toFixed(3)}`,
+    '旋转等价数量=' + combo.equivalent_count,
+    `拼接 nx=${Math.round(loadState.layout.nx)}, ny=${Math.round(loadState.layout.ny)}, 总单元=${Math.round(loadState.layout.nx) * Math.round(loadState.layout.ny)}`,
+    `方块数量=${loadState.cubes.length}，当前=C${loadState.activeCube + 1}`,
+    `当前方块(层=${Math.round(active.layer)}, 尺寸=[${active.sizeX.toFixed(2)},${active.sizeY.toFixed(2)},${active.sizeZ.toFixed(2)}], 中心=[${active.posX.toFixed(2)},${active.posY.toFixed(2)}], 重量=${active.weight.toFixed(2)})`,
+    `容量(杆=${loadState.caps.rod.toFixed(2)}, 支撑板=${loadState.caps.panel.toFixed(2)}, 连接件=${loadState.caps.connector.toFixed(2)}, 层板=${loadState.caps.board.toFixed(2)}, 挠度=${loadState.caps.boardDeflect.toFixed(2)})`,
+    `承载判定=${ev.pass ? '通过' : '不通过'}，最大利用率=${ev.maxUtil.toFixed(3)}`,
   ];
   if (ev.pathIssues.length) {
-    lines.push('path_issues=' + ev.pathIssues.join(' | '));
+    lines.push('传力路径问题=' + ev.pathIssues.join(' | '));
   }
   if (ev.critical.length) {
-    lines.push('critical=' + ev.critical.map((it) => `${it.type}:${it.key}:${it.util.toFixed(3)}`).join(' | '));
+    const typeName = {
+      rod: '杆',
+      panel: '支撑板',
+      connector: '连接件',
+      board: '层板',
+      board_deflect: '层板挠度',
+    };
+    lines.push('关键超限=' + ev.critical.map((it) => `${typeName[it.type] || it.type}:${it.key}:${it.util.toFixed(3)}`).join(' | '));
   }
   document.getElementById('info').textContent = lines.join('\\n');
 }
 
 function syncControlsFromState() {
   const active = getActiveCube();
+  const nx = Math.max(1, Math.round(loadState.layout.nx));
+  const ny = Math.max(1, Math.round(loadState.layout.ny));
+  controls.nxCount.value = String(nx);
+  controls.nyCount.value = String(ny);
   controls.cubeCount.value = String(loadState.cubes.length);
   controls.cubeLayer.value = String(Math.round(active.layer));
   controls.cubeWeight.value = active.weight.toFixed(2);
@@ -1329,20 +1501,32 @@ function syncControlsFromState() {
   controls.capConnector.value = loadState.caps.connector.toFixed(2);
   controls.capBoard.value = loadState.caps.board.toFixed(2);
   controls.capBoardDeflect.value = loadState.caps.boardDeflect.toFixed(2);
+  controls.cubePosX.max = String(sceneWidth());
+  controls.cubePosY.max = String(sceneDepth());
+  if (controls.sceneMeta) {
+    controls.sceneMeta.textContent = `N=${N}, x=${X}, y=${Y}, h=${H} | nx=${nx}, ny=${ny}`;
+  }
+  if (controls.tileInfo) {
+    controls.tileInfo.textContent = `总单元数：${nx * ny}（X方向 ${nx} × Y方向 ${ny}）`;
+  }
   syncCubeIndexOptions();
 }
 
 function normalizeCube(cube) {
+  const sw = sceneWidth();
+  const sd = sceneDepth();
   cube.layer = clamp(Math.round(cube.layer), 1, N);
   cube.weight = Math.max(0, cube.weight);
-  cube.sizeX = clamp(cube.sizeX, 0.5, X);
-  cube.sizeY = clamp(cube.sizeY, 0.5, Y);
+  cube.sizeX = clamp(cube.sizeX, 0.5, Math.max(0.5, Math.min(X, sw)));
+  cube.sizeY = clamp(cube.sizeY, 0.5, Math.max(0.5, Math.min(Y, sd)));
   cube.sizeZ = clamp(cube.sizeZ, 0.5, H * 2.0);
-  cube.posX = clamp(cube.posX, cube.sizeX / 2, X - cube.sizeX / 2);
-  cube.posY = clamp(cube.posY, cube.sizeY / 2, Y - cube.sizeY / 2);
+  cube.posX = clamp(cube.posX, cube.sizeX / 2, sw - cube.sizeX / 2);
+  cube.posY = clamp(cube.posY, cube.sizeY / 2, sd - cube.sizeY / 2);
 }
 
 function normalizeState() {
+  loadState.layout.nx = clamp(Math.round(loadState.layout.nx), 1, 6);
+  loadState.layout.ny = clamp(Math.round(loadState.layout.ny), 1, 6);
   if (!loadState.cubes.length) loadState.cubes.push(makeDefaultCube());
   loadState.activeCube = clamp(Math.round(loadState.activeCube), 0, loadState.cubes.length - 1);
   for (const cube of loadState.cubes) normalizeCube(cube);
@@ -1358,6 +1542,8 @@ function ensureCubeCount(targetCount) {
   while (loadState.cubes.length < want) {
     const newCube = makeDefaultCube();
     newCube.layer = clamp(loadState.cubes.length + 1, 1, N);
+    newCube.posX = sceneWidth() * 0.5;
+    newCube.posY = sceneDepth() * 0.5;
     loadState.cubes.push(newCube);
   }
   while (loadState.cubes.length > want) {
@@ -1381,6 +1567,10 @@ function syncCubeIndexOptions() {
 }
 
 function onControlInput() {
+  const oldNx = Math.round(loadState.layout.nx);
+  const oldNy = Math.round(loadState.layout.ny);
+  loadState.layout.nx = num(controls.nxCount.value, loadState.layout.nx);
+  loadState.layout.ny = num(controls.nyCount.value, loadState.layout.ny);
   ensureCubeCount(num(controls.cubeCount.value, loadState.cubes.length));
   loadState.activeCube = clamp(num(controls.cubeIndex.value, loadState.activeCube), 0, loadState.cubes.length - 1);
   const active = getActiveCube();
@@ -1397,12 +1587,20 @@ function onControlInput() {
   loadState.caps.board = num(controls.capBoard.value, loadState.caps.board);
   loadState.caps.boardDeflect = num(controls.capBoardDeflect.value, loadState.caps.boardDeflect);
   normalizeState();
+  const layoutChanged = oldNx !== Math.round(loadState.layout.nx) || oldNy !== Math.round(loadState.layout.ny);
+  if (layoutChanged) fitView();
   syncControlsFromState();
   draw();
   refreshInfo();
 }
 
 function initControls() {
+  controls.nxCount.min = '1';
+  controls.nxCount.max = '6';
+  controls.nxCount.step = '1';
+  controls.nyCount.min = '1';
+  controls.nyCount.max = '6';
+  controls.nyCount.step = '1';
   controls.cubeCount.min = '1';
   controls.cubeCount.max = '12';
   controls.cubeCount.step = '1';
@@ -1421,10 +1619,10 @@ function initControls() {
   controls.cubeSizeZ.max = String(H * 2.0);
   controls.cubeSizeZ.step = '0.5';
   controls.cubePosX.min = '0';
-  controls.cubePosX.max = String(X);
+  controls.cubePosX.max = String(sceneWidth());
   controls.cubePosX.step = '0.5';
   controls.cubePosY.min = '0';
-  controls.cubePosY.max = String(Y);
+  controls.cubePosY.max = String(sceneDepth());
   controls.cubePosY.step = '0.5';
 
   for (const key of ['capRod', 'capPanel', 'capConnector', 'capBoard', 'capBoardDeflect']) {
@@ -1433,6 +1631,7 @@ function initControls() {
   }
 
   const inputIds = [
+    'nxCount', 'nyCount',
     'cubeCount', 'cubeLayer', 'cubeWeight', 'cubeSizeX', 'cubeSizeY', 'cubeSizeZ', 'cubePosX', 'cubePosY',
     'capRod', 'capPanel', 'capConnector', 'capBoard', 'capBoardDeflect',
   ];
@@ -1490,7 +1689,7 @@ function pickCubeAtScreen(clientX, clientY) {
 
 function renderCurrent() {
   if (!combos.length) {
-    showStatus('No combos available to render.', true);
+    showStatus('没有可渲染的组合。', true);
     draw();
     return;
   }
@@ -1505,7 +1704,7 @@ function renderCurrent() {
   combos.forEach((c, idx) => {
     const op = document.createElement('option');
     op.value = String(idx);
-    op.textContent = c.combo_id + '  (' + c.equivalent_count + ')  ' + c.label;
+    op.textContent = c.combo_id + '  （等价' + c.equivalent_count + '）  ' + c.label;
     sel.appendChild(op);
   });
   sel.addEventListener('change', () => {
@@ -1589,9 +1788,9 @@ function renderCurrent() {
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
   renderCurrent();
-  showStatus('Viewer ready. Drag cube to move x/y. External properties enabled. combos=' + combos.length, false);
+  showStatus('可视化已就绪。可拖动方块并调整 nx/ny；组合数=' + combos.length, false);
 } catch (err) {
-  showStatus('Viewer init failed: ' + String(err), true);
+  showStatus('可视化初始化失败：' + String(err), true);
 }
 </script>
 </body>

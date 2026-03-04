@@ -137,6 +137,7 @@
       "l1_anchor": "## 2. 边界定义（Boundary）",
       "l2_file": "standards/L2/置物架框架标准.md",
       "l2_anchor": "## 2. 边界定义（Boundary）",
+      "sync_note": "L2 boundary keeps N as global layer parameter and adds horizontal tiling inputs nx/ny for assembled shelf layout",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -184,7 +185,7 @@
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
       "l2_file": "standards/L2/置物架框架标准.md",
       "l2_anchor": "## 4. 组合原则（Combination Principles）",
-      "sync_note": "L2 keeps geometric legality in R1-R7 and moves load-capacity checks to qualification outputs (utilization/pass-fail) under external properties",
+      "sync_note": "L2 combination rules are merged by functional similarity (still categorized by function), remain extensible, support nx*ny horizontal assembly (e.g., 1x2), keep per-cell layer count in [1, N], add per-panel openness-to-outside interface constraint, and preserve legality vs qualification separation",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",

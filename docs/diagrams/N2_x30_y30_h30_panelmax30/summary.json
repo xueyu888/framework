@@ -32,11 +32,11 @@
   "valid_combos": [
     {
       "combo_id": "CASE-01",
-      "label": "L1(R:none|P:back-front) L2(R:none|P:back-front)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:back-front)",
       "equivalent_count": 2,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:none|P:back-front)",
-        "L1(R:none|P:left-right) L2(R:none|P:left-right)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:无|支撑板:left-right)"
       ],
       "layers": [
         {
@@ -67,11 +67,11 @@
     },
     {
       "combo_id": "CASE-02",
-      "label": "L1(R:none|P:back-front) L2(R:none|P:left-right)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:left-right)",
       "equivalent_count": 2,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:none|P:left-right)",
-        "L1(R:none|P:left-right) L2(R:none|P:back-front)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:无|支撑板:back-front)"
       ],
       "layers": [
         {
@@ -102,13 +102,13 @@
     },
     {
       "combo_id": "CASE-03",
-      "label": "L1(R:none|P:back-front) L2(R:BL|P:front-right)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL|支撑板:front-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:BL|P:front-right)",
-        "L1(R:none|P:back-front) L2(R:FR|P:back-left)",
-        "L1(R:none|P:left-right) L2(R:BR|P:front-left)",
-        "L1(R:none|P:left-right) L2(R:FL|P:back-right)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:FL|支撑板:back-right)"
       ],
       "layers": [
         {
@@ -141,13 +141,13 @@
     },
     {
       "combo_id": "CASE-04",
-      "label": "L1(R:none|P:back-front) L2(R:BL-BR|P:front)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR|支撑板:front)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:BL-BR|P:front)",
-        "L1(R:none|P:back-front) L2(R:FL-FR|P:back)",
-        "L1(R:none|P:left-right) L2(R:BL-FL|P:right)",
-        "L1(R:none|P:left-right) L2(R:BR-FR|P:left)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BR-FR|支撑板:left)"
       ],
       "layers": [
         {
@@ -181,11 +181,11 @@
     },
     {
       "combo_id": "CASE-05",
-      "label": "L1(R:none|P:back-front) L2(R:BL-BR-FL-FR|P:none)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
       "equivalent_count": 2,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:none|P:left-right) L2(R:BL-BR-FL-FR|P:none)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
       ],
       "layers": [
         {
@@ -220,13 +220,13 @@
     },
     {
       "combo_id": "CASE-06",
-      "label": "L1(R:none|P:back-front) L2(R:BL-FL|P:right)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-FL|支撑板:right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:BL-FL|P:right)",
-        "L1(R:none|P:back-front) L2(R:BR-FR|P:left)",
-        "L1(R:none|P:left-right) L2(R:BL-BR|P:front)",
-        "L1(R:none|P:left-right) L2(R:FL-FR|P:back)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:FL-FR|支撑板:back)"
       ],
       "layers": [
         {
@@ -260,13 +260,13 @@
     },
     {
       "combo_id": "CASE-07",
-      "label": "L1(R:none|P:back-front) L2(R:BR|P:front-left)",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BR|支撑板:front-left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:none|P:back-front) L2(R:BR|P:front-left)",
-        "L1(R:none|P:back-front) L2(R:FL|P:back-right)",
-        "L1(R:none|P:left-right) L2(R:BL|P:front-right)",
-        "L1(R:none|P:left-right) L2(R:FR|P:back-left)"
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:FR|支撑板:back-left)"
       ],
       "layers": [
         {
@@ -299,13 +299,13 @@
     },
     {
       "combo_id": "CASE-08",
-      "label": "L1(R:BL|P:front-right) L2(R:none|P:back-front)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:back-front)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:none|P:back-front)",
-        "L1(R:BR|P:front-left) L2(R:none|P:left-right)",
-        "L1(R:FL|P:back-right) L2(R:none|P:left-right)",
-        "L1(R:FR|P:back-left) L2(R:none|P:back-front)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:无|支撑板:back-front)"
       ],
       "layers": [
         {
@@ -338,13 +338,13 @@
     },
     {
       "combo_id": "CASE-09",
-      "label": "L1(R:BL|P:front-right) L2(R:none|P:left-right)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:left-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:none|P:left-right)",
-        "L1(R:BR|P:front-left) L2(R:none|P:back-front)",
-        "L1(R:FL|P:back-right) L2(R:none|P:back-front)",
-        "L1(R:FR|P:back-left) L2(R:none|P:left-right)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:无|支撑板:left-right)"
       ],
       "layers": [
         {
@@ -377,13 +377,13 @@
     },
     {
       "combo_id": "CASE-10",
-      "label": "L1(R:BL|P:front-right) L2(R:BL|P:front-right)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL|支撑板:front-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:BL|P:front-right)",
-        "L1(R:BR|P:front-left) L2(R:BR|P:front-left)",
-        "L1(R:FL|P:back-right) L2(R:FL|P:back-right)",
-        "L1(R:FR|P:back-left) L2(R:FR|P:back-left)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:FR|支撑板:back-left)"
       ],
       "layers": [
         {
@@ -418,13 +418,13 @@
     },
     {
       "combo_id": "CASE-11",
-      "label": "L1(R:BL|P:front-right) L2(R:BL-BR|P:front)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR|支撑板:front)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:BL-BR|P:front)",
-        "L1(R:BR|P:front-left) L2(R:BR-FR|P:left)",
-        "L1(R:FL|P:back-right) L2(R:BL-FL|P:right)",
-        "L1(R:FR|P:back-left) L2(R:FL-FR|P:back)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:FL-FR|支撑板:back)"
       ],
       "layers": [
         {
@@ -460,13 +460,13 @@
     },
     {
       "combo_id": "CASE-12",
-      "label": "L1(R:BL|P:front-right) L2(R:BL-BR-FL-FR|P:none)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:BR|P:front-left) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:FL|P:back-right) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:FR|P:back-left) L2(R:BL-BR-FL-FR|P:none)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
       ],
       "layers": [
         {
@@ -503,13 +503,13 @@
     },
     {
       "combo_id": "CASE-13",
-      "label": "L1(R:BL|P:front-right) L2(R:BL-FL|P:right)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-FL|支撑板:right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:BL-FL|P:right)",
-        "L1(R:BR|P:front-left) L2(R:BL-BR|P:front)",
-        "L1(R:FL|P:back-right) L2(R:FL-FR|P:back)",
-        "L1(R:FR|P:back-left) L2(R:BR-FR|P:left)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BR-FR|支撑板:left)"
       ],
       "layers": [
         {
@@ -545,13 +545,13 @@
     },
     {
       "combo_id": "CASE-14",
-      "label": "L1(R:BL|P:front-right) L2(R:BR|P:front-left)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR|支撑板:front-left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:BR|P:front-left)",
-        "L1(R:BR|P:front-left) L2(R:FR|P:back-left)",
-        "L1(R:FL|P:back-right) L2(R:BL|P:front-right)",
-        "L1(R:FR|P:back-left) L2(R:FL|P:back-right)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:FL|支撑板:back-right)"
       ],
       "layers": [
         {
@@ -586,13 +586,13 @@
     },
     {
       "combo_id": "CASE-15",
-      "label": "L1(R:BL|P:front-right) L2(R:BR-FR|P:left)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR-FR|支撑板:left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:BR-FR|P:left)",
-        "L1(R:BR|P:front-left) L2(R:FL-FR|P:back)",
-        "L1(R:FL|P:back-right) L2(R:BL-BR|P:front)",
-        "L1(R:FR|P:back-left) L2(R:BL-FL|P:right)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL-FL|支撑板:right)"
       ],
       "layers": [
         {
@@ -628,13 +628,13 @@
     },
     {
       "combo_id": "CASE-16",
-      "label": "L1(R:BL|P:front-right) L2(R:FL|P:back-right)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL|支撑板:back-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:FL|P:back-right)",
-        "L1(R:BR|P:front-left) L2(R:BL|P:front-right)",
-        "L1(R:FL|P:back-right) L2(R:FR|P:back-left)",
-        "L1(R:FR|P:back-left) L2(R:BR|P:front-left)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BR|支撑板:front-left)"
       ],
       "layers": [
         {
@@ -669,13 +669,13 @@
     },
     {
       "combo_id": "CASE-17",
-      "label": "L1(R:BL|P:front-right) L2(R:FL-FR|P:back)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL-FR|支撑板:back)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:FL-FR|P:back)",
-        "L1(R:BR|P:front-left) L2(R:BL-FL|P:right)",
-        "L1(R:FL|P:back-right) L2(R:BR-FR|P:left)",
-        "L1(R:FR|P:back-left) L2(R:BL-BR|P:front)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL-BR|支撑板:front)"
       ],
       "layers": [
         {
@@ -711,13 +711,13 @@
     },
     {
       "combo_id": "CASE-18",
-      "label": "L1(R:BL|P:front-right) L2(R:FR|P:back-left)",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:FR|支撑板:back-left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL|P:front-right) L2(R:FR|P:back-left)",
-        "L1(R:BR|P:front-left) L2(R:FL|P:back-right)",
-        "L1(R:FL|P:back-right) L2(R:BR|P:front-left)",
-        "L1(R:FR|P:back-left) L2(R:BL|P:front-right)"
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL|支撑板:front-right)"
       ],
       "layers": [
         {
@@ -752,13 +752,13 @@
     },
     {
       "combo_id": "CASE-19",
-      "label": "L1(R:BL-BR|P:front) L2(R:none|P:back-front)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:back-front)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:none|P:back-front)",
-        "L1(R:BL-FL|P:right) L2(R:none|P:left-right)",
-        "L1(R:BR-FR|P:left) L2(R:none|P:left-right)",
-        "L1(R:FL-FR|P:back) L2(R:none|P:back-front)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:无|支撑板:back-front)"
       ],
       "layers": [
         {
@@ -792,13 +792,13 @@
     },
     {
       "combo_id": "CASE-20",
-      "label": "L1(R:BL-BR|P:front) L2(R:none|P:left-right)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:left-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:none|P:left-right)",
-        "L1(R:BL-FL|P:right) L2(R:none|P:back-front)",
-        "L1(R:BR-FR|P:left) L2(R:none|P:back-front)",
-        "L1(R:FL-FR|P:back) L2(R:none|P:left-right)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:无|支撑板:left-right)"
       ],
       "layers": [
         {
@@ -832,13 +832,13 @@
     },
     {
       "combo_id": "CASE-21",
-      "label": "L1(R:BL-BR|P:front) L2(R:BL|P:front-right)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL|支撑板:front-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:BL|P:front-right)",
-        "L1(R:BL-FL|P:right) L2(R:FL|P:back-right)",
-        "L1(R:BR-FR|P:left) L2(R:BR|P:front-left)",
-        "L1(R:FL-FR|P:back) L2(R:FR|P:back-left)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:FR|支撑板:back-left)"
       ],
       "layers": [
         {
@@ -874,13 +874,13 @@
     },
     {
       "combo_id": "CASE-22",
-      "label": "L1(R:BL-BR|P:front) L2(R:BL-BR|P:front)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR|支撑板:front)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:BL-BR|P:front)",
-        "L1(R:BL-FL|P:right) L2(R:BL-FL|P:right)",
-        "L1(R:BR-FR|P:left) L2(R:BR-FR|P:left)",
-        "L1(R:FL-FR|P:back) L2(R:FL-FR|P:back)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:FL-FR|支撑板:back)"
       ],
       "layers": [
         {
@@ -917,13 +917,13 @@
     },
     {
       "combo_id": "CASE-23",
-      "label": "L1(R:BL-BR|P:front) L2(R:BL-BR-FL-FR|P:none)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:BL-FL|P:right) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:BR-FR|P:left) L2(R:BL-BR-FL-FR|P:none)",
-        "L1(R:FL-FR|P:back) L2(R:BL-BR-FL-FR|P:none)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
       ],
       "layers": [
         {
@@ -961,13 +961,13 @@
     },
     {
       "combo_id": "CASE-24",
-      "label": "L1(R:BL-BR|P:front) L2(R:BL-FL|P:right)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-FL|支撑板:right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:BL-FL|P:right)",
-        "L1(R:BL-FL|P:right) L2(R:FL-FR|P:back)",
-        "L1(R:BR-FR|P:left) L2(R:BL-BR|P:front)",
-        "L1(R:FL-FR|P:back) L2(R:BR-FR|P:left)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BR-FR|支撑板:left)"
       ],
       "layers": [
         {
@@ -1004,13 +1004,13 @@
     },
     {
       "combo_id": "CASE-25",
-      "label": "L1(R:BL-BR|P:front) L2(R:BR|P:front-left)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR|支撑板:front-left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:BR|P:front-left)",
-        "L1(R:BL-FL|P:right) L2(R:BL|P:front-right)",
-        "L1(R:BR-FR|P:left) L2(R:FR|P:back-left)",
-        "L1(R:FL-FR|P:back) L2(R:FL|P:back-right)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:FL|支撑板:back-right)"
       ],
       "layers": [
         {
@@ -1046,13 +1046,13 @@
     },
     {
       "combo_id": "CASE-26",
-      "label": "L1(R:BL-BR|P:front) L2(R:BR-FR|P:left)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR-FR|支撑板:left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:BR-FR|P:left)",
-        "L1(R:BL-FL|P:right) L2(R:BL-BR|P:front)",
-        "L1(R:BR-FR|P:left) L2(R:FL-FR|P:back)",
-        "L1(R:FL-FR|P:back) L2(R:BL-FL|P:right)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL-FL|支撑板:right)"
       ],
       "layers": [
         {
@@ -1089,13 +1089,13 @@
     },
     {
       "combo_id": "CASE-27",
-      "label": "L1(R:BL-BR|P:front) L2(R:FL|P:back-right)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL|支撑板:back-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:FL|P:back-right)",
-        "L1(R:BL-FL|P:right) L2(R:FR|P:back-left)",
-        "L1(R:BR-FR|P:left) L2(R:BL|P:front-right)",
-        "L1(R:FL-FR|P:back) L2(R:BR|P:front-left)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BR|支撑板:front-left)"
       ],
       "layers": [
         {
@@ -1131,13 +1131,13 @@
     },
     {
       "combo_id": "CASE-28",
-      "label": "L1(R:BL-BR|P:front) L2(R:FL-FR|P:back)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL-FR|支撑板:back)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:FL-FR|P:back)",
-        "L1(R:BL-FL|P:right) L2(R:BR-FR|P:left)",
-        "L1(R:BR-FR|P:left) L2(R:BL-FL|P:right)",
-        "L1(R:FL-FR|P:back) L2(R:BL-BR|P:front)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL-BR|支撑板:front)"
       ],
       "layers": [
         {
@@ -1174,13 +1174,13 @@
     },
     {
       "combo_id": "CASE-29",
-      "label": "L1(R:BL-BR|P:front) L2(R:FR|P:back-left)",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FR|支撑板:back-left)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR|P:front) L2(R:FR|P:back-left)",
-        "L1(R:BL-FL|P:right) L2(R:BR|P:front-left)",
-        "L1(R:BR-FR|P:left) L2(R:FL|P:back-right)",
-        "L1(R:FL-FR|P:back) L2(R:BL|P:front-right)"
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL|支撑板:front-right)"
       ],
       "layers": [
         {
@@ -1216,11 +1216,11 @@
     },
     {
       "combo_id": "CASE-30",
-      "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:none|P:back-front)",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:无|支撑板:back-front)",
       "equivalent_count": 2,
       "equivalent_members": [
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:none|P:back-front)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:none|P:left-right)"
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:无|支撑板:left-right)"
       ],
       "layers": [
         {
@@ -1255,13 +1255,13 @@
     },
     {
       "combo_id": "CASE-31",
-      "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:BL|P:front-right)",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL|支撑板:front-right)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:BL|P:front-right)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:BR|P:front-left)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:FL|P:back-right)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:FR|P:back-left)"
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:FR|支撑板:back-left)"
       ],
       "layers": [
         {
@@ -1298,13 +1298,13 @@
     },
     {
       "combo_id": "CASE-32",
-      "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR|P:front)",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR|支撑板:front)",
       "equivalent_count": 4,
       "equivalent_members": [
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR|P:front)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-FL|P:right)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:BR-FR|P:left)",
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:FL-FR|P:back)"
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:FL-FR|支撑板:back)"
       ],
       "layers": [
         {
@@ -1342,10 +1342,10 @@
     },
     {
       "combo_id": "CASE-33",
-      "label": "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR-FL-FR|P:none)",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
       "equivalent_count": 1,
       "equivalent_members": [
-        "L1(R:BL-BR-FL-FR|P:none) L2(R:BL-BR-FL-FR|P:none)"
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
       ],
       "layers": [
         {
