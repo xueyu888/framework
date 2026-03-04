@@ -18,7 +18,7 @@ VALID_NODE_KINDS = {"layer", "file"}
 REQUIRED_L1_ANCHORS_PER_L2 = (
     "## 1. 目标（Goal）",
     "## 2. 边界定义（Boundary）",
-    "## 3. 模块（最小可行基，Module）",
+    "## 3. 最小可行基（Bases）",
     "## 4. 组合原则（Combination Principles）",
     "## 5. 验证（Verification）",
 )
