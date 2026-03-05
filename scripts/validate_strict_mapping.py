@@ -34,12 +34,12 @@ ASSIGN_CALL_PATTERN = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\(\s*$"
 )
 LAYER_DIR_PATTERN = re.compile(r"^L(\d+)$")
-FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN = re.compile(r"^L(\d+)-[^/]+\.md$")
+FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN = re.compile(r"^L(\d+)-M(\d+)-[^/]+\.md$")
 CANONICAL_BASE_ID_PATTERN = re.compile(r"^B(\d+)$")
 CANONICAL_NODE_ID_PATTERN = re.compile(r"^L(\d+)\.M([A-Za-z0-9_-]+)\.B(\d+)$")
 CANONICAL_CAPABILITY_ID_PATTERN = re.compile(r"^C(\d+)$")
 CANONICAL_VERIFY_ID_PATTERN = re.compile(r"^V(\d+)$")
-FRAMEWORK_L2_FILE_PATTERN = re.compile(r"^framework/[^/]+/L2-[^/]+\.md$")
+FRAMEWORK_L2_FILE_PATTERN = re.compile(r"^framework/[^/]+/L2-M\d+-[^/]+\.md$")
 LAYER_TAG_PATTERN = re.compile(r"<!--\s*@layer\s+([^>]*)-->", re.IGNORECASE)
 BASE_TAG_PATTERN = re.compile(r"<!--\s*@base\s+([^>]*)-->", re.IGNORECASE)
 COMPOSE_TAG_PATTERN = re.compile(r"<!--\s*@compose\s+([^>]*)-->", re.IGNORECASE)
@@ -349,7 +349,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                 rel = entry.relative_to(REPO_ROOT).as_posix()
                 issues.append(
                     make_issue(
-                        "framework markdown filename must use Lx- prefix, e.g. L2-xxx.md",
+                        "framework markdown filename must use Lx-Mn- prefix, e.g. L2-M0-xxx.md",
                         rel,
                         1,
                         code="FRAMEWORK_FILE_LEVEL_PREFIX_INVALID",
@@ -359,7 +359,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                 rel = entry.relative_to(REPO_ROOT).as_posix()
                 issues.append(
                     make_issue(
-                        "framework module must store markdown directly under module directory; use Lx-*.md files",
+                        "framework module must store markdown directly under module directory; use Lx-Mn-*.md files",
                         rel,
                         1,
                         code="FRAMEWORK_SUBDIR_FORBIDDEN",
@@ -1412,7 +1412,7 @@ def validate_registry_structure(
         if standard_file not in declared_l2:
             issues.append(
                 make_issue(
-                    "mapping_registry.json: unregistered domain standard under framework/*/L2-*.md: "
+                    "mapping_registry.json: unregistered domain standard under framework/*/L2-Mn-*.md: "
                     f"{standard_file}",
                     REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
                     find_line(registry_text, '"L2"'),

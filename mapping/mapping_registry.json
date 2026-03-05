@@ -1,10 +1,10 @@
 {
   "meta": {
-    "updated_at": "2026-03-05",
+    "updated_at": "2026-03-06",
     "l3_sync_notes": [
       {
         "id": "SYNC-20260305-runtime-env-l0",
-        "note": "Add framework/runtime_env/L0-运行环境识别模块.md for framework directive schema trial."
+        "note": "Add framework/runtime_env/L0-M0-运行环境识别模块.md for framework directive schema trial."
       },
       {
         "id": "SYNC-20260305-frontend-foundation-flow",
@@ -17,6 +17,10 @@
       {
         "id": "SYNC-20260305-bases-structure-first",
         "note": "Rewrite all framework B* definitions as finite structural units (structure-first), avoiding function-first phrasing."
+      },
+      {
+        "id": "SYNC-20260306-frontend-multi-path-graph",
+        "note": "Frontend multi-path graph is inferred from framework base definitions (B*) and rule participation (参与基), without extra graph directives."
       }
     ]
   },
@@ -61,21 +65,28 @@
                 "id": "NODE-L2-SHELF",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/shelf/L2-置物架框架标准.md",
+                "file": "framework/shelf/L2-M0-置物架框架标准模块.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-CURTAIN",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/curtain/L2-窗帘框架标准.md",
+                "file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-FRONTEND",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/frontend/L2-前端框架标准.md",
+                "file": "framework/frontend/L2-M0-前端框架标准模块.md",
+                "children": []
+              },
+              {
+                "id": "NODE-L2-FRONTEND-LOGIN",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
                 "children": []
               },
               {
@@ -109,7 +120,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
@@ -128,7 +139,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
@@ -155,7 +166,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "sync_note": "L2 bases section migrated to tagged annotations; Module symbols in L3 remain unchanged",
       "impl_symbols": [
@@ -175,7 +186,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
@@ -222,7 +233,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
@@ -249,7 +260,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
@@ -264,7 +275,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
@@ -279,7 +290,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
@@ -294,7 +305,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
@@ -309,7 +320,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
@@ -324,7 +335,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_file": "framework/frontend/L2-M0-前端框架标准模块.md",
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
@@ -339,7 +350,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_file": "framework/frontend/L2-M0-前端框架标准模块.md",
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
@@ -358,7 +369,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_file": "framework/frontend/L2-M0-前端框架标准模块.md",
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
@@ -377,7 +388,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_file": "framework/frontend/L2-M0-前端框架标准模块.md",
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
@@ -396,7 +407,102 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_file": "framework/frontend/L2-M0-前端框架标准模块.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class VerificationInput"
+        },
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class VerificationResult"
+        },
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "def verify("
+        }
+      ]
+    },
+    {
+      "id": "MAP-FRONTEND-LOGIN-G",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 目标（Goal）",
+      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class Goal"
+        }
+      ]
+    },
+    {
+      "id": "MAP-FRONTEND-LOGIN-B",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class BoundaryDefinition"
+        },
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class Space3D"
+        }
+      ]
+    },
+    {
+      "id": "MAP-FRONTEND-LOGIN-M",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class Module"
+        },
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "MODULE_ROLE"
+        }
+      ]
+    },
+    {
+      "id": "MAP-FRONTEND-LOGIN-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class CombinationRules"
+        },
+        {
+          "file": "src/shelf_framework.py",
+          "symbol": "class StructuralPrinciples"
+        }
+      ]
+    },
+    {
+      "id": "MAP-FRONTEND-LOGIN-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {

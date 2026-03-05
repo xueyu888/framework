@@ -14,7 +14,10 @@ DEFAULT_FRAMEWORK_DIR = REPO_ROOT / "framework"
 DEFAULT_OUTPUT_JSON = REPO_ROOT / "docs/hierarchy/shelf_framework_tree.json"
 DEFAULT_OUTPUT_HTML = REPO_ROOT / "docs/hierarchy/shelf_framework_tree.html"
 LEVEL_PATTERN = re.compile(r"^L(\d+)$")
-FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN = re.compile(r"^L(\d+)-[^/]+\.md$")
+FRAMEWORK_FILE_LEVEL_MODULE_PATTERN = re.compile(r"^L(\d+)-M(\d+)-[^/]+\.md$")
+FRAMEWORK_BASE_ITEM_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(B(\d+))`\s*(.*)$")
+FRAMEWORK_UPSTREAM_CLAUSE_PATTERN = re.compile(r"上游模块[：:]\s*([^。；;]+)")
+FRAMEWORK_UPSTREAM_TERM_PATTERN = re.compile(r"^(L\d+\.[A-Za-z][A-Za-z0-9_-]*)(?:\[(.*?)\])?$")
 
 
 def parse_level(level_value: Any, *, node_id: str) -> int:
@@ -30,6 +33,10 @@ def normalize_path(input_path: Path) -> Path:
     if input_path.is_absolute():
         return input_path
     return (REPO_ROOT / input_path).resolve()
+
+
+def line_from_offset(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
 
 
 def node_label(node_kind: str, level_num: int, file_name: str | None) -> str:
@@ -137,8 +144,8 @@ def build_payload_from_registry(registry_path: Path) -> dict[str, Any]:
     return {"root": root}
 
 
-def iter_framework_docs(framework_dir: Path) -> list[tuple[str, int, Path]]:
-    docs: list[tuple[str, int, Path]] = []
+def iter_framework_docs(framework_dir: Path) -> list[tuple[str, int, int, Path]]:
+    docs: list[tuple[str, int, int, Path]] = []
     if not framework_dir.exists():
         return docs
 
@@ -147,25 +154,98 @@ def iter_framework_docs(framework_dir: Path) -> list[tuple[str, int, Path]]:
             continue
         module_name = module_dir.name
         for markdown_file in sorted(module_dir.glob("*.md")):
-            level_match = FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(markdown_file.name)
-            if level_match is None:
+            module_match = FRAMEWORK_FILE_LEVEL_MODULE_PATTERN.fullmatch(markdown_file.name)
+            if module_match is None:
                 continue
-            level_num = int(level_match.group(1))
-            docs.append((module_name, level_num, markdown_file))
+            level_num = int(module_match.group(1))
+            module_num = int(module_match.group(2))
+            docs.append((module_name, level_num, module_num, markdown_file))
     return docs
+
+
+def iter_section_bullet_lines(text: str, heading_prefix: str) -> list[tuple[int, str]]:
+    lines = text.splitlines()
+    in_section = False
+    bullets: list[tuple[int, str]] = []
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if in_section:
+                break
+            if stripped.startswith(heading_prefix):
+                in_section = True
+            continue
+        if not in_section:
+            continue
+        if stripped.startswith("- ") or stripped.startswith("* "):
+            bullets.append((idx, line))
+    return bullets
+
+
+def normalize_base_title(raw_text: str, fallback: str) -> str:
+    text = str(raw_text or "").strip()
+    if "来源：" in text:
+        text = text.split("来源：", 1)[0].strip()
+    if "来源:" in text:
+        text = text.split("来源:", 1)[0].strip()
+    for sep in ("：", ":"):
+        if sep in text:
+            left = text.split(sep, 1)[0].strip()
+            if left:
+                text = left
+                break
+    text = text.strip().rstrip("。.;；")
+    return text or fallback
+
+
+def parse_upstream_refs(raw_text: str) -> list[tuple[str, str]]:
+    refs: list[tuple[str, str]] = []
+
+    match = FRAMEWORK_UPSTREAM_CLAUSE_PATTERN.search(raw_text)
+    if match is not None:
+        refs.extend(parse_upstream_expr(match.group(1).strip()))
+
+    if refs:
+        return refs
+
+    # Support inline module reference style:
+    # `B3` xxx基：L0.M0[R2,R3] + L0.M1[R2,R3]。来源：`...`
+    source_split = re.split(r"来源[：:]", raw_text, maxsplit=1)
+    before_source = source_split[0].strip()
+    if "：" not in before_source and ":" not in before_source:
+        return refs
+
+    _, _, expr_tail = before_source.partition("：")
+    if not expr_tail:
+        _, _, expr_tail = before_source.partition(":")
+    expr = expr_tail.strip().rstrip("。.;；")
+    if "L" not in expr:
+        return refs
+    refs.extend(parse_upstream_expr(expr))
+    return refs
+
+
+def parse_upstream_expr(expr: str) -> list[tuple[str, str]]:
+    refs: list[tuple[str, str]] = []
+    for part in expr.split("+"):
+        term = part.strip()
+        if not term:
+            continue
+        term_match = FRAMEWORK_UPSTREAM_TERM_PATTERN.fullmatch(term)
+        if term_match is None:
+            continue
+        refs.append((term_match.group(1), (term_match.group(2) or "").strip()))
+    return refs
 
 
 def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], list[str]]:
     docs = iter_framework_docs(framework_dir)
     if not docs:
-        raise ValueError("no framework Lx-*.md files found under framework directory")
+        raise ValueError("no framework Lx-Mn-*.md files found under framework directory")
 
     module_level_files: dict[str, dict[int, list[str]]] = {}
-    source_line_by_file: dict[str, int] = {}
-    for module_name, level_num, markdown_file in docs:
-        rel = markdown_file.relative_to(REPO_ROOT).as_posix()
-        module_level_files.setdefault(module_name, {}).setdefault(level_num, []).append(rel)
-        source_line_by_file[rel] = find_first_h1_line(markdown_file)
+    module_node_records: list[dict[str, Any]] = []
+    module_growth_specs: list[dict[str, Any]] = []
 
     warnings: list[str] = []
     seen_warnings: set[str] = set()
@@ -176,21 +256,73 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
         seen_warnings.add(message)
         warnings.append(message)
 
-    nodes: list[dict[str, Any]] = []
-    edges: list[dict[str, Any]] = []
-    level_order_counter: dict[int, int] = {}
-    node_id_by_file: dict[str, str] = {}
+    for module_name, level_num, module_num, markdown_file in docs:
+        rel = markdown_file.relative_to(REPO_ROOT).as_posix()
+        module_level_files.setdefault(module_name, {}).setdefault(level_num, []).append(rel)
+        file_text = markdown_file.read_text(encoding="utf-8")
+        file_module_id = f"M{module_num}"
 
-    node_seq = 0
+        base_entries: list[dict[str, Any]] = []
+        for base_line_num, base_line in iter_section_bullet_lines(file_text, "## 3."):
+            base_match = FRAMEWORK_BASE_ITEM_LINE_PATTERN.match(base_line)
+            if base_match is None:
+                continue
+            base_index = int(base_match.group(2))
+            base_text = base_match.group(3).strip()
+            base_title = normalize_base_title(
+                base_text,
+                f"Base B{base_index}",
+            )
+            base_entries.append(
+                {
+                    "base_index": base_index,
+                    "base_line_num": base_line_num,
+                    "base_title": base_title,
+                    "upstream_refs": parse_upstream_refs(base_text),
+                }
+            )
+
+        if base_entries:
+            logical_id = f"L{level_num}.{file_module_id}"
+            first_base_line = int(base_entries[0]["base_line_num"])
+            upstream_refs_set: set[tuple[str, str]] = set()
+            for entry in base_entries:
+                for source_ref, source_rules in list(entry["upstream_refs"]):
+                    upstream_refs_set.add((str(source_ref), str(source_rules)))
+
+            module_node_records.append(
+                {
+                    "mode": "file",
+                    "module_name": module_name,
+                    "level_num": level_num,
+                    "logical_id": logical_id,
+                    "logical_module": file_module_id,
+                    "source_file": rel,
+                    "source_line": first_base_line,
+                    "module_title": Path(markdown_file.name).stem,
+                }
+            )
+            module_growth_specs.append(
+                {
+                    "mode": "file",
+                    "module_name": module_name,
+                    "level_num": level_num,
+                    "source_file": rel,
+                    "source_line": first_base_line,
+                    "target_ref": logical_id,
+                    "upstream_refs": sorted(upstream_refs_set),
+                }
+            )
+            continue
+
+        add_warning(f"{rel}: no parseable B* in section ## 3.")
+
     for module_name in sorted(module_level_files):
-        level_map = module_level_files[module_name]
-        levels = sorted(level_map)
-
+        levels = sorted(module_level_files[module_name])
         if levels and levels[0] != 0:
             add_warning(
                 f"module '{module_name}' has no L0 base (lowest existing level: L{levels[0]})."
             )
-
         for current_level, next_level in zip(levels, levels[1:]):
             if next_level - current_level > 1:
                 add_warning(
@@ -200,55 +332,176 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
                     )
                 )
 
-        for level_num in levels:
-            for rel in sorted(level_map[level_num]):
-                node_seq += 1
-                node_id = f"NODE-FW-{node_seq:04d}"
-                node_id_by_file[rel] = node_id
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    level_order_counter: dict[int, int] = {}
+    module_node_id_by_qualified_ref: dict[str, str] = {}
+    seen_module_refs: set[str] = set()
 
-                level_order_counter[level_num] = level_order_counter.get(level_num, 0) + 1
-                order = level_order_counter[level_num]
+    node_seq = 0
+    all_node_records: list[tuple[int, str, str, dict[str, Any]]] = []
+    for record in module_node_records:
+        all_node_records.append(
+            (
+                int(record["level_num"]),
+                str(record["module_name"]),
+                str(record["logical_id"]),
+                record,
+            )
+        )
+    all_node_records.sort(key=lambda item: (item[0], item[1], item[2]))
 
-                nodes.append(
-                    {
-                        "id": node_id,
-                        "label": f"L{level_num}.{module_name}.{Path(rel).stem}",
-                        "level": level_num,
-                        "order": order,
-                        "description": (
-                            f"module={module_name} | level=L{level_num} | file={rel}"
-                        ),
-                        "source_file": rel,
-                        "source_line": source_line_by_file.get(rel, 1),
-                    }
+    for _, _, _, record in all_node_records:
+        level_num = int(record["level_num"])
+        module_name = str(record["module_name"])
+        source_file = str(record["source_file"])
+
+        node_seq += 1
+        node_id = f"NODE-FW-{node_seq:04d}"
+        level_order_counter[level_num] = level_order_counter.get(level_num, 0) + 1
+        order = level_order_counter[level_num]
+
+        if "logical_id" in record:
+            logical_id = str(record["logical_id"])
+            logical_module = str(record["logical_module"])
+            module_title = str(record["module_title"])
+            qualified_ref = f"{module_name}:{logical_id}"
+            if qualified_ref in seen_module_refs:
+                add_warning(
+                    f"duplicate module node declaration ignored: {qualified_ref} ({source_file})"
                 )
-
-    # Enforce adjacent-level visibility only: Lx -> L(x+1)
-    for module_name in sorted(module_level_files):
-        level_map = module_level_files[module_name]
-        for level_num in sorted(level_map):
-            next_level = level_num + 1
-            if next_level not in level_map:
+                node_seq -= 1
+                level_order_counter[level_num] -= 1
                 continue
-            for source_file in sorted(level_map[level_num]):
-                for target_file in sorted(level_map[next_level]):
-                    edges.append(
-                        {
-                            "from": node_id_by_file[source_file],
-                            "to": node_id_by_file[target_file],
-                            "relation": "framework_adjacent_level",
-                            "module": module_name,
-                            "from_level": f"L{level_num}",
-                            "to_level": f"L{next_level}",
-                        }
+            seen_module_refs.add(qualified_ref)
+            module_node_id_by_qualified_ref[qualified_ref] = node_id
+
+            description_parts = [
+                f"module={module_name}",
+                f"level=L{level_num}",
+                f"node={logical_id}",
+                f"file={source_file}",
+            ]
+            if module_title:
+                description_parts.append(f"title={module_title}")
+
+            nodes.append(
+                {
+                    "id": node_id,
+                    "label": f"L{level_num}.{module_name}.{logical_module}",
+                    "level": level_num,
+                    "order": order,
+                    "description": " | ".join(description_parts),
+                    "source_file": source_file,
+                    "source_line": int(record["source_line"]),
+                }
+            )
+            continue
+
+    module_growth_edge_accumulator: dict[tuple[str, str], dict[str, Any]] = {}
+    for growth_spec in module_growth_specs:
+        module_name = str(growth_spec["module_name"])
+        level_num = int(growth_spec["level_num"])
+        source_file = str(growth_spec["source_file"])
+        source_line = int(growth_spec["source_line"])
+        target_ref = str(growth_spec["target_ref"])
+        explicit_upstream_refs: list[tuple[str, str]] = growth_spec.get("upstream_refs", [])
+
+        target_node_id = module_node_id_by_qualified_ref.get(f"{module_name}:{target_ref}")
+        if target_node_id is None:
+            add_warning(
+                (
+                    f"{source_file}:{source_line}: module target '{target_ref}' is not declared "
+                    "in current module directory"
+                )
+            )
+            continue
+
+        if level_num == 0:
+            continue
+
+        if explicit_upstream_refs:
+            for source_ref, source_rules in explicit_upstream_refs:
+                source_match = re.fullmatch(r"L(\d+)\.([A-Za-z][A-Za-z0-9_-]*)", source_ref)
+                if source_match is None:
+                    continue
+                source_level = int(source_match.group(1))
+                if source_level + 1 != level_num:
+                    add_warning(
+                        (
+                            f"{source_file}:{source_line}: cross-level upstream ref ignored "
+                            f"({source_ref} -> {target_ref}); expected L{level_num - 1}.*"
+                        )
                     )
+                    continue
+                source_node_id = module_node_id_by_qualified_ref.get(f"{module_name}:{source_ref}")
+                if source_node_id is None:
+                    add_warning(
+                        (
+                            f"{source_file}:{source_line}: upstream source '{source_ref}' not found "
+                            f"for target '{target_ref}'"
+                        )
+                    )
+                    continue
+
+                edge_key = (source_node_id, target_node_id)
+                edge_bucket = module_growth_edge_accumulator.setdefault(
+                    edge_key,
+                    {
+                        "module_name": module_name,
+                        "source_ref": source_ref,
+                        "target_ref": target_ref,
+                        "from_level": f"L{source_level}",
+                        "to_level": f"L{level_num}",
+                        "rules": set(),
+                        "terms": set(),
+                        "source_file": source_file,
+                        "source_line": source_line,
+                    },
+                )
+                if source_rules:
+                    edge_bucket["rules"].add(source_rules)
+                    edge_bucket["terms"].add(f"{source_ref}[{source_rules}]")
+                else:
+                    edge_bucket["terms"].add(source_ref)
+            continue
+
+        add_warning(
+            (
+                f"{source_file}:{source_line}: no explicit upstream module refs found for '{target_ref}'"
+            )
+        )
+
+    for (source_node_id, target_node_id), edge_bucket in sorted(
+        module_growth_edge_accumulator.items(),
+        key=lambda item: (item[1]["from_level"], item[1]["to_level"], item[1]["source_ref"], item[1]["target_ref"]),
+    ):
+        rules = sorted(str(rule) for rule in edge_bucket["rules"] if str(rule).strip())
+        terms = sorted(str(term) for term in edge_bucket["terms"] if str(term).strip())
+        edges.append(
+            {
+                "from": source_node_id,
+                "to": target_node_id,
+                "relation": "framework_module_growth",
+                "module": edge_bucket["module_name"],
+                "from_level": edge_bucket["from_level"],
+                "to_level": edge_bucket["to_level"],
+                "source_ref": edge_bucket["source_ref"],
+                "target_ref": edge_bucket["target_ref"],
+                "rules": " | ".join(rules),
+                "terms": " + ".join(terms),
+                "source_file": edge_bucket["source_file"],
+                "source_line": edge_bucket["source_line"],
+            }
+        )
 
     levels = sorted({node["level"] for node in nodes})
     level_labels = {str(level): f"L{level} 标准层" for level in levels}
 
     description = (
-        "从 framework/<module>/Lx-*.md 自动生成，"
-        "仅生成相邻层级连接（Lx -> Lx+1），禁止跨级可见。"
+        "从 framework/<module>/Lx-Mn-*.md 自动生成；"
+        "模块级节点为文件级 M 编号（Lx.Mn），边来自基中显式上游模块引用；"
+        "仅允许相邻层级连接（Lx-1 -> Lx），禁止跨级可见。"
     )
     if warnings:
         description = f"{description} 警告数量={len(warnings)}。"

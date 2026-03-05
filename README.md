@@ -5,8 +5,8 @@
 ## 规范入口
 - 规范总纲（树形）：`specs/规范总纲与树形结构.md`
 - 框架设计核心标准：`specs/框架设计核心标准.md`
-- 领域标准（置物架）：`framework/shelf/L2-置物架框架标准.md`
-- 领域标准（前端 L0-L7）：`framework/frontend/L0` 到 `framework/frontend/L7`
+- 领域标准（置物架 L0-L2）：`framework/shelf/Lx-M0-*.md`
+- 领域标准（前端 L0-L7）：`framework/frontend/Lx-M0-*.md`
 - 工程执行规范：`AGENTS.md`
 
 ## 映射与验证
@@ -55,7 +55,7 @@ uv run python src/main.py
   - `docs/hierarchy/shelf_framework_tree.html`
 - M 层级关系图（仅 M 节点，不含规范/代码约束）：
   - `docs/hierarchy/shelf_module_hierarchy.html`
-- 前端模块自动抽取层级图（基于 `framework/frontend/Lx` 与 `@base/@compose`）：
+- 前端模块自动抽取层级图（基于 `framework/frontend/Lx-Mn`）：
   - `docs/hierarchy/shelf_spec_frontend_hierarchy.html`
 - 双族分型子页面入口：
   - `docs/examples/type_subpages_valid_2x2x2_dualfamily/index.html`
@@ -141,7 +141,7 @@ uv run python scripts/generate_module_hierarchy_html.py \
   --output docs/hierarchy/shelf_module_hierarchy.html
 ```
 
-从 `framework/frontend/Lx` 自动抽取并生成“前端展示层级图”：
+从 `framework/frontend/Lx-Mn` 自动抽取并生成“前端展示层级图”：
 ```bash
 uv run python scripts/generate_spec_frontend_hierarchy.py \
   --module frontend \
@@ -152,7 +152,8 @@ uv run python scripts/generate_spec_frontend_hierarchy.py \
 从 `mapping/mapping_registry.json` 的 `tree` 自动抽取并生成“框架标准树结构图”：
 ```bash
 uv run python scripts/generate_framework_tree_hierarchy.py \
-  --registry mapping/mapping_registry.json \
+  --source framework \
+  --framework-dir framework \
   --output-json docs/hierarchy/shelf_framework_tree.json \
   --output-html docs/hierarchy/shelf_framework_tree.html
 ```
