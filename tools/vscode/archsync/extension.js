@@ -16,6 +16,10 @@ const REGISTRY_FILE = path.join("mapping", "mapping_registry.json");
 const DEFAULT_FRAMEWORK_TREE_HTML = path.join("docs", "hierarchy", "shelf_framework_tree.html");
 const DEFAULT_FRAMEWORK_TREE_GENERATE_COMMAND =
   "uv run python scripts/generate_framework_tree_hierarchy.py --registry mapping/mapping_registry.json --output-json docs/hierarchy/shelf_framework_tree.json --output-html docs/hierarchy/shelf_framework_tree.html";
+const DEFAULT_FRAMEWORK_SCAFFOLD_SCRIPT = path.join("scripts", "generate_framework_scaffold.py");
+const MODULE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const LEVEL_PATTERN = /^L\d+$/i;
+const FRAMEWORK_DIRECTIVE_PREFIX = "@framework";
 
 function activate(context) {
   const output = vscode.window.createOutputChannel("ArchSync");
@@ -274,6 +278,164 @@ function activate(context) {
     await openFrameworkTree({ regenerateIfMissing: false });
   });
 
+  const generateFrameworkScaffoldDisposable = vscode.commands.registerCommand("archSync.generateFrameworkScaffold", async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      vscode.window.showWarningMessage("ArchSync: no workspace is open.");
+      return;
+    }
+
+    const repoRoot = folder.uri.fsPath;
+    const editor = vscode.window.activeTextEditor;
+    const inferred = inferFrameworkDefaults(editor?.document.uri.fsPath, repoRoot);
+
+    const moduleId = await promptScaffoldValue({
+      title: "ArchSync: module id",
+      prompt: "Canonical module id used in node ids (Lx.Mmodule.By)",
+      value: inferred.module,
+      validateInput: (value) => (MODULE_ID_PATTERN.test(value.trim()) ? null : "Use [A-Za-z0-9_-], e.g. frontend")
+    });
+    if (!moduleId) {
+      return;
+    }
+
+    const moduleDisplay = await promptScaffoldValue({
+      title: "ArchSync: module display name",
+      prompt: "Display name shown in markdown title",
+      value: inferred.moduleDisplay
+    });
+    if (!moduleDisplay) {
+      return;
+    }
+
+    const level = await promptScaffoldValue({
+      title: "ArchSync: level",
+      prompt: "Layer level, e.g. L4",
+      value: inferred.level,
+      validateInput: (value) => (LEVEL_PATTERN.test(value.trim()) ? null : "Use L<number>, e.g. L4")
+    });
+    if (!level) {
+      return;
+    }
+
+    const title = await promptScaffoldValue({
+      title: "ArchSync: layer title",
+      prompt: "Markdown title and default filename stem",
+      value: inferred.title,
+      validateInput: (value) => validateScaffoldTitle(value)
+    });
+    if (!title) {
+      return;
+    }
+
+    const subtitle = await promptScaffoldValue({
+      title: "ArchSync: goal subtitle",
+      prompt: "Short subtitle for Goal section",
+      value: "一句话描述该层要解决的问题。"
+    });
+    if (!subtitle) {
+      return;
+    }
+
+    const baseCountRaw = await promptScaffoldValue({
+      title: "ArchSync: base count",
+      prompt: "Placeholder base count when custom bases are not provided",
+      value: "3",
+      validateInput: (value) => validatePositiveInt(value)
+    });
+    if (!baseCountRaw) {
+      return;
+    }
+    const baseCount = Number(baseCountRaw.trim());
+
+    const targetOptions = [
+      {
+        label: "Write current file",
+        description: "Overwrite active markdown file",
+        value: "current"
+      },
+      {
+        label: "Write default path",
+        description: "framework/<module>/<level>/<title>.md",
+        value: "default"
+      }
+    ];
+    const targetPick = await vscode.window.showQuickPick(targetOptions, {
+      title: "ArchSync: scaffold output",
+      placeHolder: "Choose where to write scaffold"
+    });
+    if (!targetPick) {
+      return;
+    }
+
+    if (targetPick.value === "current" && !editor) {
+      vscode.window.showWarningMessage("ArchSync: no active editor for current-file output.");
+      return;
+    }
+
+    const args = [
+      "run",
+      "python",
+      DEFAULT_FRAMEWORK_SCAFFOLD_SCRIPT,
+      "--module",
+      moduleId.trim(),
+      "--module-display",
+      moduleDisplay.trim(),
+      "--level",
+      level.trim().toUpperCase(),
+      "--title",
+      title.trim(),
+      "--subtitle",
+      subtitle.trim(),
+      "--base-count",
+      String(baseCount)
+    ];
+
+    let outputFilePath = null;
+    if (targetPick.value === "current" && editor) {
+      const rel = path.relative(repoRoot, editor.document.uri.fsPath).replace(/\\/g, "/");
+      args.push("--output", rel, "--overwrite");
+      outputFilePath = editor.document.uri.fsPath;
+    }
+
+    output.appendLine(`[framework-scaffold] uv ${args.join(" ")}`);
+    const result = await execCommandArgs("uv", args, repoRoot);
+    output.appendLine(result.stdout || "");
+    output.appendLine(result.stderr || "");
+    output.appendLine(`[framework-scaffold] exit=${result.code}`);
+
+    if (result.code !== 0) {
+      await vscode.window.showErrorMessage(
+        "ArchSync: failed to generate framework scaffold.",
+        "Open Log"
+      ).then((action) => {
+        if (action === "Open Log") {
+          output.show(true);
+        }
+      });
+      return;
+    }
+
+    if (!outputFilePath) {
+      const resolvedFromOutput = extractGeneratedPath(result.stdout, repoRoot);
+      if (resolvedFromOutput) {
+        outputFilePath = resolvedFromOutput;
+      }
+    }
+
+    if (outputFilePath) {
+      try {
+        const uri = vscode.Uri.file(outputFilePath);
+        const doc = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(doc, { preview: false });
+      } catch (error) {
+        output.appendLine(`[framework-scaffold] open file failed: ${String(error)}`);
+      }
+    }
+
+    vscode.window.showInformationMessage("ArchSync: framework scaffold generated.");
+  });
+
   const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (doc) => {
     const config = vscode.workspace.getConfiguration("archSync");
     if (!config.get("enableOnSave")) {
@@ -291,6 +453,89 @@ function activate(context) {
     }
 
     scheduleValidation({ mode: "change", triggerUri: doc.uri, notifyOnFail: false });
+  });
+
+  const willSaveDisposable = vscode.workspace.onWillSaveTextDocument((event) => {
+    const config = vscode.workspace.getConfiguration("archSync");
+    if (!config.get("autoExpandFrameworkDirective")) {
+      return;
+    }
+
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      return;
+    }
+
+    const doc = event.document;
+    if (doc.languageId !== "markdown") {
+      return;
+    }
+
+    const relPath = path.relative(folder.uri.fsPath, doc.uri.fsPath).replace(/\\/g, "/");
+    if (!relPath.startsWith("framework/")) {
+      return;
+    }
+
+    const directive = parseFrameworkDirective(doc.getText());
+    if (!directive) {
+      return;
+    }
+
+    event.waitUntil((async () => {
+      const defaults = inferFrameworkDefaults(doc.uri.fsPath, folder.uri.fsPath);
+      const resolved = resolveFrameworkDirectiveConfig(directive, defaults);
+      if (resolved.error) {
+        vscode.window.showErrorMessage(`ArchSync: ${resolved.error}`);
+        return [];
+      }
+
+      const args = [
+        "run",
+        "python",
+        DEFAULT_FRAMEWORK_SCAFFOLD_SCRIPT,
+        "--module",
+        resolved.module,
+        "--module-display",
+        resolved.moduleDisplay,
+        "--level",
+        resolved.level,
+        "--title",
+        resolved.title,
+        "--subtitle",
+        resolved.subtitle,
+        "--base-count",
+        String(resolved.baseCount),
+        "--stdout"
+      ];
+
+      if (resolved.upstreamLevel) {
+        args.push("--upstream-level", resolved.upstreamLevel);
+      }
+
+      output.appendLine(`[framework-directive] uv ${args.join(" ")}`);
+      const result = await execCommandArgs("uv", args, folder.uri.fsPath);
+      output.appendLine(result.stdout || "");
+      output.appendLine(result.stderr || "");
+      output.appendLine(`[framework-directive] exit=${result.code}`);
+
+      if (result.code !== 0) {
+        vscode.window.showErrorMessage(
+          "ArchSync: @framework expansion failed. Check ArchSync output log."
+        );
+        return [];
+      }
+
+      const generated = String(result.stdout || "");
+      if (!generated.trim()) {
+        return [];
+      }
+
+      const fullRange = new vscode.Range(
+        doc.positionAt(0),
+        doc.positionAt(doc.getText().length)
+      );
+      return [vscode.TextEdit.replace(fullRange, generated)];
+    })());
   });
 
   const createDisposable = vscode.workspace.onDidCreateFiles(async (event) => {
@@ -372,6 +617,8 @@ function activate(context) {
     showIssuesDisposable,
     openFrameworkTreeDisposable,
     refreshFrameworkTreeDisposable,
+    generateFrameworkScaffoldDisposable,
+    willSaveDisposable,
     saveDisposable,
     createDisposable,
     deleteDisposable,
@@ -421,6 +668,217 @@ function execCommand(command, cwd) {
       });
     });
   });
+}
+
+function execCommandArgs(command, args, cwd) {
+  return new Promise((resolve) => {
+    cp.execFile(command, args, { cwd, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      resolve({
+        code: error ? error.code ?? 1 : 0,
+        stdout: stdout || "",
+        stderr: stderr || ""
+      });
+    });
+  });
+}
+
+async function promptScaffoldValue(options) {
+  const value = await vscode.window.showInputBox({
+    title: options.title,
+    prompt: options.prompt,
+    value: options.value || "",
+    validateInput: options.validateInput
+      ? (raw) => {
+        const result = options.validateInput(raw);
+        return result || undefined;
+      }
+      : undefined,
+    ignoreFocusOut: true
+  });
+
+  if (value === undefined) {
+    return null;
+  }
+  const cleaned = value.trim();
+  return cleaned || null;
+}
+
+function validateScaffoldTitle(value) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "Title cannot be empty.";
+  }
+  if (trimmed.includes("/") || trimmed.includes("\\")) {
+    return "Title cannot contain path separators.";
+  }
+  return null;
+}
+
+function validatePositiveInt(value) {
+  const n = Number(value.trim());
+  if (!Number.isInteger(n) || n < 1) {
+    return "Use integer >= 1.";
+  }
+  return null;
+}
+
+function inferFrameworkDefaults(activeFilePath, repoRoot) {
+  const defaults = {
+    module: "frontend",
+    moduleDisplay: "前端",
+    level: "L4",
+    title: "状态与数据编排层"
+  };
+
+  if (!activeFilePath) {
+    return defaults;
+  }
+
+  const relPath = path.relative(repoRoot, activeFilePath).replace(/\\/g, "/");
+  const match = /^framework\/([^/]+)\/(L\d+)\/([^/]+)\.md$/i.exec(relPath);
+  if (!match) {
+    return defaults;
+  }
+
+  const moduleName = match[1];
+  return {
+    module: moduleName,
+    moduleDisplay: moduleDisplayName(moduleName),
+    level: match[2].toUpperCase(),
+    title: match[3]
+  };
+}
+
+function moduleDisplayName(moduleName) {
+  const lower = String(moduleName || "").toLowerCase();
+  if (lower === "frontend") {
+    return "前端";
+  }
+  if (lower === "shelf") {
+    return "置物架";
+  }
+  if (lower === "curtain") {
+    return "窗帘";
+  }
+  return moduleName;
+}
+
+function extractGeneratedPath(stdout, repoRoot) {
+  const match = /generated scaffold:\s*([^\n\r]+)/i.exec(String(stdout || ""));
+  if (!match) {
+    return null;
+  }
+  const rel = match[1].trim();
+  if (!rel) {
+    return null;
+  }
+  return path.join(repoRoot, rel);
+}
+
+function parseFrameworkDirective(documentText) {
+  const lines = String(documentText || "").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith(FRAMEWORK_DIRECTIVE_PREFIX)) {
+      continue;
+    }
+
+    const rest = trimmed.slice(FRAMEWORK_DIRECTIVE_PREFIX.length).trim();
+    if (!rest) {
+      return { params: {}, error: null };
+    }
+
+    const params = {};
+    const tokenPattern = /([A-Za-z_][A-Za-z0-9_]*)=("([^"\\]|\\.)*"|'([^'\\]|\\.)*'|[^\s;]+)/g;
+    let match = null;
+    while ((match = tokenPattern.exec(rest)) !== null) {
+      const key = match[1];
+      const rawValue = match[2];
+      params[key] = unquoteDirectiveValue(rawValue);
+    }
+
+    if (!Object.keys(params).length) {
+      return {
+        params: {},
+        error: "invalid @framework format. Use: @framework module=frontend level=L4 title=\"状态层\""
+      };
+    }
+
+    return { params, error: null };
+  }
+
+  return null;
+}
+
+function unquoteDirectiveValue(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (
+    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function resolveFrameworkDirectiveConfig(directive, defaults) {
+  if (directive?.error) {
+    return { error: directive.error };
+  }
+
+  const params = directive?.params || {};
+  const module = String(params.module || defaults.module || "").trim();
+  const moduleDisplay = String(
+    params.module_display || params.moduleDisplay || defaults.moduleDisplay || moduleDisplayName(module)
+  ).trim();
+  const level = String(params.level || defaults.level || "").trim().toUpperCase();
+  const title = String(params.title || defaults.title || "").trim();
+  const subtitle = String(params.subtitle || "一句话描述该层要解决的问题。").trim();
+  const baseCountRaw = String(params.base_count || "3").trim();
+  const upstreamLevelRaw = params.upstream_level ? String(params.upstream_level).trim().toUpperCase() : "";
+
+  if (!MODULE_ID_PATTERN.test(module)) {
+    return { error: "directive module must match [A-Za-z0-9_-], e.g. frontend" };
+  }
+  if (!LEVEL_PATTERN.test(level)) {
+    return { error: "directive level must be L<number>, e.g. L4" };
+  }
+  if (!title || title.includes("/") || title.includes("\\")) {
+    return { error: "directive title is required and cannot contain path separators" };
+  }
+  if (!moduleDisplay) {
+    return { error: "directive module_display cannot be empty" };
+  }
+
+  const baseCount = Number(baseCountRaw);
+  if (!Number.isInteger(baseCount) || baseCount < 1) {
+    return { error: "directive base_count must be integer >= 1" };
+  }
+
+  let upstreamLevel = null;
+  if (upstreamLevelRaw) {
+    if (!LEVEL_PATTERN.test(upstreamLevelRaw)) {
+      return { error: "directive upstream_level must be L<number>, e.g. L5" };
+    }
+
+    const sourceNum = Number(level.slice(1));
+    const upstreamNum = Number(upstreamLevelRaw.slice(1));
+    if (upstreamNum !== sourceNum + 1) {
+      return { error: `directive upstream_level must be adjacent to ${level}, expected L${sourceNum + 1}` };
+    }
+    upstreamLevel = upstreamLevelRaw;
+  }
+
+  return {
+    error: null,
+    module,
+    moduleDisplay,
+    level,
+    title,
+    subtitle,
+    baseCount,
+    upstreamLevel
+  };
 }
 
 async function generateFrameworkTree(repoRoot, command, output) {

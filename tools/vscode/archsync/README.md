@@ -3,6 +3,8 @@
 ## What It Does
 - Opens framework tree structure HTML in Webview (`docs/hierarchy/shelf_framework_tree.html`).
 - Refreshes framework tree artifacts by running the generator script.
+- Generates framework layer scaffold markdown via command palette.
+- Auto-expands `@framework` directive on save for `framework/**` markdown files.
 - Runs strict mapping validation automatically on startup.
 - Runs strict mapping validation on save/create/rename/delete for relevant files.
 - Runs strict mapping validation when watched files change outside VSCode and when window regains focus.
@@ -22,6 +24,21 @@
 - `ArchSync: Refresh Framework Tree`
 - `ArchSync: Validate Mapping Now`
 - `ArchSync: Show Mapping Issues`
+- `ArchSync: Generate Framework Scaffold`
+
+## Markdown Snippets
+- `@framework`: insert a full layer scaffold with required headings and tags.
+- `@base`: insert one base entry with `@base` metadata.
+- `@compose`: insert one compose edge entry with canonical node ids.
+
+## Auto Expand `@framework`
+- Default enabled: `archSync.autoExpandFrameworkDirective = true`
+- Scope: markdown files under `framework/**`
+- Behavior: if file contains a line starting with `@framework`, save will replace full file content with generated scaffold.
+- Directive format:
+  - `@framework`
+  - `@framework module=frontend level=L4 title="状态与数据编排层"`
+  - Optional keys: `module_display`, `subtitle`, `base_count`, `upstream_level`
 
 ## Configuration
 - `archSync.enableOnSave`

@@ -1,0 +1,63 @@
+{
+  "@framework Layer Scaffold": {
+    "prefix": "@framework",
+    "description": "Insert a full framework layer scaffold with required headings and tags.",
+    "body": [
+      "# ${1:前端}框架模块标准（${2:L4}）${3:状态与数据编排层}",
+      "<!--@layer module=${4:frontend}; level=${2}-->",
+      "",
+      "## 1. 目标（Goal）",
+      "",
+      "- 小标题：${5:一句话说明本层目标。}",
+      "",
+      "${6:请补充目标正文。}",
+      "",
+      "## 2. 边界定义（Boundary）",
+      "",
+      "- 小标题：${7:定义该层负责什么、不负责什么。}",
+      "- `${8:TODO_SCOPE}`：${9:待补充边界说明。}",
+      "",
+      "## 3. 最小可行基（Bases）",
+      "",
+      "- 小标题：${10:列出最小能力基并补全元数据。}",
+      "- `B1` ${11:能力基1}  <!--@base id=B1; name=${12:BASE_ONE}; capability=${13:base_one_capability}-->",
+      "- `B2` ${14:能力基2}  <!--@base id=B2; name=${15:BASE_TWO}; capability=${16:base_two_capability}-->",
+      "",
+      "## 4. 组合原则（Combination Principles）",
+      "",
+      "- 小标题：${17:描述组合方向、约束与映射示例。}",
+      "仅允许下游向上游组合：`${2} -> ${18:L5}`。禁止同层组合与反向组合。",
+      "",
+      "组合约束集合：",
+      "- `C1` 相邻层约束",
+      "- `C2` 下游上行约束",
+      "- `C3` 能力契约约束",
+      "",
+      "组合映射（示例）：",
+      "- `U1 = {${2}.B1, ${2}.B2} --[C1,C2,C3]--> ${18}.B1`",
+      "",
+      "- ${19:待补充组合关系。}  <!--@compose from=${2}.M${4}.B1; to=${18}.M${4}.B1; rule=adjacent_only; principle=P_DOWNSTREAM_UPSTREAM; constraint=C1_C2_C3-->",
+      "",
+      "## 5. 验证（Verification）",
+      "",
+      "- 小标题：${20:定义可执行验证条件。}",
+      "- 每个 `${2}` 基必须至少指向一个 `${18}` 父节点。",
+      "- 每个 `${18}` 基必须至少由一个 `${2}` 子节点支撑。",
+      "- 不允许同层或跨层跳级组合。"
+    ]
+  },
+  "@base Tag Entry": {
+    "prefix": "@base",
+    "description": "Insert a base entry with @base metadata tag.",
+    "body": [
+      "- `B${1:1}` ${2:能力基名称}  <!--@base id=B${1}; name=${3:BASE_NAME}; capability=${4:base_capability}-->"
+    ]
+  },
+  "@compose Edge Entry": {
+    "prefix": "@compose",
+    "description": "Insert a compose edge entry with canonical from/to node ids.",
+    "body": [
+      "- ${1:下游基组合到上游基。}  <!--@compose from=${2:L4}.M${3:frontend}.B${4:1}; to=${5:L5}.M${3}.B${6:1}; rule=adjacent_only; principle=P_DOWNSTREAM_UPSTREAM; constraint=C1_C2_C3-->"
+    ]
+  }
+}
