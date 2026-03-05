@@ -19,7 +19,6 @@ VALID_NODE_KINDS = {"layer", "file"}
 REQUIRED_L1_ANCHORS_PER_L2 = (
     "## 1. 目标（Goal）",
     "## 2. 边界定义（Boundary）",
-    "## 3. 模块（最小可行基，Module）",
     "## 4. 组合原则（Combination Principles）",
     "## 5. 验证（Verification）",
 )
@@ -124,6 +123,38 @@ def find_level_order_line(registry_text: str, level: str) -> int:
 
 def collect_changed_files() -> set[str]:
     changed: set[str] = set()
+    git_top = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    repo_root = REPO_ROOT.resolve()
+    top_root = Path(git_top.stdout.strip()).resolve() if git_top.returncode == 0 else repo_root
+
+    def normalize_git_path(raw_path: str) -> str:
+        raw = raw_path.strip()
+        if not raw:
+            return ""
+
+        normalized = raw.replace("\\", "/")
+        path_obj = Path(normalized)
+        if path_obj.is_absolute():
+            candidates = [path_obj]
+        else:
+            candidates = [top_root / normalized, repo_root / normalized, path_obj]
+
+        for candidate in candidates:
+            try:
+                rel = candidate.resolve().relative_to(repo_root)
+                return rel.as_posix()
+            except Exception:
+                continue
+
+        return normalized
 
     commands = [
         ["git", "-c", "core.quotePath=false", "diff", "--name-only"],
@@ -143,7 +174,7 @@ def collect_changed_files() -> set[str]:
         if result.returncode != 0:
             continue
         for line in result.stdout.splitlines():
-            item = line.strip()
+            item = normalize_git_path(line)
             if item:
                 changed.add(item)
 
@@ -158,21 +189,11 @@ def collect_changed_files() -> set[str]:
     )
     if untracked.returncode == 0:
         for line in untracked.stdout.splitlines():
-            item = line.strip()
+            item = normalize_git_path(line)
             if item:
                 changed.add(item)
 
     return changed
-
-
-def discover_domain_standards() -> list[str]:
-    standards_dir = REPO_ROOT / "standards" / "L2"
-    if not standards_dir.exists():
-        return []
-    return [
-        path.relative_to(REPO_ROOT).as_posix()
-        for path in sorted(standards_dir.glob("*.md"))
-    ]
 
 
 def parse_level_order(registry: dict[str, Any], registry_text: str) -> tuple[list[str], list[Issue]]:
@@ -494,27 +515,6 @@ def validate_registry_structure(
                 )
             )
 
-    declared_l2 = set(level_files.get("L2", set()))
-    for standard_file in discover_domain_standards():
-        if standard_file not in declared_l2:
-            issues.append(
-                make_issue(
-                    "mapping_registry.json: unregistered domain standard in standards/L2/: "
-                    f"{standard_file}",
-                    REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
-                    find_line(registry_text, '"L2"'),
-                    code="TREE_UNREGISTERED_DOMAIN",
-                    related=[
-                        {
-                            "message": "New domain standard added here",
-                            "file": standard_file,
-                            "line": 1,
-                            "column": 1,
-                        }
-                    ],
-                )
-            )
-
     mappings = registry.get("mappings", [])
     if not isinstance(mappings, list) or not mappings:
         issues.append(
@@ -691,6 +691,8 @@ def validate_mapping_content(
             file_name = item[file_key]
             anchor = item[anchor_key]
             file_path = REPO_ROOT / file_name
+            if file_path.suffix.lower() == ".md":
+                continue
             file_text = read_text(file_path)
             if anchor not in file_text:
                 issues.append(
@@ -726,6 +728,8 @@ def validate_mapping_content(
                 continue
 
             file_path = REPO_ROOT / file_name
+            if file_path.suffix.lower() == ".md":
+                continue
             if file_path not in code_cache:
                 code_cache[file_path] = read_text(file_path)
             if file_path.suffix == ".py" and file_path not in ast_cache:

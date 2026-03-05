@@ -40,28 +40,28 @@
                 "id": "NODE-L2-FRONTEND",
                 "kind": "file",
                 "level": "L2",
-                "file": "standards/L2/前端框架标准.md",
+                "file": "framework/L0/前端框架标准.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-PAGE",
                 "kind": "file",
                 "level": "L2",
-                "file": "standards/L2/前端页面标准.md",
+                "file": "framework/L1/前端页面标准.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-BUSINESS",
                 "kind": "file",
                 "level": "L2",
-                "file": "standards/L2/前端业务组件层标准.md",
+                "file": "framework/L2/前端业务组件层标准.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-BASE",
                 "kind": "file",
                 "level": "L2",
-                "file": "standards/L2/前端基础组件层标准.md",
+                "file": "framework/L3/前端基础组件层标准.md",
                 "children": []
               },
               {
@@ -113,7 +113,12 @@
     ]
   },
   "validation": {
-    "level_order": ["L0", "L1", "L2", "L3"],
+    "level_order": [
+      "L0",
+      "L1",
+      "L2",
+      "L3"
+    ],
     "reverse_validation_command": "uv run python scripts/validate_strict_mapping.py --check-changes"
   },
   "mappings": [
@@ -123,11 +128,17 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "standards/L2/前端框架标准.md",
+      "l2_file": "framework/L0/前端框架标准.md",
       "l2_anchor": "## 1. 目标（Goal）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Goal" },
-        { "file": "src/main.py", "symbol": "goal = Goal(" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class Goal"
+        },
+        {
+          "file": "src/main.py",
+          "symbol": "goal = Goal("
+        }
       ]
     },
     {
@@ -136,23 +147,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "standards/L2/前端框架标准.md",
+      "l2_file": "framework/L0/前端框架标准.md",
       "l2_anchor": "## 2. 边界定义（Boundary）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class BoundaryDefinition" }
-      ]
-    },
-    {
-      "id": "MAP-FRONTEND-M",
-      "l0_file": "standards/L0/规范总纲与树形结构.md",
-      "l0_anchor": "## 2. 标准树（强制）",
-      "l1_file": "standards/L1/框架设计核心标准.md",
-      "l1_anchor": "## 3. 模块（最小可行基，Module）",
-      "l2_file": "standards/L2/前端框架标准.md",
-      "l2_anchor": "## 3. 模块（最小可行基，Module）",
-      "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Module" },
-        { "file": "src/frontend_framework.py", "symbol": "MODULE_ROLE" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class BoundaryDefinition"
+        }
       ]
     },
     {
@@ -161,12 +162,21 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "standards/L2/前端框架标准.md",
+      "l2_file": "framework/L0/前端框架标准.md",
       "l2_anchor": "## 4. 组合原则（Combination Principles）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Rule" },
-        { "file": "src/frontend_framework.py", "symbol": "class CombinationRules" },
-        { "file": "src/frontend_framework.py", "symbol": "def default()" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class Rule"
+        },
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class CombinationRules"
+        },
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "def default()"
+        }
       ]
     },
     {
@@ -175,13 +185,25 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "standards/L2/前端框架标准.md",
+      "l2_file": "framework/L0/前端框架标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class VerificationInput" },
-        { "file": "src/frontend_framework.py", "symbol": "class VerificationResult" },
-        { "file": "src/frontend_framework.py", "symbol": "def verify(" },
-        { "file": "src/main.py", "symbol": "verification_result = verify(" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class VerificationInput"
+        },
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class VerificationResult"
+        },
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "def verify("
+        },
+        {
+          "file": "src/main.py",
+          "symbol": "verification_result = verify("
+        }
       ]
     },
     {
@@ -190,10 +212,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "standards/L2/前端页面标准.md",
+      "l2_file": "framework/L1/前端页面标准.md",
       "l2_anchor": "## 1. 目标（Goal）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Goal" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class Goal"
+        }
       ]
     },
     {
@@ -202,22 +227,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "standards/L2/前端页面标准.md",
+      "l2_file": "framework/L1/前端页面标准.md",
       "l2_anchor": "## 2. 边界定义（Boundary）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class BoundaryDefinition" }
-      ]
-    },
-    {
-      "id": "MAP-PAGE-M",
-      "l0_file": "standards/L0/规范总纲与树形结构.md",
-      "l0_anchor": "## 2. 标准树（强制）",
-      "l1_file": "standards/L1/框架设计核心标准.md",
-      "l1_anchor": "## 3. 模块（最小可行基，Module）",
-      "l2_file": "standards/L2/前端页面标准.md",
-      "l2_anchor": "## 3. 模块（最小可行基，Module）",
-      "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Module" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class BoundaryDefinition"
+        }
       ]
     },
     {
@@ -226,10 +242,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "standards/L2/前端页面标准.md",
+      "l2_file": "framework/L1/前端页面标准.md",
       "l2_anchor": "## 4. 组合原则（Combination Principles）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class CombinationRules" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class CombinationRules"
+        }
       ]
     },
     {
@@ -238,10 +257,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "standards/L2/前端页面标准.md",
+      "l2_file": "framework/L1/前端页面标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "def verify(" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "def verify("
+        }
       ]
     },
     {
@@ -250,10 +272,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "standards/L2/前端业务组件层标准.md",
+      "l2_file": "framework/L2/前端业务组件层标准.md",
       "l2_anchor": "## 1. 目标（Goal）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Goal" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class Goal"
+        }
       ]
     },
     {
@@ -262,22 +287,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "standards/L2/前端业务组件层标准.md",
+      "l2_file": "framework/L2/前端业务组件层标准.md",
       "l2_anchor": "## 2. 边界定义（Boundary）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class BoundaryDefinition" }
-      ]
-    },
-    {
-      "id": "MAP-BIZ-M",
-      "l0_file": "standards/L0/规范总纲与树形结构.md",
-      "l0_anchor": "## 2. 标准树（强制）",
-      "l1_file": "standards/L1/框架设计核心标准.md",
-      "l1_anchor": "## 3. 模块（最小可行基，Module）",
-      "l2_file": "standards/L2/前端业务组件层标准.md",
-      "l2_anchor": "## 3. 模块（最小可行基，Module）",
-      "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Module" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class BoundaryDefinition"
+        }
       ]
     },
     {
@@ -286,10 +302,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "standards/L2/前端业务组件层标准.md",
+      "l2_file": "framework/L2/前端业务组件层标准.md",
       "l2_anchor": "## 4. 组合原则（Combination Principles）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class CombinationRules" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class CombinationRules"
+        }
       ]
     },
     {
@@ -298,10 +317,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "standards/L2/前端业务组件层标准.md",
+      "l2_file": "framework/L2/前端业务组件层标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "def verify(" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "def verify("
+        }
       ]
     },
     {
@@ -310,10 +332,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "standards/L2/前端基础组件层标准.md",
+      "l2_file": "framework/L3/前端基础组件层标准.md",
       "l2_anchor": "## 1. 目标（Goal）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Goal" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class Goal"
+        }
       ]
     },
     {
@@ -322,22 +347,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "standards/L2/前端基础组件层标准.md",
+      "l2_file": "framework/L3/前端基础组件层标准.md",
       "l2_anchor": "## 2. 边界定义（Boundary）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class BoundaryDefinition" }
-      ]
-    },
-    {
-      "id": "MAP-BASE-M",
-      "l0_file": "standards/L0/规范总纲与树形结构.md",
-      "l0_anchor": "## 2. 标准树（强制）",
-      "l1_file": "standards/L1/框架设计核心标准.md",
-      "l1_anchor": "## 3. 模块（最小可行基，Module）",
-      "l2_file": "standards/L2/前端基础组件层标准.md",
-      "l2_anchor": "## 3. 模块（最小可行基，Module）",
-      "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class Module" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class BoundaryDefinition"
+        }
       ]
     },
     {
@@ -346,10 +362,13 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "standards/L2/前端基础组件层标准.md",
+      "l2_file": "framework/L3/前端基础组件层标准.md",
       "l2_anchor": "## 4. 组合原则（Combination Principles）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "class CombinationRules" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "class CombinationRules"
+        }
       ]
     },
     {
@@ -358,11 +377,15 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "standards/L1/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "standards/L2/前端基础组件层标准.md",
+      "l2_file": "framework/L3/前端基础组件层标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
-        { "file": "src/frontend_framework.py", "symbol": "def verify(" }
+        {
+          "file": "src/frontend_framework.py",
+          "symbol": "def verify("
+        }
       ]
     }
   ]
 }
+
