@@ -1097,7 +1097,7 @@ function renderBoundaryControls() {
   layerSel.value = String(profile ? profile.max_layers : (parsed ? parsed.layers : 1));
 }
 
-function renderHeader(primaryLabel, secondary, totalCount) {
+function renderHeader(primaryLabel, secondary, totalCount, passedCount, failedCount) {
   const breadcrumb = document.getElementById("breadcrumb");
   const v = activeVariant();
   const secText = secondary ? ` / 二级组: ${secondary.id}` : "";
@@ -1121,9 +1121,9 @@ function renderHeader(primaryLabel, secondary, totalCount) {
   ].join("");
 
   document.getElementById("chips").innerHTML = [
-    `types=${secondary ? secondary.type_ids.length : totalCount}`,
-    `passed=${secondary ? secondary.type_ids.length : totalCount}`,
-    "failed=0",
+    `types=${totalCount}`,
+    `passed=${passedCount}`,
+    `failed=${failedCount}`,
     `A=${v.meta.footprint_area_cells}`,
     `N<=${v.meta.max_layers}`,
     `rr=${mask}`,
@@ -1156,7 +1156,7 @@ function renderCatalog(baseList, secondaryId) {
   let list = baseList.slice();
 
   if (state.status !== "all") {
-    list = list.filter((item) => item.runtime_status === state.status);
+    list = list.filter((item) => item.status === state.status);
   }
 
   if (state.sort === "ratio") {
@@ -1182,7 +1182,7 @@ function renderCatalog(baseList, secondaryId) {
       <article class="type-card" data-href="${detailHref}">
         <div class="type-head">
           <span>#${item.type_id} / ${item.group_id}</span>
-          <span class="pill ${item.runtime_status === "passed" ? "ok" : "bad"}">${item.runtime_status}</span>
+          <span class="pill ${item.status === "passed" ? "ok" : "bad"}">${item.status === "passed" ? "passed" : "risk"}</span>
         </div>
         <div class="mini-stack">${layers}</div>
         <div class="chips">
@@ -1209,15 +1209,17 @@ function renderCatalog(baseList, secondaryId) {
 function bootstrap() {
   const v = activeVariant();
   const evaluated = evaluateTypesWithRules(v.types);
-  const filtered = evaluated.filter((item) => item.runtime_status === "passed");
+  const filtered = evaluated.slice();
   const secondaryGroups = buildSecondaryGroups(filtered, v.meta.cell_count);
   const secondary = state.requestedSecondary
     ? secondaryGroups.find((item) => item.id === state.requestedSecondary) || null
     : null;
   const typeIdSet = new Set(secondary ? secondary.type_ids : filtered.map((item) => item.type_id));
   const listItems = filtered.filter((item) => typeIdSet.has(item.type_id));
+  const passedCount = listItems.filter((item) => item.status === "passed").length;
+  const failedCount = listItems.length - passedCount;
 
-  renderHeader("ACTIVE | 当前启用规则", secondary, filtered.length);
+  renderHeader("ACTIVE | 当前启用规则", secondary, listItems.length, passedCount, failedCount);
   renderCatalog(listItems, secondary ? secondary.id : "");
   updateURL("ACTIVE", secondary ? secondary.id : "");
 

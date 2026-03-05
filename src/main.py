@@ -1449,17 +1449,18 @@ function evaluateCurrentVariant() {
   });
 }
 
-function generatedCurrent() {
-  return state.evaluated.filter((item) => item.runtime_status === "passed");
+function currentPool() {
+  return state.evaluated.slice();
 }
 
 function summaryCurrent() {
-  const generated = generatedCurrent();
+  const pool = currentPool();
+  const passed = pool.filter((item) => item.status === "passed").length;
   return {
-    total: generated.length,
-    passed: generated.length,
-    failed: 0,
-    raw_pool: state.evaluated.length,
+    total: pool.length,
+    passed,
+    failed: pool.length - passed,
+    raw_pool: pool.length,
   };
 }
 
@@ -1489,28 +1490,29 @@ function renderBoundaryControls() {
 function renderHeader() {
   const v = activeVariant();
   const s = summaryCurrent();
-  const valid = generatedCurrent();
+  const pool = currentPool();
   const secKeys = new Set(
-    valid.map((item) => {
+    pool.map((item) => {
       const support = supportProfileRuntime(item.layer_masks);
       const bin = ratioBinRuntime(item.projection_ratio);
       return `L${item.active_cells_per_layer.join("-")}_SUP${support.supported}-${support.unsupported}_PR${bin[0].toFixed(2)}-${bin[1].toFixed(2)}`;
     })
   );
   document.getElementById("title").textContent = `${report.title} | 分组总览`;
-  document.getElementById("desc").textContent = `A=${v.meta.footprint_area_cells}, N<=${v.meta.max_layers}。综合总数(当前规则)=${s.total}，候选池(预计算)=${s.raw_pool}`;
+  document.getElementById("desc").textContent = `A=${v.meta.footprint_area_cells}, N<=${v.meta.max_layers}。综合总数(当前规则)=${s.total}，当前规则生成池=${s.raw_pool}`;
   document.getElementById("chips").innerHTML = [
     `primary_groups=1`,
     `secondary_groups=${secKeys.size}`,
     `active_types=${s.total}`,
-    `candidate_pool=${s.raw_pool}`,
+    `risk_types=${s.failed}`,
     `baseline=${v.meta.baseline_efficiency.toFixed(2)}`,
     `combo=${v.meta.module_combo.join("+")}`,
   ].map((item) => `<span class=\"chip\">${item}</span>`).join("");
 
   document.getElementById("hero-kpis").innerHTML = [
     `综合总数 ${s.total}`,
-    `通过率 100.0%`,
+    `通过率 ${pct(s.passed, s.total)}%`,
+    `风险样本 ${s.failed}`,
     `覆盖组数 1/${secKeys.size}`,
     `层数上限 ${v.meta.max_layers}`,
     `占地目标 ${v.meta.footprint_area_cells}`,
@@ -1583,11 +1585,19 @@ function renderRuleLab() {
   const current = summaryCurrent();
   const disabled = RULE_DEFS.filter((rule) => !state.rules[rule.id]);
   const mask = encodeRuleMask(state.rules);
+  const riskByRule = disabled.map((rule) => {
+    const count = state.evaluated.filter(
+      (item) => item.status === "failed" && item.runtime_failed_rules.includes(rule.id)
+    ).length;
+    return `${rule.id}风险样本=${count}`;
+  });
 
   document.getElementById("rule-impact").innerHTML = [
     `规则掩码=${mask}`,
     `当前规则组合=${current.total}`,
-    `候选池=${current.raw_pool}`,
+    `当前通过=${current.passed}`,
+    `当前风险=${current.failed}`,
+    ...riskByRule,
   ].map((text) => `<span class=\"chip\">${text}</span>`).join("");
 
   document.getElementById("rule-note").textContent = disabled.length
@@ -1597,7 +1607,7 @@ function renderRuleLab() {
 
 function renderVisualOverview() {
   const v = activeVariant();
-  const generated = generatedCurrent();
+  const pool = currentPool();
   const s = summaryCurrent();
   const passPct = pctNumber(s.passed, s.total || 1);
   const ring = document.getElementById("pass-ring");
@@ -1605,7 +1615,7 @@ function renderVisualOverview() {
   document.getElementById("pass-ring-text").textContent = `${passPct.toFixed(1)}%`;
 
   const bins = v.histogram.map((item) => ({ start: item.start, end: item.end, passed: 0, failed: 0 }));
-  generated.forEach((item) => {
+  pool.forEach((item) => {
     const idx = bins.findIndex((bin, i) => {
       const isLast = i === bins.length - 1;
       return isLast
@@ -1613,7 +1623,11 @@ function renderVisualOverview() {
         : (item.projection_ratio >= bin.start && item.projection_ratio < bin.end);
     });
     if (idx < 0) return;
-    bins[idx].passed += 1;
+    if (item.status === "passed") {
+      bins[idx].passed += 1;
+    } else {
+      bins[idx].failed += 1;
+    }
   });
 
   const maxCount = Math.max(1, ...bins.map((item) => item.passed + item.failed));
@@ -1631,7 +1645,7 @@ function renderVisualOverview() {
     `;
   }).join("");
 
-  const samples = generated
+  const samples = pool
     .slice()
     .sort((a, b) => {
       return b.projection_ratio - a.projection_ratio || a.type_id - b.type_id;
@@ -1643,12 +1657,13 @@ function renderVisualOverview() {
     const rr = mask !== "11111" ? `&rr=${encodeURIComponent(mask)}` : "";
     const href = `type.html?variant=${encodeURIComponent(state.variant)}&type=${item.type_id}&primary=ALL${rr}`;
     const maskPreview = matrixMini(item.layer_masks[item.layer_masks.length - 1] || 0);
-    const riskTag = "可用";
+    const riskCodes = (item.runtime_failed_rules || []).join(", ");
+    const riskTag = item.status === "passed" ? "全规则通过" : `风险:${riskCodes || "规则放宽样本"}`;
     return `
       <a class=\"sample-tile\" href=\"${href}\">
         <div class=\"sample-head\">
           <span>#${item.type_id}</span>
-          <span class=\"pill ok\">passed</span>
+          <span class=\"pill ${item.status === "passed" ? "ok" : "bad"}\">${item.status === "passed" ? "passed" : "risk"}</span>
         </div>
         ${maskPreview}
         <div class=\"meta-line\">ratio=${item.projection_ratio.toFixed(2)} | ${riskTag}</div>
@@ -1659,14 +1674,14 @@ function renderVisualOverview() {
 
 function renderPrimaryGrid() {
   const host = document.getElementById("primary-grid");
-  const valid = state.evaluated.filter((item) => item.runtime_status === "passed");
-  if (!valid.length) {
+  const pool = currentPool();
+  if (!pool.length) {
     host.innerHTML = `<article class=\"primary-card\"><div class=\"primary-title\">当前规则下无可用组合</div><div class=\"sub\">请恢复部分规则或调整边界。</div></article>`;
     return;
   }
 
   const secondaryMap = new Map();
-  valid.forEach((item) => {
+  pool.forEach((item) => {
     const support = supportProfileRuntime(item.layer_masks);
     const bin = ratioBinRuntime(item.projection_ratio);
     const secId = `L${item.active_cells_per_layer.join("-")}_SUP${support.supported}-${support.unsupported}_PR${bin[0].toFixed(2)}-${bin[1].toFixed(2)}`;
@@ -1675,9 +1690,17 @@ function renderPrimaryGrid() {
         id: secId,
         label: `L${item.active_cells_per_layer.join("/")} | support ${support.supported}/${support.unsupported} | R[${bin[0].toFixed(2)},${bin[1].toFixed(2)})`,
         type_ids: [],
+        passed: 0,
+        failed: 0,
       });
     }
-    secondaryMap.get(secId).type_ids.push(item.type_id);
+    const entry = secondaryMap.get(secId);
+    entry.type_ids.push(item.type_id);
+    if (item.status === "passed") {
+      entry.passed += 1;
+    } else {
+      entry.failed += 1;
+    }
   });
   const secondaryGroups = Array.from(secondaryMap.values()).sort((a, b) => b.type_ids.length - a.type_ids.length);
   const mask = encodeRuleMask(state.rules);
@@ -1689,7 +1712,7 @@ function renderPrimaryGrid() {
       <div class=\"secondary-row\">
         <div>
           <a href=\"${secHref}\">${sec.label}</a>
-          <div class=\"meta-line\">types=${sec.type_ids.length}, passed=${sec.type_ids.length}, failed=0</div>
+          <div class=\"meta-line\">types=${sec.type_ids.length}, passed=${sec.passed}, failed=${sec.failed}</div>
         </div>
         <a class=\"btn\" href=\"${secHref}\">进入组合</a>
       </div>
@@ -1703,11 +1726,11 @@ function renderPrimaryGrid() {
     <article class=\"primary-card\">
       <div class=\"primary-head\">
         <div class=\"primary-title\">ACTIVE | 当前启用规则生成集合</div>
-        <span class=\"pill ok\">pass=100.0%</span>
+        <span class=\"pill ${summaryCurrent().failed ? "bad" : "ok"}\">pass=${pct(summaryCurrent().passed, summaryCurrent().total)}%</span>
       </div>
-      <div class=\"meter\"><span style=\"width:100%\"></span></div>
+      <div class=\"meter\"><span style=\"width:${pct(summaryCurrent().passed, summaryCurrent().total)}%\"></span></div>
       <div class=\"sub\">组划分基于当前启用规则生成的有效组合集合（非全规则基线）。</div>
-      <div class=\"meta-line\">types=${valid.length}, secondary_groups=${secondaryGroups.length}</div>
+      <div class=\"meta-line\">types=${pool.length}, passed=${summaryCurrent().passed}, failed=${summaryCurrent().failed}, secondary_groups=${secondaryGroups.length}</div>
       <div class=\"toolbar\"><a class=\"btn\" href=\"${primaryHref}\">查看该组全部组合</a></div>
       <div class=\"secondary-table\">${secRows}</div>
       ${moreHint}
@@ -2022,7 +2045,7 @@ function renderBoundaryControls() {
   layerSel.value = String(profile ? profile.max_layers : (parsed ? parsed.layers : 1));
 }
 
-function renderHeader(primaryLabel, secondary, totalCount) {
+function renderHeader(primaryLabel, secondary, totalCount, passedCount, failedCount) {
   const breadcrumb = document.getElementById("breadcrumb");
   const v = activeVariant();
   const secText = secondary ? ` / 二级组: ${secondary.id}` : "";
@@ -2046,9 +2069,9 @@ function renderHeader(primaryLabel, secondary, totalCount) {
   ].join("");
 
   document.getElementById("chips").innerHTML = [
-    `types=${secondary ? secondary.type_ids.length : totalCount}`,
-    `passed=${secondary ? secondary.type_ids.length : totalCount}`,
-    "failed=0",
+    `types=${totalCount}`,
+    `passed=${passedCount}`,
+    `failed=${failedCount}`,
     `A=${v.meta.footprint_area_cells}`,
     `N<=${v.meta.max_layers}`,
     `rr=${mask}`,
@@ -2081,7 +2104,7 @@ function renderCatalog(baseList, secondaryId) {
   let list = baseList.slice();
 
   if (state.status !== "all") {
-    list = list.filter((item) => item.runtime_status === state.status);
+    list = list.filter((item) => item.status === state.status);
   }
 
   if (state.sort === "ratio") {
@@ -2107,7 +2130,7 @@ function renderCatalog(baseList, secondaryId) {
       <article class=\"type-card\" data-href=\"${detailHref}\">
         <div class=\"type-head\">
           <span>#${item.type_id} / ${item.group_id}</span>
-          <span class=\"pill ${item.runtime_status === "passed" ? "ok" : "bad"}\">${item.runtime_status}</span>
+          <span class=\"pill ${item.status === "passed" ? "ok" : "bad"}\">${item.status === "passed" ? "passed" : "risk"}</span>
         </div>
         <div class=\"mini-stack\">${layers}</div>
         <div class=\"chips\">
@@ -2134,15 +2157,17 @@ function renderCatalog(baseList, secondaryId) {
 function bootstrap() {
   const v = activeVariant();
   const evaluated = evaluateTypesWithRules(v.types);
-  const filtered = evaluated.filter((item) => item.runtime_status === "passed");
+  const filtered = evaluated.slice();
   const secondaryGroups = buildSecondaryGroups(filtered, v.meta.cell_count);
   const secondary = state.requestedSecondary
     ? secondaryGroups.find((item) => item.id === state.requestedSecondary) || null
     : null;
   const typeIdSet = new Set(secondary ? secondary.type_ids : filtered.map((item) => item.type_id));
   const listItems = filtered.filter((item) => typeIdSet.has(item.type_id));
+  const passedCount = listItems.filter((item) => item.status === "passed").length;
+  const failedCount = listItems.length - passedCount;
 
-  renderHeader("ACTIVE | 当前启用规则", secondary, filtered.length);
+  renderHeader("ACTIVE | 当前启用规则", secondary, listItems.length, passedCount, failedCount);
   renderCatalog(listItems, secondary ? secondary.id : "");
   updateURL("ACTIVE", secondary ? secondary.id : "");
 
@@ -3166,6 +3191,10 @@ function renderHeader() {
   const typeItem = getCurrentType();
   const ruleMask = encodeRuleMask(state.rules);
   const runtimeStatus = typeItem ? (passWithRules(typeItem) ? "passed" : "failed") : "";
+  const strictStatus = typeItem ? (typeItem.status || "failed") : "";
+  const shownStatus = typeItem
+    ? (runtimeStatus === "passed" && strictStatus !== "passed" ? "risk" : runtimeStatus)
+    : "";
   const rr = ruleMask !== "11111" ? `&rr=${encodeURIComponent(ruleMask)}` : "";
   const scopePrimary = state.primary === "ALL" ? "ALL" : "ACTIVE";
   const chips = [
@@ -3180,7 +3209,8 @@ function renderHeader() {
   if (typeItem) {
     document.getElementById("title").textContent = `3D 详情 | #${typeItem.type_id} / ${typeItem.group_id}`;
     document.getElementById("type-desc").textContent = `key=${typeItem.canonical_key} | active=${typeItem.active_cells_per_layer.join("/")} | effective_layers=${typeItem.effective_layers}/${typeItem.declared_layers} | ratio=${typeItem.projection_ratio.toFixed(2)}`;
-    chips.unshift(`status=${runtimeStatus}`);
+    chips.unshift(`status=${shownStatus}`);
+    chips.unshift(`strict=${strictStatus}`);
     if (typeItem.is_degenerate_single_layer) {
       chips.unshift("退化单层(上层为空)");
     }

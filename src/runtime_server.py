@@ -144,12 +144,7 @@ def _build_variant(area: int, layers: int, rule_mask: str) -> dict[str, Any]:
             flags=flags,
         ):
             continue
-        normalized = copy.deepcopy(item)
-        normalized["status"] = "passed"
-        if isinstance(normalized.get("verification"), dict):
-            normalized["verification"]["passed"] = True
-            normalized["verification"]["reasons"] = []
-        filtered_types.append(normalized)
+        filtered_types.append(copy.deepcopy(item))
 
     if filtered_types:
         sample_checks = filtered_types[0].get("structural_checks", {})

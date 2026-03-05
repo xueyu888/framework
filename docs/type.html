@@ -1804,6 +1804,10 @@ function renderHeader() {
   const typeItem = getCurrentType();
   const ruleMask = encodeRuleMask(state.rules);
   const runtimeStatus = typeItem ? (passWithRules(typeItem) ? "passed" : "failed") : "";
+  const strictStatus = typeItem ? (typeItem.status || "failed") : "";
+  const shownStatus = typeItem
+    ? (runtimeStatus === "passed" && strictStatus !== "passed" ? "risk" : runtimeStatus)
+    : "";
   const rr = ruleMask !== "11111" ? `&rr=${encodeURIComponent(ruleMask)}` : "";
   const scopePrimary = state.primary === "ALL" ? "ALL" : "ACTIVE";
   const chips = [
@@ -1818,7 +1822,8 @@ function renderHeader() {
   if (typeItem) {
     document.getElementById("title").textContent = `3D 详情 | #${typeItem.type_id} / ${typeItem.group_id}`;
     document.getElementById("type-desc").textContent = `key=${typeItem.canonical_key} | active=${typeItem.active_cells_per_layer.join("/")} | effective_layers=${typeItem.effective_layers}/${typeItem.declared_layers} | ratio=${typeItem.projection_ratio.toFixed(2)}`;
-    chips.unshift(`status=${runtimeStatus}`);
+    chips.unshift(`status=${shownStatus}`);
+    chips.unshift(`strict=${strictStatus}`);
     if (typeItem.is_degenerate_single_layer) {
       chips.unshift("退化单层(上层为空)");
     }
