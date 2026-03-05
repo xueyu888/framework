@@ -53,24 +53,24 @@
       },
       {
         "id": "NODE-L2-SHELF",
-        "label": "L2.置物架框架标准",
+        "label": "L2.L2-置物架框架标准",
         "level": 2,
         "order": 2,
-        "description": "id=NODE-L2-SHELF | kind=file | level=L2 | file=framework/shelf/L2/置物架框架标准.md"
+        "description": "id=NODE-L2-SHELF | kind=file | level=L2 | file=framework/shelf/L2-置物架框架标准.md"
       },
       {
         "id": "NODE-L2-CURTAIN",
-        "label": "L2.窗帘框架标准",
+        "label": "L2.L2-窗帘框架标准",
         "level": 2,
         "order": 3,
-        "description": "id=NODE-L2-CURTAIN | kind=file | level=L2 | file=framework/curtain/L2/窗帘框架标准.md"
+        "description": "id=NODE-L2-CURTAIN | kind=file | level=L2 | file=framework/curtain/L2-窗帘框架标准.md"
       },
       {
         "id": "NODE-L2-FRONTEND",
-        "label": "L2.前端框架标准",
+        "label": "L2.L2-前端框架标准",
         "level": 2,
         "order": 4,
-        "description": "id=NODE-L2-FRONTEND | kind=file | level=L2 | file=framework/frontend/L2/前端框架标准.md"
+        "description": "id=NODE-L2-FRONTEND | kind=file | level=L2 | file=framework/frontend/L2-前端框架标准.md"
       },
       {
         "id": "NODE-L3-LAYER",

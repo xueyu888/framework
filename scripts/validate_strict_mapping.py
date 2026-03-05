@@ -34,15 +34,19 @@ ASSIGN_CALL_PATTERN = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\(\s*$"
 )
 LAYER_DIR_PATTERN = re.compile(r"^L(\d+)$")
+FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN = re.compile(r"^L(\d+)-[^/]+\.md$")
 CANONICAL_BASE_ID_PATTERN = re.compile(r"^B(\d+)$")
 CANONICAL_NODE_ID_PATTERN = re.compile(r"^L(\d+)\.M([A-Za-z0-9_-]+)\.B(\d+)$")
 CANONICAL_CAPABILITY_ID_PATTERN = re.compile(r"^C(\d+)$")
 CANONICAL_VERIFY_ID_PATTERN = re.compile(r"^V(\d+)$")
-FRAMEWORK_L2_FILE_PATTERN = re.compile(r"^framework/[^/]+/L2/[^/]+\.md$")
+FRAMEWORK_L2_FILE_PATTERN = re.compile(r"^framework/[^/]+/L2-[^/]+\.md$")
 LAYER_TAG_PATTERN = re.compile(r"<!--\s*@layer\s+([^>]*)-->", re.IGNORECASE)
 BASE_TAG_PATTERN = re.compile(r"<!--\s*@base\s+([^>]*)-->", re.IGNORECASE)
 COMPOSE_TAG_PATTERN = re.compile(r"<!--\s*@compose\s+([^>]*)-->", re.IGNORECASE)
-FRAMEWORK_DIRECTIVE_LINE_PATTERN = re.compile(r"^\s*@framework(?:\s+(.*))?\s*$", re.MULTILINE)
+FRAMEWORK_DIRECTIVE_LINE_PATTERN = re.compile(
+    r"^[ \t]*@framework(?:[ \t]+([^\r\n]+))?[ \t]*$",
+    re.MULTILINE,
+)
 FRAMEWORK_TITLE_LINE_PATTERN = re.compile(r"^\s*#\s+(.+?)\s*$", re.MULTILINE)
 FRAMEWORK_NUMBERED_ITEM_PATTERN = re.compile(
     r"^\s*[-*]\s*`([A-Za-z][A-Za-z0-9]*(?:\.[0-9]+)?)`",
@@ -277,15 +281,12 @@ def iter_framework_layer_markdown() -> list[tuple[str, int, Path]]:
         if not module_dir.is_dir():
             continue
         module_name = module_dir.name
-        for layer_dir in sorted(module_dir.iterdir()):
-            if not layer_dir.is_dir():
-                continue
-            layer_match = LAYER_DIR_PATTERN.fullmatch(layer_dir.name)
+        for markdown_file in sorted(module_dir.glob("*.md")):
+            layer_match = FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(markdown_file.name)
             if layer_match is None:
                 continue
             layer_num = int(layer_match.group(1))
-            for markdown_file in sorted(layer_dir.glob("*.md")):
-                docs.append((module_name, layer_num, markdown_file))
+            docs.append((module_name, layer_num, markdown_file))
     return docs
 
 
@@ -319,9 +320,9 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
     node_origin: dict[str, tuple[str, int]] = {}
     compose_edges: list[tuple[str, str, str, int, str]] = []
     module_levels: dict[str, set[int]] = {}
+    module_has_legacy_files: dict[str, bool] = {}
     edge_pairs: set[tuple[str, str]] = set()
     valid_compose_edges: list[tuple[str, str]] = []
-    framework_identifier_origin: dict[str, dict[str, tuple[str, int]]] = {}
 
     if not FRAMEWORK_DIR.exists():
         issues.append(
@@ -338,27 +339,30 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
         if not module_dir.is_dir():
             continue
         module_name = module_dir.name
-        levels = module_levels.setdefault(module_name, set())
+        module_levels.setdefault(module_name, set())
+        module_has_legacy_files.setdefault(module_name, False)
 
         for entry in sorted(module_dir.iterdir()):
             if entry.is_file() and entry.suffix == ".md":
+                if FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(entry.name) is not None:
+                    continue
                 rel = entry.relative_to(REPO_ROOT).as_posix()
                 issues.append(
                     make_issue(
-                        "framework module markdown must be under Lx directory",
+                        "framework markdown filename must use Lx- prefix, e.g. L2-xxx.md",
                         rel,
                         1,
-                        code="FRAMEWORK_FILE_NOT_IN_LAYER_DIR",
+                        code="FRAMEWORK_FILE_LEVEL_PREFIX_INVALID",
                     )
                 )
-            if entry.is_dir() and LAYER_DIR_PATTERN.fullmatch(entry.name) is None:
+            if entry.is_dir():
                 rel = entry.relative_to(REPO_ROOT).as_posix()
                 issues.append(
                     make_issue(
-                        "framework module subdirectory must be named as Lx",
+                        "framework module must store markdown directly under module directory; use Lx-*.md files",
                         rel,
                         1,
-                        code="FRAMEWORK_LAYER_DIR_NAME_INVALID",
+                        code="FRAMEWORK_SUBDIR_FORBIDDEN",
                     )
                 )
 
@@ -425,38 +429,36 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                             )
                         )
 
-            module_identifier_origin = framework_identifier_origin.setdefault(module_name, {})
             file_identifiers: set[str] = set()
+            file_identifier_origin: dict[str, int] = {}
             for id_match in FRAMEWORK_NUMBERED_ITEM_PATTERN.finditer(file_text):
                 identifier = id_match.group(1)
                 line_num = line_from_offset(file_text, id_match.start(1))
-                file_identifiers.add(identifier)
-                previous_origin = module_identifier_origin.get(identifier)
-                if previous_origin is not None:
-                    prev_file, prev_line = previous_origin
+                previous_line = file_identifier_origin.get(identifier)
+                if previous_line is not None:
                     issues.append(
                         make_issue(
-                            f"framework identifier must be unique inside module '{module_name}': {identifier}",
+                            f"framework identifier must be unique inside current framework file: {identifier}",
                             rel_file,
                             line_num,
                             code="FW010",
                             related=[
                                 {
                                     "message": "previous declaration",
-                                    "file": prev_file,
-                                    "line": prev_line,
+                                    "file": rel_file,
+                                    "line": previous_line,
                                     "column": 1,
                                 }
                             ],
                         )
                     )
                     continue
-                module_identifier_origin[identifier] = (rel_file, line_num)
+                file_identifier_origin[identifier] = line_num
+                file_identifiers.add(identifier)
 
             for identifier in sorted(file_identifiers):
-                origin = module_identifier_origin.get(identifier)
-                line_num = origin[1] if origin and origin[0] == rel_file else 1
-                if identifier.startswith("C") and CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(identifier) is None:
+                line_num = file_identifier_origin.get(identifier, 1)
+                if re.fullmatch(r"C\d.*", identifier) and CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(identifier) is None:
                     issues.append(
                         make_issue(
                             f"invalid capability identifier format: {identifier}; expected C<number>",
@@ -465,7 +467,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                             code="FW011",
                         )
                     )
-                if identifier.startswith("B") and CANONICAL_BASE_ID_PATTERN.fullmatch(identifier) is None:
+                if re.fullmatch(r"B\d.*", identifier) and CANONICAL_BASE_ID_PATTERN.fullmatch(identifier) is None:
                     issues.append(
                         make_issue(
                             f"invalid base identifier format: {identifier}; expected B<number>",
@@ -474,7 +476,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                             code="FW011",
                         )
                     )
-                if identifier.startswith("V") and CANONICAL_VERIFY_ID_PATTERN.fullmatch(identifier) is None:
+                if re.fullmatch(r"V\d.*", identifier) and CANONICAL_VERIFY_ID_PATTERN.fullmatch(identifier) is None:
                     issues.append(
                         make_issue(
                             f"invalid verification identifier format: {identifier}; expected V<number>",
@@ -611,11 +613,10 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                     )
 
             for identifier in sorted(file_identifiers):
-                if not identifier.startswith("R"):
+                if re.fullmatch(r"R\d.*", identifier) is None:
                     continue
                 if FRAMEWORK_RULE_ID_PATTERN.fullmatch(identifier) is None:
-                    origin = module_identifier_origin.get(identifier)
-                    line_num = origin[1] if origin and origin[0] == rel_file else 1
+                    line_num = file_identifier_origin.get(identifier, 1)
                     issues.append(
                         make_issue(
                             f"invalid rule identifier format: {identifier}; expected R<number> or R<number>.<number>",
@@ -628,8 +629,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                 if "." in identifier:
                     parent = identifier.split(".", 1)[0]
                     if parent not in file_identifiers:
-                        origin = module_identifier_origin.get(identifier)
-                        line_num = origin[1] if origin and origin[0] == rel_file else 1
+                        line_num = file_identifier_origin.get(identifier, 1)
                         issues.append(
                             make_issue(
                                 f"rule child identifier requires parent declaration: {identifier} (missing {parent})",
@@ -766,6 +766,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         )
         else:
             is_framework_directive_file = False
+            module_has_legacy_files[module_name] = True
 
         required_headings = (
             REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS
@@ -975,6 +976,11 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                     code="FRAMEWORK_LAYER_ZERO_MISSING",
                 )
             )
+
+        # Legacy @layer/@base/@compose DAG checks only apply to legacy files.
+        if not module_has_legacy_files.get(module_name, False):
+            continue
+
         for lower_level in sorted(levels):
             upper_level = lower_level + 1
             if upper_level not in levels:
@@ -1406,7 +1412,7 @@ def validate_registry_structure(
         if standard_file not in declared_l2:
             issues.append(
                 make_issue(
-                    "mapping_registry.json: unregistered domain standard under framework/*/L2/: "
+                    "mapping_registry.json: unregistered domain standard under framework/*/L2-*.md: "
                     f"{standard_file}",
                     REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
                     find_line(registry_text, '"L2"'),

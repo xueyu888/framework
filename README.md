@@ -5,7 +5,7 @@
 ## 规范入口
 - 规范总纲（树形）：`specs/规范总纲与树形结构.md`
 - 框架设计核心标准：`specs/框架设计核心标准.md`
-- 领域标准（置物架）：`framework/shelf/L2/置物架框架标准.md`
+- 领域标准（置物架）：`framework/shelf/L2-置物架框架标准.md`
 - 领域标准（前端 L0-L7）：`framework/frontend/L0` 到 `framework/frontend/L7`
 - 工程执行规范：`AGENTS.md`
 

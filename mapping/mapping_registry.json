@@ -1,6 +1,12 @@
 {
   "meta": {
-    "updated_at": "2026-03-05"
+    "updated_at": "2026-03-05",
+    "l3_sync_notes": [
+      {
+        "id": "SYNC-20260305-runtime-env-l0",
+        "note": "Add framework/runtime_env/L0-运行环境识别模块.md for framework directive schema trial."
+      }
+    ]
   },
   "tree": {
     "id": "NODE-L0-ROOT",
@@ -43,21 +49,21 @@
                 "id": "NODE-L2-SHELF",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/shelf/L2/置物架框架标准.md",
+                "file": "framework/shelf/L2-置物架框架标准.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-CURTAIN",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/curtain/L2/窗帘框架标准.md",
+                "file": "framework/curtain/L2-窗帘框架标准.md",
                 "children": []
               },
               {
                 "id": "NODE-L2-FRONTEND",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/frontend/L2/前端框架标准.md",
+                "file": "framework/frontend/L2-前端框架标准.md",
                 "children": []
               },
               {
@@ -91,8 +97,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "framework/shelf/L2/置物架框架标准.md",
-      "l2_anchor": "## 1. 目标（Goal）",
+      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -110,8 +116,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/shelf/L2/置物架框架标准.md",
-      "l2_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -137,8 +143,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/shelf/L2/置物架框架标准.md",
-      "l2_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "sync_note": "L2 bases section migrated to tagged annotations; Module symbols in L3 remain unchanged",
       "impl_symbols": [
         {
@@ -157,8 +163,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/shelf/L2/置物架框架标准.md",
-      "l2_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/shelf/L2-置物架框架标准.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -204,7 +210,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/shelf/L2/置物架框架标准.md",
+      "l2_file": "framework/shelf/L2-置物架框架标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
@@ -231,8 +237,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "framework/curtain/L2/窗帘框架标准.md",
-      "l2_anchor": "## 1. 目标（Goal）",
+      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -246,8 +252,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/curtain/L2/窗帘框架标准.md",
-      "l2_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -261,8 +267,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/curtain/L2/窗帘框架标准.md",
-      "l2_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -276,8 +282,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/curtain/L2/窗帘框架标准.md",
-      "l2_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -291,7 +297,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/curtain/L2/窗帘框架标准.md",
+      "l2_file": "framework/curtain/L2-窗帘框架标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
@@ -306,8 +312,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 目标（Goal）",
-      "l2_file": "framework/frontend/L2/前端框架标准.md",
-      "l2_anchor": "## 1. 目标（Goal）",
+      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -321,8 +327,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/frontend/L2/前端框架标准.md",
-      "l2_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -340,8 +346,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/frontend/L2/前端框架标准.md",
-      "l2_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -359,8 +365,8 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/frontend/L2/前端框架标准.md",
-      "l2_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/frontend/L2-前端框架标准.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
           "file": "src/shelf_framework.py",
@@ -378,7 +384,7 @@
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/frontend/L2/前端框架标准.md",
+      "l2_file": "framework/frontend/L2-前端框架标准.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {

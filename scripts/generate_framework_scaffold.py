@@ -198,7 +198,7 @@ def resolve_output_path(output: str | None, module: str, level: str, title: str)
         if not output_path.is_absolute():
             output_path = REPO_ROOT / output_path
         return output_path
-    return REPO_ROOT / "framework" / module / level / f"{title}.md"
+    return REPO_ROOT / "framework" / module / f"{level}-{title}.md"
 
 
 def write_output(path: Path, content: str, overwrite: bool) -> None:
@@ -244,7 +244,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        help="output markdown path. Defaults to framework/<module>/<level>/<title>.md",
+        help="output markdown path. Defaults to framework/<module>/<level>-<title>.md",
     )
     parser.add_argument(
         "--overwrite",

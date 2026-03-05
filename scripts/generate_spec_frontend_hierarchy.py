@@ -15,7 +15,7 @@ DEFAULT_FRAMEWORK_ROOT = REPO_ROOT / "framework"
 DEFAULT_OUTPUT_JSON = REPO_ROOT / "docs/hierarchy/shelf_spec_frontend_hierarchy.json"
 DEFAULT_OUTPUT_HTML = REPO_ROOT / "docs/hierarchy/shelf_spec_frontend_hierarchy.html"
 
-LAYER_DIR_PATTERN = re.compile(r"^L(\d+)$")
+FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN = re.compile(r"^L(\d+)-[^/]+\.md$")
 BASE_TAG_PATTERN = re.compile(r"<!--\s*@base\s+([^>]*)-->", re.IGNORECASE)
 COMPOSE_TAG_PATTERN = re.compile(r"<!--\s*@compose\s+([^>]*)-->", re.IGNORECASE)
 BASE_ID_PATTERN = re.compile(r"^B(\d+)$")
@@ -74,15 +74,12 @@ def discover_layer_files(framework_root: Path, module: str) -> list[LayerFile]:
         raise FileNotFoundError(f"module root not found: {module_root}")
 
     layer_files: list[LayerFile] = []
-    for layer_dir in sorted(module_root.iterdir()):
-        if not layer_dir.is_dir():
-            continue
-        match = LAYER_DIR_PATTERN.fullmatch(layer_dir.name)
+    for markdown in sorted(module_root.glob("*.md")):
+        match = FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(markdown.name)
         if match is None:
             continue
         level_num = int(match.group(1))
-        for markdown in sorted(layer_dir.glob("*.md")):
-            layer_files.append(LayerFile(module=module, level=level_num, path=markdown))
+        layer_files.append(LayerFile(module=module, level=level_num, path=markdown))
 
     if not layer_files:
         raise ValueError(f"no markdown layer files found under {module_root}")
