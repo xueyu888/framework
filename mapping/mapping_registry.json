@@ -5,6 +5,18 @@
       {
         "id": "SYNC-20260305-runtime-env-l0",
         "note": "Add framework/runtime_env/L0-运行环境识别模块.md for framework directive schema trial."
+      },
+      {
+        "id": "SYNC-20260305-frontend-foundation-flow",
+        "note": "Refactor frontend L2-L6 docs to enforce component-first composition path: atom components -> base templates/open-source wrappers -> page routing -> login-centric business flows."
+      },
+      {
+        "id": "SYNC-20260305-l0-abstract-bases-normalization",
+        "note": "Normalize specs and framework docs (frontend/curtain/runtime_env/shelf) to enforce L0-first modeling and abstract Minimal Viable Bases with boundary-driven instance expansion."
+      },
+      {
+        "id": "SYNC-20260305-bases-structure-first",
+        "note": "Rewrite all framework B* definitions as finite structural units (structure-first), avoiding function-first phrasing."
       }
     ]
   },
