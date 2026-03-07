@@ -4,6 +4,7 @@ from pathlib import Path
 
 from domain.models import DiscreteGrid, StructureTopology
 from geometry.builders import build_geometry
+from visualization.plotly_html import write_plotly_html
 
 
 def _render_plotly_html(topology: StructureTopology, grid: DiscreteGrid, html_path: Path) -> Path:
@@ -67,8 +68,7 @@ def _render_plotly_html(topology: StructureTopology, grid: DiscreteGrid, html_pa
     )
 
     html_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.write_html(str(html_path), include_plotlyjs="cdn")
-    return html_path
+    return write_plotly_html(fig, html_path)
 
 
 def _render_obj(topology: StructureTopology, grid: DiscreteGrid, obj_path: Path) -> Path:

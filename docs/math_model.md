@@ -41,14 +41,14 @@ FRAME（V1，腔体诱导骨架）：
 总计数：
 `C_raw^all = C_raw^frame + C_raw^shelf`
 
-## 7. 效率函数
+## 7. 空间利用度函数
 SHELF：
-`eta_shelf(S) = (1/A) * sum_k(A_usable_k * h_clear_k * alpha_access_k)`
+`u_shelf(S) = (1/V_total) * sum_k(A_usable_k * h_clear_k * alpha_access_k)`
 
 FRAME：
-`eta_frame(S) = (1/A) * sum_b(volume(bay_b) * access_coeff(bay_b))`
+`u_frame(S) = (1/V_total) * sum_b(volume(bay_b) * access_coeff(bay_b))`
 
-说明：若不引入 `eta_frame` 分支，纯骨架结构会因无 panel usable area 导致效率恒为 0。
+说明：`V_total = footprint_area * total_height`。这样利用度会被归一化到总包络体积上，避免结果退化成带长度量纲的“高度分数”。
 
 ## 8. 有限与无限边界
 连续尺寸空间通常是无限问题。

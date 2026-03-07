@@ -34,9 +34,9 @@
 
 ## A6
 
-- 假设：baseline_efficiency 默认由实验输入给定，可替换为任意基准结构。
+- 假设：baseline_utilization 默认由实验输入给定，可替换为任意基准结构。
 
-- 配置位置：`baseline_efficiency`
+- 配置位置：`baseline_utilization`
 
 ## A7
 

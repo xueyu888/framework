@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 
 from domain.models import CandidateEvaluation, DiscreteGrid
 from geometry.builders import build_geometry
+from visualization.plotly_html import write_plotly_html
 from visualization.type_grouping import TypeGroup, build_type_groups
 
 
@@ -321,7 +322,6 @@ def generate_type_gallery_3d(
     )
 
     out = Path(output_html)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fig.write_html(str(out), include_plotlyjs="cdn")
+    write_plotly_html(fig, out)
 
     return Gallery3DArtifacts(html_path=str(out), type_count=len(candidates))

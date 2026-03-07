@@ -5,7 +5,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from domain import (
+    Base,
     BoundaryDefinition,
+    Capability,
     DiscreteGrid,
     EnumerationConfig,
     Footprint2D,
@@ -60,8 +62,8 @@ def build_assumptions() -> list[dict[str, str]]:
         },
         {
             "id": "A6",
-            "statement": "baseline_efficiency 默认由实验输入给定，可替换为任意基准结构。",
-            "config_key": "baseline_efficiency",
+            "statement": "baseline_utilization 默认由实验输入给定，可替换为任意基准结构。",
+            "config_key": "baseline_utilization",
         },
         {
             "id": "A7",
@@ -91,23 +93,23 @@ def write_architecture_doc() -> None:
 - `src/rules/`: 组合规则与结构规则判定
 - `src/geometry/`: 网格与几何诱导构造
 - `src/enumeration/`: 有界离散分型穷举与 canonical 去重
-- `src/metrics/`: 效率与简化载荷
+- `src/metrics/`: 空间利用度与简化载荷
 - `src/verification/`: 统一验证报告
 - `src/visualization/`: 3D 渲染（Plotly + OBJ fallback）
 - `src/main.py`: 流水线入口，输出证据与文档
 
 ## 数据流
-自然语言规则 -> 形式化对象 -> 枚举候选 -> 规则判定 -> 计算效率 -> baseline 比较 -> 输出证据
+自然语言规则 -> 形式化对象 -> 枚举候选 -> 规则判定 -> 计算空间利用度 -> baseline 比较 -> 输出证据
 
 ## 规则流
 - R1/R2：模块种类组合过滤（FRAME/SHELF 通用）
 - R3：对所有结构适用
 - R4/R5/R6：仅对 SHELF 适用；FRAME 视为 not applicable/pass
 - FRAME 特有规则：connected、ground_contact、minimal_under_deletability、可选 forbid_dangling_rods
-- Verification：边界有效 + 组合有效 + 效率提升
+- Verification：边界有效 + 组合有效 + 空间利用度提升
 
 ## 可追溯性
-核心类名与规则函数保持与 L2 -> L3 映射一致，且输出 `docs/logic_record.json` 保存证据链。
+核心类名与规则函数保持与 L2 -> L3 映射一致，输出 `docs/logic_record.json` 保存步骤级证据链，输出 `docs/run_summary.json` 保存运行摘要。
 """,
     )
 
@@ -158,14 +160,14 @@ FRAME（V1，腔体诱导骨架）：
 总计数：
 `C_raw^all = C_raw^frame + C_raw^shelf`
 
-## 7. 效率函数
+## 7. 空间利用度函数
 SHELF：
-`eta_shelf(S) = (1/A) * sum_k(A_usable_k * h_clear_k * alpha_access_k)`
+`u_shelf(S) = (1/V_total) * sum_k(A_usable_k * h_clear_k * alpha_access_k)`
 
 FRAME：
-`eta_frame(S) = (1/A) * sum_b(volume(bay_b) * access_coeff(bay_b))`
+`u_frame(S) = (1/V_total) * sum_b(volume(bay_b) * access_coeff(bay_b))`
 
-说明：若不引入 `eta_frame` 分支，纯骨架结构会因无 panel usable area 导致效率恒为 0。
+说明：`V_total = footprint_area * total_height`。这样利用度会被归一化到总包络体积上，避免结果退化成带长度量纲的“高度分数”。
 
 ## 8. 有限与无限边界
 连续尺寸空间通常是无限问题。
@@ -220,7 +222,7 @@ def write_slides_outline_doc() -> None:
 6. R1-R6 规则形式化
 7. 穷举器与剪枝策略
 8. canonical 去重
-9. 效率函数与 baseline
+9. 空间利用度函数与 baseline
 10. 示例：3个有效 + 3个无效
 11. 3D 可视化与证据输出
 12. 结论、边界与下一步
@@ -238,7 +240,7 @@ def write_examples_doc(
         lines.append(f"### V{idx}\n")
         lines.append(f"- canonical_key: `{item['canonical_key']}`\n")
         lines.append(f"- panel_count: {item['panel_count']}\n")
-        lines.append(f"- target_efficiency: {item['target_efficiency']:.6f}\n")
+        lines.append(f"- target_utilization: {item['target_utilization']:.6f}\n")
         lines.append(f"- 结论: {item['passed']}\n")
 
     lines.append("## 无效结构示例\n")
@@ -251,7 +253,7 @@ def write_examples_doc(
     _write_text("docs/examples.md", "\n".join(lines) + "\n")
 
 
-def build_logic_record(
+def build_run_summary(
     assumptions: list[dict[str, str]],
     combo_sets: dict[str, list[list[str]]],
     enumeration_summary: dict[str, object],
@@ -259,7 +261,8 @@ def build_logic_record(
     invalid_count: int,
 ) -> dict[str, object]:
     return {
-        "goal": "提升单位占地面积下的存取效率",
+        "goal": "提升单位占地面积下的空间利用度",
+        "metric_name": "space_utilization",
         "formalization_chain": [
             "自然语言规范",
             "形式化对象",
@@ -285,8 +288,14 @@ def build_logic_record(
 
 
 def main() -> None:
-    # Keep strict mapping symbol for MAP-G.
-    goal = Goal("Increase storage access efficiency per footprint area")
+    # Optional design intent can exist, but capability remains the primary framework object.
+    goal = Goal("Increase space utilization per footprint area")
+    capabilities = [
+        Capability("C1", "Construct stable load-bearing paths and preserve structural integrity"),
+        Capability("C2", "Generate reusable storage units and access channels"),
+        Capability("C3", "Remain extensible and maintainable under scene constraints"),
+        Capability("C4", "Exclude material ornament, color style, and decorative preference"),
+    ]
 
     boundary = BoundaryDefinition(
         layers_n=2,
@@ -295,6 +304,11 @@ def main() -> None:
         opening_o=Opening2D(width=65.0, height=28.0),
         footprint_a=Footprint2D(width=90.0, depth=40.0),
     )
+    bases = [
+        Base("B1", "load-bearing skeleton base", "L1.M0[R1]"),
+        Base("B2", "connection extension base", "L1.M0[R2]"),
+        Base("B3", "surface organization base", "L1.M0[R3]"),
+    ]
     assumptions = build_assumptions()
 
     combo_sets = classify_combo_sets()
@@ -303,7 +317,7 @@ def main() -> None:
 
     baseline_efficiency = 0.08
 
-    # Keep strict mapping symbol for MAP-V.
+    # Keep strict mapping symbol for verification mapping.
     verification_result = verify(
         VerificationInput(
             boundary=boundary,
@@ -349,7 +363,7 @@ def main() -> None:
                 "canonical_key": candidate.canonical_key,
                 "panel_count": candidate.topology.panel_count(),
                 "passed": report.passed,
-                "target_efficiency": report.target_efficiency,
+                "target_utilization": report.target_utilization,
                 "reasons": report.reasons,
             }
         )
@@ -385,7 +399,7 @@ def main() -> None:
     )
     manual_invalid_cases.append(
         {
-            "case": "效率未超过 baseline",
+            "case": "空间利用度未超过 baseline",
             "passed": not_improved_report.passed,
             "reasons": not_improved_report.reasons,
         }
@@ -455,7 +469,7 @@ def main() -> None:
     logic_record = LogicRecord.build(logic_steps)
     logic_record.export_json("docs/logic_record.json")
 
-    enriched_logic = build_logic_record(
+    run_summary = build_run_summary(
         assumptions=assumptions,
         combo_sets=combo_sets,
         enumeration_summary={
@@ -466,24 +480,26 @@ def main() -> None:
         valid_count=len(valid_reports),
         invalid_count=len(manual_invalid_cases),
     )
-    enriched_logic["strict_mapping"] = strict_mapping_meta()
-    enriched_logic["load_check"] = load_check.to_dict()
-    enriched_logic["visualization_artifacts"] = visualization_artifacts
-    Path("docs/logic_record.json").write_text(
-        json.dumps(enriched_logic, ensure_ascii=False, indent=2),
+    run_summary["strict_mapping"] = strict_mapping_meta()
+    run_summary["load_check"] = load_check.to_dict()
+    run_summary["visualization_artifacts"] = visualization_artifacts
+    Path("docs/run_summary.json").write_text(
+        json.dumps(run_summary, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
     hypothesis = Hypothesis(
         hypothesis_id="H1",
-        statement="With valid boundary and combination, access efficiency should improve",
+        statement="With valid boundary and combination, space utilization should improve",
     )
 
     output = {
         "step_1": {
             "formalization_summary": {
+                "capabilities": [item.to_dict() for item in capabilities],
                 "goal": goal.to_dict(),
                 "boundary": boundary.to_dict(),
+                "bases": [item.to_dict() for item in bases],
                 "modules": [item.value for item in Module],
                 "rules": [
                     "R1",
@@ -517,6 +533,7 @@ def main() -> None:
         },
         "artifacts": {
             "logic_record": "docs/logic_record.json",
+            "run_summary": "docs/run_summary.json",
             "architecture": "docs/architecture.md",
             "math_model": "docs/math_model.md",
             "assumptions": "docs/assumptions.md",

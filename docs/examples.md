@@ -8,7 +8,7 @@
 
 - panel_count: 2
 
-- target_efficiency: 32.734375
+- target_utilization: 0.545573
 
 - 结论: True
 
@@ -18,7 +18,7 @@
 
 - panel_count: 3
 
-- target_efficiency: 32.734375
+- target_utilization: 0.545573
 
 - 结论: True
 
@@ -28,7 +28,7 @@
 
 - panel_count: 4
 
-- target_efficiency: 32.734375
+- target_utilization: 0.545573
 
 - 结论: True
 
@@ -44,7 +44,7 @@
 
 ### I2
 
-- case: 效率未超过 baseline
+- case: 空间利用度未超过 baseline
 
 - 结论: False
 
