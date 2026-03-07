@@ -32,6 +32,7 @@
   - Visual Studio Marketplace: publish `rdshr.archsync` for standard VSCode installs
 - Release automation lives in `.github/workflows/publish-archsync.yml`.
 - Tagging `archsync-vX.Y.Z` packages the current source, creates a GitHub Release, and attaches the generated `.vsix`.
+- Public tag releases must include a curated bilingual notes file at `tools/vscode/archsync/release-notes/<version>.md`; the workflow uses that file as the GitHub Release body.
 - If repository secrets are configured, the same tag also publishes to:
   - `OPEN_VSX_TOKEN`
   - `VS_MARKETPLACE_TOKEN`

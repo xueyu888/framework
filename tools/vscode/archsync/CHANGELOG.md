@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.24 - 2026-03-07
+- Enforced versioned bilingual release notes for ArchSync public releases.
+- Updated the publish workflow to fail when release notes or the `.vsix` asset are missing, and to use the curated notes file as the GitHub release body.
+
 ## 0.0.23 - 2026-03-07
 - Fixed the GitHub release workflow so the packaged VSIX is uploaded from the correct path during tag-based publishing.
 

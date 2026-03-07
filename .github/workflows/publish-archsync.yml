@@ -38,6 +38,36 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "vsix_run_path=releases/archsync-${VERSION}.vsix" >> "${GITHUB_OUTPUT}"
           echo "vsix_repo_path=tools/vscode/archsync/releases/archsync-${VERSION}.vsix" >> "${GITHUB_OUTPUT}"
+          echo "notes_run_path=release-notes/${VERSION}.md" >> "${GITHUB_OUTPUT}"
+          echo "notes_repo_path=tools/vscode/archsync/release-notes/${VERSION}.md" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate release notes
+        if: github.ref_type == 'tag'
+        run: |
+          NOTES_PATH="${{ steps.meta.outputs.notes_run_path }}"
+          if [[ ! -f "${NOTES_PATH}" ]]; then
+            echo "Missing release notes: ${NOTES_PATH}" >&2
+            exit 1
+          fi
+          grep -q '^## 中文说明' "${NOTES_PATH}" || { echo "Missing Chinese release-note section" >&2; exit 1; }
+          grep -q '^## English Notes' "${NOTES_PATH}" || { echo "Missing English release-note section" >&2; exit 1; }
+          awk '
+            /^## 中文说明/ { in_zh=1; in_en=0; next }
+            /^## English Notes/ { in_zh=0; in_en=1; next }
+            /^## / { in_zh=0; in_en=0 }
+            in_zh && /^- / { zh=1 }
+            in_en && /^- / { en=1 }
+            END {
+              if (!zh) {
+                print "Chinese release-note section must contain at least one bullet." > "/dev/stderr";
+                exit 1;
+              }
+              if (!en) {
+                print "English release-note section must contain at least one bullet." > "/dev/stderr";
+                exit 1;
+              }
+            }
+          ' "${NOTES_PATH}"
 
       - name: Package VSIX
         run: npx --yes @vscode/vsce package -o "${{ steps.meta.outputs.vsix_run_path }}"
@@ -50,14 +80,18 @@ jobs:
 
       - name: Create GitHub release
         if: github.ref_type == 'tag'
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "ArchSync ${{ steps.meta.outputs.version }}" \
+              --notes-file "${{ steps.meta.outputs.notes_run_path }}"
+          else
             gh release create "${GITHUB_REF_NAME}" \
               --title "ArchSync ${{ steps.meta.outputs.version }}" \
-              --generate-notes
+              --notes-file "${{ steps.meta.outputs.notes_run_path }}"
+          fi
           gh release upload "${GITHUB_REF_NAME}" "${{ steps.meta.outputs.vsix_run_path }}" --clobber
 
       - name: Publish to Open VSX
