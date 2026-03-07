@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.14 - 2026-03-07
+- Replaced third-party GitHub release/publish actions with CLI-based publishing steps so the release workflow can run under stricter GitHub Actions policies.
+
 ## 0.0.13 - 2026-03-07
 - Switched the public extension identity from `local.archsync` to `rdshr.archsync` for registry publishing.
 - Added release automation for GitHub Releases plus optional Open VSX / VS Marketplace publishing on `archsync-v*` tags.

@@ -49,25 +49,23 @@ jobs:
 
       - name: Create GitHub release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: ${{ steps.meta.outputs.vsix }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "ArchSync ${{ steps.meta.outputs.version }}" \
+              --generate-notes
+          gh release upload "${GITHUB_REF_NAME}" "${{ steps.meta.outputs.vsix }}" --clobber
 
       - name: Publish to Open VSX
         if: github.ref_type == 'tag' && secrets.OPEN_VSX_TOKEN != ''
-        uses: HaaLeo/publish-vscode-extension@v2
-        with:
-          pat: ${{ secrets.OPEN_VSX_TOKEN }}
-          extensionFile: ${{ steps.meta.outputs.vsix }}
-          skipDuplicate: true
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: npx --yes ovsx publish "${{ steps.meta.outputs.vsix }}" -p "${OPEN_VSX_TOKEN}"
 
       - name: Publish to VS Marketplace
         if: github.ref_type == 'tag' && secrets.VS_MARKETPLACE_TOKEN != ''
-        uses: HaaLeo/publish-vscode-extension@v2
-        with:
-          pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
-          extensionFile: ${{ steps.meta.outputs.vsix }}
-          registryUrl: https://marketplace.visualstudio.com
-          skipDuplicate: true
+        env:
+          VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: npx --yes @vscode/vsce publish --packagePath "${{ steps.meta.outputs.vsix }}"
