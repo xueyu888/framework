@@ -1,0 +1,127 @@
+[project]
+project_id = "knowledge_base_basic"
+template = "knowledge_base_workbench"
+display_name = "Knowledge Base Basic"
+description = "A project-instantiated knowledge-base workbench generated from framework standards plus fixed project configuration."
+version = "0.1.0"
+
+[framework_refs]
+frontend = "framework/frontend/L2-M0-前端框架标准模块.md"
+workspace = "framework/knowledge_base/L2-M0-知识库工作台场景模块.md"
+backend = "framework/backend/L2-M0-知识库接口框架标准模块.md"
+
+[composition_profile]
+surface = "single_page_workbench"
+detail_flow = "read_panel"
+write_flow = "compose_panel"
+supports_edit = true
+supports_draft = true
+
+[boundary_values.routes]
+home = "/"
+workbench = "/knowledge-base"
+api_prefix = "/api/knowledge"
+workspace_flow = "/api/knowledge/workspace-flow"
+
+[boundary_values.frontend]
+page_title = "Knowledge Base Workbench"
+hero_kicker = "Framework-driven knowledge base"
+hero_title = "Knowledge Base Workbench"
+hero_copy = "One page, three flows: retrieval, reading, and create-or-edit writing. The surface is instantiated from a project file while preserving one stable contract."
+contract_title = "Workbench Contract"
+contract_value = "List + Detail + Compose"
+contract_meta = "Search and filter on the left, reading in the middle, create or edit on the right."
+boundary_title = "Project Boundary"
+boundary_meta = "Routes, article constraints, draft policy, and API shape are all fixed by the project instance."
+search_title = "Search"
+read_title = "Read"
+compose_title = "Compose"
+query_button_label = "Query"
+reset_button_label = "Reset"
+save_draft_label = "Save Draft"
+publish_label = "Publish"
+clear_label = "Clear"
+edit_label = "Edit in Compose"
+keyword_placeholder = "Search title, summary, or body"
+title_placeholder = "Write a focused title"
+summary_placeholder = "Capture the problem and the conclusion"
+body_placeholder = "Write the reusable explanation or procedure"
+tags_placeholder = "comma,separated,tags"
+list_empty_title = "No results"
+list_empty_description = "Adjust filters or create a new article."
+list_error_title = "List unavailable"
+list_error_description = "The article list could not be loaded."
+detail_empty_title = "Knowledge detail will appear here."
+detail_empty_description = "Choose a result card to inspect title, metadata, body, and related articles."
+detail_no_selection_title = "Nothing selected"
+detail_no_selection_description = "The current query returned no readable article."
+
+[constraint_profile.backend]
+default_page_size = 10
+max_page_size = 20
+max_tags_per_article = 6
+min_title_length = 3
+max_title_length = 120
+min_summary_length = 10
+max_summary_length = 240
+min_body_length = 30
+max_body_length = 5000
+allowed_statuses = ["draft", "published"]
+
+[[scenes]]
+scene_id = "browse"
+title = "Browse"
+steps = ["open workspace", "apply filters", "scan list", "select article"]
+entry_path = "/knowledge-base"
+return_path = "/knowledge-base"
+
+[[scenes]]
+scene_id = "read"
+title = "Read"
+steps = ["load detail", "inspect related articles", "return to list"]
+entry_path = "/knowledge-base?focus=detail&slug=framework-language-for-ai-coding"
+return_path = "/knowledge-base"
+
+[[scenes]]
+scene_id = "write"
+title = "Write"
+steps = ["open compose panel", "fill title and summary", "save draft or publish"]
+entry_path = "/knowledge-base?mode=create"
+return_path = "/knowledge-base"
+
+[[scenes]]
+scene_id = "edit"
+title = "Edit"
+steps = ["open existing article", "load detail into compose panel", "update draft or publish changes"]
+entry_path = "/knowledge-base?mode=edit&slug=framework-language-for-ai-coding"
+return_path = "/knowledge-base"
+
+[[seed_articles]]
+slug = "framework-language-for-ai-coding"
+title = "Framework language for AI coding"
+summary = "Describe structure-first prompts so the model can derive page, API, and verification code from one contract."
+body = "Use one stable workbench contract. The frontend asks for keyword, tag, status, list results, detail payload, and write feedback. The backend returns one consistent surface for all of them."
+tags = ["framework", "ai", "coding"]
+status = "published"
+updated_at = "2026-03-07"
+related_slugs = ["knowledge-workbench-contracts"]
+
+[[seed_articles]]
+slug = "knowledge-workbench-contracts"
+title = "Knowledge workbench contracts"
+summary = "Keep browse, read, and write flows on one page while preserving explicit loading, empty, and error states."
+body = "A workbench contract is useful when the list, detail, and compose regions all share one explicit state machine. Search changes refresh the list, selection refreshes detail, and write actions publish feedback."
+tags = ["knowledge-base", "frontend", "contracts"]
+status = "published"
+updated_at = "2026-03-06"
+related_slugs = ["framework-language-for-ai-coding"]
+
+[[seed_articles]]
+slug = "drafting-verification-notes"
+title = "Drafting verification notes"
+summary = "Record how boundary, base, and combination checks map to implementation evidence before publishing."
+body = "The draft path matters because not every knowledge note is ready to publish. A stable API should allow draft writes, explicit publish states, and traceable validation errors."
+tags = ["verification", "draft", "backend"]
+status = "draft"
+updated_at = "2026-03-05"
+related_slugs = []

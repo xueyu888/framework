@@ -5,10 +5,13 @@ description = "Logic-consistent shelf framework with executable Python reference
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.135.1",
+    "httpx>=0.28.1",
     "matplotlib>=3.10.8",
     "mypy>=1.19.1",
     "plotly>=6.5.2",
     "pyqt6>=6.10.2",
+    "uvicorn>=0.41.0",
 ]
 
 [tool.uv]
@@ -25,5 +28,6 @@ show_error_codes = true
 
 [dependency-groups]
 dev = [
+    "playwright>=1.58.0",
     "pytest>=9.0.2",
 ]

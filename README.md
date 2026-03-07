@@ -7,7 +7,10 @@
 - 框架设计核心标准：`specs/框架设计核心标准.md`
 - 代码规范目录：`specs/code/`
 - 领域标准（置物架 L0-L2）：`framework/shelf/Lx-M0-*.md`
-- 领域标准（前端 L0-L7）：`framework/frontend/Lx-M0-*.md`
+- 领域标准（前端通用框架 L0-L6）：`framework/frontend/Lx-Mn-*.md`
+- 领域标准（知识库领域框架 L0-L2）：`framework/knowledge_base/Lx-Mn-*.md`
+- 领域标准（知识库接口 L0-L2）：`framework/backend/Lx-M0-*.md`
+- 项目实例层：`projects/<project_id>/project.toml`
 - 工程执行规范：`AGENTS.md`
 
 ## 映射与验证
@@ -60,6 +63,32 @@ bash tools/vscode/archsync/install_local.sh
 uv sync
 uv run python src/main.py
 ```
+
+## 项目实例
+- 实例层说明：`projects/README.md`
+- 当前样板：`projects/knowledge_base_basic/project.toml`
+- 运行时工厂：`src/project_runtime/`
+
+## 知识库 Demo
+基于 `framework/frontend`、`framework/knowledge_base` 与 `framework/backend` 的第一个“项目实例配置驱动”样板位于：
+- 项目配置：`projects/knowledge_base_basic/project.toml`
+- 实现代码：`src/knowledge_base_demo/`
+
+按默认项目实例启动：
+```bash
+uv run uvicorn --app-dir src project_runtime.app_factory:app --reload
+```
+
+切换项目文件启动：
+```bash
+SHELF_PROJECT_FILE=projects/knowledge_base_basic/project.toml \
+uv run uvicorn --app-dir src project_runtime.app_factory:app --reload
+```
+
+入口：
+- 页面：`http://127.0.0.1:8000/knowledge-base`
+- 工作台场景验证：`http://127.0.0.1:8000/api/knowledge/workspace-flow`
+- 接口：`http://127.0.0.1:8000/api/knowledge/articles`
 
 ## 看图（总入口）
 - 框架标准树结构图（来自 `framework/<module>/Lx-Mn-*.md`）：

@@ -16,6 +16,8 @@ node_modules/
 *.swp
 *.swo
 .DS_Store
+.env
+.env.*
 
 # Codex workspace
 .codex/**
