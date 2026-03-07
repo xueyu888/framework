@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.0.12 - 2026-03-07
+- Added an experimental rainbow-arch Activity Bar icon direction and kept the previous tomoe glyph as an explicit rollback snapshot.
+
+## 0.0.11 - 2026-03-07
+- Reduced the outer ring thickness again while keeping the enlarged custom glyph pipeline unchanged.
+
+## 0.0.10 - 2026-03-07
+- Thinned the ArchSync glyph geometry while keeping the larger GitLens-style product icon pipeline, reducing the heavy ring and inner tomoe weight.
+
+## 0.0.9 - 2026-03-07
+- Switched the Activity Bar icon from raw SVG path loading to a custom product icon glyph, matching GitLens-style rendering behavior more closely.
+- Bumped the packaged extension version to force icon cache refresh on reinstall.
+
+## 0.0.8 - 2026-03-06
+- Refined the Activity Bar icon to a cleaner infinity-loop silhouette closer to the intended ribbon form.
+- Changed module-node source jumps to open module headers, while growth edges keep precise `B*` source lines.
+- Framework tree generation now aborts on warnings instead of emitting partial-success graphs.
+- Documented remote type-check parity with local validation expectations.
+
 ## 0.0.7 - 2026-03-06
 - Removed the last validator-side legacy `@layer/@base/@compose` compatibility path; framework docs now validate against one rule set only.
 - Added packaged `LICENSE.txt` so VSIX publishing no longer depends on an implicit repository license.

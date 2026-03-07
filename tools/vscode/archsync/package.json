@@ -2,7 +2,7 @@
   "name": "archsync",
   "displayName": "ArchSync",
   "description": "ArchSync: framework tree webview + strict mapping validation guard.",
-  "version": "0.0.7",
+  "version": "0.0.12",
   "publisher": "local",
   "license": "UNLICENSED",
   "repository": {
@@ -57,12 +57,21 @@
         "title": "ArchSync: Refresh Framework Tree"
       }
     ],
+    "icons": {
+      "archsync-logo": {
+        "description": "ArchSync Activity Bar icon",
+        "default": {
+          "fontPath": "media/archsync-icons.woff2",
+          "fontCharacter": "\\ea01"
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
           "id": "archSyncSidebar",
           "title": "ArchSync",
-          "icon": "media/archsync.svg"
+          "icon": "$(archsync-logo)"
         }
       ]
     },

@@ -27,7 +27,9 @@
 3. Open the repository in the launched host window.
 
 ## Sidebar Icon
-- Activity Bar icon uses `media/archsync.svg` (Möbius ring geometry).
+- Activity Bar icon uses custom product icon glyph `$(archsync-logo)` from `media/archsync-icons.woff2`.
+- Current source mark lives in `media/archsync.svg`.
+- Explicit rollback snapshot for the previous tomoe build is `media/archsync-backup-0.0.11-tomoe-triad.svg`.
 
 ## Commands
 - `ArchSync: Open Framework Tree`
@@ -81,5 +83,6 @@ Tree generation behavior:
 - In file-level mode, growth edges are parsed from base lines that directly reference upstream modules, for example:
   - ``- `B3` ...：L0.M0[R2,R3] + L0.M1[R2,R3]。来源：`...`。``
 - Growth edges only allow adjacent layers (`Lx-1 -> Lx`).
-- Strict validator rejects missing or invalid inline upstream refs for non-`L0` modules; if generator runs standalone on invalid docs, it warns and skips the affected growth edges.
-- Each node carries `source_file` and `source_line` metadata for line-level jump.
+- Strict validator rejects missing or invalid inline upstream refs for non-`L0` modules; standalone tree generation now aborts on warnings instead of silently skipping invalid growth edges.
+- Module nodes jump to the module header; growth edges keep their source `B*` line for precise trace-back.
+- Each node and growth edge carries `source_file` and `source_line` metadata for line-level jump.
