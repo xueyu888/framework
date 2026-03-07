@@ -61,7 +61,9 @@ FRAMEWORK_BASE_ITEM_LINE_PATTERN = re.compile(
 FRAMEWORK_SOURCE_EXPR_PATTERN = re.compile(r"来源[：:]\s*`([^`]+)`")
 FRAMEWORK_LEGACY_UPSTREAM_CLAUSE_PATTERN = re.compile(r"上游模块[：:]")
 FRAMEWORK_SOURCE_TOKEN_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:\.[0-9]+)?")
-FRAMEWORK_INLINE_UPSTREAM_TERM_PATTERN = re.compile(r"^L(\d+)\.M(\d+)(?:\[(.*?)\])?$")
+FRAMEWORK_INLINE_UPSTREAM_TERM_PATTERN = re.compile(
+    r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.M(?P<module>\d+)(?:\[(?P<rules>.*?)\])?$"
+)
 FRAMEWORK_RULE_ID_PATTERN = re.compile(r"^R\d+(?:\.\d+)?$")
 FRAMEWORK_RULE_TOP_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(R\d+)`\s*(.*)$")
 FRAMEWORK_RULE_CHILD_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(R\d+\.\d+)`\s*(.*)$")
@@ -261,8 +263,8 @@ def extract_framework_base_inline_expr(base_line: str) -> str:
     return expr_tail.strip().rstrip("。.;；")
 
 
-def parse_framework_base_inline_refs(expr: str) -> list[tuple[int, int, str]]:
-    refs: list[tuple[int, int, str]] = []
+def parse_framework_base_inline_refs(expr: str) -> list[tuple[str | None, int, int, str]]:
+    refs: list[tuple[str | None, int, int, str]] = []
     for part in expr.split("+"):
         term = part.strip()
         if not term:
@@ -270,7 +272,15 @@ def parse_framework_base_inline_refs(expr: str) -> list[tuple[int, int, str]]:
         match = FRAMEWORK_INLINE_UPSTREAM_TERM_PATTERN.fullmatch(term)
         if match is None:
             return []
-        refs.append((int(match.group(1)), int(match.group(2)), (match.group(3) or "").strip()))
+        framework_name = match.group("framework")
+        refs.append(
+            (
+                framework_name.strip() if framework_name else None,
+                int(match.group("level")),
+                int(match.group("module")),
+                (match.group("rules") or "").strip(),
+            )
+        )
     return refs
 
 
@@ -525,18 +535,65 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         code="FW023",
                     )
                 )
-            if level_num == 0 and inline_refs:
+            local_inline_refs: list[tuple[int, int, str]] = []
+            external_inline_refs: list[tuple[str, int, int, str]] = []
+            for ref_framework, ref_level, ref_module_num, ref_rules in inline_refs:
+                normalized_framework = ref_framework or module_name
+                if normalized_framework == module_name:
+                    local_inline_refs.append((ref_level, ref_module_num, ref_rules))
+                else:
+                    external_inline_refs.append(
+                        (
+                            normalized_framework,
+                            ref_level,
+                            ref_module_num,
+                            ref_rules,
+                        )
+                    )
+
+            if level_num == 0 and local_inline_refs:
                 issues.append(
                     make_issue(
                         (
-                            f"{base_id} in L0 cannot reference upstream modules; "
-                            "L0 bases must be self-contained structural definitions"
+                            f"{base_id} in L0 cannot reference local upstream modules; "
+                            "L0 bases must be self-contained inside current framework"
                         ),
                         rel_file,
                         base_line_num,
                         code="FW026",
                     )
                 )
+
+            if external_inline_refs:
+                for ext_framework, ref_level, ref_module_num, _ in external_inline_refs:
+                    if ref_level not in {0, 1}:
+                        issues.append(
+                            make_issue(
+                                (
+                                    f"{base_id} external foundation ref must target another framework "
+                                    f"L0 or L1 module: {ext_framework}.L{ref_level}.M{ref_module_num}"
+                                ),
+                                rel_file,
+                                base_line_num,
+                                code="FW027",
+                            )
+                        )
+                        continue
+
+                    available_external_ids = module_level_module_ids.get(ext_framework, {}).get(ref_level, set())
+                    if ref_module_num not in available_external_ids:
+                        issues.append(
+                            make_issue(
+                                (
+                                    f"{base_id} external foundation ref points to missing framework module: "
+                                    f"{ext_framework}.L{ref_level}.M{ref_module_num}"
+                                ),
+                                rel_file,
+                                base_line_num,
+                                code="FW028",
+                            )
+                        )
+
             if level_num > 0:
                 if not inline_expr:
                     issues.append(
@@ -555,7 +612,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         make_issue(
                             (
                                 f"{base_id} inline upstream module expression is invalid: {inline_expr}; "
-                                "expected Lx.My[...] terms joined by '+'"
+                                "expected Lx.My[...] or framework.Lx.My[...] terms joined by '+'"
                             ),
                             rel_file,
                             base_line_num,
@@ -563,7 +620,19 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         )
                     )
                 else:
-                    for ref_level, ref_module_num, _ in inline_refs:
+                    if not local_inline_refs:
+                        issues.append(
+                            make_issue(
+                                (
+                                    f"{base_id} must include at least one adjacent lower-layer local ref "
+                                    "inside current framework before using external foundation refs"
+                                ),
+                                rel_file,
+                                base_line_num,
+                                code="FW024",
+                            )
+                        )
+                    for ref_level, ref_module_num, _ in local_inline_refs:
                         if ref_level != level_num - 1:
                             issues.append(
                                 make_issue(

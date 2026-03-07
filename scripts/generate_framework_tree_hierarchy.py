@@ -16,7 +16,9 @@ DEFAULT_OUTPUT_HTML = REPO_ROOT / "docs/hierarchy/shelf_framework_tree.html"
 LEVEL_PATTERN = re.compile(r"^L(\d+)$")
 FRAMEWORK_FILE_LEVEL_MODULE_PATTERN = re.compile(r"^L(\d+)-M(\d+)-[^/]+\.md$")
 FRAMEWORK_BASE_ITEM_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(B(\d+))`\s*(.*)$")
-FRAMEWORK_UPSTREAM_TERM_PATTERN = re.compile(r"^(L\d+\.[A-Za-z][A-Za-z0-9_-]*)(?:\[(.*?)\])?$")
+FRAMEWORK_UPSTREAM_TERM_PATTERN = re.compile(
+    r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?(?P<ref>L\d+\.M\d+)(?:\[(?P<rules>.*?)\])?$"
+)
 
 
 def parse_level(level_value: Any, *, node_id: str) -> int:
@@ -226,7 +228,10 @@ def parse_upstream_expr(expr: str) -> list[tuple[str, str]]:
         term_match = FRAMEWORK_UPSTREAM_TERM_PATTERN.fullmatch(term)
         if term_match is None:
             continue
-        refs.append((term_match.group(1), (term_match.group(2) or "").strip()))
+        framework_name = term_match.group("framework")
+        ref = term_match.group("ref")
+        qualified_ref = f"{framework_name}.{ref}" if framework_name else ref
+        refs.append((qualified_ref, (term_match.group("rules") or "").strip()))
     return refs
 
 
@@ -409,24 +414,38 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
             )
             continue
 
-        if level_num == 0:
-            continue
-
         if explicit_upstream_refs:
             for source_ref, source_rules in explicit_upstream_refs:
-                source_match = re.fullmatch(r"L(\d+)\.([A-Za-z][A-Za-z0-9_-]*)", source_ref)
+                source_match = re.fullmatch(
+                    r"(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.(?P<module>M\d+)",
+                    source_ref,
+                )
                 if source_match is None:
                     continue
-                source_level = int(source_match.group(1))
-                if source_level + 1 != level_num:
+                source_framework = source_match.group("framework") or module_name
+                source_level = int(source_match.group("level"))
+                source_module = source_match.group("module")
+                source_ref_local = f"L{source_level}.{source_module}"
+                qualified_lookup = f"{source_framework}:{source_ref_local}"
+
+                if source_framework == module_name and source_level + 1 != level_num:
                     add_warning(
                         (
-                            f"{source_file}:{source_line}: cross-level upstream ref ignored "
+                            f"{source_file}:{source_line}: cross-level local upstream ref ignored "
                             f"({source_ref} -> {target_ref}); expected L{level_num - 1}.*"
                         )
                     )
                     continue
-                source_node_id = module_node_id_by_qualified_ref.get(f"{module_name}:{source_ref}")
+                if source_framework != module_name and source_level not in {0, 1}:
+                    add_warning(
+                        (
+                            f"{source_file}:{source_line}: external foundation ref ignored "
+                            f"({source_ref} -> {target_ref}); expected another framework L0/L1 module"
+                        )
+                    )
+                    continue
+
+                source_node_id = module_node_id_by_qualified_ref.get(qualified_lookup)
                 if source_node_id is None:
                     add_warning(
                         (
@@ -456,6 +475,9 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
                     edge_bucket["terms"].add(f"{source_ref}[{source_rules}]")
                 else:
                     edge_bucket["terms"].add(source_ref)
+            continue
+
+        if level_num == 0:
             continue
 
         add_warning(
@@ -493,7 +515,8 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
     description = (
         "从 framework/<module>/Lx-Mn-*.md 自动生成；"
         "模块级节点为文件级 M 编号（Lx.Mn），边来自基中显式上游模块引用；"
-        "仅允许相邻层级连接（Lx-1 -> Lx），禁止跨级可见。"
+        "本框架内部仅允许相邻层级连接（Lx-1 -> Lx），"
+        "领域 L0 允许显式引用其它框架的 L0/L1 基础结构。"
     )
     if warnings:
         description = f"{description} 警告数量={len(warnings)}。"

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "updated_at": "2026-03-06",
+    "updated_at": "2026-03-07",
     "l3_sync_notes": [
       {
         "id": "SYNC-20260305-runtime-env-l0",
@@ -37,6 +37,10 @@
       {
         "id": "SYNC-20260306-code-standards-folder",
         "note": "Move Python implementation quality rules out of core framework standard into specs/code/ so code conventions can expand by language without mixing into framework design core."
+      },
+      {
+        "id": "SYNC-20260307-knowledge-base-ai-coding",
+        "note": "Refactor the AI-coding sample into a structure-first stack: generic frontend structures, knowledge-base domain structures, backend knowledge contracts, and a project-instantiated knowledge_base_demo bound to the L2 framework standards."
       }
     ]
   },
@@ -99,6 +103,13 @@
                 "children": []
               },
               {
+                "id": "NODE-L2-BACKEND",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
+                "children": []
+              },
+              {
                 "id": "NODE-L2-FRONTEND",
                 "kind": "file",
                 "level": "L2",
@@ -106,10 +117,10 @@
                 "children": []
               },
               {
-                "id": "NODE-L2-FRONTEND-LOGIN",
+                "id": "NODE-L2-KNOWLEDGE-BASE",
                 "kind": "file",
                 "level": "L2",
-                "file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+                "file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
                 "children": []
               },
               {
@@ -378,8 +389,8 @@
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class Capability"
+          "file": "src/knowledge_base_demo/frontend.py",
+          "symbol": "KNOWLEDGE_BASE_FRONTEND_CAPABILITIES = ("
         }
       ]
     },
@@ -393,12 +404,8 @@
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class BoundaryDefinition"
-        },
-        {
-          "file": "src/framework_core.py",
-          "symbol": "class BoundaryItem"
+          "file": "src/knowledge_base_demo/frontend.py",
+          "symbol": "KNOWLEDGE_BASE_FRONTEND_BOUNDARY = BoundaryDefinition("
         }
       ]
     },
@@ -412,8 +419,8 @@
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class Base"
+          "file": "src/knowledge_base_demo/frontend.py",
+          "symbol": "KNOWLEDGE_BASE_FRONTEND_BASES = ("
         }
       ]
     },
@@ -427,12 +434,8 @@
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class CombinationRules"
-        },
-        {
-          "file": "src/framework_core.py",
-          "symbol": "class Rule"
+          "file": "src/knowledge_base_demo/frontend.py",
+          "symbol": "def compose_knowledge_base_page("
         }
       ]
     },
@@ -446,107 +449,158 @@
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class VerificationInput"
-        },
-        {
-          "file": "src/framework_core.py",
-          "symbol": "class VerificationResult"
-        },
-        {
-          "file": "src/framework_core.py",
-          "symbol": "def verify("
+          "file": "src/knowledge_base_demo/frontend.py",
+          "symbol": "def verify_knowledge_base_frontend("
         }
       ]
     },
     {
-      "id": "MAP-FRONTEND-LOGIN-CAPABILITY",
+      "id": "MAP-KNOWLEDGE-BASE-CAPABILITY",
       "l0_file": "specs/规范总纲与树形结构.md",
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 1. 能力声明（Capability Statement）",
-      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class Capability"
+          "file": "src/knowledge_base_demo/workspace.py",
+          "symbol": "KNOWLEDGE_BASE_WORKSPACE_CAPABILITIES = ("
         }
       ]
     },
     {
-      "id": "MAP-FRONTEND-LOGIN-B",
+      "id": "MAP-KNOWLEDGE-BASE-B",
       "l0_file": "specs/规范总纲与树形结构.md",
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 2. 边界定义（Boundary）",
-      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class BoundaryDefinition"
-        },
-        {
-          "file": "src/framework_core.py",
-          "symbol": "class BoundaryItem"
+          "file": "src/knowledge_base_demo/workspace.py",
+          "symbol": "KNOWLEDGE_BASE_WORKSPACE_BOUNDARY = BoundaryDefinition("
         }
       ]
     },
     {
-      "id": "MAP-FRONTEND-LOGIN-BASE",
+      "id": "MAP-KNOWLEDGE-BASE-BASE",
       "l0_file": "specs/规范总纲与树形结构.md",
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 3. 最小可行基（Bases）",
-      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class Base"
+          "file": "src/knowledge_base_demo/workspace.py",
+          "symbol": "KNOWLEDGE_BASE_WORKSPACE_BASES = ("
         }
       ]
     },
     {
-      "id": "MAP-FRONTEND-LOGIN-COMBINATION",
+      "id": "MAP-KNOWLEDGE-BASE-COMBINATION",
       "l0_file": "specs/规范总纲与树形结构.md",
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 4. 组合原则（Combination Principles）",
-      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class CombinationRules"
-        },
-        {
-          "file": "src/framework_core.py",
-          "symbol": "class Rule"
+          "file": "src/knowledge_base_demo/workspace.py",
+          "symbol": "def compose_workspace_flow("
         }
       ]
     },
     {
-      "id": "MAP-FRONTEND-LOGIN-V",
+      "id": "MAP-KNOWLEDGE-BASE-V",
       "l0_file": "specs/规范总纲与树形结构.md",
       "l0_anchor": "## 2. 标准树（强制）",
       "l1_file": "specs/框架设计核心标准.md",
       "l1_anchor": "## 5. 验证（Verification）",
-      "l2_file": "framework/frontend_login/L2-M0-登录业务流程场景模块.md",
+      "l2_file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class VerificationInput"
-        },
+          "file": "src/knowledge_base_demo/workspace.py",
+          "symbol": "def verify_workspace_flow("
+        }
+      ]
+    },
+    {
+      "id": "MAP-BACKEND-CAPABILITY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 能力声明（Capability Statement）",
+      "l2_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "class VerificationResult"
-        },
+          "file": "src/knowledge_base_demo/backend.py",
+          "symbol": "KNOWLEDGE_BASE_API_CAPABILITIES = ("
+        }
+      ]
+    },
+    {
+      "id": "MAP-BACKEND-B",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
         {
-          "file": "src/framework_core.py",
-          "symbol": "def verify("
+          "file": "src/knowledge_base_demo/backend.py",
+          "symbol": "KNOWLEDGE_BASE_API_BOUNDARY = BoundaryDefinition("
+        }
+      ]
+    },
+    {
+      "id": "MAP-BACKEND-BASE",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/knowledge_base_demo/backend.py",
+          "symbol": "KNOWLEDGE_BASE_API_BASES = ("
+        }
+      ]
+    },
+    {
+      "id": "MAP-BACKEND-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/knowledge_base_demo/backend.py",
+          "symbol": "def build_knowledge_base_router("
+        }
+      ]
+    },
+    {
+      "id": "MAP-BACKEND-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/knowledge_base_demo/backend.py",
+          "symbol": "def verify_knowledge_base_backend("
         }
       ]
     }
