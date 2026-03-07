@@ -2,6 +2,7 @@ const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const vscode = require("vscode");
+const frameworkNavigation = require("./framework_navigation");
 
 const WATCH_PREFIXES = ["framework/", "specs/", "mapping/", "src/", "docs/"];
 const WATCH_FILES = new Set([
@@ -374,6 +375,39 @@ function activate(context) {
     }
   );
 
+  const frameworkDefinitionDisposable = vscode.languages.registerDefinitionProvider(
+    { language: "markdown", scheme: "file" },
+    {
+      provideDefinition(document, position) {
+        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+        if (!folder) {
+          return null;
+        }
+
+        const repoRoot = folder.uri.fsPath;
+        if (!frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)) {
+          return null;
+        }
+
+        const target = frameworkNavigation.resolveDefinitionTarget({
+          repoRoot,
+          filePath: document.uri.fsPath,
+          text: document.getText(),
+          line: position.line,
+          character: position.character,
+        });
+        if (!target) {
+          return null;
+        }
+
+        const targetUri = vscode.Uri.file(target.filePath);
+        const start = new vscode.Position(target.line, target.character);
+        const end = new vscode.Position(target.line, target.character + Math.max(1, target.length || 1));
+        return new vscode.Location(targetUri, new vscode.Range(start, end));
+      }
+    }
+  );
+
   const validateNowDisposable = vscode.commands.registerCommand("archSync.validateNow", async () => {
     scheduleValidation({ mode: "full", triggerUri: null, notifyOnFail: true, source: "manual" });
   });
@@ -544,6 +578,7 @@ function activate(context) {
 
   context.subscriptions.push(
     sidebarViewDisposable,
+    frameworkDefinitionDisposable,
     validateNowDisposable,
     showIssuesDisposable,
     openFrameworkTreeDisposable,

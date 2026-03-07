@@ -6,6 +6,7 @@
 - Opens framework tree structure HTML in Webview (`docs/hierarchy/shelf_framework_tree.html`).
 - Refreshes framework tree artifacts by running the generator script.
 - Supports node-to-source jump: click a node, then use `打开源文件` in detail panel to jump to the mapped markdown line.
+- Supports `Go to Definition` / `Ctrl/Cmd+Click` inside framework markdown for `B/C/R/V`, boundary ids, `Lx.My`, `framework.Lx.My`, and bracketed module-rule refs like `frontend.L1.M4[R1,R3]`.
 - Runs strict mapping validation automatically on startup.
 - Runs strict mapping validation on save/create/rename/delete for relevant files.
 - Runs strict mapping validation when watched files change outside VSCode and when window regains focus.

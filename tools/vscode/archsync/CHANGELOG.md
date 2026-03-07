@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.20 - 2026-03-07
+- Added framework-markdown `Go to Definition` navigation for local `B/C/R/V` ids, boundary ids, module refs such as `L1.M0` / `frontend.L1.M4`, and rule refs inside module brackets like `frontend.L1.M4[R1,R3]`.
+
 ## 0.0.19 - 2026-03-07
 - Updated packaged guidance and snippets for the deeper frontend common-structure split: frontend `L0` now represents common structure atoms, while domain `L0` examples point to concrete frontend `L1` component atoms such as `frontend.L1.M0[...]`.
 - Synced the published docs with the new structure chain: frontend common structures -> frontend component atoms -> frontend standard -> domain atoms.
