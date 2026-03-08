@@ -271,7 +271,7 @@
         "order": 3,
         "description": "module=frontend | level=L2 | node=L2.M0 | file=framework/frontend/L2-M0-前端框架标准模块.md | title=L2-M0-前端框架标准模块",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "id": "NODE-FW-0030",
@@ -1223,7 +1223,7 @@
         "rules": "R1,R3 | R2,R3",
         "terms": "L1.M0[R1,R3] + L1.M0[R2,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0024",
@@ -1265,7 +1265,7 @@
         "rules": "R1,R3",
         "terms": "L1.M1[R1,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0025",
@@ -1293,7 +1293,7 @@
         "rules": "R1,R3",
         "terms": "L1.M2[R1,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0018",
@@ -1307,7 +1307,7 @@
         "rules": "R1,R3",
         "terms": "L1.M3[R1,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0019",
@@ -1321,7 +1321,7 @@
         "rules": "R1,R3",
         "terms": "L1.M4[R1,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0020",
@@ -1335,7 +1335,7 @@
         "rules": "R1,R3 | R2,R3",
         "terms": "L1.M5[R1,R3] + L1.M5[R2,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0021",
@@ -1349,7 +1349,7 @@
         "rules": "R1,R3",
         "terms": "L1.M6[R1,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0022",
@@ -1363,7 +1363,7 @@
         "rules": "R1,R3",
         "terms": "L1.M7[R1,R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0023",
@@ -1377,7 +1377,7 @@
         "rules": "R1,R2 | R2,R3 | R3",
         "terms": "L1.M8[R1,R2] + L1.M8[R2,R3] + L1.M8[R3]",
         "source_file": "framework/frontend/L2-M0-前端框架标准模块.md",
-        "source_line": 25
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0029",
