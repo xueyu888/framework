@@ -104,6 +104,7 @@ Tree generation behavior:
 - Legacy `Lx-*.md` (without `-Mn`) files are ignored.
 - Preferred derivation: file-level module mode (`Lx-Mn-*.md` -> node `Lx.Mn`).
 - Framework-source trees use `framework columns` layout: each framework directory is rendered as its own group, and each group keeps its own local `L0/L1/L2...` bands.
+- Each framework group can now be collapsed / expanded from its header, dragged as one box inside the graph, and restored to the default compact dependency-aware layout with `恢复布局`.
 - In file-level mode, growth edges are parsed from base lines that directly reference upstream modules, for example:
   - ``- `B3` ...：L0.M0[R2,R3] + L0.M1[R2,R3]。来源：`...`。``
 - Framework root modules may also declare explicit external refs, for example:

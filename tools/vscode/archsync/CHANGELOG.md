@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.0.31 - 2026-03-08
+- Added framework-group box controls to the generated framework-tree page. Each framework panel can now be collapsed or expanded from its header, dragged as one unit inside the graph, and restored to the default compact layout with `恢复布局`.
+- Fixed the framework-group interaction layer so dragging no longer depends on fragile transparent title hit zones. The generated graph now uses explicit framework drag handles and preserves node hover / click behavior while groups move.
+- Documented the new framework-group interaction model in the packaged ArchSync README so the published extension guidance matches the current tree UX.
+
 ## 0.0.30 - 2026-03-08
 - Reworked the framework-tree layout for framework sources from one global `L0/L1/L2` swimlane into per-framework grouped columns. Each `framework/<module>/` now renders as its own column group, and group ordering follows the cross-framework reference graph.
 - Shifted strict framework validation to a references-first model: local inline refs must point downward within the same framework, external refs must resolve to real modules, and the full inline-ref graph is now checked for cycles via `FW029`.
