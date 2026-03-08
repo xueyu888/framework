@@ -479,6 +479,53 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       border-bottom: 1px solid var(--border);
     }
 
+    .graph-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .zoom-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .zoom-btn {
+      width: auto;
+      min-width: 36px;
+      min-height: 28px;
+      padding: 0 10px;
+      text-align: center;
+      border-radius: 999px;
+    }
+
+    .zoom-indicator {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 58px;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card-muted);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .graph-hint {
+      color: var(--sub);
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: nowrap;
+    }
+
     .graph-scroll {
       overflow: auto;
       max-height: min(76vh, 980px);
@@ -902,6 +949,16 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
         <span class=\"pill\">点击节点查看直连上游/下游关系</span>
       </div>
       <div class=\"graph-shell\">
+        <div class=\"graph-toolbar\">
+          <div class=\"zoom-controls\">
+            <button type=\"button\" class=\"zoom-btn\" data-zoom=\"out\" aria-label=\"缩小\">-</button>
+            <button type=\"button\" class=\"zoom-btn\" data-zoom=\"reset\">100%</button>
+            <button type=\"button\" class=\"zoom-btn\" data-zoom=\"fit\">适配</button>
+            <button type=\"button\" class=\"zoom-btn\" data-zoom=\"in\" aria-label=\"放大\">+</button>
+            <span class=\"zoom-indicator\" id=\"zoomIndicator\">100%</span>
+          </div>
+          <span class=\"graph-hint\">Ctrl/⌘ + 滚轮缩放</span>
+        </div>
         <div class=\"graph-scroll\">
           <div class=\"graph-stage\">
             <svg id=\"graphSvg\" role=\"img\" aria-label=\"M hierarchy graph\"></svg>
@@ -935,15 +992,25 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : null;
 
     const svg = document.getElementById("graphSvg");
+    const graphScrollEl = document.querySelector(".graph-scroll");
     const titleEl = document.getElementById("title");
     const descriptionEl = document.getElementById("description");
     const summaryNodesEl = document.getElementById("summaryNodes");
     const summaryEdgesEl = document.getElementById("summaryEdges");
     const summaryFanEl = document.getElementById("summaryFan");
     const toggleLabelsEl = document.getElementById("toggleLabels");
+    const zoomIndicatorEl = document.getElementById("zoomIndicator");
     const levelStatsEl = document.getElementById("levelStats");
     const relationStatsEl = document.getElementById("relationStats");
     const detailBoxEl = document.getElementById("detailBox");
+    const zoomButtons = Array.from(document.querySelectorAll("[data-zoom]"));
+
+    const BASE_WIDTH = graphData.width;
+    const BASE_HEIGHT = graphData.height;
+    const MIN_ZOOM = 0.45;
+    const MAX_ZOOM = 2.4;
+    const ZOOM_STEP = 1.15;
+    let zoomLevel = 1;
 
     function appendStatRow(container, label, value) {
       const row = document.createElement("div");
@@ -969,6 +1036,98 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     svg.setAttribute("viewBox", `0 0 ${graphData.width} ${graphData.height}`);
     svg.setAttribute("width", String(graphData.width));
     svg.setAttribute("height", String(graphData.height));
+
+    function clampZoom(value) {
+      return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+    }
+
+    function renderZoom() {
+      const scaledWidth = Math.round(BASE_WIDTH * zoomLevel);
+      const scaledHeight = Math.round(BASE_HEIGHT * zoomLevel);
+      svg.style.width = `${scaledWidth}px`;
+      svg.style.height = `${scaledHeight}px`;
+      if (zoomIndicatorEl) {
+        zoomIndicatorEl.textContent = `${Math.round(zoomLevel * 100)}%`;
+      }
+    }
+
+    function computeFitZoom() {
+      if (!graphScrollEl) {
+        return 1;
+      }
+      const horizontalPadding = 36;
+      const verticalPadding = 36;
+      const widthScale = Math.max(0.1, (graphScrollEl.clientWidth - horizontalPadding) / BASE_WIDTH);
+      const heightScale = Math.max(0.1, (graphScrollEl.clientHeight - verticalPadding) / BASE_HEIGHT);
+      return clampZoom(Math.min(widthScale, heightScale));
+    }
+
+    function zoomTo(nextZoom, options = {}) {
+      if (!graphScrollEl) {
+        zoomLevel = clampZoom(nextZoom);
+        renderZoom();
+        return;
+      }
+
+      const targetZoom = clampZoom(nextZoom);
+      if (Math.abs(targetZoom - zoomLevel) < 0.001) {
+        return;
+      }
+
+      const preserveCenter = options.preserveCenter !== false;
+      const graphCenterX = preserveCenter
+        ? (graphScrollEl.scrollLeft + graphScrollEl.clientWidth / 2) / zoomLevel
+        : 0;
+      const graphCenterY = preserveCenter
+        ? (graphScrollEl.scrollTop + graphScrollEl.clientHeight / 2) / zoomLevel
+        : 0;
+
+      zoomLevel = targetZoom;
+      renderZoom();
+
+      if (preserveCenter) {
+        graphScrollEl.scrollLeft = graphCenterX * zoomLevel - graphScrollEl.clientWidth / 2;
+        graphScrollEl.scrollTop = graphCenterY * zoomLevel - graphScrollEl.clientHeight / 2;
+      } else {
+        graphScrollEl.scrollLeft = 0;
+        graphScrollEl.scrollTop = 0;
+      }
+    }
+
+    function zoomAtPoint(nextZoom, clientX, clientY) {
+      if (!graphScrollEl) {
+        zoomTo(nextZoom);
+        return;
+      }
+
+      const targetZoom = clampZoom(nextZoom);
+      if (Math.abs(targetZoom - zoomLevel) < 0.001) {
+        return;
+      }
+
+      const rect = graphScrollEl.getBoundingClientRect();
+      const offsetX = clientX - rect.left;
+      const offsetY = clientY - rect.top;
+      const graphX = (graphScrollEl.scrollLeft + offsetX) / zoomLevel;
+      const graphY = (graphScrollEl.scrollTop + offsetY) / zoomLevel;
+
+      zoomLevel = targetZoom;
+      renderZoom();
+
+      graphScrollEl.scrollLeft = graphX * zoomLevel - offsetX;
+      graphScrollEl.scrollTop = graphY * zoomLevel - offsetY;
+    }
+
+    function initializeZoom() {
+      const fitZoom = computeFitZoom();
+      zoomLevel = fitZoom < 0.78 ? 0.78 : fitZoom;
+      zoomLevel = clampZoom(zoomLevel);
+      renderZoom();
+      if (graphScrollEl) {
+        graphScrollEl.scrollLeft = 0;
+        graphScrollEl.scrollTop = 0;
+      }
+    }
 
     const byId = new Map(graphData.nodes.map((node) => [node.id, node]));
     const incoming = new Map(graphData.nodes.map((node) => [node.id, []]));
@@ -1378,12 +1537,49 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       attributeFilter: ["class"]
     });
 
+    for (const button of zoomButtons) {
+      button.addEventListener("click", () => {
+        const action = button.getAttribute("data-zoom");
+        if (action === "in") {
+          zoomTo(zoomLevel * ZOOM_STEP);
+        } else if (action === "out") {
+          zoomTo(zoomLevel / ZOOM_STEP);
+        } else if (action === "reset") {
+          zoomTo(1);
+        } else if (action === "fit") {
+          zoomTo(computeFitZoom(), { preserveCenter: false });
+        }
+      });
+    }
+
+    if (graphScrollEl) {
+      graphScrollEl.addEventListener(
+        "wheel",
+        (event) => {
+          if (!(event.ctrlKey || event.metaKey)) {
+            return;
+          }
+          event.preventDefault();
+          const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+          zoomAtPoint(zoomLevel * factor, event.clientX, event.clientY);
+        },
+        { passive: false }
+      );
+    }
+
+    window.addEventListener("resize", () => {
+      if (Math.abs(zoomLevel - computeFitZoom()) < 0.02) {
+        zoomTo(computeFitZoom(), { preserveCenter: false });
+      }
+    });
+
     svg.addEventListener("click", resetSelection);
     if (toggleLabelsEl) {
       toggleLabelsEl.addEventListener("change", () => {
         updateLabelVisibility();
       });
     }
+    initializeZoom();
     resetSelection();
   </script>
 </body>
