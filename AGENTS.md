@@ -4,6 +4,9 @@
 - 框架不是某个项目的模板，而是 AI 编程时代的人和 AI 之间的共同结构语言。
 - 仓库主分层应保持 `Framework -> Product Spec -> Implementation Config -> Code -> Evidence` 的单向收敛。
 - 当前若尚未把 `Product Spec` 与 `Implementation Config` 拆成独立文件，则临时合并承载文件也必须能被解释为“产品真相”与“实现细化”的组合，不得反向修改框架边界、规则与基定义。
+- `projects/<project_id>/product_spec.toml` 与 `projects/<project_id>/implementation_config.toml` 默认应使用中文注释，作为人与 AI 协作讨论的主入口。
+- 上述 TOML 文件在篇幅可控时，应优先提供详细注释而不是极简标签；至少在文件头和每个主 section 前说明职责边界、讨论重点与与相邻层的分界。
+- `Product Spec` 注释必须解释产品真相，不得混入仅属于实现层的技巧；`Implementation Config` 注释必须解释实现细化，不得伪装成产品真相。
 
 ## 工程执行规范（强制）
 
