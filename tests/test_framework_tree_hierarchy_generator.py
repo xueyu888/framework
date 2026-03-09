@@ -199,6 +199,63 @@ class FrameworkTreeHierarchyGeneratorTest(unittest.TestCase):
             self.assertIn("恢复布局", html)
             self.assertIn("data-framework-toggle", html)
             self.assertIn("data-framework-handle", html)
+            self.assertIn("data-pan-ignore", html)
+            self.assertIn("左键拖动画布", html)
+            self.assertIn("[data-node-hit='1']", html)
+            self.assertIn("[data-edge-hit='1']", html)
+            self.assertIn('markerWidth="14"', html)
+            self.assertIn("stroke-width: 2.15;", html)
+
+    def test_rendered_html_preserves_interaction_contract(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:
+            framework_dir = Path(tmp_dir) / "framework"
+            frontend_dir = framework_dir / "frontend"
+            knowledge_dir = framework_dir / "knowledge_base"
+            frontend_dir.mkdir(parents=True, exist_ok=True)
+            knowledge_dir.mkdir(parents=True, exist_ok=True)
+
+            (frontend_dir / "L0-M0-承载原子模块.md").write_text(
+                "\n".join(
+                    [
+                        "# 承载原子模块:SurfaceAtoms",
+                        "@framework",
+                        "## 3. 最小可行基（Minimum Viable Bases）",
+                        "- `B1` 承载基：定义界面承载结构。来源：`C1 + SURFACE`。",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (knowledge_dir / "L0-M0-知识库原子模块.md").write_text(
+                "\n".join(
+                    [
+                        "# 知识库原子模块:KnowledgeAtoms",
+                        "@framework",
+                        "## 3. 最小可行基（Minimum Viable Bases）",
+                        "- `B1` 知识库入口基：frontend.L0.M0[R1]。来源：`C1 + LIBRARY`。",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload, _ = build_payload_from_framework(framework_dir)
+            json_path = Path(tmp_dir) / "tree.json"
+            html_path = Path(tmp_dir) / "tree.html"
+            json_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+            graph = load_hierarchy(json_path)
+            render_html(graph, html_path)
+            html = html_path.read_text(encoding="utf-8")
+
+            self.assertIn("Interaction contract:", html)
+            self.assertIn("background drag pans the canvas", html)
+            self.assertIn("node / edge click keeps relationship selection working", html)
+            self.assertIn("graphScrollEl.addEventListener(\"pointerdown\", beginPan);", html)
+            self.assertIn("selectNode(node.id);", html)
+            self.assertIn("selectEdge(edgeKey);", html)
+            self.assertIn("data-pan-ignore", html)
+            self.assertIn("[data-node-hit='1']", html)
+            self.assertIn("[data-node-group='1']", html)
+            self.assertIn("[data-edge-hit='1']", html)
 
 
 if __name__ == "__main__":

@@ -105,6 +105,12 @@ Tree generation behavior:
 - Preferred derivation: file-level module mode (`Lx-Mn-*.md` -> node `Lx.Mn`).
 - Framework-source trees use `framework columns` layout: each framework directory is rendered as its own group, and each group keeps its own local `L0/L1/L2...` bands.
 - Each framework group can now be collapsed / expanded from its header, dragged as one box inside the graph, and restored to the default compact dependency-aware layout with `恢复布局`.
+- Interaction contract for the generated framework tree:
+  - Left-drag on background scrolls / pans the whole graph canvas.
+  - Clicking a node or edge must keep selection and relationship-detail inspection working.
+  - `Ctrl/⌘ + click` on a node or edge must keep source-file jump working.
+  - Framework header drag and collapse / expand controls must not steal node / edge selection.
+  - These interactions are repository-side regression constraints and are guarded by the framework-tree HTML generator tests.
 - In file-level mode, growth edges are parsed from base lines that directly reference upstream modules, for example:
   - ``- `B3` ...：L0.M0[R2,R3] + L0.M1[R2,R3]。来源：`...`。``
 - Framework root modules may also declare explicit external refs, for example:

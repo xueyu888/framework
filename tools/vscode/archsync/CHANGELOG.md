@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.0.32 - 2026-03-09
+- Hardened the framework-tree interaction contract in the repository-side HTML generator and tests: background drag pans the graph, node / edge click selection stays intact, `Ctrl/⌘ + click` source jumps stay intact, and framework-group controls remain isolated from canvas pan.
+- Improved default framework-tree edge readability by making relationship lines and arrowheads more visible without overpowering the graph.
+
 ## 0.0.31 - 2026-03-08
 - Added framework-group box controls to the generated framework-tree page. Each framework panel can now be collapsed or expanded from its header, dragged as one unit inside the graph, and restored to the default compact layout with `恢复布局`.
 - Fixed the framework-group interaction layer so dragging no longer depends on fragile transparent title hit zones. The generated graph now uses explicit framework drag handles and preserves node hover / click behavior while groups move.

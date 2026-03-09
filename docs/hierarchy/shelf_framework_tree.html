@@ -26,7 +26,7 @@
       --graph-guide: rgba(255, 255, 255, 0.10);
       --graph-band-a: rgba(255, 255, 255, 0.04);
       --graph-band-b: rgba(255, 255, 255, 0.02);
-      --graph-edge: rgba(158, 174, 190, 0.58);
+      --graph-edge: rgba(176, 192, 210, 0.72);
       --graph-edge-active: var(--accent);
       --graph-edge-muted: rgba(255, 255, 255, 0.08);
       --graph-label: var(--text);
@@ -49,7 +49,7 @@
       --graph-guide: rgba(0, 0, 0, 0.08);
       --graph-band-a: rgba(0, 0, 0, 0.04);
       --graph-band-b: rgba(0, 0, 0, 0.02);
-      --graph-edge: rgba(78, 103, 131, 0.45);
+      --graph-edge: rgba(74, 98, 128, 0.62);
       --graph-edge-muted: rgba(0, 0, 0, 0.08);
       --graph-label-bg: rgba(255, 255, 255, 0.86);
       --graph-label-border: rgba(0, 0, 0, 0.09);
@@ -196,6 +196,7 @@
       border-radius: 12px;
       background: var(--graph-stage);
       cursor: grab;
+      touch-action: none;
     }
 
     .graph-scroll.dragging {
@@ -537,11 +538,14 @@
     .edge {
       fill: none;
       stroke: var(--graph-edge);
-      stroke-width: 1.8;
+      stroke-width: 2.15;
       stroke-linecap: round;
+      stroke-linejoin: round;
       marker-end: url(#arrowDefault);
-      opacity: 0.86;
-      transition: opacity 140ms ease, stroke 140ms ease;
+      opacity: 0.94;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+      transition: opacity 140ms ease, stroke 140ms ease, stroke-width 140ms ease;
     }
 
     .edge.faded {
@@ -557,12 +561,27 @@
       filter: drop-shadow(0 0 8px rgba(55, 148, 255, 0.24));
     }
 
+    .edge-hit-area {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: stroke;
+      cursor: pointer;
+      vector-effect: non-scaling-stroke;
+    }
+
     .arrow-default {
       fill: var(--graph-edge);
+      stroke: color-mix(in srgb, var(--canvas) 48%, transparent);
+      stroke-width: 0.55;
     }
 
     .arrow-active {
       fill: var(--graph-edge-active);
+      stroke: color-mix(in srgb, var(--canvas) 38%, transparent);
+      stroke-width: 0.4;
     }
 
     .node-group {
@@ -580,13 +599,14 @@
       stroke: var(--canvas);
       stroke-width: 2.4;
       pointer-events: none;
+      transform-box: fill-box;
       transition:
         transform 140ms ease,
         opacity 140ms ease,
         filter 140ms ease,
         stroke 140ms ease,
         stroke-width 140ms ease;
-      transform-origin: center;
+      transform-origin: center center;
     }
 
     .node-group.hovered .node-circle {
@@ -805,7 +825,7 @@
           <input type="checkbox" id="toggleLabels" checked />
           显示全部标签
         </label>
-        <span class="pill">点击节点查看直连上游/下游关系</span>
+        <span class="pill">点击节点或连线查看关系</span>
       </div>
       <div class="graph-shell">
         <div class="graph-toolbar">
@@ -819,7 +839,7 @@
           <div class="toolbar-tail">
             <button type="button" class="zoom-btn" id="resetLayoutButton">恢复布局</button>
             <button type="button" class="zoom-btn" id="sideToggleButton" aria-expanded="true">隐藏侧栏</button>
-            <span class="graph-hint">拖动框标题移动 framework，点击框右上角折叠/展开，Ctrl/⌘ + 滚轮缩放，Ctrl/⌘ + 点击节点打开文档</span>
+            <span class="graph-hint">左键拖动画布，拖动框标题移动 framework，点击框右上角折叠/展开，Ctrl/⌘ + 滚轮缩放，Ctrl/⌘ + 点击节点或连线打开来源文档</span>
           </div>
         </div>
         <div class="graph-scroll">
@@ -897,9 +917,13 @@
     const MAX_ZOOM = 2.4;
     const ZOOM_STEP = 1.15;
     const DRAG_THRESHOLD = 4;
+    const NODE_RADIUS = 24;
+    const EDGE_START_PADDING = NODE_RADIUS + 2;
+    const EDGE_END_PADDING = NODE_RADIUS + 12;
     let zoomLevel = 1;
     let sideVisible = true;
     let selectedNodeId = null;
+    let selectedEdgeKey = null;
     let canvasWidth = graphData.width;
     let canvasHeight = graphData.height;
     const panState = {
@@ -991,7 +1015,6 @@
     titleEl.textContent = graphData.title;
     descriptionEl.textContent = graphData.description;
     summaryNodesEl.textContent = `节点数: ${graphData.nodes.length}`;
-    summaryEdgesEl.textContent = `关系边: ${graphData.edges.length}`;
     if (levelStatsTitleEl) {
       levelStatsTitleEl.textContent = isFrameworkColumns ? "框架层级统计" : "层级统计";
     }
@@ -1095,16 +1118,26 @@
       }
     }
 
+    // Interaction contract:
+    // - background drag pans the canvas
+    // - node / edge click keeps relationship selection working
+    // - framework header / toggle interactions stay isolated from canvas pan
+    function shouldIgnorePanStart(target) {
+      if (!target || typeof target.closest !== "function") {
+        return false;
+      }
+      return Boolean(
+        target.closest(
+          "button, input, label, a, [data-pan-ignore='1'], [data-node-hit='1'], [data-node-group='1'], [data-edge-hit='1']"
+        )
+      );
+    }
+
     function beginPan(event) {
       if (!graphScrollEl || event.button !== 0) {
         return;
       }
-      if (event.target.closest("button, input, label, a")) {
-        return;
-      }
-      if (
-        event.target.closest("[data-node-hit='1'], [data-node-group='1'], [data-framework-handle='1'], [data-framework-toggle='1']")
-      ) {
+      if (shouldIgnorePanStart(event.target)) {
         return;
       }
       panState.active = true;
@@ -1207,11 +1240,25 @@
       }, 0);
     }
 
+    const graphEdges = graphData.edges.map((edge, index) => ({
+      ...edge,
+      __edgeKey: [
+        String(edge.from ?? ""),
+        String(edge.to ?? ""),
+        String(edge.relation ?? ""),
+        String(edge.source_file ?? ""),
+        String(edge.source_line ?? ""),
+        String(index)
+      ].join("::")
+    }));
+
+    summaryEdgesEl.textContent = `关系边: ${graphEdges.length}`;
+
     const byId = new Map(graphData.nodes.map((node) => [node.id, node]));
     const incoming = new Map(graphData.nodes.map((node) => [node.id, []]));
     const outgoing = new Map(graphData.nodes.map((node) => [node.id, []]));
 
-    for (const edge of graphData.edges) {
+    for (const edge of graphEdges) {
       const inList = incoming.get(edge.to);
       if (inList) inList.push(edge);
       const outList = outgoing.get(edge.from);
@@ -1371,25 +1418,43 @@
 
     const defs = document.createElementNS(SVG_NS, "defs");
     defs.innerHTML = `
-      <marker id="arrowDefault" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-        <path class="arrow-default" d="M0,0 L0,6 L9,3 z"></path>
+      <marker id="arrowDefault" markerWidth="14" markerHeight="14" viewBox="0 0 14 10" refX="12" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+        <path class="arrow-default" d="M0,0 L0,10 L14,5 z"></path>
       </marker>
-      <marker id="arrowActive" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-        <path class="arrow-active" d="M0,0 L0,6 L9,3 z"></path>
+      <marker id="arrowActive" markerWidth="14" markerHeight="14" viewBox="0 0 14 10" refX="12" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+        <path class="arrow-active" d="M0,0 L0,10 L14,5 z"></path>
       </marker>
     `;
 
-    function edgePath(fromNode, toNode) {
+    function edgeEndpoints(fromNode, toNode) {
       const dx = toNode.x - fromNode.x;
       const dy = toNode.y - fromNode.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const ux = dx / distance;
+      const uy = dy / distance;
+      const maxPad = Math.max(0, distance / 2 - 6);
+      const startPad = Math.min(EDGE_START_PADDING, maxPad);
+      const endPad = Math.min(EDGE_END_PADDING, maxPad);
+      return {
+        startX: fromNode.x + ux * startPad,
+        startY: fromNode.y + uy * startPad,
+        endX: toNode.x - ux * endPad,
+        endY: toNode.y - uy * endPad
+      };
+    }
+
+    function edgePath(fromNode, toNode) {
+      const endpoints = edgeEndpoints(fromNode, toNode);
+      const dx = endpoints.endX - endpoints.startX;
+      const dy = endpoints.endY - endpoints.startY;
       const curve = Math.max(44, Math.min(136, Math.abs(dy) * 0.44));
       const sidePull =
         dx === 0 ? 0 : Math.sign(dx) * Math.max(26, Math.min(116, Math.abs(dx) * 0.28));
-      const c1x = fromNode.x + sidePull;
-      const c1y = fromNode.y + curve;
-      const c2x = toNode.x - sidePull;
-      const c2y = toNode.y - curve;
-      return `M ${fromNode.x} ${fromNode.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${toNode.x} ${toNode.y}`;
+      const c1x = endpoints.startX + sidePull;
+      const c1y = endpoints.startY + curve;
+      const c2x = endpoints.endX - sidePull;
+      const c2y = endpoints.endY - curve;
+      return `M ${endpoints.startX} ${endpoints.startY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endpoints.endX} ${endpoints.endY}`;
     }
 
     const levelNumbers = levelEntries.map(([level]) => level);
@@ -1437,6 +1502,7 @@
     }
 
     let edgeElements = [];
+    let edgeElementMap = new Map();
     let nodeCircleMap = new Map();
     let nodeLabelMap = new Map();
     let nodeLabelBoxMap = new Map();
@@ -1535,6 +1601,7 @@
       surface.setAttribute("ry", "11");
       surface.setAttribute("class", "framework-toggle-surface");
       surface.setAttribute("data-framework-toggle", "1");
+      surface.setAttribute("data-pan-ignore", "1");
       groupLayer.appendChild(surface);
 
       const label = document.createElementNS(SVG_NS, "text");
@@ -1639,6 +1706,7 @@
         handle.setAttribute("height", String(Math.max(28, layout.headerBottom - layout.headerTop)));
         handle.setAttribute("class", "framework-handle");
         handle.setAttribute("data-framework-handle", "1");
+        handle.setAttribute("data-pan-ignore", "1");
         handle.addEventListener("pointerdown", (event) => beginGroupDrag(event, group.name));
         handle.addEventListener("click", (event) => event.stopPropagation());
         groupLayer.appendChild(handle);
@@ -1719,12 +1787,13 @@
     function renderNodesAndEdges() {
       currentNodeSnapshots = buildNodeSnapshots();
       edgeElements = [];
+      edgeElementMap = new Map();
       nodeCircleMap = new Map();
       nodeLabelMap = new Map();
       nodeLabelBoxMap = new Map();
       nodeGroupMap = new Map();
 
-      for (const edge of graphData.edges) {
+      for (const edge of graphEdges) {
         const fromNode = currentNodeSnapshots.get(edge.from);
         const toNode = currentNodeSnapshots.get(edge.to);
         if (!fromNode || !toNode) {
@@ -1734,9 +1803,12 @@
           continue;
         }
 
+        const edgeKey = edge.__edgeKey;
+        const pathData = edgePath(fromNode, toNode);
         const path = document.createElementNS(SVG_NS, "path");
-        path.setAttribute("d", edgePath(fromNode, toNode));
+        path.setAttribute("d", pathData);
         path.setAttribute("class", "edge");
+        path.setAttribute("data-edge-key", edgeKey);
         path.setAttribute("data-from", edge.from);
         path.setAttribute("data-to", edge.to);
         path.setAttribute("data-relation", edge.relation);
@@ -1744,7 +1816,32 @@
         const edgeConstraint = edge.constraint ? `, constraint=${edge.constraint}` : "";
         path.appendChild(document.createElementNS(SVG_NS, "title")).textContent = `${edge.from} -> ${edge.to} (${edge.relation}${edgeRule}${edgeConstraint})`;
         svg.appendChild(path);
+
+        const hitArea = document.createElementNS(SVG_NS, "path");
+        hitArea.setAttribute("d", pathData);
+        hitArea.setAttribute("class", "edge-hit-area");
+        hitArea.setAttribute("data-edge-hit", "1");
+        hitArea.setAttribute("data-edge-key", edgeKey);
+        hitArea.setAttribute("data-from", edge.from);
+        hitArea.setAttribute("data-to", edge.to);
+        hitArea.addEventListener("click", (event) => {
+          if (panState.suppressClick || groupDragState.suppressClick) {
+            event.stopPropagation();
+            return;
+          }
+          event.stopPropagation();
+          if ((event.ctrlKey || event.metaKey) && typeof edge.source_file === "string" && edge.source_file) {
+            hideNodeHover();
+            openSourceFile(edge.source_file, edge.source_line);
+            return;
+          }
+          hideNodeHover();
+          selectEdge(edgeKey);
+        });
+        svg.appendChild(hitArea);
+
         edgeElements.push(path);
+        edgeElementMap.set(edgeKey, { edge, path, hitArea });
       }
 
       for (const node of graphData.nodes) {
@@ -1791,7 +1888,7 @@
         group.insertBefore(labelBox, label);
 
         const hitPadding = 10;
-        const circleRadius = 24;
+        const circleRadius = NODE_RADIUS;
         const minX = Math.min(snapshot.x - circleRadius - hitPadding, bbox.x - padX - hitPadding);
         const maxX = Math.max(snapshot.x + circleRadius + hitPadding, bbox.x + bbox.width + padX + hitPadding);
         const minY = Math.min(snapshot.y - circleRadius - hitPadding, bbox.y - padY - hitPadding);
@@ -1876,7 +1973,10 @@
       if (selectedNodeId && !currentNodeSnapshots.get(selectedNodeId)?.visible) {
         selectedNodeId = null;
       }
-      if (selectedNodeId) {
+      if (selectedEdgeKey && !edgeElementMap.has(selectedEdgeKey)) {
+        selectedEdgeKey = null;
+      }
+      if (selectedNodeId || selectedEdgeKey) {
         applySelectionState();
       } else {
         renderDetailEmpty();
@@ -2018,13 +2118,74 @@
     function renderDetailEmpty() {
       detailBoxEl.innerHTML =
         isFrameworkColumns
-          ? '<p class="meta detail-empty">点击左侧节点查看详情；框标题可拖动，框右上角可折叠或展开，恢复布局按钮可回到默认紧凑位置。</p>'
-          : '<p class="meta detail-empty">点击左侧节点查看详情；可通过“显示全部标签”控制整体标签密度。</p>';
+          ? '<p class="meta detail-empty">点击左侧节点或连线查看详情；框标题可拖动，框右上角可折叠或展开，恢复布局按钮可回到默认紧凑位置。</p>'
+          : '<p class="meta detail-empty">点击左侧节点或连线查看详情；可通过“显示全部标签”控制整体标签密度。</p>';
+    }
+
+    function renderEdgeDetail(edge) {
+      const fromNode = byId.get(edge.from);
+      const toNode = byId.get(edge.to);
+      const sourceFile = typeof edge.source_file === "string" ? edge.source_file : "";
+      const sourceLine =
+        Number.isFinite(Number(edge.source_line)) && Number(edge.source_line) > 0
+          ? Number(edge.source_line)
+          : 1;
+      const sourceAction = sourceFile
+        ? `<button type="button" class="detail-action" data-open-source="1" data-file="${escapeHtml(sourceFile)}" data-line="${sourceLine}">打开来源</button>`
+        : "无";
+
+      detailBoxEl.innerHTML = `
+        <section class="detail-group">
+          <h3 class="detail-section-title">关系概览</h3>
+          <div class="detail-kv">
+            <span class="detail-key">起点</span>
+            <span class="detail-value">${escapeHtml(fromNode?.label ?? edge.from)}</span>
+          </div>
+          <div class="detail-kv">
+            <span class="detail-key">终点</span>
+            <span class="detail-value">${escapeHtml(toNode?.label ?? edge.to)}</span>
+          </div>
+          <div class="detail-kv">
+            <span class="detail-key">关系</span>
+            <span class="detail-value mono">${escapeHtml(edge.relation ?? "")}</span>
+          </div>
+        </section>
+        <section class="detail-group">
+          <h3 class="detail-section-title">规则与术语</h3>
+          <div class="detail-kv">
+            <span class="detail-key">规则</span>
+            <span class="detail-value mono">${escapeHtml(edge.rules || edge.rule || "无")}</span>
+          </div>
+          <div class="detail-kv">
+            <span class="detail-key">术语</span>
+            <span class="detail-value mono">${escapeHtml(edge.terms || "无")}</span>
+          </div>
+        </section>
+        <section class="detail-group">
+          <h3 class="detail-section-title">来源与跳转</h3>
+          <div class="detail-kv">
+            <span class="detail-key">结构来源</span>
+            <span class="detail-value mono">${sourceFile ? `${escapeHtml(sourceFile)}:${sourceLine}` : "无"}</span>
+          </div>
+          <div class="action-row">${sourceAction}</div>
+        </section>
+      `;
+
+      const openBtn = detailBoxEl.querySelector("[data-open-source='1']");
+      if (openBtn) {
+        openBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const filePath = openBtn.getAttribute("data-file") || "";
+          const lineNumber = Number(openBtn.getAttribute("data-line") || "1");
+          openSourceFile(filePath, lineNumber);
+        });
+      }
     }
 
     function applySelectionState() {
       const nodeId = selectedNodeId;
-      if (!nodeId) {
+      const edgeKey = selectedEdgeKey;
+      if (!nodeId && !edgeKey) {
         for (const circle of nodeCircleMap.values()) {
           circle.classList.remove("active", "faded");
         }
@@ -2037,6 +2198,44 @@
         for (const edgeEl of edgeElements) {
           edgeEl.classList.remove("active", "faded");
         }
+        updateLabelVisibility();
+        return;
+      }
+
+      if (edgeKey) {
+        const selectedEdge = edgeElementMap.get(edgeKey)?.edge;
+        if (!selectedEdge) {
+          resetSelection();
+          return;
+        }
+        const related = new Set([selectedEdge.from, selectedEdge.to]);
+
+        for (const [id, circle] of nodeCircleMap.entries()) {
+          circle.classList.remove("active", "faded");
+          const label = nodeLabelMap.get(id);
+          const labelBox = nodeLabelBoxMap.get(id);
+          if (label) label.classList.remove("faded");
+          if (labelBox) labelBox.classList.remove("faded");
+
+          if (related.has(id)) {
+            circle.classList.add("active");
+          } else {
+            circle.classList.add("faded");
+            if (label) label.classList.add("faded");
+            if (labelBox) labelBox.classList.add("faded");
+          }
+        }
+
+        for (const edgeEl of edgeElements) {
+          edgeEl.classList.remove("active", "faded");
+          if (edgeEl.getAttribute("data-edge-key") === edgeKey) {
+            edgeEl.classList.add("active");
+          } else {
+            edgeEl.classList.add("faded");
+          }
+        }
+
+        renderEdgeDetail(selectedEdge);
         updateLabelVisibility();
         return;
       }
@@ -2153,6 +2352,13 @@
 
     function selectNode(nodeId) {
       selectedNodeId = nodeId;
+      selectedEdgeKey = null;
+      applySelectionState();
+    }
+
+    function selectEdge(edgeKey) {
+      selectedNodeId = null;
+      selectedEdgeKey = edgeKey;
       applySelectionState();
     }
 
@@ -2169,6 +2375,7 @@
     function resetSelection() {
       hideNodeHover();
       selectedNodeId = null;
+      selectedEdgeKey = null;
       for (const group of nodeGroupMap.values()) {
         group.classList.remove("hovered");
       }
@@ -2226,6 +2433,7 @@
           groupState.set(name, { dx: 0, dy: 0, collapsed: false });
         }
         selectedNodeId = null;
+        selectedEdgeKey = null;
         renderGraph();
         if (graphScrollEl) {
           graphScrollEl.scrollLeft = 0;
