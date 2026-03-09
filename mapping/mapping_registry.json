@@ -3,6 +3,10 @@
     "updated_at": "2026-03-09",
     "l3_sync_notes": [
       {
+        "id": "SYNC-20260309-aitrans-layer-order-flip",
+        "note": "Flip framework/aitrans layer semantics back to the repository-standard L0 -> L1 -> L2 -> L3 direction, register the five L2 domain standards in the mapping tree, and treat supporting analysis docs as non-framework documents."
+      },
+      {
         "id": "SYNC-20260309-framework-template-entry",
         "note": "Promote plain @framework standard-template generation to a hard repository authoring constraint, and keep the active framework/tooling chain aligned with a non-removable direct entry plus regression coverage."
       },
@@ -149,6 +153,41 @@
                 "kind": "file",
                 "level": "L2",
                 "file": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
+                "children": []
+              },
+              {
+                "id": "NODE-L2-AITRANS-SHELL",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/aitrans/L2-M0-桌面宿主层.md",
+                "children": []
+              },
+              {
+                "id": "NODE-L2-AITRANS-CAPTURE",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/aitrans/L2-M1-截图交互层.md",
+                "children": []
+              },
+              {
+                "id": "NODE-L2-AITRANS-OCR-TRANS",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/aitrans/L2-M2-识别翻译层.md",
+                "children": []
+              },
+              {
+                "id": "NODE-L2-AITRANS-PRESENTATION",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/aitrans/L2-M3-结果展示层.md",
+                "children": []
+              },
+              {
+                "id": "NODE-L2-AITRANS-GOVERNANCE",
+                "kind": "file",
+                "level": "L2",
+                "file": "framework/aitrans/L2-M4-运行治理层.md",
                 "children": []
               },
               {
@@ -629,6 +668,381 @@
         {
           "file": "src/knowledge_base_demo/backend.py",
           "symbol": "def verify_knowledge_base_backend("
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-HOST-CAPABILITY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 能力声明（Capability Statement）",
+      "l2_file": "framework/aitrans/L2-M0-桌面宿主层.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Capability"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-HOST-BOUNDARY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/aitrans/L2-M0-桌面宿主层.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class BoundaryDefinition"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-HOST-BASE",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/aitrans/L2-M0-桌面宿主层.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Base"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-HOST-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/aitrans/L2-M0-桌面宿主层.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class CombinationRules"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-HOST-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/aitrans/L2-M0-桌面宿主层.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class VerificationResult"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-CAPTURE-CAPABILITY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 能力声明（Capability Statement）",
+      "l2_file": "framework/aitrans/L2-M1-截图交互层.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Capability"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-CAPTURE-BOUNDARY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/aitrans/L2-M1-截图交互层.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class BoundaryDefinition"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-CAPTURE-BASE",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/aitrans/L2-M1-截图交互层.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Base"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-CAPTURE-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/aitrans/L2-M1-截图交互层.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class CombinationRules"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-CAPTURE-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/aitrans/L2-M1-截图交互层.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class VerificationResult"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PIPELINE-CAPABILITY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 能力声明（Capability Statement）",
+      "l2_file": "framework/aitrans/L2-M2-识别翻译层.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Capability"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PIPELINE-BOUNDARY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/aitrans/L2-M2-识别翻译层.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class BoundaryDefinition"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PIPELINE-BASE",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/aitrans/L2-M2-识别翻译层.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Base"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PIPELINE-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/aitrans/L2-M2-识别翻译层.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class CombinationRules"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PIPELINE-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/aitrans/L2-M2-识别翻译层.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class VerificationResult"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PRESENTATION-CAPABILITY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 能力声明（Capability Statement）",
+      "l2_file": "framework/aitrans/L2-M3-结果展示层.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Capability"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PRESENTATION-BOUNDARY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/aitrans/L2-M3-结果展示层.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class BoundaryDefinition"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PRESENTATION-BASE",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/aitrans/L2-M3-结果展示层.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Base"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PRESENTATION-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/aitrans/L2-M3-结果展示层.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class CombinationRules"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-PRESENTATION-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/aitrans/L2-M3-结果展示层.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class VerificationResult"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-GOVERNANCE-CAPABILITY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 1. 能力声明（Capability Statement）",
+      "l2_file": "framework/aitrans/L2-M4-运行治理层.md",
+      "l2_anchor": "## 1. 能力声明（Capability Statement）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Capability"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-GOVERNANCE-BOUNDARY",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 2. 边界定义（Boundary）",
+      "l2_file": "framework/aitrans/L2-M4-运行治理层.md",
+      "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class BoundaryDefinition"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-GOVERNANCE-BASE",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 3. 最小可行基（Bases）",
+      "l2_file": "framework/aitrans/L2-M4-运行治理层.md",
+      "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class Base"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-GOVERNANCE-COMBINATION",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 4. 组合原则（Combination Principles）",
+      "l2_file": "framework/aitrans/L2-M4-运行治理层.md",
+      "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class CombinationRules"
+        }
+      ]
+    },
+    {
+      "id": "MAP-AITRANS-GOVERNANCE-V",
+      "l0_file": "specs/规范总纲与树形结构.md",
+      "l0_anchor": "## 2. 标准树（强制）",
+      "l1_file": "specs/框架设计核心标准.md",
+      "l1_anchor": "## 5. 验证（Verification）",
+      "l2_file": "framework/aitrans/L2-M4-运行治理层.md",
+      "l2_anchor": "## 5. 验证（Verification）",
+      "impl_symbols": [
+        {
+          "file": "src/framework_core.py",
+          "symbol": "class VerificationResult"
         }
       ]
     }
