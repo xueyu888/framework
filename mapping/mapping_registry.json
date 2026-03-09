@@ -3,6 +3,18 @@
     "updated_at": "2026-03-09",
     "l3_sync_notes": [
       {
+        "id": "SYNC-20260309-structure-definition-section",
+        "note": "Promote 'structure' into a dedicated core-standard section, clarifying that structure is the primary abstract organization unit, that it can be either module-local minimal units or higher-layer composed units, and that it must be distinguished from capabilities, boundaries, modules, and implementation details."
+      },
+      {
+        "id": "SYNC-20260309-base-not-global-leaf",
+        "note": "Clarify that B* is the minimal structure unit within the current module boundary rather than a mandatory global leaf in the whole framework graph; higher-layer bases may be composed from lower-layer modules while only the lowest expanded layer must remain self-contained."
+      },
+      {
+        "id": "SYNC-20260309-framework-lint-standard",
+        "note": "Split framework semantic core from framework markdown/lint governance: keep semantic rules in specs/框架设计核心标准.md, move expression/author-entry/lint contract into specs/框架文档Lint标准.md, and explicitly link the new L1 lint standard into the tree plus active frontend L2 standard."
+      },
+      {
         "id": "SYNC-20260309-framework-template-entry",
         "note": "Promote plain @framework standard-template generation to a hard repository authoring constraint, and keep the active framework/tooling chain aligned with a non-removable direct entry plus regression coverage."
       },
@@ -88,6 +100,13 @@
             "kind": "file",
             "level": "L1",
             "file": "specs/框架设计核心标准.md",
+            "children": []
+          },
+          {
+            "id": "NODE-L1-LINT",
+            "kind": "file",
+            "level": "L1",
+            "file": "specs/框架文档Lint标准.md",
             "children": []
           },
           {
