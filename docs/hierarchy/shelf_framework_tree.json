@@ -28,8 +28,18 @@
         }
       },
       {
-        "name": "data_washer",
+        "name": "input_access",
         "order": 1,
+        "local_levels": [
+          0
+        ],
+        "level_node_counts": {
+          "0": 1
+        }
+      },
+      {
+        "name": "data_washer",
+        "order": 2,
         "local_levels": [
           0,
           1,
@@ -39,7 +49,7 @@
         ],
         "level_node_counts": {
           "0": 1,
-          "1": 1,
+          "1": 2,
           "2": 3,
           "3": 5,
           "4": 7
@@ -166,12 +176,12 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "文档分块：`L1.M0[B1,B2,B3]`；对已完成归一化的文档执行资格识别，判断其是否具备进入清洗流程的资格；对于具备清洗资格的文档，按照输入分块标准将文档分为多个内容块，再按稳定输出格式生成新的分块结果文件；每个块记录都必须保留原文映射并预留属性扩展接口",
+            "text": "文档分块：`L1.M0[B1,B2,B3,B4]`；先将已完成归一化的文档接入为稳定文档变量，再执行资格识别并判断其是否具备进入清洗流程的资格；对于具备清洗资格的文档，按照输入分块标准将文档分为多个内容块，再按稳定输出格式生成新的分块结果文件；每个块记录都必须保留原文映射并预留属性扩展接口",
             "line": "33"
           },
           {
             "token": "B2",
-            "text": "块标注：将内容块标注对应的Tag",
+            "text": "块标注：`L1.M1[B1,B2,B3]`；消费稳定块记录集合，为每个块绑定可追踪 `Tag`，并输出稳定标注关系集合",
             "line": "34"
           },
           {
@@ -193,6 +203,58 @@
       },
       {
         "id": "NODE-FW-0003",
+        "label": "L0.input_access.M0",
+        "level": 0,
+        "order": 3,
+        "description": "module=input_access | level=L0 | node=L0.M0 | file=framework/input_access/L0/L0-M0-输入接入原子模块.md | title=L0-M0-输入接入原子模块",
+        "source_file": "framework/input_access/L0/L0-M0-输入接入原子模块.md",
+        "source_line": 22,
+        "doc_line": 1,
+        "module_name": "input_access",
+        "module_ref": "L0.M0",
+        "module_title": "输入接入原子模块:InputAccessAtom",
+        "capability_items": [
+          {
+            "token": "C1",
+            "text": "输入源承接能力：提供对输入对象或输入集合执行稳定承接的能力",
+            "line": "7"
+          },
+          {
+            "token": "C2",
+            "text": "读取规则绑定能力：提供将读取规则绑定到输入源并形成稳定读取结果的能力",
+            "line": "8"
+          },
+          {
+            "token": "C3",
+            "text": "变量归一承载能力：提供将读取结果整理为统一变量格式并完成交接的能力",
+            "line": "9"
+          },
+          {
+            "token": "C4",
+            "text": "非能力项：不负责领域规则判定、业务决策与结果输出",
+            "line": "10"
+          }
+        ],
+        "base_items": [
+          {
+            "token": "B1",
+            "text": "输入源承载结构基",
+            "line": "22"
+          },
+          {
+            "token": "B2",
+            "text": "读取规则绑定结构基",
+            "line": "23"
+          },
+          {
+            "token": "B3",
+            "text": "变量归一承载结构基",
+            "line": "24"
+          }
+        ]
+      },
+      {
+        "id": "NODE-FW-0004",
         "label": "L1.data_station.M0",
         "level": 1,
         "order": 1,
@@ -249,7 +311,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0004",
+        "id": "NODE-FW-0005",
         "label": "L1.data_station.M1",
         "level": 1,
         "order": 2,
@@ -306,7 +368,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0005",
+        "id": "NODE-FW-0006",
         "label": "L1.data_station.M2",
         "level": 1,
         "order": 3,
@@ -363,7 +425,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0006",
+        "id": "NODE-FW-0007",
         "label": "L1.data_station.M3",
         "level": 1,
         "order": 4,
@@ -420,7 +482,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0007",
+        "id": "NODE-FW-0008",
         "label": "L1.data_station.M4",
         "level": 1,
         "order": 5,
@@ -477,7 +539,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0008",
+        "id": "NODE-FW-0009",
         "label": "L1.data_station.M5",
         "level": 1,
         "order": 6,
@@ -534,13 +596,13 @@
         ]
       },
       {
-        "id": "NODE-FW-0009",
+        "id": "NODE-FW-0010",
         "label": "L1.data_washer.M0",
         "level": 1,
         "order": 7,
         "description": "module=data_washer | level=L1 | node=L1.M0 | file=framework/data_washer/L1/L1-M0-文档分块.md | title=L1-M0-文档分块",
         "source_file": "framework/data_washer/L1/L1-M0-文档分块.md",
-        "source_line": 30,
+        "source_line": 32,
         "doc_line": 1,
         "module_name": "data_washer",
         "module_ref": "L1.M0",
@@ -548,45 +610,107 @@
         "capability_items": [
           {
             "token": "C1",
-            "text": "资格识别能力：提供对已完成归一化文档执行清洗资格识别的能力",
+            "text": "文档输入接入能力：提供对归一文档执行稳定接入并形成可消费文档变量的能力",
             "line": "7"
           },
           {
             "token": "C2",
-            "text": "分块结果构造能力：提供按输入分块标准执行分块，并按结果格式要求构造稳定块结果对象、填写追踪信息、原文映射与属性扩展接口的能力",
+            "text": "资格识别能力：提供对已完成归一化文档执行清洗资格识别的能力",
             "line": "8"
           },
           {
             "token": "C3",
-            "text": "结果输出能力：提供按稳定输出格式生成新的结果文件并完成下游可消费交付的能力",
+            "text": "分块结果构造能力：提供按输入分块标准执行分块，并按结果格式要求构造稳定块结果对象、填写追踪信息、原文映射与属性扩展接口的能力",
             "line": "9"
           },
           {
             "token": "C4",
+            "text": "结果输出能力：提供按稳定输出格式生成新的结果文件并完成下游可消费交付的能力",
+            "line": "10"
+          },
+          {
+            "token": "C5",
             "text": "非能力项：不负责 `Tag` 标注、数据提取、结果对比与参数调整",
+            "line": "11"
+          }
+        ],
+        "base_items": [
+          {
+            "token": "B1",
+            "text": "文档输入接入结构基：`input_access.L0.M0[B1,B2,B3]`",
+            "line": "32"
+          },
+          {
+            "token": "B2",
+            "text": "资格识别结构基：`L2.M0[B1,B2,B3]`",
+            "line": "33"
+          },
+          {
+            "token": "B3",
+            "text": "分块结果构造结构基：`L2.M1[B1,B2,B3]`",
+            "line": "34"
+          },
+          {
+            "token": "B4",
+            "text": "结果输出结构基：`L2.M2[B1,B2,B3]`",
+            "line": "35"
+          }
+        ]
+      },
+      {
+        "id": "NODE-FW-0011",
+        "label": "L1.data_washer.M1",
+        "level": 1,
+        "order": 8,
+        "description": "module=data_washer | level=L1 | node=L1.M1 | file=framework/data_washer/L1/L1-M1-块标注.md | title=L1-M1-块标注",
+        "source_file": "framework/data_washer/L1/L1-M1-块标注.md",
+        "source_line": 25,
+        "doc_line": 1,
+        "module_name": "data_washer",
+        "module_ref": "L1.M1",
+        "module_title": "块标注模块:BlockTag",
+        "capability_items": [
+          {
+            "token": "C1",
+            "text": "块记录接入能力：提供对上游分块结果中的稳定块记录集合执行接入与就绪校验的能力",
+            "line": "7"
+          },
+          {
+            "token": "C2",
+            "text": "Tag判定能力：提供依据标签集合与标注规则为块记录判定适用 `Tag` 的能力",
+            "line": "8"
+          },
+          {
+            "token": "C3",
+            "text": "标注关系组织能力：提供将块标识与 `Tag` 绑定为稳定标注结果集合的能力",
+            "line": "9"
+          },
+          {
+            "token": "C4",
+            "text": "非能力项：不负责文档分块、数据提取、结果对比与参数调整",
             "line": "10"
           }
         ],
         "base_items": [
           {
             "token": "B1",
-            "text": "资格识别结构基：`L2.M0[B1,B2,B3]`",
-            "line": "30"
+            "text": "块记录接入结构基：`input_access.L0.M0[B1,B2,B3]`",
+            "line": "25"
           },
           {
             "token": "B2",
-            "text": "分块结果构造结构基：`L2.M1[B1,B2,B3]`",
-            "line": "31"
+            "text": "Tag判定结构基",
+            "line": "26"
           },
           {
             "token": "B3",
-            "text": "结果输出结构基：`L2.M2[B1,B2,B3]`",
-            "line": "32"
+            "text": "标注关系结构基",
+            "line": "27"
           }
         ]
       },
       {
-        "id": "NODE-FW-0010",
+        "id": "NODE-FW-0012",
         "label": "L2.data_station.M0",
         "level": 2,
         "order": 1,
@@ -643,7 +767,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0011",
+        "id": "NODE-FW-0013",
         "label": "L2.data_station.M1",
         "level": 2,
         "order": 2,
@@ -710,7 +834,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0012",
+        "id": "NODE-FW-0014",
         "label": "L2.data_station.M10",
         "level": 2,
         "order": 3,
@@ -762,7 +886,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0013",
+        "id": "NODE-FW-0015",
         "label": "L2.data_station.M11",
         "level": 2,
         "order": 4,
@@ -814,7 +938,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0014",
+        "id": "NODE-FW-0016",
         "label": "L2.data_station.M12",
         "level": 2,
         "order": 5,
@@ -866,7 +990,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0015",
+        "id": "NODE-FW-0017",
         "label": "L2.data_station.M13",
         "level": 2,
         "order": 6,
@@ -918,7 +1042,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0016",
+        "id": "NODE-FW-0018",
         "label": "L2.data_station.M14",
         "level": 2,
         "order": 7,
@@ -970,7 +1094,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0017",
+        "id": "NODE-FW-0019",
         "label": "L2.data_station.M15",
         "level": 2,
         "order": 8,
@@ -1022,7 +1146,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0018",
+        "id": "NODE-FW-0020",
         "label": "L2.data_station.M16",
         "level": 2,
         "order": 9,
@@ -1074,7 +1198,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0019",
+        "id": "NODE-FW-0021",
         "label": "L2.data_station.M17",
         "level": 2,
         "order": 10,
@@ -1126,7 +1250,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0020",
+        "id": "NODE-FW-0022",
         "label": "L2.data_station.M2",
         "level": 2,
         "order": 11,
@@ -1183,7 +1307,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0021",
+        "id": "NODE-FW-0023",
         "label": "L2.data_station.M3",
         "level": 2,
         "order": 12,
@@ -1235,7 +1359,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0022",
+        "id": "NODE-FW-0024",
         "label": "L2.data_station.M4",
         "level": 2,
         "order": 13,
@@ -1287,7 +1411,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0023",
+        "id": "NODE-FW-0025",
         "label": "L2.data_station.M5",
         "level": 2,
         "order": 14,
@@ -1339,7 +1463,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0024",
+        "id": "NODE-FW-0026",
         "label": "L2.data_station.M6",
         "level": 2,
         "order": 15,
@@ -1391,7 +1515,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0025",
+        "id": "NODE-FW-0027",
         "label": "L2.data_station.M7",
         "level": 2,
         "order": 16,
@@ -1443,7 +1567,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0026",
+        "id": "NODE-FW-0028",
         "label": "L2.data_station.M8",
         "level": 2,
         "order": 17,
@@ -1495,7 +1619,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0027",
+        "id": "NODE-FW-0029",
         "label": "L2.data_station.M9",
         "level": 2,
         "order": 18,
@@ -1547,7 +1671,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0028",
+        "id": "NODE-FW-0030",
         "label": "L2.data_washer.M0",
         "level": 2,
         "order": 19,
@@ -1599,7 +1723,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0029",
+        "id": "NODE-FW-0031",
         "label": "L2.data_washer.M1",
         "level": 2,
         "order": 20,
@@ -1651,7 +1775,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0030",
+        "id": "NODE-FW-0032",
         "label": "L2.data_washer.M2",
         "level": 2,
         "order": 21,
@@ -1703,7 +1827,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0031",
+        "id": "NODE-FW-0033",
         "label": "L3.data_station.M0",
         "level": 3,
         "order": 1,
@@ -1760,7 +1884,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0032",
+        "id": "NODE-FW-0034",
         "label": "L3.data_station.M1",
         "level": 3,
         "order": 2,
@@ -1817,7 +1941,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0033",
+        "id": "NODE-FW-0035",
         "label": "L3.data_station.M2",
         "level": 3,
         "order": 3,
@@ -1874,7 +1998,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0034",
+        "id": "NODE-FW-0036",
         "label": "L3.data_station.M3",
         "level": 3,
         "order": 4,
@@ -1931,7 +2055,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0035",
+        "id": "NODE-FW-0037",
         "label": "L3.data_washer.M0",
         "level": 3,
         "order": 5,
@@ -1983,7 +2107,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0036",
+        "id": "NODE-FW-0038",
         "label": "L3.data_washer.M1",
         "level": 3,
         "order": 6,
@@ -2035,7 +2159,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0037",
+        "id": "NODE-FW-0039",
         "label": "L3.data_washer.M2",
         "level": 3,
         "order": 7,
@@ -2087,7 +2211,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0038",
+        "id": "NODE-FW-0040",
         "label": "L3.data_washer.M3",
         "level": 3,
         "order": 8,
@@ -2139,7 +2263,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0039",
+        "id": "NODE-FW-0041",
         "label": "L3.data_washer.M4",
         "level": 3,
         "order": 9,
@@ -2191,7 +2315,7 @@
         ]
       },
       {
-        "id": "NODE-FW-0040",
+        "id": "NODE-FW-0042",
         "label": "L4.data_washer.M0",
         "level": 4,
         "order": 1,
@@ -2227,23 +2351,23 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "属性读取结构基",
+            "text": "属性读取结构基：`input_access.L0.M0[B1,B2,B3]`。用于从归一文档中按目标读取稳定属性结果",
             "line": "23"
           },
           {
             "token": "B2",
-            "text": "简单对比结构基",
+            "text": "简单对比结构基。用于将读取结果与目标条件比对并形成资格结论",
             "line": "24"
           },
           {
             "token": "B3",
-            "text": "资格结果封装结构基",
+            "text": "资格结果封装结构基。用于把资格结论整理为可供下游消费的稳定结果对象",
             "line": "25"
           }
         ]
       },
       {
-        "id": "NODE-FW-0041",
+        "id": "NODE-FW-0043",
         "label": "L4.data_washer.M1",
         "level": 4,
         "order": 2,
@@ -2279,23 +2403,23 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "规则集结构基",
+            "text": "规则集结构基。用于定义稳定可排序的分块规则集合",
             "line": "21"
           },
           {
             "token": "B2",
-            "text": "边界策略结构基",
+            "text": "边界策略结构基。用于为规则集合补齐起止与闭合策略约束",
             "line": "22"
           },
           {
             "token": "B3",
-            "text": "规范模型结构基",
+            "text": "规范模型结构基。用于把规则集与边界策略组装为统一规范模型",
             "line": "23"
           }
         ]
       },
       {
-        "id": "NODE-FW-0042",
+        "id": "NODE-FW-0044",
         "label": "L4.data_washer.M2",
         "level": 4,
         "order": 3,
@@ -2331,23 +2455,23 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "扫描游标结构基",
+            "text": "扫描游标结构基。用于确定归一文档的扫描位置与前进顺序",
             "line": "23"
           },
           {
             "token": "B2",
-            "text": "单元抽取结构基",
+            "text": "单元抽取结构基。用于依据游标位置抽取稳定扫描单元",
             "line": "24"
           },
           {
             "token": "B3",
-            "text": "扫描集结构基",
+            "text": "扫描集结构基。用于把扫描单元汇总为可枚举的扫描集合",
             "line": "25"
           }
         ]
       },
       {
-        "id": "NODE-FW-0043",
+        "id": "NODE-FW-0045",
         "label": "L4.data_washer.M3",
         "level": 4,
         "order": 4,
@@ -2383,23 +2507,23 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "规则选择结构基",
+            "text": "规则选择结构基。用于从分块规范中选出当前应执行的规则",
             "line": "23"
           },
           {
             "token": "B2",
-            "text": "条件判定结构基",
+            "text": "条件判定结构基。用于基于扫描单元和当前规则生成判定结果",
             "line": "24"
           },
           {
             "token": "B3",
-            "text": "匹配结果结构基",
+            "text": "匹配结果结构基。用于把判定结果整理为稳定匹配集合",
             "line": "25"
           }
         ]
       },
       {
-        "id": "NODE-FW-0044",
+        "id": "NODE-FW-0046",
         "label": "L4.data_washer.M4",
         "level": 4,
         "order": 5,
@@ -2435,23 +2559,23 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "起块结构基",
+            "text": "起块结构基。用于依据匹配结果确定每个块的起始边界",
             "line": "24"
           },
           {
             "token": "B2",
-            "text": "闭块结构基",
+            "text": "闭块结构基。用于依据起块状态补齐每个块的结束边界",
             "line": "25"
           },
           {
             "token": "B3",
-            "text": "块集合结构基",
+            "text": "块集合结构基。用于把块边界组织为完整且可枚举的分块集合",
             "line": "26"
           }
         ]
       },
       {
-        "id": "NODE-FW-0045",
+        "id": "NODE-FW-0047",
         "label": "L4.data_washer.M5",
         "level": 4,
         "order": 6,
@@ -2487,23 +2611,23 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "追踪绑定器结构基",
+            "text": "追踪绑定器结构基。用于为分块结果绑定稳定追踪标识",
             "line": "24"
           },
           {
             "token": "B2",
-            "text": "映射绑定器结构基",
+            "text": "映射绑定器结构基。用于为分块结果补齐原文映射和扩展属性",
             "line": "25"
           },
           {
             "token": "B3",
-            "text": "结果模型结构基",
+            "text": "结果模型结构基。用于按格式要求组织稳定结果对象集合",
             "line": "26"
           }
         ]
       },
       {
-        "id": "NODE-FW-0046",
+        "id": "NODE-FW-0048",
         "label": "L4.data_washer.M6",
         "level": 4,
         "order": 7,
@@ -2539,17 +2663,17 @@
         "base_items": [
           {
             "token": "B1",
-            "text": "结果模型结构基",
+            "text": "结果模型结构基。用于确保上游结果对象以稳定模型进入输出阶段",
             "line": "22"
           },
           {
             "token": "B2",
-            "text": "序列化器结构基",
+            "text": "序列化器结构基。用于把结果模型转换为可写入的输出载荷",
             "line": "23"
           },
           {
             "token": "B3",
-            "text": "文件写入器结构基",
+            "text": "文件写入器结构基。用于将输出载荷落盘为独立结果文件",
             "line": "24"
           }
         ]
@@ -2558,7 +2682,7 @@
     "edges": [
       {
         "from": "NODE-FW-0001",
-        "to": "NODE-FW-0003",
+        "to": "NODE-FW-0004",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L0",
@@ -2572,7 +2696,7 @@
       },
       {
         "from": "NODE-FW-0001",
-        "to": "NODE-FW-0004",
+        "to": "NODE-FW-0005",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L0",
@@ -2586,7 +2710,7 @@
       },
       {
         "from": "NODE-FW-0001",
-        "to": "NODE-FW-0005",
+        "to": "NODE-FW-0006",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L0",
@@ -2600,7 +2724,7 @@
       },
       {
         "from": "NODE-FW-0001",
-        "to": "NODE-FW-0006",
+        "to": "NODE-FW-0007",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L0",
@@ -2614,7 +2738,7 @@
       },
       {
         "from": "NODE-FW-0001",
-        "to": "NODE-FW-0007",
+        "to": "NODE-FW-0008",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L0",
@@ -2628,7 +2752,7 @@
       },
       {
         "from": "NODE-FW-0001",
-        "to": "NODE-FW-0008",
+        "to": "NODE-FW-0009",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L0",
@@ -2641,7 +2765,49 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0009",
+        "from": "NODE-FW-0003",
+        "to": "NODE-FW-0010",
+        "relation": "framework_module_growth",
+        "module": "data_washer",
+        "from_level": "L0",
+        "to_level": "L1",
+        "source_ref": "input_access.L0.M0",
+        "target_ref": "L1.M0",
+        "rules": "B1,B2,B3",
+        "terms": "input_access.L0.M0[B1,B2,B3]",
+        "source_file": "framework/data_washer/L1/L1-M0-文档分块.md",
+        "source_line": 32
+      },
+      {
+        "from": "NODE-FW-0003",
+        "to": "NODE-FW-0011",
+        "relation": "framework_module_growth",
+        "module": "data_washer",
+        "from_level": "L0",
+        "to_level": "L1",
+        "source_ref": "input_access.L0.M0",
+        "target_ref": "L1.M1",
+        "rules": "B1,B2,B3",
+        "terms": "input_access.L0.M0[B1,B2,B3]",
+        "source_file": "framework/data_washer/L1/L1-M1-块标注.md",
+        "source_line": 25
+      },
+      {
+        "from": "NODE-FW-0003",
+        "to": "NODE-FW-0042",
+        "relation": "framework_module_growth",
+        "module": "data_washer",
+        "from_level": "L0",
+        "to_level": "L4",
+        "source_ref": "input_access.L0.M0",
+        "target_ref": "L4.M0",
+        "rules": "B1,B2,B3",
+        "terms": "input_access.L0.M0[B1,B2,B3]",
+        "source_file": "framework/data_washer/L4/L4-M0-资格识别模块.md",
+        "source_line": 23
+      },
+      {
+        "from": "NODE-FW-0010",
         "to": "NODE-FW-0002",
         "relation": "framework_module_growth",
         "module": "data_washer",
@@ -2649,14 +2815,28 @@
         "to_level": "L0",
         "source_ref": "L1.M0",
         "target_ref": "L0.M0",
-        "rules": "B1,B2,B3",
-        "terms": "L1.M0[B1,B2,B3]",
+        "rules": "B1,B2,B3,B4",
+        "terms": "L1.M0[B1,B2,B3,B4]",
         "source_file": "framework/data_washer/L0/L0-M0-数据清洗.md",
         "source_line": 33
       },
       {
-        "from": "NODE-FW-0003",
-        "to": "NODE-FW-0010",
+        "from": "NODE-FW-0011",
+        "to": "NODE-FW-0002",
+        "relation": "framework_module_growth",
+        "module": "data_washer",
+        "from_level": "L1",
+        "to_level": "L0",
+        "source_ref": "L1.M1",
+        "target_ref": "L0.M0",
+        "rules": "B1,B2,B3",
+        "terms": "L1.M1[B1,B2,B3]",
+        "source_file": "framework/data_washer/L0/L0-M0-数据清洗.md",
+        "source_line": 33
+      },
+      {
+        "from": "NODE-FW-0004",
+        "to": "NODE-FW-0012",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2669,8 +2849,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0003",
-        "to": "NODE-FW-0011",
+        "from": "NODE-FW-0004",
+        "to": "NODE-FW-0013",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2683,8 +2863,8 @@
         "source_line": 25
       },
       {
-        "from": "NODE-FW-0003",
-        "to": "NODE-FW-0020",
+        "from": "NODE-FW-0004",
+        "to": "NODE-FW-0022",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2697,8 +2877,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0004",
-        "to": "NODE-FW-0021",
+        "from": "NODE-FW-0005",
+        "to": "NODE-FW-0023",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2711,8 +2891,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0004",
-        "to": "NODE-FW-0022",
+        "from": "NODE-FW-0005",
+        "to": "NODE-FW-0024",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2725,8 +2905,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0004",
-        "to": "NODE-FW-0023",
+        "from": "NODE-FW-0005",
+        "to": "NODE-FW-0025",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2739,8 +2919,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0005",
-        "to": "NODE-FW-0024",
+        "from": "NODE-FW-0006",
+        "to": "NODE-FW-0026",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2753,8 +2933,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0005",
-        "to": "NODE-FW-0025",
+        "from": "NODE-FW-0006",
+        "to": "NODE-FW-0027",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2767,8 +2947,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0005",
-        "to": "NODE-FW-0026",
+        "from": "NODE-FW-0006",
+        "to": "NODE-FW-0028",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2781,8 +2961,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0006",
-        "to": "NODE-FW-0012",
+        "from": "NODE-FW-0007",
+        "to": "NODE-FW-0014",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2795,8 +2975,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0006",
-        "to": "NODE-FW-0013",
+        "from": "NODE-FW-0007",
+        "to": "NODE-FW-0015",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2809,8 +2989,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0006",
-        "to": "NODE-FW-0027",
+        "from": "NODE-FW-0007",
+        "to": "NODE-FW-0029",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2823,8 +3003,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0007",
-        "to": "NODE-FW-0014",
+        "from": "NODE-FW-0008",
+        "to": "NODE-FW-0016",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2837,8 +3017,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0007",
-        "to": "NODE-FW-0015",
+        "from": "NODE-FW-0008",
+        "to": "NODE-FW-0017",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2851,8 +3031,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0007",
-        "to": "NODE-FW-0016",
+        "from": "NODE-FW-0008",
+        "to": "NODE-FW-0018",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2865,8 +3045,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0008",
-        "to": "NODE-FW-0017",
+        "from": "NODE-FW-0009",
+        "to": "NODE-FW-0019",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2879,8 +3059,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0008",
-        "to": "NODE-FW-0018",
+        "from": "NODE-FW-0009",
+        "to": "NODE-FW-0020",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2893,8 +3073,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0008",
-        "to": "NODE-FW-0019",
+        "from": "NODE-FW-0009",
+        "to": "NODE-FW-0021",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L1",
@@ -2907,8 +3087,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0028",
-        "to": "NODE-FW-0009",
+        "from": "NODE-FW-0030",
+        "to": "NODE-FW-0010",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L2",
@@ -2918,11 +3098,11 @@
         "rules": "B1,B2,B3",
         "terms": "L2.M0[B1,B2,B3]",
         "source_file": "framework/data_washer/L1/L1-M0-文档分块.md",
-        "source_line": 30
+        "source_line": 32
       },
       {
-        "from": "NODE-FW-0029",
-        "to": "NODE-FW-0009",
+        "from": "NODE-FW-0031",
+        "to": "NODE-FW-0010",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L2",
@@ -2932,11 +3112,11 @@
         "rules": "B1,B2,B3",
         "terms": "L2.M1[B1,B2,B3]",
         "source_file": "framework/data_washer/L1/L1-M0-文档分块.md",
-        "source_line": 30
+        "source_line": 32
       },
       {
-        "from": "NODE-FW-0030",
-        "to": "NODE-FW-0009",
+        "from": "NODE-FW-0032",
+        "to": "NODE-FW-0010",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L2",
@@ -2946,11 +3126,11 @@
         "rules": "B1,B2,B3",
         "terms": "L2.M2[B1,B2,B3]",
         "source_file": "framework/data_washer/L1/L1-M0-文档分块.md",
-        "source_line": 30
+        "source_line": 32
       },
       {
-        "from": "NODE-FW-0011",
-        "to": "NODE-FW-0031",
+        "from": "NODE-FW-0013",
+        "to": "NODE-FW-0033",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L2",
@@ -2963,8 +3143,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0011",
-        "to": "NODE-FW-0032",
+        "from": "NODE-FW-0013",
+        "to": "NODE-FW-0034",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L2",
@@ -2977,8 +3157,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0011",
-        "to": "NODE-FW-0033",
+        "from": "NODE-FW-0013",
+        "to": "NODE-FW-0035",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L2",
@@ -2991,8 +3171,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0011",
-        "to": "NODE-FW-0034",
+        "from": "NODE-FW-0013",
+        "to": "NODE-FW-0036",
         "relation": "framework_module_growth",
         "module": "data_station",
         "from_level": "L2",
@@ -3005,8 +3185,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0035",
-        "to": "NODE-FW-0028",
+        "from": "NODE-FW-0037",
+        "to": "NODE-FW-0030",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L3",
@@ -3019,8 +3199,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0036",
-        "to": "NODE-FW-0029",
+        "from": "NODE-FW-0038",
+        "to": "NODE-FW-0031",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L3",
@@ -3033,8 +3213,8 @@
         "source_line": 29
       },
       {
-        "from": "NODE-FW-0037",
-        "to": "NODE-FW-0029",
+        "from": "NODE-FW-0039",
+        "to": "NODE-FW-0031",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L3",
@@ -3047,8 +3227,8 @@
         "source_line": 29
       },
       {
-        "from": "NODE-FW-0038",
-        "to": "NODE-FW-0029",
+        "from": "NODE-FW-0040",
+        "to": "NODE-FW-0031",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L3",
@@ -3061,8 +3241,8 @@
         "source_line": 29
       },
       {
-        "from": "NODE-FW-0039",
-        "to": "NODE-FW-0030",
+        "from": "NODE-FW-0041",
+        "to": "NODE-FW-0032",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L3",
@@ -3075,8 +3255,8 @@
         "source_line": 22
       },
       {
-        "from": "NODE-FW-0040",
-        "to": "NODE-FW-0035",
+        "from": "NODE-FW-0042",
+        "to": "NODE-FW-0037",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
@@ -3089,8 +3269,8 @@
         "source_line": 23
       },
       {
-        "from": "NODE-FW-0041",
-        "to": "NODE-FW-0036",
+        "from": "NODE-FW-0043",
+        "to": "NODE-FW-0038",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
@@ -3103,8 +3283,8 @@
         "source_line": 21
       },
       {
-        "from": "NODE-FW-0042",
-        "to": "NODE-FW-0037",
+        "from": "NODE-FW-0044",
+        "to": "NODE-FW-0039",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
@@ -3117,8 +3297,8 @@
         "source_line": 26
       },
       {
-        "from": "NODE-FW-0043",
-        "to": "NODE-FW-0037",
+        "from": "NODE-FW-0045",
+        "to": "NODE-FW-0039",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
@@ -3131,8 +3311,8 @@
         "source_line": 26
       },
       {
-        "from": "NODE-FW-0044",
-        "to": "NODE-FW-0037",
+        "from": "NODE-FW-0046",
+        "to": "NODE-FW-0039",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
@@ -3145,8 +3325,8 @@
         "source_line": 26
       },
       {
-        "from": "NODE-FW-0045",
-        "to": "NODE-FW-0038",
+        "from": "NODE-FW-0047",
+        "to": "NODE-FW-0040",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
@@ -3159,8 +3339,8 @@
         "source_line": 24
       },
       {
-        "from": "NODE-FW-0046",
-        "to": "NODE-FW-0039",
+        "from": "NODE-FW-0048",
+        "to": "NODE-FW-0041",
         "relation": "framework_module_growth",
         "module": "data_washer",
         "from_level": "L4",
