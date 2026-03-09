@@ -44,9 +44,9 @@ class KnowledgeBaseDemoTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["project"]["project"]["project_id"], "knowledge_base_basic")
         self.assertEqual(payload["frontend"], "/knowledge-base")
-        self.assertEqual(payload["workbench_spec"], "/api/knowledge/workbench-spec")
-        self.assertEqual(payload["project"]["ui_spec_summary"]["renderer"], "knowledge_chat_client_v1")
-        self.assertEqual(payload["project"]["backend_spec_summary"]["renderer"], "knowledge_chat_backend_v1")
+        self.assertEqual(payload["product_spec"], "/api/knowledge/product-spec")
+        self.assertIn("chat_home", payload["project"]["ui_spec_summary"]["page_ids"])
+        self.assertEqual(payload["project"]["backend_spec_summary"]["answer_policy"]["citation_style"], "inline_refs")
 
     def test_knowledge_base_endpoints_exist(self) -> None:
         response = self.client.get("/api/knowledge/knowledge-bases")
@@ -130,19 +130,18 @@ class KnowledgeBaseDemoTest(unittest.TestCase):
             payload["citations"][0]["document_path"],
         )
 
-    def test_workbench_spec_exposes_verification_evidence(self) -> None:
-        response = self.client.get("/api/knowledge/workbench-spec")
+    def test_product_spec_endpoint_exposes_compiled_product_truth(self) -> None:
+        response = self.client.get("/api/knowledge/product-spec")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["project"]["project"]["project_id"], "knowledge_base_basic")
-        self.assertEqual(len(payload["workspace_flow"]), 3)
-        self.assertEqual(payload["project"]["ui_spec"]["components"]["chat_composer"]["submit_label"], "发送")
-        self.assertEqual(payload["project"]["backend_spec"]["return_policy"]["chat_path"], "/knowledge-base")
-        self.assertTrue(payload["frontend_verification"]["passed"])
-        self.assertTrue(payload["workspace_verification"]["passed"])
-        self.assertTrue(payload["backend_verification"]["passed"])
-        self.assertTrue(payload["project"]["generated_artifacts"])
-        self.assertTrue(payload["project"]["validation_reports"]["overall"]["passed"])
+        self.assertEqual(payload["product"]["project_id"], "knowledge_base_basic")
+        self.assertEqual(payload["navigation"]["pages"]["chat_home"], "/knowledge-base")
+        self.assertEqual(payload["library"]["knowledge_base_id"], "research-and-standards")
+        self.assertEqual(payload["chat"]["citation_style"], "inline_refs")
+        self.assertEqual(payload["interaction_model"]["workspace_flow"][0]["stage_id"], "knowledge_base_select")
+        self.assertEqual(payload["interaction_model"]["citation_return"]["query_keys"], ["document", "section", "citation"])
+        self.assertNotIn("ui_spec", payload)
+        self.assertNotIn("backend_spec", payload)
 
 
 if __name__ == "__main__":

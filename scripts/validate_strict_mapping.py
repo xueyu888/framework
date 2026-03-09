@@ -83,15 +83,9 @@ REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS = (
     "## 5. 验证",
 )
 PROJECT_ALLOWED_TOP_LEVEL_DIRS = {"assets", "generated"}
-PROJECT_ALLOWED_ROOT_FILES = {"instance.toml"}
+PROJECT_ALLOWED_ROOT_FILES = {"product_spec.toml", "implementation_config.toml"}
 PROJECT_ALLOWED_DOC_SUFFIXES = {".md"}
-PROJECT_REQUIRED_GENERATED_FILES = (
-    "framework_ir.json",
-    "workbench_spec.json",
-    "project_bundle.py",
-    "generation_manifest.json",
-)
-PROJECT_REQUIRED_INSTANCE_TOP_LEVEL_KEYS = {
+PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS = {
     "project",
     "framework",
     "surface",
@@ -105,15 +99,19 @@ PROJECT_REQUIRED_INSTANCE_TOP_LEVEL_KEYS = {
     "return",
     "documents",
 }
-PROJECT_ALLOWED_INSTANCE_TOP_LEVEL_KEYS = set(PROJECT_REQUIRED_INSTANCE_TOP_LEVEL_KEYS)
-PROJECT_REQUIRED_INSTANCE_NESTED_TABLES: dict[str, set[str]] = {
+PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS = set(PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS)
+PRODUCT_SPEC_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {
     "surface": {"copy"},
     "library": {"copy"},
     "chat": {"copy"},
 }
-PROJECT_ALLOWED_INSTANCE_NESTED_TABLES: dict[str, set[str]] = {
-    key: set(value) for key, value in PROJECT_REQUIRED_INSTANCE_NESTED_TABLES.items()
+PRODUCT_SPEC_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {
+    key: set(value) for key, value in PRODUCT_SPEC_REQUIRED_NESTED_TABLES.items()
 }
+IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS = {"frontend", "backend", "evidence", "artifacts"}
+IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS = set(IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS)
+IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {}
+IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {}
 
 Issue = dict[str, Any]
 
@@ -251,10 +249,36 @@ def collect_changed_files() -> set[str]:
     return changed
 
 
-def discover_project_instance_files(projects_dir: Path = PROJECTS_DIR) -> list[Path]:
+def discover_project_product_spec_files(projects_dir: Path = PROJECTS_DIR) -> list[Path]:
     if not projects_dir.exists():
         return []
-    return sorted(projects_dir.glob("*/instance.toml"))
+    return sorted(projects_dir.glob("*/product_spec.toml"))
+
+
+def implementation_config_path_for(product_spec_file: Path) -> Path:
+    return product_spec_file.parent / "implementation_config.toml"
+
+
+def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
+    implementation_config_file = implementation_config_path_for(product_spec_file)
+    _, data = _load_toml_text_and_data(implementation_config_file)
+    artifacts = data.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise ValueError("implementation_config.toml must define [artifacts]")
+    names: list[str] = []
+    for key in (
+        "framework_ir_json",
+        "product_spec_json",
+        "implementation_bundle_py",
+        "generation_manifest_json",
+    ):
+        value = artifacts.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"implementation_config.toml missing artifacts.{key}")
+        names.append(value.strip())
+    if len(set(names)) != len(names):
+        raise ValueError("artifact file names in implementation_config.toml must be unique")
+    return tuple(names)
 
 
 def _read_file_bytes(path: Path) -> bytes:
@@ -265,98 +289,159 @@ def _load_toml_text_and_data(path: Path) -> tuple[str, dict[str, Any]]:
     text = read_text(path)
     data = tomllib.loads(text)
     if not isinstance(data, dict):
-        raise ValueError("instance.toml must decode into a table")
+        raise ValueError(f"{path.name} must decode into a table")
     return text, data
 
 
-def validate_project_instance_layout(instance_files: list[Path] | None = None) -> list[Issue]:
+def _validate_project_toml_layout(
+    file_path: Path,
+    *,
+    required_top_level_keys: set[str],
+    allowed_top_level_keys: set[str],
+    required_nested_tables: dict[str, set[str]],
+    allowed_nested_tables: dict[str, set[str]],
+    parse_error_code: str,
+    missing_section_code: str,
+    unknown_section_code: str,
+    missing_nested_code: str,
+    unknown_nested_code: str,
+    kind_label: str,
+) -> list[Issue]:
     issues: list[Issue] = []
-    project_instance_files = instance_files or discover_project_instance_files()
-    if not project_instance_files:
+    rel_file = file_path.relative_to(REPO_ROOT).as_posix()
+    try:
+        text, data = _load_toml_text_and_data(file_path)
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"failed to parse {kind_label}: {exc}",
+                rel_file,
+                1,
+                code=parse_error_code,
+            )
+        )
         return issues
 
-    for instance_file in project_instance_files:
-        rel_instance = instance_file.relative_to(REPO_ROOT).as_posix()
-        try:
-            text, data = _load_toml_text_and_data(instance_file)
-        except Exception as exc:
-            issues.append(
-                make_issue(
-                    f"failed to parse instance.toml: {exc}",
-                    rel_instance,
-                    1,
-                    code="PROJECT_INSTANCE_PARSE_FAILED",
-                )
+    top_level_keys = set(data)
+    for key in sorted(required_top_level_keys - top_level_keys):
+        issues.append(
+            make_issue(
+                f"missing required {kind_label} section or array: {key}",
+                rel_file,
+                1,
+                code=missing_section_code,
             )
+        )
+
+    for key in sorted(top_level_keys - allowed_top_level_keys):
+        line = find_line(text, f"[{key}]")
+        if line == 1:
+            line = find_line(text, f"[[{key}]]")
+        issues.append(
+            make_issue(
+                f"unknown {kind_label} top-level section: {key}",
+                rel_file,
+                line,
+                code=unknown_section_code,
+            )
+        )
+
+    for parent, required_children in required_nested_tables.items():
+        parent_value = data.get(parent)
+        if not isinstance(parent_value, dict):
             continue
-
-        top_level_keys = set(data)
-        for key in sorted(PROJECT_REQUIRED_INSTANCE_TOP_LEVEL_KEYS - top_level_keys):
+        nested_table_keys = {key for key, value in parent_value.items() if isinstance(value, dict)}
+        for child in sorted(required_children - nested_table_keys):
             issues.append(
                 make_issue(
-                    f"missing required instance section or array: {key}",
-                    rel_instance,
-                    1,
-                    code="PROJECT_INSTANCE_SECTION_MISSING",
+                    f"missing required nested {kind_label} section: [{parent}.{child}]",
+                    rel_file,
+                    find_line(text, f"[{parent}]"),
+                    code=missing_nested_code,
                 )
             )
-
-        for key in sorted(top_level_keys - PROJECT_ALLOWED_INSTANCE_TOP_LEVEL_KEYS):
-            line = find_line(text, f"[{key}]")
-            if line == 1:
-                line = find_line(text, f"[[{key}]]")
+        allowed_children = allowed_nested_tables.get(parent, set())
+        for child in sorted(nested_table_keys - allowed_children):
             issues.append(
                 make_issue(
-                    (
-                        f"unknown instance top-level section: {key}; keep instance config grouped by "
-                        "framework big-category sections only"
-                    ),
-                    rel_instance,
-                    line,
-                    code="PROJECT_INSTANCE_SECTION_UNKNOWN",
+                    f"unknown nested {kind_label} section: [{parent}.{child}]",
+                    rel_file,
+                    find_line(text, f"[{parent}.{child}]"),
+                    code=unknown_nested_code,
                 )
             )
-
-        for parent, required_children in PROJECT_REQUIRED_INSTANCE_NESTED_TABLES.items():
-            parent_value = data.get(parent)
-            if not isinstance(parent_value, dict):
-                continue
-            nested_table_keys = {key for key, value in parent_value.items() if isinstance(value, dict)}
-            for child in sorted(required_children - nested_table_keys):
-                issues.append(
-                    make_issue(
-                        f"missing required nested instance section: [{parent}.{child}]",
-                        rel_instance,
-                        find_line(text, f"[{parent}]"),
-                        code="PROJECT_INSTANCE_NESTED_SECTION_MISSING",
-                    )
-                )
-            allowed_children = PROJECT_ALLOWED_INSTANCE_NESTED_TABLES.get(parent, set())
-            for child in sorted(nested_table_keys - allowed_children):
-                issues.append(
-                    make_issue(
-                        (
-                            f"unknown nested instance section: [{parent}.{child}]; nested sections must remain "
-                            "inside the owning big-category boundary"
-                        ),
-                        rel_instance,
-                        find_line(text, f"[{parent}.{child}]"),
-                        code="PROJECT_INSTANCE_NESTED_SECTION_UNKNOWN",
-                    )
-                )
 
     return issues
 
 
-def validate_project_generation_discipline(
-    instance_files: list[Path] | None = None,
-) -> list[Issue]:
+def validate_project_configuration_layout(product_spec_files: list[Path] | None = None) -> list[Issue]:
     issues: list[Issue] = []
-    project_instance_files = instance_files or discover_project_instance_files()
-    if not project_instance_files:
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    if not project_product_spec_files:
         return issues
 
-    issues.extend(validate_project_instance_layout(project_instance_files))
+    for product_spec_file in project_product_spec_files:
+        issues.extend(
+            _validate_project_toml_layout(
+                product_spec_file,
+                required_top_level_keys=PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS,
+                allowed_top_level_keys=PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS,
+                required_nested_tables=PRODUCT_SPEC_REQUIRED_NESTED_TABLES,
+                allowed_nested_tables=PRODUCT_SPEC_ALLOWED_NESTED_TABLES,
+                parse_error_code="PROJECT_PRODUCT_SPEC_PARSE_FAILED",
+                missing_section_code="PROJECT_PRODUCT_SPEC_SECTION_MISSING",
+                unknown_section_code="PROJECT_PRODUCT_SPEC_SECTION_UNKNOWN",
+                missing_nested_code="PROJECT_PRODUCT_SPEC_NESTED_SECTION_MISSING",
+                unknown_nested_code="PROJECT_PRODUCT_SPEC_NESTED_SECTION_UNKNOWN",
+                kind_label="product_spec.toml",
+            )
+        )
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        if not implementation_config_file.exists():
+            issues.append(
+                make_issue(
+                    "missing implementation_config.toml next to product_spec.toml",
+                    product_spec_file.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="PROJECT_IMPLEMENTATION_CONFIG_MISSING",
+                    related=[
+                        {
+                            "message": "Expected implementation config",
+                            "file": implementation_config_file.relative_to(REPO_ROOT).as_posix(),
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+            )
+            continue
+        issues.extend(
+            _validate_project_toml_layout(
+                implementation_config_file,
+                required_top_level_keys=IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS,
+                allowed_top_level_keys=IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS,
+                required_nested_tables=IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES,
+                allowed_nested_tables=IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES,
+                parse_error_code="PROJECT_IMPLEMENTATION_CONFIG_PARSE_FAILED",
+                missing_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_MISSING",
+                unknown_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_UNKNOWN",
+                missing_nested_code="PROJECT_IMPLEMENTATION_CONFIG_NESTED_SECTION_MISSING",
+                unknown_nested_code="PROJECT_IMPLEMENTATION_CONFIG_NESTED_SECTION_UNKNOWN",
+                kind_label="implementation_config.toml",
+            )
+        )
+    return issues
+
+
+def validate_project_generation_discipline(
+    product_spec_files: list[Path] | None = None,
+) -> list[Issue]:
+    issues: list[Issue] = []
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    if not project_product_spec_files:
+        return issues
+
+    issues.extend(validate_project_configuration_layout(project_product_spec_files))
 
     try:
         from project_runtime.knowledge_base import materialize_knowledge_base_project
@@ -371,10 +456,24 @@ def validate_project_generation_discipline(
         )
         return issues
 
-    for instance_file in project_instance_files:
-        instance_file = instance_file.resolve()
-        project_dir = instance_file.parent
-        rel_instance_file = instance_file.relative_to(REPO_ROOT).as_posix()
+    for product_spec_file in project_product_spec_files:
+        product_spec_file = product_spec_file.resolve()
+        project_dir = product_spec_file.parent
+        rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        rel_implementation_config_file = implementation_config_file.relative_to(REPO_ROOT).as_posix()
+        try:
+            expected_generated_files = expected_generated_files_for(product_spec_file)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to resolve generated artifact names for {rel_product_spec_file}: {exc}",
+                    rel_implementation_config_file,
+                    1,
+                    code="PROJECT_IMPLEMENTATION_CONFIG_INVALID",
+                )
+            )
+            continue
 
         for file_path in sorted(project_dir.rglob("*")):
             if not file_path.is_file():
@@ -390,16 +489,23 @@ def validate_project_generation_discipline(
             issues.append(
                 make_issue(
                     (
-                        "project instances must not contain direct implementation files outside "
-                        "generated/ or assets/; change framework markdown or instance.toml instead"
+                        "project configuration directories must not contain direct implementation files "
+                        "outside generated/ or assets/; change framework markdown, product_spec.toml, "
+                        "or implementation_config.toml instead"
                     ),
                     file_path.relative_to(REPO_ROOT).as_posix(),
                     1,
                     code="PROJECT_DIRECT_CODE_FORBIDDEN",
                     related=[
                         {
-                            "message": "Project source of truth",
-                            "file": rel_instance_file,
+                            "message": "Project product spec",
+                            "file": rel_product_spec_file,
+                            "line": 1,
+                            "column": 1,
+                        },
+                        {
+                            "message": "Project implementation config",
+                            "file": rel_implementation_config_file,
                             "line": 1,
                             "column": 1,
                         }
@@ -413,9 +519,9 @@ def validate_project_generation_discipline(
                 make_issue(
                     (
                         "missing generated project artifacts; run "
-                        f"`uv run python scripts/materialize_project.py --project {rel_instance_file}`"
+                        f"`uv run python scripts/materialize_project.py --project {rel_product_spec_file}`"
                     ),
-                    rel_instance_file,
+                    rel_product_spec_file,
                     1,
                     code="PROJECT_GENERATED_MISSING",
                 )
@@ -425,15 +531,15 @@ def validate_project_generation_discipline(
         try:
             with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
                 temp_generated_dir = Path(temp_dir) / "generated"
-                materialize_knowledge_base_project(instance_file, output_dir=temp_generated_dir)
-                for required_name in PROJECT_REQUIRED_GENERATED_FILES:
+                materialize_knowledge_base_project(product_spec_file, output_dir=temp_generated_dir)
+                for required_name in expected_generated_files:
                     actual_file = actual_generated_dir / required_name
                     expected_file = temp_generated_dir / required_name
                     if not actual_file.exists():
                         issues.append(
                             make_issue(
                                 f"missing generated artifact: {required_name}",
-                                rel_instance_file,
+                                rel_product_spec_file,
                                 1,
                                 code="PROJECT_GENERATED_FILE_MISSING",
                                 related=[
@@ -452,15 +558,21 @@ def validate_project_generation_discipline(
                             make_issue(
                                 (
                                     f"generated artifact is stale or manually edited: {required_name}; "
-                                    "re-materialize from framework markdown and instance.toml"
+                                    "re-materialize from framework markdown, product spec, and implementation config"
                                 ),
                                 actual_file.relative_to(REPO_ROOT).as_posix(),
                                 1,
                                 code="PROJECT_GENERATED_OUT_OF_SYNC",
                                 related=[
                                     {
-                                        "message": "Project source of truth",
-                                        "file": rel_instance_file,
+                                        "message": "Project product spec",
+                                        "file": rel_product_spec_file,
+                                        "line": 1,
+                                        "column": 1,
+                                    },
+                                    {
+                                        "message": "Project implementation config",
+                                        "file": rel_implementation_config_file,
                                         "line": 1,
                                         "column": 1,
                                     }
@@ -470,8 +582,8 @@ def validate_project_generation_discipline(
         except Exception as exc:
             issues.append(
                 make_issue(
-                    f"project materialization failed for {rel_instance_file}: {exc}",
-                    rel_instance_file,
+                    f"project materialization failed for {rel_product_spec_file}: {exc}",
+                    rel_product_spec_file,
                     1,
                     code="PROJECT_GENERATION_FAILED",
                 )

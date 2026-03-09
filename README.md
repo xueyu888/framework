@@ -17,7 +17,8 @@ In short: **Shelf helps teams turn framework docs into a real engineering system
 Shelf 的目标不是做一个“会写代码的聊天界面”，而是提供一套 **AI-native engineering workflow**：
 
 - 用 `framework/*.md` 作为框架级事实来源
-- 用 `projects/<project_id>/instance.toml` 固化实例级边界
+- 用 `projects/<project_id>/product_spec.toml` 固化产品真相
+- 用 `projects/<project_id>/implementation_config.toml` 固化实现细化
 - 用脚本把规范物化为项目产物
 - 用严格映射验证保证结构一致性
 - 用 VSCode 插件把模块树、跳转、问题定位接到日常开发里
@@ -81,15 +82,16 @@ uv run uvicorn --app-dir src project_runtime.app_factory:app --reload
 默认入口：
 
 - Page: `http://127.0.0.1:8000/knowledge-base`
-- Workbench spec: `http://127.0.0.1:8000/api/knowledge/workbench-spec`
+- Product spec: `http://127.0.0.1:8000/api/knowledge/product-spec`
 - API: `http://127.0.0.1:8000/api/knowledge/documents`
 
 ## How The Workflow Fits Together
 
 1. **Define the framework**
    - 在 `framework/` 里写模块标准，例如能力声明、边界定义、最小可行基、组合规则。
-2. **Configure a project instance**
-   - 在 `projects/<project_id>/instance.toml` 里填写实例边界和数据。
+2. **Define the product and implementation**
+   - 在 `projects/<project_id>/product_spec.toml` 里填写产品边界、内容和路由。
+   - 在 `projects/<project_id>/implementation_config.toml` 里填写技术细化、证据接口和产物命名。
 3. **Materialize the project**
    - 由框架和实例配置生成 `projects/<project_id>/generated/*`。
 4. **Validate changes**
@@ -130,10 +132,11 @@ uv run uvicorn --app-dir src project_runtime.app_factory:app --reload
 - 知识库领域框架：`framework/knowledge_base/Lx-Mn-*.md`
 - 知识库接口：`framework/backend/Lx-M0-*.md`
 
-### Project instances
+### Projects
 
 - 实例层说明：`projects/README.md`
-- 当前样板：`projects/knowledge_base_basic/instance.toml`
+- 当前样板：`projects/knowledge_base_basic/product_spec.toml`
+- 当前实现配置：`projects/knowledge_base_basic/implementation_config.toml`
 
 ## ArchSync VSCode Extension
 
@@ -166,22 +169,23 @@ bash tools/vscode/archsync/install_local.sh
 
 ## Knowledge Base Demo
 
-仓库内置了一个“项目实例配置驱动”的知识库 demo，用来演示：
+仓库内置了一个“产品规格 + 实现配置驱动”的知识库 demo，用来演示：
 
 - 前端框架 + 领域框架 + 后端接口如何组合
-- `framework/*.md + instance.toml -> generated/*` 的物化链路
-- 运行时模板如何从实例配置构建出真实应用
+- `framework/*.md + product_spec.toml + implementation_config.toml -> generated/*` 的物化链路
+- 运行时模板如何从产品规格和实现配置构建出真实应用
 
 相关入口：
 
-- 项目配置：`projects/knowledge_base_basic/instance.toml`
+- Product Spec：`projects/knowledge_base_basic/product_spec.toml`
+- Implementation Config：`projects/knowledge_base_basic/implementation_config.toml`
 - 运行时模板：`src/knowledge_base_demo/`
 - 物化产物：`projects/knowledge_base_basic/generated/`
 
 手动物化：
 
 ```bash
-uv run python scripts/materialize_project.py --project projects/knowledge_base_basic/instance.toml
+uv run python scripts/materialize_project.py --project projects/knowledge_base_basic/product_spec.toml
 ```
 
 ## Framework Tree and Visual Outputs
@@ -212,7 +216,7 @@ uv run python scripts/generate_framework_tree_hierarchy.py \
 
 - 必须使用 `uv` 管理 Python 环境和依赖
 - 不直接修改 `projects/<project_id>/generated/*`
-- 项目行为变更先改 `framework/*.md` 或 `projects/<project_id>/instance.toml`
+- 项目行为变更先改 `framework/*.md`、`projects/<project_id>/product_spec.toml` 或 `projects/<project_id>/implementation_config.toml`
 - 推送前必须通过严格映射验证
 - 公开发布必须遵守 `specs/code/发布与版本说明标准.md`
 

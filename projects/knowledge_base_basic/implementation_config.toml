@@ -1,0 +1,19 @@
+[frontend]
+renderer = "knowledge_chat_client_v1"
+style_profile = "knowledge_chat_web_v1"
+script_profile = "knowledge_chat_browser_v1"
+
+[backend]
+renderer = "knowledge_chat_backend_v1"
+transport = "http_json"
+retrieval_strategy = "retrieval_stub"
+
+[evidence]
+product_spec_endpoint = "/api/knowledge/product-spec"
+
+[artifacts]
+framework_ir_json = "framework_ir.json"
+product_spec_json = "product_spec.json"
+implementation_bundle_py = "implementation_bundle.py"
+generation_manifest_json = "generation_manifest.json"
+

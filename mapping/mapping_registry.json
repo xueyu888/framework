@@ -1,7 +1,11 @@
 {
   "meta": {
-    "updated_at": "2026-03-08",
+    "updated_at": "2026-03-09",
     "l3_sync_notes": [
+      {
+        "id": "SYNC-20260309-framework-product-impl-layering",
+        "note": "Promote the repository-wide AI coding layering model: framework as shared structural language, product spec as implementation-independent product truth, implementation config as technical refinement, with one-way truth flow into code and evidence."
+      },
       {
         "id": "SYNC-20260305-runtime-env-l0",
         "note": "Add framework/runtime_env/L0-M0-运行环境识别模块.md for framework directive schema trial."

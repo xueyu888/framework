@@ -12,36 +12,36 @@ if str(SRC_DIR) not in sys.path:
 from project_runtime.knowledge_base import materialize_knowledge_base_project
 
 
-def discover_instance_files() -> list[Path]:
-    return sorted((REPO_ROOT / "projects").glob("*/instance.toml"))
+def discover_product_spec_files() -> list[Path]:
+    return sorted((REPO_ROOT / "projects").glob("*/product_spec.toml"))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Materialize generated project artifacts from framework markdown and instance config."
+        description="Materialize generated project artifacts from framework markdown, product spec, and implementation config."
     )
     parser.add_argument(
         "--project",
         action="append",
         dest="projects",
-        help="project instance file to materialize; repeatable. Defaults to every projects/*/instance.toml.",
+        help="product spec file to materialize; repeatable. Defaults to every projects/*/product_spec.toml.",
     )
     args = parser.parse_args()
 
     requested = args.projects or []
-    instance_files = [
+    product_spec_files = [
         (REPO_ROOT / item).resolve() if not Path(item).is_absolute() else Path(item).resolve()
         for item in requested
     ]
-    if not instance_files:
-        instance_files = [path.resolve() for path in discover_instance_files()]
+    if not product_spec_files:
+        product_spec_files = [path.resolve() for path in discover_product_spec_files()]
 
-    if not instance_files:
-        print("[FAIL] no project instance files found")
+    if not product_spec_files:
+        print("[FAIL] no product spec files found")
         return 1
 
-    for instance_file in instance_files:
-        project = materialize_knowledge_base_project(instance_file)
+    for product_spec_file in product_spec_files:
+        project = materialize_knowledge_base_project(product_spec_file)
         assert project.generated_artifacts is not None
         print(
             "[OK] materialized",

@@ -2,7 +2,7 @@
 project_id = "knowledge_base_basic"
 template = "knowledge_base_workbench"
 display_name = "ArchSync Knowledge Chat"
-description = "A ChatGPT-style knowledge chat client compiled from framework standards and one instance configuration."
+description = "A ChatGPT-style knowledge chat client compiled from framework standards and one product spec."
 version = "0.3.0"
 
 [framework]
@@ -19,7 +19,7 @@ preview_mode = "drawer"
 density = "comfortable"
 
 [surface.copy]
-hero_kicker = "Framework-Compiled Chat Client"
+hero_kicker = "Framework-Compiled Product"
 hero_title = "ArchSync Knowledge Chat"
 hero_copy = "A ChatGPT-style knowledge chat client with inline citations, on-demand source drawers, and secondary knowledge pages."
 library_title = "Knowledge Bases"
@@ -44,7 +44,6 @@ knowledge_list = "/knowledge-bases"
 knowledge_detail = "/knowledge-bases/details"
 document_detail_prefix = "/knowledge-bases/details/documents"
 api_prefix = "/api/knowledge"
-workbench_spec = "/api/knowledge/workbench-spec"
 
 [a11y]
 reading_order = ["conversation_sidebar", "chat_header", "message_stream", "chat_composer", "citation_drawer"]
@@ -84,7 +83,7 @@ system_prompt = "Answer with concise structure-first guidance grounded in the se
 welcome_prompts = [
   "总结框架文档到生成代码的编译链",
   "解释引用抽屉和文档详情页如何形成来源回路",
-  "说明哪些改动属于框架变更，哪些属于实例配置",
+  "说明哪些改动属于框架变更，哪些改动属于实现配置",
   "基于知识库概括 ChatGPT 风格知识问答客户端的结构",
 ]
 
@@ -109,7 +108,7 @@ document_id = "chat-client-principles"
 title = "Chat Client Principles"
 summary = "The primary product shape should feel like ChatGPT first and a knowledge platform second."
 tags = ["chat", "ux", "frontend"]
-updated_at = "2026-03-08"
+updated_at = "2026-03-09"
 body_markdown = """
 ## Chat First
 The primary shell should stay close to ChatGPT: a conversation sidebar, one centered message stream, and one bottom composer.
@@ -124,18 +123,18 @@ Knowledge base list, knowledge base detail, and document detail pages exist as s
 [[documents]]
 document_id = "framework-compilation-chain"
 title = "Framework Compilation Chain"
-summary = "Framework markdown, instance configuration, generated contracts, and runtime code form one deterministic compile path."
+summary = "Framework markdown, product spec, implementation config, generated contracts, and runtime code form one deterministic compile path."
 tags = ["framework", "generator", "traceability"]
-updated_at = "2026-03-08"
+updated_at = "2026-03-09"
 body_markdown = """
-## Framework To IR
-Framework markdown defines structure, boundary, base, rule, and verification statements. The compiler parses them into framework IR.
+## Framework To Product Spec
+Framework markdown defines structure, boundary, base, rule, and verification statements. Product spec fixes the concrete product truth inside those boundaries.
 
-## Instance To Spec
-Instance configuration selects legal values inside framework boundaries. The generator resolves those values into a concrete workbench spec.
+## Product Spec To Implementation Config
+Implementation config refines the product spec into one technical realization path without changing the product truth.
 
 ## Generated Runtime
-The final application surface, API contract, verification reports, and generated bundle all derive from the same framework plus instance inputs.
+The final application surface, API contract, verification reports, and generated bundle all derive from the same framework plus product spec and implementation config inputs.
 """
 
 [[documents]]
@@ -143,7 +142,7 @@ document_id = "knowledge-citation-loop"
 title = "Knowledge Citation Loop"
 summary = "A knowledge answer is complete only when the user can inspect citations, reopen source context, and continue the same conversation."
 tags = ["knowledge-base", "citation", "return-path"]
-updated_at = "2026-03-08"
+updated_at = "2026-03-09"
 body_markdown = """
 ## Inline References
 Assistant answers should attach numbered inline references such as [1] and [2] instead of heavy source cards in the main reading flow.
