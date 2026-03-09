@@ -1,4 +1,4 @@
-# 模块框架：L3-M42-IPC白名单守卫
+# IPC白名单守卫:IpcBaiMingDanShouWei
 
 @module
 

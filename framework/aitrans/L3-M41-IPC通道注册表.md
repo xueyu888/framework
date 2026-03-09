@@ -1,4 +1,4 @@
-# 模块框架：L3-M41-IPC通道注册表
+# IPC通道注册表:IpcTongDaoZhuCeBiao
 
 @module
 
