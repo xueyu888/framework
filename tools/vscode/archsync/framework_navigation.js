@@ -11,7 +11,7 @@ const UPPER_SYMBOL_PATTERN = /[A-Z][A-Z0-9_]+/g;
 const BACKTICK_SEGMENT_PATTERN = /`([^`]+)`/g;
 const SYMBOL_TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
 const TOML_SECTION_PATTERN = /^\s*\[([A-Za-z0-9_.-]+)\]\s*$/;
-const DEFAULT_INSTANCE_FILE = path.join("projects", "knowledge_base_basic", "instance.toml");
+const DEFAULT_PRODUCT_SPEC_FILE = path.join("projects", "knowledge_base_basic", "product_spec.toml");
 
 const SECTION_PREFIXES = [
   ["## 1. 能力声明", "capability"],
@@ -96,8 +96,8 @@ const FRAMEWORK_BOUNDARY_SECTION_MAP = {
       ["preview", "return"],
       "该边界由来源锚点与返回路径配置共同承接。"
     ),
-    TURN: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话实例配置承接。"),
-    INPUT: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话实例配置承接。"),
+    TURN: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
+    INPUT: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
     STATUS: derivedConfigMapping(
       "chat",
       ["chat", "chat.copy", "preview"],
@@ -145,8 +145,8 @@ const FRAMEWORK_BOUNDARY_SECTION_MAP = {
     FILE: derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。"),
     PREVIEW: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
     PREVIEWAPI: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
-    CHAT: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话实例配置承接。"),
-    CHATAPI: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话实例配置承接。"),
+    CHAT: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
+    CHATAPI: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
     CITATION: derivedConfigMapping(
       "chat",
       ["chat", "chat.copy", "context", "return", "preview"],
@@ -662,7 +662,7 @@ function inferKnowledgeBaseBoundaryConfigMapping(token) {
     );
   }
   if (new Set(["CHAT", "TURN", "INPUT", "STATUS"]).has(upper)) {
-    return derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话实例配置承接。");
+    return derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。");
   }
   if (upper === "CITATION") {
     return derivedConfigMapping(
@@ -753,36 +753,36 @@ function inferBoundaryConfigMapping(frameworkName, token) {
   return null;
 }
 
-function discoverInstanceFiles(repoRoot) {
+function discoverProductSpecFiles(repoRoot) {
   const projectsDir = path.join(repoRoot, "projects");
   if (!fs.existsSync(projectsDir) || !fs.statSync(projectsDir).isDirectory()) {
     return [];
   }
   const files = [];
   for (const entry of fs.readdirSync(projectsDir)) {
-    const instanceFile = path.join(projectsDir, entry, "instance.toml");
-    if (fs.existsSync(instanceFile) && fs.statSync(instanceFile).isFile()) {
-      files.push(instanceFile);
+    const productSpecFile = path.join(projectsDir, entry, "product_spec.toml");
+    if (fs.existsSync(productSpecFile) && fs.statSync(productSpecFile).isFile()) {
+      files.push(productSpecFile);
     }
   }
   return files.sort();
 }
 
-function inferConfiguredFrameworks(instanceText) {
+function inferConfiguredFrameworks(productSpecText) {
   const frameworks = new Set();
-  for (const match of instanceText.matchAll(/^\s*(frontend|domain|backend)\s*=\s*"framework\/([^/]+)\//gm)) {
+  for (const match of productSpecText.matchAll(/^\s*(frontend|domain|backend)\s*=\s*"framework\/([^/]+)\//gm)) {
     frameworks.add(match[2]);
   }
   return frameworks;
 }
 
-function resolvePreferredInstanceFile(repoRoot, frameworkName) {
-  const preferredDefault = path.join(repoRoot, DEFAULT_INSTANCE_FILE);
+function resolvePreferredProductSpecFile(repoRoot, frameworkName) {
+  const preferredDefault = path.join(repoRoot, DEFAULT_PRODUCT_SPEC_FILE);
   if (fs.existsSync(preferredDefault) && fs.statSync(preferredDefault).isFile()) {
     return preferredDefault;
   }
 
-  const candidates = discoverInstanceFiles(repoRoot);
+  const candidates = discoverProductSpecFiles(repoRoot);
   let bestFile = null;
   let bestScore = -1;
   for (const filePath of candidates) {
@@ -793,7 +793,7 @@ function resolvePreferredInstanceFile(repoRoot, frameworkName) {
         score += 10;
       }
     } catch {
-      // Ignore broken instance files here; main parser/validator handles them elsewhere.
+      // Ignore broken product spec files here; main parser/validator handles them elsewhere.
     }
     if (score > bestScore) {
       bestScore = score;
@@ -808,12 +808,12 @@ function resolveBoundaryConfigTarget(repoRoot, frameworkName, token) {
   if (!mapping) {
     return null;
   }
-  const instanceFilePath = resolvePreferredInstanceFile(repoRoot, frameworkName);
-  if (!instanceFilePath || !fs.existsSync(instanceFilePath)) {
+  const productSpecFilePath = resolvePreferredProductSpecFile(repoRoot, frameworkName);
+  if (!productSpecFilePath || !fs.existsSync(productSpecFilePath)) {
     return null;
   }
-  const instanceText = fs.readFileSync(instanceFilePath, "utf8");
-  const sectionIndex = buildTomlSectionIndex(instanceText);
+  const productSpecText = fs.readFileSync(productSpecFilePath, "utf8");
+  const sectionIndex = buildTomlSectionIndex(productSpecText);
   let targetSectionName = mapping.primarySection;
   let sectionTarget = sectionIndex.get(targetSectionName);
   if (!sectionTarget) {
@@ -830,7 +830,7 @@ function resolveBoundaryConfigTarget(repoRoot, frameworkName, token) {
     return null;
   }
   return {
-    filePath: instanceFilePath,
+    filePath: productSpecFilePath,
     line: sectionTarget.line,
     character: sectionTarget.character,
     length: sectionTarget.length,
@@ -963,7 +963,7 @@ function appendBoundaryConfigHover(parts, repoRoot, frameworkName, token) {
     return;
   }
   const relFile = normalizePathSlashes(path.relative(repoRoot, boundaryTarget.filePath));
-  parts.push("", "实例配置");
+  parts.push("", "Product Spec");
   parts.push(`- 文件：\`${relFile}\``);
   parts.push(`- 主归属 section：\`[${boundaryTarget.primarySection}]\``);
   if (boundaryTarget.targetSection && boundaryTarget.targetSection !== boundaryTarget.primarySection) {

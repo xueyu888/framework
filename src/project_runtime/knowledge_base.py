@@ -12,7 +12,10 @@ from typing import Any
 from framework_ir import FrameworkModuleIR, load_framework_registry, parse_framework_module
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE = REPO_ROOT / "projects/knowledge_base_basic/instance.toml"
+DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE = REPO_ROOT / "projects/knowledge_base_basic/product_spec.toml"
+DEFAULT_KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_FILE = (
+    REPO_ROOT / "projects/knowledge_base_basic/implementation_config.toml"
+)
 SUPPORTED_PROJECT_TEMPLATE = "knowledge_base_workbench"
 
 SURFACE_PRESETS: dict[str, dict[str, str]] = {
@@ -106,6 +109,10 @@ def _normalize_project_path(project_file: str | Path) -> Path:
     if not project_path.is_absolute():
         project_path = (REPO_ROOT / project_path).resolve()
     return project_path
+
+
+def _implementation_config_path_for(product_spec_path: Path) -> Path:
+    return product_spec_path.parent / "implementation_config.toml"
 
 
 def _require_table(parent: dict[str, Any], key: str) -> dict[str, Any]:
@@ -259,7 +266,6 @@ class RouteConfig:
     knowledge_detail: str
     document_detail_prefix: str
     api_prefix: str
-    workbench_spec: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -374,6 +380,61 @@ class ReturnConfig:
 
 
 @dataclass(frozen=True)
+class FrontendImplementationConfig:
+    renderer: str
+    style_profile: str
+    script_profile: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BackendImplementationConfig:
+    renderer: str
+    transport: str
+    retrieval_strategy: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class EvidenceConfig:
+    product_spec_endpoint: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ArtifactConfig:
+    framework_ir_json: str
+    product_spec_json: str
+    implementation_bundle_py: str
+    generation_manifest_json: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class KnowledgeBaseImplementationConfig:
+    frontend: FrontendImplementationConfig
+    backend: BackendImplementationConfig
+    evidence: EvidenceConfig
+    artifacts: ArtifactConfig
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "frontend": self.frontend.to_dict(),
+            "backend": self.backend.to_dict(),
+            "evidence": self.evidence.to_dict(),
+            "artifacts": self.artifacts.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
 class SeedDocumentSource:
     document_id: str
     title: str
@@ -387,8 +448,8 @@ class SeedDocumentSource:
 
 
 @dataclass(frozen=True)
-class KnowledgeBaseInstanceConfig:
-    source_file: str
+class KnowledgeBaseProductSpec:
+    product_spec_file: str
     metadata: ProjectMetadata
     framework: FrameworkSelection
     surface: SurfaceConfig
@@ -449,8 +510,8 @@ class KnowledgeDocument:
 class GeneratedArtifactPaths:
     directory: str
     framework_ir_json: str
-    workbench_spec_json: str
-    project_bundle_py: str
+    product_spec_json: str
+    implementation_bundle_py: str
     generation_manifest_json: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -459,9 +520,11 @@ class GeneratedArtifactPaths:
 
 @dataclass(frozen=True)
 class KnowledgeBaseProject:
-    source_file: str
+    product_spec_file: str
+    implementation_config_file: str
     metadata: ProjectMetadata
     framework: FrameworkSelection
+    implementation: KnowledgeBaseImplementationConfig
     surface: SurfaceConfig
     visual: VisualConfig
     visual_tokens: dict[str, str]
@@ -498,10 +561,64 @@ class KnowledgeBaseProject:
     def theme_tokens(self) -> dict[str, str]:
         return self.visual_tokens
 
-    def to_spec_dict(self) -> dict[str, Any]:
+    def _resolved_page_routes(self) -> dict[str, str]:
         return {
-            "source_file": self.source_file,
-            "project": self.metadata.to_dict(),
+            "home": self.route.home,
+            "chat_home": self.route.workbench,
+            "knowledge_list": self.route.knowledge_list,
+            "knowledge_detail": f"{self.route.knowledge_detail}/{{knowledge_base_id}}",
+            "document_detail": f"{self.route.document_detail_prefix}/{{document_id}}",
+        }
+
+    def _resolved_api_routes(self) -> dict[str, str]:
+        return {
+            "knowledge_bases": f"{self.route.api_prefix}/knowledge-bases",
+            "knowledge_base_detail": f"{self.route.api_prefix}/knowledge-bases/{{knowledge_base_id}}",
+            "documents": f"{self.route.api_prefix}/documents",
+            "create_document": f"{self.route.api_prefix}/documents",
+            "document_detail": f"{self.route.api_prefix}/documents/{{document_id}}",
+            "delete_document": f"{self.route.api_prefix}/documents/{{document_id}}",
+            "section_detail": f"{self.route.api_prefix}/documents/{{document_id}}/sections/{{section_id}}",
+            "tags": f"{self.route.api_prefix}/tags",
+            "chat_turns": f"{self.route.api_prefix}/chat/turns",
+        }
+
+    def to_product_spec_dict(self) -> dict[str, Any]:
+        return {
+            "product": self.metadata.to_dict(),
+            "surface": self.surface.to_dict(),
+            "visual": self.visual.to_dict(),
+            "navigation": {
+                "pages": self._resolved_page_routes(),
+                "return_targets": list(self.return_config.targets),
+                "anchor_restore": self.return_config.anchor_restore,
+            },
+            "features": self.features.to_dict(),
+            "route": self.route.to_dict(),
+            "a11y": self.a11y.to_dict(),
+            "library": self.library.to_dict(),
+            "preview": self.preview.to_dict(),
+            "chat": self.chat.to_dict(),
+            "context": self.context.to_dict(),
+            "return": self.return_config.to_dict(),
+            "content": {
+                "surface_copy": self.surface.copy.to_dict(),
+                "derived_copy": self.copy,
+            },
+            "interaction_model": {
+                "workspace_flow": self.workbench_contract.get("flow", []),
+                "citation_return": self.workbench_contract.get("citation_return_contract", {}),
+                "surface_regions": self.frontend_contract.get("surface_regions", []),
+                "interaction_actions": self.frontend_contract.get("interaction_actions", []),
+            },
+            "documents": [item.to_dict() for item in self.documents],
+        }
+
+    def to_runtime_bundle_dict(self) -> dict[str, Any]:
+        return {
+            "product_spec_file": self.product_spec_file,
+            "implementation_config_file": self.implementation_config_file,
+            "product_spec": self.to_product_spec_dict(),
             "framework": {
                 **self.framework.to_dict(),
                 "primary_modules": [
@@ -511,98 +628,48 @@ class KnowledgeBaseProject:
                 ],
                 "resolved_modules": [item.to_dict() for item in self.resolved_modules],
             },
-            "surface": self.surface.to_dict(),
-            "visual": {
-                **self.visual.to_dict(),
-                "tokens": self.visual_tokens,
-            },
-            "features": self.features.to_dict(),
-            "route": self.route.to_dict(),
+            "implementation_config": self.implementation.to_dict(),
+            "visual_tokens": self.visual_tokens,
             "routes": {
                 **self.route.to_dict(),
-                "pages": {
-                    "knowledge_list": self.route.knowledge_list,
-                    "knowledge_detail": f"{self.route.knowledge_detail}/{{knowledge_base_id}}",
-                    "document_detail": f"{self.route.document_detail_prefix}/{{document_id}}",
-                },
-                "api": {
-                    "knowledge_bases": f"{self.route.api_prefix}/knowledge-bases",
-                    "knowledge_base_detail": f"{self.route.api_prefix}/knowledge-bases/{{knowledge_base_id}}",
-                    "documents": f"{self.route.api_prefix}/documents",
-                    "create_document": f"{self.route.api_prefix}/documents",
-                    "document_detail": f"{self.route.api_prefix}/documents/{{document_id}}",
-                    "delete_document": f"{self.route.api_prefix}/documents/{{document_id}}",
-                    "section_detail": f"{self.route.api_prefix}/documents/{{document_id}}/sections/{{section_id}}",
-                    "tags": f"{self.route.api_prefix}/tags",
-                    "chat_turns": f"{self.route.api_prefix}/chat/turns",
-                    "workbench_spec": self.route.workbench_spec,
-                },
+                "pages": self._resolved_page_routes(),
+                "api": self._resolved_api_routes(),
             },
-            "a11y": self.a11y.to_dict(),
-            "library": self.library.to_dict(),
-            "preview": self.preview.to_dict(),
-            "chat": self.chat.to_dict(),
-            "context": self.context.to_dict(),
-            "return": self.return_config.to_dict(),
-            "copy": self.copy,
-            "boundary_config": {
-                "SURFACE": {"section": "surface", "values": self.surface.to_dict()},
-                "VISUAL": {"section": "visual", "values": self.visual.to_dict()},
-                "ROUTE": {"section": "route", "values": self.route.to_dict()},
-                "A11Y": {"section": "a11y", "values": self.a11y.to_dict()},
-                "LIBRARY": {"section": "library", "values": self.library.to_dict()},
-                "PREVIEW": {"section": "preview", "values": self.preview.to_dict()},
-                "CHAT": {"section": "chat", "values": self.chat.to_dict()},
-                "CONTEXT": {"section": "context", "values": self.context.to_dict()},
-                "RETURN": {"section": "return", "values": self.return_config.to_dict()},
-            },
-            "documents": [item.to_dict() for item in self.documents],
             "frontend_contract": self.frontend_contract,
             "workbench_contract": self.workbench_contract,
             "ui_spec": self.ui_spec,
             "backend_spec": self.backend_spec,
+            "documents": [item.to_dict() for item in self.documents],
             "validation_reports": self.validation_reports,
             "generated_artifacts": self.generated_artifacts.to_dict() if self.generated_artifacts else None,
         }
 
+    def to_spec_dict(self) -> dict[str, Any]:
+        return self.to_runtime_bundle_dict()
+
     def public_summary(self) -> dict[str, Any]:
         return {
-            "source_file": self.source_file,
+            "product_spec_file": self.product_spec_file,
+            "implementation_config_file": self.implementation_config_file,
             "project": self.metadata.to_dict(),
             "framework": self.framework.to_dict(),
+            "implementation": self.implementation.to_dict(),
             "surface": self.surface.to_dict(),
             "visual": self.visual.to_dict(),
             "route": self.route.to_dict(),
             "a11y": self.a11y.to_dict(),
             "routes": {
                 **self.route.to_dict(),
-                "pages": {
-                    "knowledge_list": self.route.knowledge_list,
-                    "knowledge_detail": f"{self.route.knowledge_detail}/{{knowledge_base_id}}",
-                    "document_detail": f"{self.route.document_detail_prefix}/{{document_id}}",
-                },
-                "api": {
-                    "knowledge_bases": f"{self.route.api_prefix}/knowledge-bases",
-                    "knowledge_base_detail": f"{self.route.api_prefix}/knowledge-bases/{{knowledge_base_id}}",
-                    "documents": f"{self.route.api_prefix}/documents",
-                    "create_document": f"{self.route.api_prefix}/documents",
-                    "document_detail": f"{self.route.api_prefix}/documents/{{document_id}}",
-                    "delete_document": f"{self.route.api_prefix}/documents/{{document_id}}",
-                    "section_detail": f"{self.route.api_prefix}/documents/{{document_id}}/sections/{{section_id}}",
-                    "tags": f"{self.route.api_prefix}/tags",
-                    "chat_turns": f"{self.route.api_prefix}/chat/turns",
-                    "workbench_spec": self.route.workbench_spec,
-                },
+                "pages": self._resolved_page_routes(),
+                "api": self._resolved_api_routes(),
             },
             "document_count": len(self.documents),
             "resolved_module_ids": [item.module_id for item in self.resolved_modules],
             "ui_spec_summary": {
-                "renderer": self.ui_spec.get("renderer"),
                 "page_ids": list(self.ui_spec.get("pages", {}).keys()),
                 "component_ids": list(self.ui_spec.get("components", {}).keys()),
             },
             "backend_spec_summary": {
-                "renderer": self.backend_spec.get("renderer"),
                 "retrieval": self.backend_spec.get("retrieval", {}),
                 "answer_policy": {
                     "citation_style": self.backend_spec.get("answer_policy", {}).get("citation_style"),
@@ -780,8 +847,8 @@ def _require_documents(data: dict[str, Any]) -> tuple[SeedDocumentSource, ...]:
     return tuple(items)
 
 
-def _load_instance_config(project_path: Path) -> KnowledgeBaseInstanceConfig:
-    raw = _read_toml_file(project_path)
+def _load_product_spec(product_spec_path: Path) -> KnowledgeBaseProductSpec:
+    raw = _read_toml_file(product_spec_path)
     project_table = _require_table(raw, "project")
     framework_table = _require_table(raw, "framework")
     surface_table = _require_table(raw, "surface")
@@ -805,8 +872,8 @@ def _load_instance_config(project_path: Path) -> KnowledgeBaseInstanceConfig:
     allow_create = _require_bool(library_table, "allow_create")
     allow_delete = _require_bool(library_table, "allow_delete")
 
-    return KnowledgeBaseInstanceConfig(
-        source_file=_relative_path(project_path),
+    return KnowledgeBaseProductSpec(
+        product_spec_file=_relative_path(product_spec_path),
         metadata=ProjectMetadata(
             project_id=_require_string(project_table, "project_id"),
             template=_require_string(project_table, "template"),
@@ -861,7 +928,6 @@ def _load_instance_config(project_path: Path) -> KnowledgeBaseInstanceConfig:
             knowledge_detail=_require_string(route_table, "knowledge_detail"),
             document_detail_prefix=_require_string(route_table, "document_detail_prefix"),
             api_prefix=_require_string(route_table, "api_prefix"),
-            workbench_spec=_require_string(route_table, "workbench_spec"),
         ),
         a11y=A11yConfig(
             reading_order=_require_string_tuple(a11y_table, "reading_order"),
@@ -913,6 +979,35 @@ def _load_instance_config(project_path: Path) -> KnowledgeBaseInstanceConfig:
             citation_card_variant=_require_string(return_table, "citation_card_variant"),
         ),
         documents=_require_documents(raw),
+    )
+
+
+def _load_implementation_config(implementation_config_path: Path) -> KnowledgeBaseImplementationConfig:
+    raw = _read_toml_file(implementation_config_path)
+    frontend_table = _require_table(raw, "frontend")
+    backend_table = _require_table(raw, "backend")
+    evidence_table = _require_table(raw, "evidence")
+    artifacts_table = _require_table(raw, "artifacts")
+    return KnowledgeBaseImplementationConfig(
+        frontend=FrontendImplementationConfig(
+            renderer=_require_string(frontend_table, "renderer"),
+            style_profile=_require_string(frontend_table, "style_profile"),
+            script_profile=_require_string(frontend_table, "script_profile"),
+        ),
+        backend=BackendImplementationConfig(
+            renderer=_require_string(backend_table, "renderer"),
+            transport=_require_string(backend_table, "transport"),
+            retrieval_strategy=_require_string(backend_table, "retrieval_strategy"),
+        ),
+        evidence=EvidenceConfig(
+            product_spec_endpoint=_require_string(evidence_table, "product_spec_endpoint"),
+        ),
+        artifacts=ArtifactConfig(
+            framework_ir_json=_require_string(artifacts_table, "framework_ir_json"),
+            product_spec_json=_require_string(artifacts_table, "product_spec_json"),
+            implementation_bundle_py=_require_string(artifacts_table, "implementation_bundle_py"),
+            generation_manifest_json=_require_string(artifacts_table, "generation_manifest_json"),
+        ),
     )
 
 
@@ -994,7 +1089,7 @@ def _pick_boundary_name(module: FrameworkModuleIR, boundary_id: str, fallback: s
 
 
 def _derive_copy(
-    instance: KnowledgeBaseInstanceConfig,
+    product_spec: KnowledgeBaseProductSpec,
     frontend_ir: FrameworkModuleIR,
     domain_ir: FrameworkModuleIR,
     backend_ir: FrameworkModuleIR,
@@ -1008,14 +1103,14 @@ def _derive_copy(
     ).strip()
     base_labels = " / ".join(item.name for item in domain_ir.bases)
     boundary_labels = ", ".join(item.boundary_id for item in domain_ir.boundaries)
-    surface_copy = instance.surface.copy
+    surface_copy = product_spec.surface.copy
     return {
-        "hero_kicker": surface_copy.hero_kicker or instance.visual.brand,
-        "hero_title": surface_copy.hero_title or instance.metadata.display_name,
+        "hero_kicker": surface_copy.hero_kicker or product_spec.visual.brand,
+        "hero_title": surface_copy.hero_title or product_spec.metadata.display_name,
         "hero_copy": surface_copy.hero_copy or hero_copy,
         "mode_label": "知识问答",
-        "knowledge_base_name": instance.library.knowledge_base_name,
-        "knowledge_base_description": instance.library.knowledge_base_description,
+        "knowledge_base_name": product_spec.library.knowledge_base_name,
+        "knowledge_base_description": product_spec.library.knowledge_base_description,
         "contract_title": "Framework Contract",
         "contract_value": base_labels,
         "contract_meta": f"Boundaries: {boundary_labels}",
@@ -1023,9 +1118,9 @@ def _derive_copy(
         "preview_title": surface_copy.preview_title or _pick_boundary_name(domain_ir, "PREVIEW", "Preview"),
         "toc_title": surface_copy.toc_title or "TOC",
         "chat_title": surface_copy.chat_title or _pick_boundary_name(domain_ir, "CHAT", "Chat"),
-        "search_placeholder": instance.library.search_placeholder,
-        "chat_placeholder": instance.chat.placeholder,
-        "chat_welcome": instance.chat.welcome,
+        "search_placeholder": product_spec.library.search_placeholder,
+        "chat_placeholder": product_spec.chat.placeholder,
+        "chat_welcome": product_spec.chat.welcome,
         "empty_state_title": surface_copy.empty_state_title,
         "empty_state_copy": surface_copy.empty_state_copy,
     }
@@ -1035,7 +1130,6 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     knowledge_base_detail_path = f"{project.route.knowledge_detail}/{{knowledge_base_id}}"
     document_detail_path = f"{project.route.document_detail_prefix}/{{document_id}}"
     return {
-        "renderer": "knowledge_chat_client_v1",
         "derived_from": {
             "framework_modules": {
                 "frontend": project.frontend_ir.module_id,
@@ -1203,7 +1297,6 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
 
 def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     return {
-        "renderer": "knowledge_chat_backend_v1",
         "derived_from": {
             "framework_modules": {
                 "domain": project.domain_ir.module_id,
@@ -1286,75 +1379,73 @@ def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     }
 
 
-def _validate_instance_config(
-    instance: KnowledgeBaseInstanceConfig,
+def _validate_product_spec(
+    product_spec: KnowledgeBaseProductSpec,
     frontend_ir: FrameworkModuleIR,
     domain_ir: FrameworkModuleIR,
     backend_ir: FrameworkModuleIR,
 ) -> None:
-    if instance.metadata.template != SUPPORTED_PROJECT_TEMPLATE:
-        raise ValueError(f"unsupported project template: {instance.metadata.template}")
-    if instance.surface.shell != "conversation_sidebar_shell":
+    if product_spec.metadata.template != SUPPORTED_PROJECT_TEMPLATE:
+        raise ValueError(f"unsupported project template: {product_spec.metadata.template}")
+    if product_spec.surface.shell != "conversation_sidebar_shell":
         raise ValueError("surface.shell must be conversation_sidebar_shell")
-    if instance.surface.layout_variant != "chatgpt_knowledge_client":
+    if product_spec.surface.layout_variant != "chatgpt_knowledge_client":
         raise ValueError("surface.layout_variant must be chatgpt_knowledge_client")
-    if instance.surface.preview_mode != "drawer":
+    if product_spec.surface.preview_mode != "drawer":
         raise ValueError("surface.preview_mode must be drawer")
     if not all(
         (
-            instance.library.enabled,
-            instance.preview.enabled,
-            instance.chat.enabled,
-            instance.chat.citations_enabled,
-            instance.return_config.enabled,
+            product_spec.library.enabled,
+            product_spec.preview.enabled,
+            product_spec.chat.enabled,
+            product_spec.chat.citations_enabled,
+            product_spec.return_config.enabled,
         )
     ):
         raise ValueError("knowledge_base_workbench requires library, preview, chat, citations, and return")
-    if not instance.route.home.startswith("/") or not instance.route.workbench.startswith("/"):
+    if not product_spec.route.home.startswith("/") or not product_spec.route.workbench.startswith("/"):
         raise ValueError("route.home and route.workbench must start with '/'")
-    if not instance.route.knowledge_list.startswith("/") or not instance.route.knowledge_detail.startswith("/"):
+    if not product_spec.route.knowledge_list.startswith("/") or not product_spec.route.knowledge_detail.startswith("/"):
         raise ValueError("route.knowledge_list and route.knowledge_detail must start with '/'")
-    if not instance.route.document_detail_prefix.startswith("/"):
+    if not product_spec.route.document_detail_prefix.startswith("/"):
         raise ValueError("route.document_detail_prefix must start with '/'")
-    if not instance.route.api_prefix.startswith("/api"):
+    if not product_spec.route.api_prefix.startswith("/api"):
         raise ValueError("route.api_prefix must start with '/api'")
-    if not instance.route.workbench_spec.startswith(instance.route.api_prefix):
-        raise ValueError("route.workbench_spec must stay under route.api_prefix")
-    if not instance.route.knowledge_detail.startswith(instance.route.knowledge_list):
+    if not product_spec.route.knowledge_detail.startswith(product_spec.route.knowledge_list):
         raise ValueError("route.knowledge_detail must stay under route.knowledge_list")
-    if not instance.route.document_detail_prefix.startswith(instance.route.knowledge_detail):
+    if not product_spec.route.document_detail_prefix.startswith(product_spec.route.knowledge_detail):
         raise ValueError("route.document_detail_prefix must stay under route.knowledge_detail")
-    if not instance.library.knowledge_base_id.strip():
+    if not product_spec.library.knowledge_base_id.strip():
         raise ValueError("library.knowledge_base_id must be non-empty")
-    if "markdown" not in instance.library.source_types:
+    if "markdown" not in product_spec.library.source_types:
         raise ValueError("library.source_types must include markdown")
-    if "title" not in instance.library.metadata_fields:
+    if "title" not in product_spec.library.metadata_fields:
         raise ValueError("library.metadata_fields must include title")
-    if not instance.library.allow_create and instance.library.allow_delete:
+    if not product_spec.library.allow_create and product_spec.library.allow_delete:
         raise ValueError("library.allow_delete cannot be true when library.allow_create is false")
-    if instance.library.default_focus != "current_knowledge_base":
+    if product_spec.library.default_focus != "current_knowledge_base":
         raise ValueError("library.default_focus must be current_knowledge_base")
-    if instance.preview.anchor_mode != "heading":
+    if product_spec.preview.anchor_mode != "heading":
         raise ValueError("preview.anchor_mode must be heading")
-    if not instance.preview.show_toc:
+    if not product_spec.preview.show_toc:
         raise ValueError("preview.show_toc must stay enabled for the knowledge-base workbench")
-    if instance.preview.preview_variant != "citation_drawer":
+    if product_spec.preview.preview_variant != "citation_drawer":
         raise ValueError("preview.preview_variant must be citation_drawer")
-    if instance.chat.mode != "retrieval_stub":
+    if product_spec.chat.mode != "retrieval_stub":
         raise ValueError("chat.mode must be retrieval_stub")
-    if instance.chat.citation_style != "inline_refs":
+    if product_spec.chat.citation_style != "inline_refs":
         raise ValueError("chat.citation_style must be inline_refs")
-    if not instance.chat.welcome_prompts:
+    if not product_spec.chat.welcome_prompts:
         raise ValueError("chat.welcome_prompts must not be empty")
-    if instance.context.max_citations <= 0 or instance.context.max_preview_sections <= 0:
+    if product_spec.context.max_citations <= 0 or product_spec.context.max_preview_sections <= 0:
         raise ValueError("context max values must be positive")
-    if not instance.return_config.anchor_restore:
+    if not product_spec.return_config.anchor_restore:
         raise ValueError("return.anchor_restore must stay enabled")
-    if "citation_drawer" not in instance.return_config.targets:
+    if "citation_drawer" not in product_spec.return_config.targets:
         raise ValueError("return.targets must include citation_drawer")
-    if "document_detail" not in instance.return_config.targets:
+    if "document_detail" not in product_spec.return_config.targets:
         raise ValueError("return.targets must include document_detail")
-    if tuple(instance.a11y.reading_order) != (
+    if tuple(product_spec.a11y.reading_order) != (
         "conversation_sidebar",
         "chat_header",
         "message_stream",
@@ -1364,15 +1455,27 @@ def _validate_instance_config(
         raise ValueError(
             "a11y.reading_order must stay conversation_sidebar -> chat_header -> message_stream -> chat_composer -> citation_drawer"
         )
-    if len(instance.documents) < 1:
+    if len(product_spec.documents) < 1:
         raise ValueError("at least one document is required")
     if not frontend_ir.bases or not domain_ir.bases or not backend_ir.bases:
         raise ValueError("selected framework modules must define bases")
-    for document in instance.documents:
+    for document in product_spec.documents:
         if len(_tokenize(document.summary)) < 3:
             raise ValueError(f"document summary is too short for retrieval: {document.document_id}")
         if "## " not in document.body_markdown:
             raise ValueError(f"document body must contain level-2 headings for anchor navigation: {document.document_id}")
+
+
+def _validate_implementation_config(
+    implementation: KnowledgeBaseImplementationConfig,
+    product_spec: KnowledgeBaseProductSpec,
+) -> None:
+    if not implementation.evidence.product_spec_endpoint.startswith(product_spec.route.api_prefix):
+        raise ValueError("evidence.product_spec_endpoint must stay under route.api_prefix")
+    if implementation.backend.retrieval_strategy != product_spec.chat.mode:
+        raise ValueError("backend.retrieval_strategy must match chat.mode")
+    if implementation.backend.transport != "http_json":
+        raise ValueError("backend.transport must be http_json")
 
 
 def _collect_validation_reports(project: KnowledgeBaseProject) -> dict[str, Any]:
@@ -1424,18 +1527,21 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
     }
     framework_ir_text = json.dumps(framework_ir_payload, ensure_ascii=False, indent=2)
 
-    workbench_spec = project.to_spec_dict()
-    workbench_spec_text = json.dumps(workbench_spec, ensure_ascii=False, indent=2)
-    project_bundle_text = "\n".join(
+    product_spec = project.to_product_spec_dict()
+    runtime_bundle = project.to_runtime_bundle_dict()
+    product_spec_text = json.dumps(product_spec, ensure_ascii=False, indent=2)
+    implementation_bundle_text = "\n".join(
         [
             "from __future__ import annotations",
             "",
             "# GENERATED FILE. DO NOT EDIT.",
-            "# Change framework markdown or projects/<project_id>/instance.toml, then re-materialize.",
+            "# Change framework markdown, product_spec.toml, or implementation_config.toml, then re-materialize.",
             "",
             "import json",
             "",
-            f"PROJECT_SPEC = json.loads(r'''{json.dumps(workbench_spec, ensure_ascii=False)}''')",
+            f"PRODUCT_SPEC = json.loads(r'''{json.dumps(product_spec, ensure_ascii=False)}''')",
+            f"IMPLEMENTATION_CONFIG = json.loads(r'''{json.dumps(project.implementation.to_dict(), ensure_ascii=False)}''')",
+            f"RUNTIME_BUNDLE = json.loads(r'''{json.dumps(runtime_bundle, ensure_ascii=False)}''')",
             "",
         ]
     )
@@ -1443,11 +1549,12 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
         {
             "project_id": project.metadata.project_id,
             "template": project.metadata.template,
-            "source_file": project.source_file,
+            "product_spec_file": project.product_spec_file,
+            "implementation_config_file": project.implementation_config_file,
             "generator": {
                 "entry": "project_runtime.knowledge_base.materialize_knowledge_base_project",
                 "discipline": (
-                    "project behavior is derived from framework markdown and instance configuration; "
+                    "project behavior is derived from framework markdown, product spec, and implementation config; "
                     "generated code must not be edited directly"
                 ),
             },
@@ -1459,51 +1566,58 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
             },
             "generated_files": {
                 "framework_ir_json": generated_artifacts.framework_ir_json,
-                "workbench_spec_json": generated_artifacts.workbench_spec_json,
-                "project_bundle_py": generated_artifacts.project_bundle_py,
+                "product_spec_json": generated_artifacts.product_spec_json,
+                "implementation_bundle_py": generated_artifacts.implementation_bundle_py,
+                "generation_manifest_json": generated_artifacts.generation_manifest_json,
             },
             "content_sha256": {
                 "framework_ir_json": _sha256_text(framework_ir_text),
-                "workbench_spec_json": _sha256_text(workbench_spec_text),
-                "project_bundle_py": _sha256_text(project_bundle_text),
+                "product_spec_json": _sha256_text(product_spec_text),
+                "implementation_bundle_py": _sha256_text(implementation_bundle_text),
             },
         },
         ensure_ascii=False,
         indent=2,
     )
     return {
-        "framework_ir.json": framework_ir_text,
-        "workbench_spec.json": workbench_spec_text,
-        "project_bundle.py": project_bundle_text,
-        "generation_manifest.json": generation_manifest_text,
+        "framework_ir_json": framework_ir_text,
+        "product_spec_json": product_spec_text,
+        "implementation_bundle_py": implementation_bundle_text,
+        "generation_manifest_json": generation_manifest_text,
     }
 
 
-def _compile_project(instance: KnowledgeBaseInstanceConfig) -> KnowledgeBaseProject:
+def _compile_project(
+    product_spec: KnowledgeBaseProductSpec,
+    implementation: KnowledgeBaseImplementationConfig,
+) -> KnowledgeBaseProject:
     from frontend_kernel import build_frontend_contract
     from knowledge_base_framework import build_workbench_contract
 
-    frontend_ir = _resolve_framework_module(instance.framework.frontend)
-    domain_ir = _resolve_framework_module(instance.framework.domain)
-    backend_ir = _resolve_framework_module(instance.framework.backend)
-    _validate_instance_config(instance, frontend_ir, domain_ir, backend_ir)
-    documents = tuple(_compile_document(item) for item in instance.documents)
+    frontend_ir = _resolve_framework_module(product_spec.framework.frontend)
+    domain_ir = _resolve_framework_module(product_spec.framework.domain)
+    backend_ir = _resolve_framework_module(product_spec.framework.backend)
+    _validate_product_spec(product_spec, frontend_ir, domain_ir, backend_ir)
+    _validate_implementation_config(implementation, product_spec)
+    documents = tuple(_compile_document(item) for item in product_spec.documents)
     project = KnowledgeBaseProject(
-        source_file=instance.source_file,
-        metadata=instance.metadata,
-        framework=instance.framework,
-        surface=instance.surface,
-        visual=instance.visual,
-        visual_tokens=_build_visual_tokens(instance.visual, instance.surface, instance.preview),
-        features=instance.features,
-        route=instance.route,
-        a11y=instance.a11y,
-        library=instance.library,
-        preview=instance.preview,
-        chat=instance.chat,
-        context=instance.context,
-        return_config=instance.return_config,
-        copy=_derive_copy(instance, frontend_ir, domain_ir, backend_ir),
+        product_spec_file=product_spec.product_spec_file,
+        implementation_config_file=_relative_path(_implementation_config_path_for(_normalize_project_path(product_spec.product_spec_file))),
+        metadata=product_spec.metadata,
+        framework=product_spec.framework,
+        implementation=implementation,
+        surface=product_spec.surface,
+        visual=product_spec.visual,
+        visual_tokens=_build_visual_tokens(product_spec.visual, product_spec.surface, product_spec.preview),
+        features=product_spec.features,
+        route=product_spec.route,
+        a11y=product_spec.a11y,
+        library=product_spec.library,
+        preview=product_spec.preview,
+        chat=product_spec.chat,
+        context=product_spec.context,
+        return_config=product_spec.return_config,
+        copy=_derive_copy(product_spec, frontend_ir, domain_ir, backend_ir),
         frontend_ir=frontend_ir,
         domain_ir=domain_ir,
         backend_ir=backend_ir,
@@ -1526,41 +1640,44 @@ def _compile_project(instance: KnowledgeBaseInstanceConfig) -> KnowledgeBaseProj
 
 
 def load_knowledge_base_project(
-    project_file: str | Path = DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE,
+    product_spec_file: str | Path = DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
 ) -> KnowledgeBaseProject:
-    project_path = _normalize_project_path(project_file)
-    instance = _load_instance_config(project_path)
-    return _compile_project(instance)
+    product_spec_path = _normalize_project_path(product_spec_file)
+    implementation_config_path = _implementation_config_path_for(product_spec_path)
+    product_spec = _load_product_spec(product_spec_path)
+    implementation = _load_implementation_config(implementation_config_path)
+    return _compile_project(product_spec, implementation)
 
 
 def materialize_knowledge_base_project(
-    project_file: str | Path = DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE,
+    product_spec_file: str | Path = DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
     output_dir: str | Path | None = None,
 ) -> KnowledgeBaseProject:
-    project_path = _normalize_project_path(project_file)
-    project = load_knowledge_base_project(project_path)
-    generated_dir = project_path.parent / "generated"
+    product_spec_path = _normalize_project_path(product_spec_file)
+    project = load_knowledge_base_project(product_spec_path)
+    generated_dir = product_spec_path.parent / "generated"
     output_path = _normalize_project_path(output_dir) if output_dir is not None else generated_dir
     output_path.mkdir(parents=True, exist_ok=True)
 
-    framework_ir_path = output_path / "framework_ir.json"
-    workbench_spec_path = output_path / "workbench_spec.json"
-    project_bundle_path = output_path / "project_bundle.py"
-    generation_manifest_path = output_path / "generation_manifest.json"
+    artifact_names = project.implementation.artifacts
+    framework_ir_path = output_path / artifact_names.framework_ir_json
+    product_spec_path_json = output_path / artifact_names.product_spec_json
+    implementation_bundle_path = output_path / artifact_names.implementation_bundle_py
+    generation_manifest_path = output_path / artifact_names.generation_manifest_json
     project = replace(
         project,
         generated_artifacts=GeneratedArtifactPaths(
             directory=_relative_path(generated_dir),
-            framework_ir_json=_relative_path(generated_dir / "framework_ir.json"),
-            workbench_spec_json=_relative_path(generated_dir / "workbench_spec.json"),
-            project_bundle_py=_relative_path(generated_dir / "project_bundle.py"),
-            generation_manifest_json=_relative_path(generated_dir / "generation_manifest.json"),
+            framework_ir_json=_relative_path(generated_dir / artifact_names.framework_ir_json),
+            product_spec_json=_relative_path(generated_dir / artifact_names.product_spec_json),
+            implementation_bundle_py=_relative_path(generated_dir / artifact_names.implementation_bundle_py),
+            generation_manifest_json=_relative_path(generated_dir / artifact_names.generation_manifest_json),
         ),
     )
     payloads = _build_generated_artifact_payloads(project)
-    framework_ir_path.write_text(payloads["framework_ir.json"], encoding="utf-8")
-    workbench_spec_path.write_text(payloads["workbench_spec.json"], encoding="utf-8")
-    project_bundle_path.write_text(payloads["project_bundle.py"], encoding="utf-8")
-    generation_manifest_path.write_text(payloads["generation_manifest.json"], encoding="utf-8")
+    framework_ir_path.write_text(payloads["framework_ir_json"], encoding="utf-8")
+    product_spec_path_json.write_text(payloads["product_spec_json"], encoding="utf-8")
+    implementation_bundle_path.write_text(payloads["implementation_bundle_py"], encoding="utf-8")
+    generation_manifest_path.write_text(payloads["generation_manifest_json"], encoding="utf-8")
 
     return project

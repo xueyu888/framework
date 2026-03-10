@@ -7,7 +7,7 @@
 - Refreshes framework tree artifacts by running the generator script.
 - Supports node-to-source jump: click a node, then use `打开源文件` in detail panel to jump to the mapped markdown line.
 - Supports `Go to Definition` / `Ctrl/Cmd+Click` inside framework markdown for `B/C/R/V`, boundary ids, `Lx.My`, `framework.Lx.My`, and bracketed module-rule refs like `frontend.L1.M2[R1,R2]`.
-- Boundary navigation is not limited to explicitly exposed top-level sections. Direct boundaries such as `CHAT` / `SURFACE` and derived boundaries such as `CITATION` / `TURN` / `SCOPE` can jump to the owning or related `projects/*/instance.toml` section, so every effective boundary stays traceable into project configuration.
+- Boundary navigation is not limited to explicitly exposed top-level sections. Direct boundaries such as `CHAT` / `SURFACE` and derived boundaries such as `CITATION` / `TURN` / `SCOPE` can jump to the owning or related `projects/*/product_spec.toml` section, so every effective boundary stays traceable into project product specs.
 - Module refs such as `frontend.L1.M2` are treated as one hover/click target, jump straight to the target module's first `B*`, and show capability/base/rule summaries on hover.
 - Hover also works for bracketed module rules such as `frontend.L1.M2[R1,R2]` and local `B/C/R/V` plus boundary symbols, showing the resolved definition content directly in place; boundary hovers also show the mapped config file, primary owning section, related sections, and inferred ownership note when applicable.
 - `Find All References` / `Shift+F12` is implemented for navigable framework symbols, so boundary tokens can return the current usage, framework definition, and mapped config target in one place.
@@ -20,6 +20,7 @@
 - Disabled status text no longer shows `n/a`.
 - Auto-fail notification provides buttons: `Open Problems` / `Open Log`.
 - Provides manual commands for validation and framework tree viewing.
+- Provides a direct fallback command to insert the standard `@framework` module template even when editor snippet suggestions are not showing.
 
 ## Install (Local)
 1. Install latest packaged VSIX:
@@ -53,13 +54,17 @@
 - Explicit rollback snapshot for the previous tomoe build is `media/archsync-backup-0.0.11-tomoe-triad.svg`.
 
 ## Commands
+- `ArchSync: Insert Framework Module Template`
 - `ArchSync: Open Framework Tree`
 - `ArchSync: Refresh Framework Tree`
 - `ArchSync: Validate Mapping Now`
 - `ArchSync: Show Mapping Issues`
 
 ## Markdown Snippets
-- `@framework`: insert neutral module template only.
+- `@framework`: insert the standard framework module template.
+- The `@framework` template entry is a repository-side hard authoring contract and must not be removed without an equally direct, default-available replacement.
+- If editor snippet suggestions are not cooperating, use `ArchSync: Insert Framework Module Template` as the explicit fallback entry.
+- Framework-markdown completion also covers the fixed skeleton directly: `@framework`、五个主章节标题、`C/P/B/R/V` 条目，以及 `R*.1~R*.4` 子项。
 - `B`: insert one `B*` line format only.
 - `R`: insert one `R*` + `R*.*` rule block format only.
 
@@ -104,6 +109,13 @@ Tree generation behavior:
 - Legacy `Lx-*.md` (without `-Mn`) files are ignored.
 - Preferred derivation: file-level module mode (`Lx-Mn-*.md` -> node `Lx.Mn`).
 - Framework-source trees use `framework columns` layout: each framework directory is rendered as its own group, and each group keeps its own local `L0/L1/L2...` bands.
+- Each framework group can now be collapsed / expanded from its header, dragged as one box inside the graph, and restored to the default compact dependency-aware layout with `恢复布局`.
+- Interaction contract for the generated framework tree:
+  - Left-drag on background scrolls / pans the whole graph canvas.
+  - Clicking a node or edge must keep selection and relationship-detail inspection working.
+  - `Ctrl/⌘ + click` on a node or edge must keep source-file jump working.
+  - Framework header drag and collapse / expand controls must not steal node / edge selection.
+  - These interactions are repository-side regression constraints and are guarded by the framework-tree HTML generator tests.
 - In file-level mode, growth edges are parsed from base lines that directly reference upstream modules, for example:
   - ``- `B3` ...：L0.M0[R2,R3] + L0.M1[R2,R3]。来源：`...`。``
 - Framework root modules may also declare explicit external refs, for example:

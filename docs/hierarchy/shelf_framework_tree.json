@@ -1101,7 +1101,7 @@
         "order": 1,
         "description": "module=backend | level=L2 | node=L2.M0 | file=framework/backend/L2-M0-知识库接口框架标准模块.md | title=L2-M0-知识库接口框架标准模块",
         "source_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
-        "source_line": 23,
+        "source_line": 25,
         "doc_line": 1,
         "module_name": "backend",
         "module_ref": "L2.M0",
@@ -1110,39 +1110,39 @@
           {
             "token": "C1",
             "text": "文件管理接口提供能力：稳定提供文件列表、上传、移除与文件聚焦相关接口",
-            "line": "7"
+            "line": "9"
           },
           {
             "token": "C2",
             "text": "文档预览接口提供能力：稳定提供正文、目录与章节锚点相关接口",
-            "line": "8"
+            "line": "10"
           },
           {
             "token": "C3",
             "text": "对话引用接口提供能力：稳定提供基于知识库的对话请求、回答输出与引用返回接口",
-            "line": "9"
+            "line": "11"
           },
           {
             "token": "C4",
             "text": "非能力项：不负责前端布局、检索算法优化与模型回答质量定义",
-            "line": "10"
+            "line": "12"
           }
         ],
         "base_items": [
           {
             "token": "B1",
             "text": "文件预览接口基：L1.M0[R1,R3]",
-            "line": "23"
+            "line": "25"
           },
           {
             "token": "B2",
             "text": "对话引用接口基：L1.M0[R2,R3]",
-            "line": "24"
+            "line": "26"
           },
           {
             "token": "B3",
             "text": "接口治理基：L1.M0[R1,R2,R3]",
-            "line": "25"
+            "line": "27"
           }
         ]
       },
@@ -1153,7 +1153,7 @@
         "order": 2,
         "description": "module=curtain | level=L2 | node=L2.M0 | file=framework/curtain/L2-M0-窗帘框架标准模块.md | title=L2-M0-窗帘框架标准模块",
         "source_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
-        "source_line": 24,
+        "source_line": 26,
         "doc_line": 1,
         "module_name": "curtain",
         "module_ref": "L2.M0",
@@ -1162,39 +1162,39 @@
           {
             "token": "C1",
             "text": "窗帘结构集成能力：集成承载、导向与连接结构形成稳定系统",
-            "line": "7"
+            "line": "9"
           },
           {
             "token": "C2",
             "text": "开合控制能力：实现可控开合、状态反馈和模式切换能力",
-            "line": "8"
+            "line": "10"
           },
           {
             "token": "C3",
             "text": "场景适配能力：在不同安装场景下保持安全、静音与可维护性",
-            "line": "9"
+            "line": "11"
           },
           {
             "token": "C4",
             "text": "非能力项：不负责布料图案、空间软装风格和装饰偏好",
-            "line": "10"
+            "line": "12"
           }
         ],
         "base_items": [
           {
             "token": "B1",
             "text": "轨道承载基：L1.M0[R1]",
-            "line": "24"
+            "line": "26"
           },
           {
             "token": "B2",
             "text": "驱动传递基：L1.M0[R2]",
-            "line": "25"
+            "line": "27"
           },
           {
             "token": "B3",
             "text": "场景治理基：L1.M0[R3]",
-            "line": "26"
+            "line": "28"
           }
         ]
       },
@@ -1304,7 +1304,7 @@
         "order": 5,
         "description": "module=shelf | level=L2 | node=L2.M0 | file=framework/shelf/L2-M0-置物架框架标准模块.md | title=L2-M0-置物架框架标准模块",
         "source_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
-        "source_line": 25,
+        "source_line": 27,
         "doc_line": 1,
         "module_name": "shelf",
         "module_ref": "L2.M0",
@@ -1313,39 +1313,39 @@
           {
             "token": "C1",
             "text": "承载结构能力：构建稳定承载路径并保证结构完整性",
-            "line": "7"
+            "line": "9"
           },
           {
             "token": "C2",
             "text": "空间组织能力：生成可复用的存放单元与访问通道",
-            "line": "8"
+            "line": "10"
           },
           {
             "token": "C3",
             "text": "场景适配能力：在不同空间约束下保持可扩展与可维护",
-            "line": "9"
+            "line": "11"
           },
           {
             "token": "C4",
             "text": "非能力项：不负责具体材质花纹、色彩风格和装饰偏好",
-            "line": "10"
+            "line": "12"
           }
         ],
         "base_items": [
           {
             "token": "B1",
             "text": "承载骨架基：L1.M0[R1]",
-            "line": "25"
+            "line": "27"
           },
           {
             "token": "B2",
             "text": "连接扩展基：L1.M0[R2]",
-            "line": "26"
+            "line": "28"
           },
           {
             "token": "B3",
             "text": "承载面组织基：L1.M0[R3]",
-            "line": "27"
+            "line": "29"
           }
         ]
       },
@@ -1900,7 +1900,7 @@
         "rules": "R1,R2,R3 | R1,R3 | R2,R3",
         "terms": "L1.M0[R1,R2,R3] + L1.M0[R1,R3] + L1.M0[R2,R3]",
         "source_file": "framework/backend/L2-M0-知识库接口框架标准模块.md",
-        "source_line": 23
+        "source_line": 25
       },
       {
         "from": "NODE-FW-0012",
@@ -1914,7 +1914,7 @@
         "rules": "R1 | R2 | R3",
         "terms": "L1.M0[R1] + L1.M0[R2] + L1.M0[R3]",
         "source_file": "framework/curtain/L2-M0-窗帘框架标准模块.md",
-        "source_line": 24
+        "source_line": 26
       },
       {
         "from": "NODE-FW-0013",
@@ -1956,7 +1956,7 @@
         "rules": "R1 | R2 | R3",
         "terms": "L1.M0[R1] + L1.M0[R2] + L1.M0[R3]",
         "source_file": "framework/shelf/L2-M0-置物架框架标准模块.md",
-        "source_line": 25
+        "source_line": 27
       },
       {
         "from": "NODE-FW-0014",

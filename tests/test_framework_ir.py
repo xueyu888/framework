@@ -29,7 +29,8 @@ class FrameworkIrTest(unittest.TestCase):
         self.assertIsNotNone(project.generated_artifacts)
         assert project.generated_artifacts is not None
         self.assertTrue(project.generated_artifacts.framework_ir_json.endswith("framework_ir.json"))
-        self.assertTrue(project.generated_artifacts.workbench_spec_json.endswith("workbench_spec.json"))
+        self.assertTrue(project.generated_artifacts.product_spec_json.endswith("product_spec.json"))
+        self.assertTrue(project.generated_artifacts.implementation_bundle_py.endswith("implementation_bundle.py"))
         self.assertTrue(project.generated_artifacts.generation_manifest_json.endswith("generation_manifest.json"))
 
 

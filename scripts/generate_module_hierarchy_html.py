@@ -391,17 +391,18 @@ def _compute_framework_columns_layout(
         incoming[edge.target].append(edge.source)
         outgoing[edge.source].append(edge.target)
 
-    group_min_width = 260.0
-    group_gap = 72.0
-    group_padding_left = 68.0
-    group_padding_right = 56.0
-    left_margin = 56.0
-    right_margin = 44.0
-    top_margin = 152.0
-    bottom_margin = 108.0
+    group_min_width = 236.0
+    group_gap = 44.0
+    group_padding_left = 52.0
+    group_padding_right = 40.0
+    left_margin = 40.0
+    right_margin = 28.0
+    top_margin = 118.0
+    bottom_margin = 72.0
+    level_gap = 164.0
 
     positions: dict[str, tuple[float, float]] = {}
-    max_required_height = float(height)
+    max_required_height = 0.0
     cursor_x = left_margin
 
     for group in framework_groups:
@@ -444,15 +445,14 @@ def _compute_framework_columns_layout(
         max_row_count = max(len(level_orders[level]) for level in local_levels)
         usable_width = max(group_min_width - group_padding_left - group_padding_right, 1.0)
         if max_row_count > 1:
-            min_cell = 112.0
+            min_cell = 96.0
             usable_width = max(usable_width, float(max_row_count + 1) * min_cell)
         group_width = max(group_min_width, usable_width + group_padding_left + group_padding_right)
 
-        vertical_span = max(1.0, float(height) - top_margin - bottom_margin)
-        y_step = vertical_span / max(1, len(local_levels) - 1)
+        group_height = top_margin + bottom_margin + (len(local_levels) - 1) * level_gap
         max_required_height = max(
             max_required_height,
-            top_margin + bottom_margin + (len(local_levels) - 1) * y_step,
+            group_height,
         )
 
         for level_idx, local_level in enumerate(local_levels):
@@ -465,14 +465,14 @@ def _compute_framework_columns_layout(
                 cell = row_usable_width / float(count + 1)
                 xs = [cursor_x + group_padding_left + cell * float(i + 1) for i in range(count)]
 
-            y = top_margin + level_idx * y_step
+            y = top_margin + level_idx * level_gap
             for node_id, x in zip(row_ids, xs):
                 positions[node_id] = (x, y)
 
         cursor_x += group_width + group_gap
 
     layout_width = int(max(width, round(cursor_x - group_gap + right_margin)))
-    layout_height = int(max(height, round(max_required_height)))
+    layout_height = int(max(620, round(max_required_height)))
     return LayoutResult(positions=positions, width=layout_width, height=layout_height)
 
 
@@ -581,7 +581,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       --graph-guide: rgba(255, 255, 255, 0.10);
       --graph-band-a: rgba(255, 255, 255, 0.04);
       --graph-band-b: rgba(255, 255, 255, 0.02);
-      --graph-edge: rgba(158, 174, 190, 0.58);
+      --graph-edge: rgba(176, 192, 210, 0.72);
       --graph-edge-active: var(--accent);
       --graph-edge-muted: rgba(255, 255, 255, 0.08);
       --graph-label: var(--text);
@@ -604,7 +604,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       --graph-guide: rgba(0, 0, 0, 0.08);
       --graph-band-a: rgba(0, 0, 0, 0.04);
       --graph-band-b: rgba(0, 0, 0, 0.02);
-      --graph-edge: rgba(78, 103, 131, 0.45);
+      --graph-edge: rgba(74, 98, 128, 0.62);
       --graph-edge-muted: rgba(0, 0, 0, 0.08);
       --graph-label-bg: rgba(255, 255, 255, 0.86);
       --graph-label-border: rgba(0, 0, 0, 0.09);
@@ -751,6 +751,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       border-radius: 12px;
       background: var(--graph-stage);
       cursor: grab;
+      touch-action: none;
     }
 
     .graph-scroll.dragging {
@@ -1042,6 +1043,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       font-weight: 700;
       letter-spacing: 0.03em;
       text-transform: uppercase;
+      pointer-events: none;
     }
 
     .framework-kicker {
@@ -1050,16 +1052,55 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .framework-summary {
+      font-size: 10px;
+      fill: var(--sub);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+
+    .framework-handle {
+      fill: rgba(255, 255, 255, 0.001);
+      pointer-events: all;
+      cursor: grab;
+    }
+
+    .framework-toggle-surface {
+      fill: var(--button-bg);
+      stroke: var(--border);
+      stroke-width: 1;
+      cursor: pointer;
+    }
+
+    .framework-toggle-surface:hover {
+      fill: var(--button-bg-hover);
+    }
+
+    .framework-toggle-label {
+      font-size: 10px;
+      fill: var(--text);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: central;
     }
 
     .edge {
       fill: none;
       stroke: var(--graph-edge);
-      stroke-width: 1.8;
+      stroke-width: 2.15;
       stroke-linecap: round;
+      stroke-linejoin: round;
       marker-end: url(#arrowDefault);
-      opacity: 0.86;
-      transition: opacity 140ms ease, stroke 140ms ease;
+      opacity: 0.94;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+      transition: opacity 140ms ease, stroke 140ms ease, stroke-width 140ms ease;
     }
 
     .edge.faded {
@@ -1073,6 +1114,17 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       opacity: 1;
       stroke-width: 2.6;
       filter: drop-shadow(0 0 8px rgba(55, 148, 255, 0.24));
+    }
+
+    .edge-hit-area {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: stroke;
+      cursor: pointer;
+      vector-effect: non-scaling-stroke;
     }
 
     .arrow-default {
@@ -1098,13 +1150,14 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       stroke: var(--canvas);
       stroke-width: 2.4;
       pointer-events: none;
+      transform-box: fill-box;
       transition:
         transform 140ms ease,
         opacity 140ms ease,
         filter 140ms ease,
         stroke 140ms ease,
         stroke-width 140ms ease;
-      transform-origin: center;
+      transform-origin: center center;
     }
 
     .node-group.hovered .node-circle {
@@ -1323,7 +1376,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
           <input type=\"checkbox\" id=\"toggleLabels\" checked />
           显示全部标签
         </label>
-        <span class=\"pill\">点击节点查看直连上游/下游关系</span>
+        <span class=\"pill\">点击节点或连线查看关系</span>
       </div>
       <div class=\"graph-shell\">
         <div class=\"graph-toolbar\">
@@ -1335,8 +1388,9 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
             <span class=\"zoom-indicator\" id=\"zoomIndicator\">100%</span>
           </div>
           <div class=\"toolbar-tail\">
+            <button type=\"button\" class=\"zoom-btn\" id=\"resetLayoutButton\">恢复布局</button>
             <button type=\"button\" class=\"zoom-btn\" id=\"sideToggleButton\" aria-expanded=\"true\">隐藏侧栏</button>
-            <span class=\"graph-hint\">Ctrl/⌘ + 滚轮缩放，拖拽平移，Ctrl/⌘ + 点击打开文档</span>
+            <span class=\"graph-hint\">左键拖动画布，拖动框标题移动 framework，点击框右上角折叠/展开，Ctrl/⌘ + 滚轮缩放，Ctrl/⌘ + 点击节点或连线打开来源文档</span>
           </div>
         </div>
         <div class=\"graph-scroll\">
@@ -1394,6 +1448,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     const zoomButtons = Array.from(document.querySelectorAll("[data-zoom]"));
     const levelStatsTitleEl = document.getElementById("levelStatsTitle");
     const graphFootEl = document.getElementById("graphFoot");
+    const resetLayoutButtonEl = document.getElementById("resetLayoutButton");
 
     const layoutMode = graphData.layout_mode || "global_levels";
     const isFrameworkColumns = layoutMode === "framework_columns";
@@ -1413,8 +1468,15 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     const MAX_ZOOM = 2.4;
     const ZOOM_STEP = 1.15;
     const DRAG_THRESHOLD = 4;
+    const NODE_RADIUS = 24;
+    const EDGE_START_PADDING = NODE_RADIUS + 2;
+    const EDGE_END_PADDING = NODE_RADIUS + 1;
     let zoomLevel = 1;
     let sideVisible = true;
+    let selectedNodeId = null;
+    let selectedEdgeKey = null;
+    let canvasWidth = graphData.width;
+    let canvasHeight = graphData.height;
     const panState = {
       active: false,
       pointerId: null,
@@ -1422,6 +1484,18 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       startClientY: 0,
       startScrollLeft: 0,
       startScrollTop: 0,
+      captured: false,
+      moved: false,
+      suppressClick: false
+    };
+    const groupDragState = {
+      active: false,
+      pointerId: null,
+      frameworkName: "",
+      startClientX: 0,
+      startClientY: 0,
+      startDx: 0,
+      startDy: 0,
       moved: false,
       suppressClick: false
     };
@@ -1493,7 +1567,6 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     titleEl.textContent = graphData.title;
     descriptionEl.textContent = graphData.description;
     summaryNodesEl.textContent = `节点数: ${graphData.nodes.length}`;
-    summaryEdgesEl.textContent = `关系边: ${graphData.edges.length}`;
     if (levelStatsTitleEl) {
       levelStatsTitleEl.textContent = isFrameworkColumns ? "框架层级统计" : "层级统计";
     }
@@ -1510,8 +1583,8 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     }
 
     function renderZoom() {
-      const scaledWidth = Math.round(BASE_WIDTH * zoomLevel);
-      const scaledHeight = Math.round(BASE_HEIGHT * zoomLevel);
+      const scaledWidth = Math.round(canvasWidth * zoomLevel);
+      const scaledHeight = Math.round(canvasHeight * zoomLevel);
       svg.style.width = `${scaledWidth}px`;
       svg.style.height = `${scaledHeight}px`;
       if (zoomIndicatorEl) {
@@ -1525,8 +1598,8 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       }
       const horizontalPadding = 36;
       const verticalPadding = 36;
-      const widthScale = Math.max(0.1, (graphScrollEl.clientWidth - horizontalPadding) / BASE_WIDTH);
-      const heightScale = Math.max(0.1, (graphScrollEl.clientHeight - verticalPadding) / BASE_HEIGHT);
+      const widthScale = Math.max(0.1, (graphScrollEl.clientWidth - horizontalPadding) / canvasWidth);
+      const heightScale = Math.max(0.1, (graphScrollEl.clientHeight - verticalPadding) / canvasHeight);
       return clampZoom(Math.min(widthScale, heightScale));
     }
 
@@ -1597,14 +1670,55 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       }
     }
 
+    // Interaction contract:
+    // - the whole graph surface can start a pan gesture
+    // - node / edge click keeps relationship selection working until drag threshold is crossed
+    // - framework header / toggle interactions stay isolated from canvas pan
+    function shouldIgnorePanStart(target) {
+      if (!target || typeof target.closest !== "function") {
+        return false;
+      }
+      return Boolean(target.closest("button, input, label, a, [data-pan-ignore='1']"));
+    }
+
+    function safeSetPointerCapture(element, pointerId) {
+      if (!element || typeof element.setPointerCapture !== "function") {
+        return false;
+      }
+      try {
+        element.setPointerCapture(pointerId);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    function safeReleasePointerCapture(element, pointerId) {
+      if (
+        !element ||
+        typeof element.releasePointerCapture !== "function" ||
+        typeof element.hasPointerCapture !== "function" ||
+        pointerId === null
+      ) {
+        return;
+      }
+      try {
+        if (element.hasPointerCapture(pointerId)) {
+          element.releasePointerCapture(pointerId);
+        }
+      } catch (_error) {
+        // Ignore capture teardown failures so drag cleanup still completes.
+      }
+    }
+
     function beginPan(event) {
-      if (!graphScrollEl || event.button !== 0) {
+      if (!graphScrollEl || panState.active || event.button !== 0) {
         return;
       }
-      if (event.target.closest("button, input, label, a")) {
+      if (!graphScrollEl.contains(event.target)) {
         return;
       }
-      if (event.target.closest("[data-node-hit='1'], [data-node-group='1']")) {
+      if (shouldIgnorePanStart(event.target)) {
         return;
       }
       panState.active = true;
@@ -1613,12 +1727,9 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       panState.startClientY = event.clientY;
       panState.startScrollLeft = graphScrollEl.scrollLeft;
       panState.startScrollTop = graphScrollEl.scrollTop;
+      panState.captured = false;
       panState.moved = false;
       hideNodeHover();
-      graphScrollEl.classList.add("dragging");
-      if (typeof graphScrollEl.setPointerCapture === "function") {
-        graphScrollEl.setPointerCapture(event.pointerId);
-      }
     }
 
     function updatePan(event) {
@@ -1630,6 +1741,11 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       if (!panState.moved && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
         panState.moved = true;
         panState.suppressClick = true;
+        if (typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+        graphScrollEl.classList.add("dragging");
+        panState.captured = safeSetPointerCapture(graphScrollEl, event.pointerId);
       }
       if (!panState.moved) {
         return;
@@ -1645,27 +1761,74 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       if (event && event.pointerId !== undefined && event.pointerId !== panState.pointerId) {
         return;
       }
-      if (
-        typeof graphScrollEl.releasePointerCapture === "function" &&
-        panState.pointerId !== null &&
-        typeof graphScrollEl.hasPointerCapture === "function" &&
-        graphScrollEl.hasPointerCapture(panState.pointerId)
-      ) {
-        graphScrollEl.releasePointerCapture(panState.pointerId);
+      if (panState.captured) {
+        safeReleasePointerCapture(graphScrollEl, panState.pointerId);
       }
       panState.active = false;
       panState.pointerId = null;
+      panState.captured = false;
       graphScrollEl.classList.remove("dragging");
       window.setTimeout(() => {
         panState.suppressClick = false;
       }, 0);
     }
 
+    function beginGroupDrag(event, frameworkName) {
+      if (event.button !== 0) {
+        return;
+      }
+      event.stopPropagation();
+      hideNodeHover();
+      const current = groupState.get(frameworkName);
+      if (!current) {
+        return;
+      }
+      groupDragState.active = true;
+      groupDragState.pointerId = event.pointerId;
+      groupDragState.frameworkName = frameworkName;
+      groupDragState.startClientX = event.clientX;
+      groupDragState.startClientY = event.clientY;
+      groupDragState.startDx = current.dx;
+      groupDragState.startDy = current.dy;
+      groupDragState.moved = false;
+      safeSetPointerCapture(svg, event.pointerId);
+    }
+
+    function endGroupDrag(event) {
+      if (!groupDragState.active) {
+        return;
+      }
+      if (event && event.pointerId !== undefined && event.pointerId !== groupDragState.pointerId) {
+        return;
+      }
+      safeReleasePointerCapture(svg, groupDragState.pointerId);
+      groupDragState.active = false;
+      groupDragState.pointerId = null;
+      groupDragState.frameworkName = "";
+      window.setTimeout(() => {
+        groupDragState.suppressClick = false;
+      }, 0);
+    }
+
+    const graphEdges = graphData.edges.map((edge, index) => ({
+      ...edge,
+      __edgeKey: [
+        String(edge.from ?? ""),
+        String(edge.to ?? ""),
+        String(edge.relation ?? ""),
+        String(edge.source_file ?? ""),
+        String(edge.source_line ?? ""),
+        String(index)
+      ].join("::")
+    }));
+
+    summaryEdgesEl.textContent = `关系边: ${graphEdges.length}`;
+
     const byId = new Map(graphData.nodes.map((node) => [node.id, node]));
     const incoming = new Map(graphData.nodes.map((node) => [node.id, []]));
     const outgoing = new Map(graphData.nodes.map((node) => [node.id, []]));
 
-    for (const edge of graphData.edges) {
+    for (const edge of graphEdges) {
       const inList = incoming.get(edge.to);
       if (inList) inList.push(edge);
       const outList = outgoing.get(edge.from);
@@ -1707,13 +1870,18 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     const activeFrameworkGroups = frameworkGroups.length ? frameworkGroups : fallbackFrameworkGroups;
 
     function formatFrameworkLevelSummary(group) {
-      const localLevels = Array.isArray(group?.local_levels)
-        ? group.local_levels.map((value) => Number(value)).filter((value) => Number.isFinite(value))
-        : [];
+      const rawLevels = Array.isArray(group?.local_levels)
+        ? group.local_levels
+        : Array.isArray(group?.localLevels)
+          ? group.localLevels
+          : [];
+      const localLevels = rawLevels
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value));
       if (!localLevels.length) {
         return "无节点";
       }
-      const counts = group?.level_node_counts ?? {};
+      const counts = group?.level_node_counts ?? group?.levelNodeCounts ?? {};
       return localLevels
         .sort((a, b) => a - b)
         .map((level) => `L${level} ${counts[String(level)] ?? 0}`)
@@ -1764,6 +1932,32 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
         return String(a.name).localeCompare(String(b.name));
       });
 
+    for (let index = 0; index < frameworkDescriptors.length; index += 1) {
+      const group = frameworkDescriptors[index];
+      const prevGroup = index > 0 ? frameworkDescriptors[index - 1] : null;
+      const nextGroup = index < frameworkDescriptors.length - 1 ? frameworkDescriptors[index + 1] : null;
+      const panelLeft = prevGroup ? (prevGroup.maxX + group.minX) / 2 : Math.max(16, group.minX - 56);
+      const panelRight = nextGroup
+        ? (group.maxX + nextGroup.minX) / 2
+        : Math.min(graphData.width - 16, group.maxX + 56);
+      group.panelLeft = panelLeft;
+      group.panelRight = panelRight;
+      group.panelTop = 18;
+      group.panelBottom = graphData.height - 18;
+      group.panelWidth = Math.max(1, panelRight - panelLeft);
+      group.panelHeight = Math.max(1, group.panelBottom - group.panelTop);
+      group.bandTopFloor = group.panelTop + 52;
+      group.bandBottomCeil = group.panelBottom - 12;
+    }
+
+    const frameworkByNodeId = new Map(
+      graphData.nodes.map((node) => [node.id, typeof node.module_name === "string" ? node.module_name : ""])
+    );
+    const descriptorByName = new Map(frameworkDescriptors.map((group) => [group.name, group]));
+    const groupState = new Map(
+      frameworkDescriptors.map((group) => [group.name, { dx: 0, dy: 0, collapsed: false }])
+    );
+
     if (isFrameworkColumns) {
       for (const group of frameworkDescriptors) {
         appendStatRow(levelStatsEl, String(group.name), formatFrameworkLevelSummary(group));
@@ -1794,96 +1988,220 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
 
     const defs = document.createElementNS(SVG_NS, "defs");
     defs.innerHTML = `
-      <marker id=\"arrowDefault\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">
-        <path class=\"arrow-default\" d=\"M0,0 L0,6 L9,3 z\"></path>
+      <marker id=\"arrowDefault\" markerWidth=\"12\" markerHeight=\"12\" viewBox=\"0 0 12 9\" refX=\"10.5\" refY=\"4.5\" orient=\"auto\" markerUnits=\"userSpaceOnUse\">
+        <path class=\"arrow-default\" d=\"M0,0 L0,9 L12,4.5 z\"></path>
       </marker>
-      <marker id=\"arrowActive\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">
-        <path class=\"arrow-active\" d=\"M0,0 L0,6 L9,3 z\"></path>
+      <marker id=\"arrowActive\" markerWidth=\"12\" markerHeight=\"12\" viewBox=\"0 0 12 9\" refX=\"10.5\" refY=\"4.5\" orient=\"auto\" markerUnits=\"userSpaceOnUse\">
+        <path class=\"arrow-active\" d=\"M0,0 L0,9 L12,4.5 z\"></path>
       </marker>
     `;
-    svg.appendChild(defs);
 
-    if (isFrameworkColumns) {
-      const panelTop = 22;
-      const panelBottom = graphData.height - 24;
-      const bandTopFloor = panelTop + 58;
-      const bandBottomCeil = panelBottom - 18;
+    function edgeEndpoints(fromNode, toNode) {
+      const dx = toNode.x - fromNode.x;
+      const dy = toNode.y - fromNode.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const ux = dx / distance;
+      const uy = dy / distance;
+      const maxPad = Math.max(0, distance / 2 - 6);
+      const startPad = Math.min(EDGE_START_PADDING, maxPad);
+      const endPad = Math.min(EDGE_END_PADDING, maxPad);
+      return {
+        startX: fromNode.x + ux * startPad,
+        startY: fromNode.y + uy * startPad,
+        endX: toNode.x - ux * endPad,
+        endY: toNode.y - uy * endPad
+      };
+    }
 
-      for (let index = 0; index < frameworkDescriptors.length; index += 1) {
-        const group = frameworkDescriptors[index];
-        const prevGroup = index > 0 ? frameworkDescriptors[index - 1] : null;
-        const nextGroup = index < frameworkDescriptors.length - 1 ? frameworkDescriptors[index + 1] : null;
-        const panelLeft = prevGroup ? (prevGroup.maxX + group.minX) / 2 : Math.max(20, group.minX - 74);
-        const panelRight = nextGroup
-          ? (group.maxX + nextGroup.minX) / 2
-          : Math.min(graphData.width - 20, group.maxX + 74);
+    function edgePath(fromNode, toNode) {
+      const endpoints = edgeEndpoints(fromNode, toNode);
+      const dx = endpoints.endX - endpoints.startX;
+      const dy = endpoints.endY - endpoints.startY;
+      const curve = Math.max(44, Math.min(136, Math.abs(dy) * 0.44));
+      const sidePull =
+        dx === 0 ? 0 : Math.sign(dx) * Math.max(26, Math.min(116, Math.abs(dx) * 0.28));
+      const c1x = endpoints.startX + sidePull;
+      const c1y = endpoints.startY + curve;
+      const c2x = endpoints.endX - sidePull;
+      const c2y = endpoints.endY - curve;
+      return `M ${endpoints.startX} ${endpoints.startY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endpoints.endX} ${endpoints.endY}`;
+    }
 
-        const panel = document.createElementNS(SVG_NS, "rect");
-        panel.setAttribute("x", String(panelLeft));
-        panel.setAttribute("y", String(panelTop));
-        panel.setAttribute("width", String(Math.max(1, panelRight - panelLeft)));
-        panel.setAttribute("height", String(Math.max(1, panelBottom - panelTop)));
-        panel.setAttribute("rx", "16");
-        panel.setAttribute("ry", "16");
-        panel.setAttribute("class", `framework-panel${index % 2 === 1 ? " alt" : ""}`);
-        svg.appendChild(panel);
+    const levelNumbers = levelEntries.map(([level]) => level);
+    const minLevel = Math.min(...levelNumbers);
+    const maxLevel = Math.max(...levelNumbers);
+    const levelSpan = Math.max(1, maxLevel - minLevel);
 
-        const kicker = document.createElementNS(SVG_NS, "text");
-        kicker.setAttribute("x", String(panelLeft + 18));
-        kicker.setAttribute("y", String(panelTop + 18));
-        kicker.setAttribute("class", "framework-kicker");
-        kicker.textContent = "framework";
-        svg.appendChild(kicker);
-
-        const title = document.createElementNS(SVG_NS, "text");
-        title.setAttribute("x", String(panelLeft + 18));
-        title.setAttribute("y", String(panelTop + 38));
-        title.setAttribute("class", "framework-title");
-        title.textContent = String(group.name);
-        svg.appendChild(title);
-
-        const localLevels = group.localLevels;
-        for (let levelIndex = 0; levelIndex < localLevels.length; levelIndex += 1) {
-          const level = localLevels[levelIndex];
-          const centerY = group.levelCenters.get(level) ?? bandTopFloor;
-          const prevCenter =
-            levelIndex > 0 ? group.levelCenters.get(localLevels[levelIndex - 1]) ?? centerY : centerY;
-          const nextCenter =
-            levelIndex < localLevels.length - 1
-              ? group.levelCenters.get(localLevels[levelIndex + 1]) ?? centerY
-              : centerY;
-
-          const top = levelIndex === 0 ? bandTopFloor : (prevCenter + centerY) / 2;
-          const bottom =
-            levelIndex === localLevels.length - 1 ? bandBottomCeil : (centerY + nextCenter) / 2;
-
-          const band = document.createElementNS(SVG_NS, "rect");
-          band.setAttribute("x", String(panelLeft + 12));
-          band.setAttribute("y", String(top));
-          band.setAttribute("width", String(Math.max(1, panelRight - panelLeft - 24)));
-          band.setAttribute("height", String(Math.max(1, bottom - top)));
-          band.setAttribute("rx", "12");
-          band.setAttribute("ry", "12");
-          band.setAttribute("class", `level-band${levelIndex % 2 === 1 ? " alt" : ""}`);
-          svg.appendChild(band);
-
-          const guide = document.createElementNS(SVG_NS, "line");
-          guide.setAttribute("x1", String(panelLeft + 18));
-          guide.setAttribute("x2", String(panelRight - 18));
-          guide.setAttribute("y1", String(centerY));
-          guide.setAttribute("y2", String(centerY));
-          guide.setAttribute("class", "level-guide");
-          svg.appendChild(guide);
-
-          const label = document.createElementNS(SVG_NS, "text");
-          label.setAttribute("x", String(panelLeft + 20));
-          label.setAttribute("y", String(top + 24));
-          label.setAttribute("class", "level-label");
-          label.textContent = graphData.level_labels[String(level)] ?? `L${level}`;
-          svg.appendChild(label);
-        }
+    function currentThemeMode() {
+      const classList = document.body.classList;
+      if (
+        classList.contains("vscode-high-contrast") ||
+        classList.contains("vscode-high-contrast-light")
+      ) {
+        return "hc";
       }
-    } else {
+      if (classList.contains("vscode-light")) {
+        return "light";
+      }
+      if (!classList.contains("vscode-dark")) {
+        if (typeof window.matchMedia === "function") {
+          return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        return "dark";
+      }
+      return "dark";
+    }
+
+    function nodeColorForLevel(level) {
+      const t = (level - minLevel) / levelSpan;
+      const mode = currentThemeMode();
+      if (mode === "hc") {
+        const light = 76 - Math.round(t * 16);
+        return `hsl(210 24% ${light}%)`;
+      }
+      if (mode === "light") {
+        const hue = 210 - Math.round(t * 12);
+        const sat = 30 + Math.round(t * 8);
+        const light = 58 - Math.round(t * 10);
+        return `hsl(${hue} ${sat}% ${light}%)`;
+      }
+      const hue = 214 - Math.round(t * 14);
+      const sat = 34 + Math.round(t * 10);
+      const light = 48 - Math.round(t * 10);
+      return `hsl(${hue} ${sat}% ${light}%)`;
+    }
+
+    let edgeElements = [];
+    let edgeElementMap = new Map();
+    let nodeCircleMap = new Map();
+    let nodeLabelMap = new Map();
+    let nodeLabelBoxMap = new Map();
+    let nodeGroupMap = new Map();
+    let currentNodeSnapshots = new Map();
+
+    function getCollapsedMetrics(group) {
+      return {
+        width: Math.max(208, Math.min(252, Math.round(group.panelWidth))),
+        height: 86
+      };
+    }
+
+    function clampGroupOffset(group, desiredDx, desiredDy, collapsed) {
+      const metrics = collapsed ? getCollapsedMetrics(group) : { width: group.panelWidth, height: group.panelHeight };
+      const minDx = 20 - group.panelLeft;
+      const maxDx = Math.max(minDx, graphData.width - metrics.width - group.panelLeft - 20);
+      const minDy = 20 - group.panelTop;
+      const maxDy = Math.max(minDy, graphData.height - metrics.height - group.panelTop - 20);
+      return {
+        dx: Math.min(maxDx, Math.max(minDx, desiredDx)),
+        dy: Math.min(maxDy, Math.max(minDy, desiredDy))
+      };
+    }
+
+    function getGroupLayout(group) {
+      const state = groupState.get(group.name) ?? { dx: 0, dy: 0, collapsed: false };
+      if (state.collapsed) {
+        const metrics = getCollapsedMetrics(group);
+        const left = group.panelLeft + state.dx;
+        const top = group.panelTop + state.dy;
+        return {
+          left,
+          top,
+          right: left + metrics.width,
+          bottom: top + metrics.height,
+          width: metrics.width,
+          height: metrics.height,
+          collapsed: true,
+          anchorX: left + metrics.width / 2,
+          anchorY: top + metrics.height / 2 + 4,
+          headerTop: top,
+          headerBottom: top + 42
+        };
+      }
+      return {
+        left: group.panelLeft + state.dx,
+        top: group.panelTop + state.dy,
+        right: group.panelRight + state.dx,
+        bottom: group.panelBottom + state.dy,
+        width: group.panelWidth,
+        height: group.panelHeight,
+        collapsed: false,
+        anchorX: group.centerX + state.dx,
+        anchorY: group.panelTop + state.dy + 38,
+        headerTop: group.panelTop + state.dy,
+        headerBottom: group.panelTop + state.dy + 44
+      };
+    }
+
+    function buildNodeSnapshots() {
+      const snapshots = new Map();
+      for (const node of graphData.nodes) {
+        const frameworkName = frameworkByNodeId.get(node.id);
+        const group = frameworkName ? descriptorByName.get(frameworkName) : null;
+        const state = frameworkName ? groupState.get(frameworkName) : null;
+        if (group && state?.collapsed) {
+          const layout = getGroupLayout(group);
+          snapshots.set(node.id, {
+            ...node,
+            x: layout.anchorX,
+            y: layout.anchorY,
+            frameworkName,
+            visible: false
+          });
+          continue;
+        }
+        snapshots.set(node.id, {
+          ...node,
+          x: node.x + Number(state?.dx ?? 0),
+          y: node.y + Number(state?.dy ?? 0),
+          frameworkName,
+          visible: true
+        });
+      }
+      return snapshots;
+    }
+
+    function appendFrameworkToggle(groupLayer, x, y, collapsed, frameworkName) {
+      const surface = document.createElementNS(SVG_NS, "rect");
+      surface.setAttribute("x", String(x));
+      surface.setAttribute("y", String(y));
+      surface.setAttribute("width", "48");
+      surface.setAttribute("height", "22");
+      surface.setAttribute("rx", "11");
+      surface.setAttribute("ry", "11");
+      surface.setAttribute("class", "framework-toggle-surface");
+      surface.setAttribute("data-framework-toggle", "1");
+      surface.setAttribute("data-pan-ignore", "1");
+      groupLayer.appendChild(surface);
+
+      const label = document.createElementNS(SVG_NS, "text");
+      label.setAttribute("x", String(x + 24));
+      label.setAttribute("y", String(y + 12));
+      label.setAttribute("class", "framework-toggle-label");
+      label.textContent = collapsed ? "展开" : "折叠";
+      groupLayer.appendChild(label);
+
+      const toggle = (event) => {
+        event.stopPropagation();
+        const current = groupState.get(frameworkName);
+        if (!current) {
+          return;
+        }
+        groupState.set(frameworkName, { ...current, collapsed: !current.collapsed });
+        if (selectedNodeId) {
+          const selectedFramework = frameworkByNodeId.get(selectedNodeId);
+          if (selectedFramework === frameworkName && !current.collapsed) {
+            selectedNodeId = null;
+          }
+        }
+        renderGraph();
+      };
+
+      surface.addEventListener("click", toggle);
+      label.addEventListener("click", toggle);
+    }
+
+    function renderGlobalLevelBands() {
       const levelCenters = new Map();
       for (const [level] of levelEntries) {
         const nodesInLevel = graphData.nodes.filter((node) => node.level === level);
@@ -1933,187 +2251,307 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       }
     }
 
-    function edgePath(fromNode, toNode) {
-      const dx = toNode.x - fromNode.x;
-      const dy = toNode.y - fromNode.y;
-      const curve = Math.max(44, Math.min(136, Math.abs(dy) * 0.44));
-      const sidePull =
-        dx === 0 ? 0 : Math.sign(dx) * Math.max(26, Math.min(116, Math.abs(dx) * 0.28));
-      const c1x = fromNode.x + sidePull;
-      const c1y = fromNode.y + curve;
-      const c2x = toNode.x - sidePull;
-      const c2y = toNode.y - curve;
-      return `M ${fromNode.x} ${fromNode.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${toNode.x} ${toNode.y}`;
-    }
+    function renderFrameworkGroups() {
+      for (let index = 0; index < frameworkDescriptors.length; index += 1) {
+        const group = frameworkDescriptors[index];
+        const layout = getGroupLayout(group);
+        const groupLayer = document.createElementNS(SVG_NS, "g");
+        groupLayer.setAttribute("data-framework-group", group.name);
+        svg.appendChild(groupLayer);
 
-    const levelNumbers = levelEntries.map(([level]) => level);
-    const minLevel = Math.min(...levelNumbers);
-    const maxLevel = Math.max(...levelNumbers);
-    const levelSpan = Math.max(1, maxLevel - minLevel);
+        const panel = document.createElementNS(SVG_NS, "rect");
+        panel.setAttribute("x", String(layout.left));
+        panel.setAttribute("y", String(layout.top));
+        panel.setAttribute("width", String(layout.width));
+        panel.setAttribute("height", String(layout.height));
+        panel.setAttribute("rx", "16");
+        panel.setAttribute("ry", "16");
+        panel.setAttribute("class", `framework-panel${index % 2 === 1 ? " alt" : ""}`);
+        groupLayer.appendChild(panel);
 
-    function currentThemeMode() {
-      const classList = document.body.classList;
-      if (
-        classList.contains("vscode-high-contrast") ||
-        classList.contains("vscode-high-contrast-light")
-      ) {
-        return "hc";
-      }
-      if (classList.contains("vscode-light")) {
-        return "light";
-      }
-      if (!classList.contains("vscode-dark")) {
-        if (typeof window.matchMedia === "function") {
-          return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        const handle = document.createElementNS(SVG_NS, "rect");
+        handle.setAttribute("x", String(layout.left));
+        handle.setAttribute("y", String(layout.headerTop));
+        handle.setAttribute("width", String(layout.width));
+        handle.setAttribute("height", String(Math.max(28, layout.headerBottom - layout.headerTop)));
+        handle.setAttribute("class", "framework-handle");
+        handle.setAttribute("data-framework-handle", "1");
+        handle.setAttribute("data-pan-ignore", "1");
+        handle.addEventListener("pointerdown", (event) => beginGroupDrag(event, group.name));
+        handle.addEventListener("click", (event) => event.stopPropagation());
+        groupLayer.appendChild(handle);
+
+        const kicker = document.createElementNS(SVG_NS, "text");
+        kicker.setAttribute("x", String(layout.left + 18));
+        kicker.setAttribute("y", String(layout.top + 18));
+        kicker.setAttribute("class", "framework-kicker");
+        kicker.textContent = "framework";
+        groupLayer.appendChild(kicker);
+
+        const title = document.createElementNS(SVG_NS, "text");
+        title.setAttribute("x", String(layout.left + 18));
+        title.setAttribute("y", String(layout.top + 38));
+        title.setAttribute("class", "framework-title");
+        title.textContent = String(group.name);
+        groupLayer.appendChild(title);
+
+        appendFrameworkToggle(groupLayer, layout.right - 60, layout.top + 12, layout.collapsed, group.name);
+
+        if (layout.collapsed) {
+          const summary = document.createElementNS(SVG_NS, "text");
+          summary.setAttribute("x", String(layout.left + 18));
+          summary.setAttribute("y", String(layout.top + 62));
+          summary.setAttribute("class", "framework-summary");
+          summary.textContent = `${group.nodes.length} 模块 · ${formatFrameworkLevelSummary(group)}`;
+          groupLayer.appendChild(summary);
+          continue;
         }
-        return "dark";
+
+        const localLevels = group.localLevels;
+        for (let levelIndex = 0; levelIndex < localLevels.length; levelIndex += 1) {
+          const level = localLevels[levelIndex];
+          const defaultCenterY = group.levelCenters.get(level) ?? group.bandTopFloor;
+          const centerY = defaultCenterY + (groupState.get(group.name)?.dy ?? 0);
+          const prevCenter =
+            levelIndex > 0
+              ? (group.levelCenters.get(localLevels[levelIndex - 1]) ?? defaultCenterY) + (groupState.get(group.name)?.dy ?? 0)
+              : centerY;
+          const nextCenter =
+            levelIndex < localLevels.length - 1
+              ? (group.levelCenters.get(localLevels[levelIndex + 1]) ?? defaultCenterY) + (groupState.get(group.name)?.dy ?? 0)
+              : centerY;
+          const top = levelIndex === 0 ? group.bandTopFloor + (groupState.get(group.name)?.dy ?? 0) : (prevCenter + centerY) / 2;
+          const bottom =
+            levelIndex === localLevels.length - 1
+              ? group.bandBottomCeil + (groupState.get(group.name)?.dy ?? 0)
+              : (centerY + nextCenter) / 2;
+
+          const band = document.createElementNS(SVG_NS, "rect");
+          band.setAttribute("x", String(layout.left + 12));
+          band.setAttribute("y", String(top));
+          band.setAttribute("width", String(Math.max(1, layout.width - 24)));
+          band.setAttribute("height", String(Math.max(1, bottom - top)));
+          band.setAttribute("rx", "12");
+          band.setAttribute("ry", "12");
+          band.setAttribute("class", `level-band${levelIndex % 2 === 1 ? " alt" : ""}`);
+          groupLayer.appendChild(band);
+
+          const guide = document.createElementNS(SVG_NS, "line");
+          guide.setAttribute("x1", String(layout.left + 18));
+          guide.setAttribute("x2", String(layout.right - 18));
+          guide.setAttribute("y1", String(centerY));
+          guide.setAttribute("y2", String(centerY));
+          guide.setAttribute("class", "level-guide");
+          groupLayer.appendChild(guide);
+
+          const label = document.createElementNS(SVG_NS, "text");
+          label.setAttribute("x", String(layout.left + 20));
+          label.setAttribute("y", String(top + 24));
+          label.setAttribute("class", "level-label");
+          label.textContent = graphData.level_labels[String(level)] ?? `L${level}`;
+          groupLayer.appendChild(label);
+        }
       }
-      return "dark";
     }
 
-    function nodeColorForLevel(level) {
-      const t = (level - minLevel) / levelSpan;
-      const mode = currentThemeMode();
-      if (mode === "hc") {
-        const light = 76 - Math.round(t * 16);
-        return `hsl(210 24% ${light}%)`;
-      }
-      if (mode === "light") {
-        const hue = 210 - Math.round(t * 12);
-        const sat = 30 + Math.round(t * 8);
-        const light = 58 - Math.round(t * 10);
-        return `hsl(${hue} ${sat}% ${light}%)`;
-      }
-      const hue = 214 - Math.round(t * 14);
-      const sat = 34 + Math.round(t * 10);
-      const light = 48 - Math.round(t * 10);
-      return `hsl(${hue} ${sat}% ${light}%)`;
-    }
+    function renderNodesAndEdges() {
+      currentNodeSnapshots = buildNodeSnapshots();
+      edgeElements = [];
+      edgeElementMap = new Map();
+      nodeCircleMap = new Map();
+      nodeLabelMap = new Map();
+      nodeLabelBoxMap = new Map();
+      nodeGroupMap = new Map();
 
-    const edgeElements = [];
-    for (const edge of graphData.edges) {
-      const fromNode = byId.get(edge.from);
-      const toNode = byId.get(edge.to);
-      if (!fromNode || !toNode) continue;
+      for (const edge of graphEdges) {
+        const fromNode = currentNodeSnapshots.get(edge.from);
+        const toNode = currentNodeSnapshots.get(edge.to);
+        if (!fromNode || !toNode) {
+          continue;
+        }
+        if (!fromNode.visible && !toNode.visible && fromNode.frameworkName === toNode.frameworkName) {
+          continue;
+        }
 
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", edgePath(fromNode, toNode));
-      path.setAttribute("class", "edge");
-      path.setAttribute("data-from", edge.from);
-      path.setAttribute("data-to", edge.to);
-      path.setAttribute("data-relation", edge.relation);
-      const edgeRule = edge.rule ? `, rule=${edge.rule}` : "";
-      const edgeConstraint = edge.constraint ? `, constraint=${edge.constraint}` : "";
-      path.appendChild(document.createElementNS(SVG_NS, "title")).textContent = `${edge.from} -> ${edge.to} (${edge.relation}${edgeRule}${edgeConstraint})`;
-      svg.appendChild(path);
-      edgeElements.push(path);
-    }
+        const edgeKey = edge.__edgeKey;
+        const pathData = edgePath(fromNode, toNode);
+        const path = document.createElementNS(SVG_NS, "path");
+        path.setAttribute("d", pathData);
+        path.setAttribute("class", "edge");
+        path.setAttribute("data-edge-key", edgeKey);
+        path.setAttribute("data-from", edge.from);
+        path.setAttribute("data-to", edge.to);
+        path.setAttribute("data-relation", edge.relation);
+        const edgeRule = edge.rule ? `, rule=${edge.rule}` : "";
+        const edgeConstraint = edge.constraint ? `, constraint=${edge.constraint}` : "";
+        path.appendChild(document.createElementNS(SVG_NS, "title")).textContent = `${edge.from} -> ${edge.to} (${edge.relation}${edgeRule}${edgeConstraint})`;
+        svg.appendChild(path);
 
-    const nodeCircleMap = new Map();
-    const nodeLabelMap = new Map();
-    const nodeLabelBoxMap = new Map();
-    const nodeGroupMap = new Map();
-
-    for (const node of graphData.nodes) {
-      const group = document.createElementNS(SVG_NS, "g");
-      group.setAttribute("class", "node-group");
-      group.setAttribute("data-node-group", "1");
-      group.setAttribute("data-node-id", node.id);
-
-      const circle = document.createElementNS(SVG_NS, "circle");
-      circle.setAttribute("cx", String(node.x));
-      circle.setAttribute("cy", String(node.y));
-      circle.setAttribute("r", "24");
-      circle.setAttribute("class", "node-circle");
-      circle.setAttribute("data-id", node.id);
-      circle.style.setProperty("--node-fill", nodeColorForLevel(node.level));
-      group.appendChild(circle);
-
-      const labelBox = document.createElementNS(SVG_NS, "rect");
-      labelBox.setAttribute("class", "node-label-box");
-      labelBox.setAttribute("rx", "7");
-      labelBox.setAttribute("ry", "7");
-      group.appendChild(labelBox);
-
-      const label = document.createElementNS(SVG_NS, "text");
-      label.setAttribute("x", String(node.x));
-      label.setAttribute("y", String(node.y + 31));
-      label.setAttribute("class", "node-label");
-      label.textContent = node.label;
-      group.appendChild(label);
-
-      svg.appendChild(group);
-      const bbox = label.getBBox();
-      const padX = 7;
-      const padY = 2;
-      labelBox.setAttribute("x", String(bbox.x - padX));
-      labelBox.setAttribute("y", String(bbox.y - padY));
-      labelBox.setAttribute("width", String(Math.max(10, bbox.width + padX * 2)));
-      labelBox.setAttribute("height", String(Math.max(10, bbox.height + padY * 2)));
-      group.insertBefore(labelBox, label);
-
-      const hitPadding = 10;
-      const circleRadius = 24;
-      const minX = Math.min(node.x - circleRadius - hitPadding, bbox.x - padX - hitPadding);
-      const maxX = Math.max(node.x + circleRadius + hitPadding, bbox.x + bbox.width + padX + hitPadding);
-      const minY = Math.min(node.y - circleRadius - hitPadding, bbox.y - padY - hitPadding);
-      const maxY = Math.max(node.y + circleRadius + hitPadding, bbox.y + bbox.height + padY + hitPadding);
-
-      const hitArea = document.createElementNS(SVG_NS, "rect");
-      hitArea.setAttribute("class", "node-hit-area");
-      hitArea.setAttribute("data-node-hit", "1");
-      hitArea.setAttribute("data-node-id", node.id);
-      hitArea.setAttribute("x", String(minX));
-      hitArea.setAttribute("y", String(minY));
-      hitArea.setAttribute("width", String(Math.max(1, maxX - minX)));
-      hitArea.setAttribute("height", String(Math.max(1, maxY - minY)));
-      hitArea.setAttribute("rx", "14");
-      hitArea.setAttribute("ry", "14");
-      group.insertBefore(hitArea, circle);
-
-      hitArea.addEventListener("click", (event) => {
-        if (panState.suppressClick) {
+        const hitArea = document.createElementNS(SVG_NS, "path");
+        hitArea.setAttribute("d", pathData);
+        hitArea.setAttribute("class", "edge-hit-area");
+        hitArea.setAttribute("data-edge-hit", "1");
+        hitArea.setAttribute("data-edge-key", edgeKey);
+        hitArea.setAttribute("data-from", edge.from);
+        hitArea.setAttribute("data-to", edge.to);
+        hitArea.addEventListener("click", (event) => {
+          if (panState.suppressClick || groupDragState.suppressClick) {
+            event.stopPropagation();
+            return;
+          }
           event.stopPropagation();
-          return;
-        }
-        event.stopPropagation();
-        const docLine =
-          Number.isFinite(Number(node.doc_line)) && Number(node.doc_line) > 0
-            ? Number(node.doc_line)
-            : Number.isFinite(Number(node.source_line)) && Number(node.source_line) > 0
-              ? Number(node.source_line)
-              : 1;
-        if ((event.ctrlKey || event.metaKey) && typeof node.source_file === "string" && node.source_file) {
+          if ((event.ctrlKey || event.metaKey) && typeof edge.source_file === "string" && edge.source_file) {
+            hideNodeHover();
+            openSourceFile(edge.source_file, edge.source_line);
+            return;
+          }
           hideNodeHover();
-          openSourceFile(node.source_file, docLine);
-          return;
+          selectEdge(edgeKey);
+        });
+        svg.appendChild(hitArea);
+
+        edgeElements.push(path);
+        edgeElementMap.set(edgeKey, { edge, path, hitArea });
+      }
+
+      for (const node of graphData.nodes) {
+        const snapshot = currentNodeSnapshots.get(node.id);
+        if (!snapshot || !snapshot.visible) {
+          continue;
         }
-        hideNodeHover();
-        selectNode(node.id);
-      });
 
-      hitArea.addEventListener("mouseenter", (event) => {
-        group.classList.add("hovered");
-        showNodeHover(node, event.clientX, event.clientY);
-      });
+        const group = document.createElementNS(SVG_NS, "g");
+        group.setAttribute("class", "node-group");
+        group.setAttribute("data-node-group", "1");
+        group.setAttribute("data-node-id", node.id);
 
-      hitArea.addEventListener("mousemove", (event) => {
-        if (!hoverCardEl?.classList.contains("visible")) {
+        const circle = document.createElementNS(SVG_NS, "circle");
+        circle.setAttribute("cx", String(snapshot.x));
+        circle.setAttribute("cy", String(snapshot.y));
+        circle.setAttribute("r", "24");
+        circle.setAttribute("class", "node-circle");
+        circle.setAttribute("data-id", node.id);
+        circle.style.setProperty("--node-fill", nodeColorForLevel(node.level));
+        group.appendChild(circle);
+
+        const labelBox = document.createElementNS(SVG_NS, "rect");
+        labelBox.setAttribute("class", "node-label-box");
+        labelBox.setAttribute("rx", "7");
+        labelBox.setAttribute("ry", "7");
+        group.appendChild(labelBox);
+
+        const label = document.createElementNS(SVG_NS, "text");
+        label.setAttribute("x", String(snapshot.x));
+        label.setAttribute("y", String(snapshot.y + 31));
+        label.setAttribute("class", "node-label");
+        label.textContent = node.label;
+        group.appendChild(label);
+
+        svg.appendChild(group);
+        const bbox = label.getBBox();
+        const padX = 7;
+        const padY = 2;
+        labelBox.setAttribute("x", String(bbox.x - padX));
+        labelBox.setAttribute("y", String(bbox.y - padY));
+        labelBox.setAttribute("width", String(Math.max(10, bbox.width + padX * 2)));
+        labelBox.setAttribute("height", String(Math.max(10, bbox.height + padY * 2)));
+        group.insertBefore(labelBox, label);
+
+        const hitPadding = 10;
+        const circleRadius = NODE_RADIUS;
+        const minX = Math.min(snapshot.x - circleRadius - hitPadding, bbox.x - padX - hitPadding);
+        const maxX = Math.max(snapshot.x + circleRadius + hitPadding, bbox.x + bbox.width + padX + hitPadding);
+        const minY = Math.min(snapshot.y - circleRadius - hitPadding, bbox.y - padY - hitPadding);
+        const maxY = Math.max(snapshot.y + circleRadius + hitPadding, bbox.y + bbox.height + padY + hitPadding);
+
+        const hitArea = document.createElementNS(SVG_NS, "rect");
+        hitArea.setAttribute("class", "node-hit-area");
+        hitArea.setAttribute("data-node-hit", "1");
+        hitArea.setAttribute("data-node-id", node.id);
+        hitArea.setAttribute("x", String(minX));
+        hitArea.setAttribute("y", String(minY));
+        hitArea.setAttribute("width", String(Math.max(1, maxX - minX)));
+        hitArea.setAttribute("height", String(Math.max(1, maxY - minY)));
+        hitArea.setAttribute("rx", "14");
+        hitArea.setAttribute("ry", "14");
+        group.insertBefore(hitArea, circle);
+
+        hitArea.addEventListener("click", (event) => {
+          if (panState.suppressClick || groupDragState.suppressClick) {
+            event.stopPropagation();
+            return;
+          }
+          event.stopPropagation();
+          const docLine =
+            Number.isFinite(Number(node.doc_line)) && Number(node.doc_line) > 0
+              ? Number(node.doc_line)
+              : Number.isFinite(Number(node.source_line)) && Number(node.source_line) > 0
+                ? Number(node.source_line)
+                : 1;
+          if ((event.ctrlKey || event.metaKey) && typeof node.source_file === "string" && node.source_file) {
+            hideNodeHover();
+            openSourceFile(node.source_file, docLine);
+            return;
+          }
+          hideNodeHover();
+          selectNode(node.id);
+        });
+
+        hitArea.addEventListener("mouseenter", (event) => {
+          group.classList.add("hovered");
           showNodeHover(node, event.clientX, event.clientY);
-          return;
-        }
-        positionHoverCard(event.clientX, event.clientY);
-      });
+        });
 
-      hitArea.addEventListener("mouseleave", () => {
-        group.classList.remove("hovered");
-        hideNodeHover();
-      });
+        hitArea.addEventListener("mousemove", (event) => {
+          if (!hoverCardEl?.classList.contains("visible")) {
+            showNodeHover(node, event.clientX, event.clientY);
+            return;
+          }
+          positionHoverCard(event.clientX, event.clientY);
+        });
 
-      nodeCircleMap.set(node.id, circle);
-      nodeLabelMap.set(node.id, label);
-      nodeLabelBoxMap.set(node.id, labelBox);
-      nodeGroupMap.set(node.id, group);
+        hitArea.addEventListener("mouseleave", () => {
+          group.classList.remove("hovered");
+          hideNodeHover();
+        });
+
+        nodeCircleMap.set(node.id, circle);
+        nodeLabelMap.set(node.id, label);
+        nodeLabelBoxMap.set(node.id, labelBox);
+        nodeGroupMap.set(node.id, group);
+      }
+    }
+
+    function renderGraph() {
+      hideNodeHover();
+      svg.replaceChildren();
+      svg.appendChild(defs);
+      canvasWidth = graphData.width;
+      canvasHeight = graphData.height;
+      svg.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
+      svg.setAttribute("width", String(canvasWidth));
+      svg.setAttribute("height", String(canvasHeight));
+
+      if (isFrameworkColumns) {
+        renderFrameworkGroups();
+      } else {
+        renderGlobalLevelBands();
+      }
+      renderNodesAndEdges();
+      applyThemeState();
+      updateLabelVisibility();
+      if (selectedNodeId && !currentNodeSnapshots.get(selectedNodeId)?.visible) {
+        selectedNodeId = null;
+      }
+      if (selectedEdgeKey && !edgeElementMap.has(selectedEdgeKey)) {
+        selectedEdgeKey = null;
+      }
+      if (selectedNodeId || selectedEdgeKey) {
+        applySelectionState();
+      } else {
+        renderDetailEmpty();
+      }
+      renderZoom();
     }
 
     function applyThemeState() {
@@ -2247,7 +2685,131 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       window.location.href = uri;
     }
 
-    function selectNode(nodeId) {
+    function renderDetailEmpty() {
+      detailBoxEl.innerHTML =
+        isFrameworkColumns
+          ? '<p class="meta detail-empty">点击左侧节点或连线查看详情；框标题可拖动，框右上角可折叠或展开，恢复布局按钮可回到默认紧凑位置。</p>'
+          : '<p class="meta detail-empty">点击左侧节点或连线查看详情；可通过“显示全部标签”控制整体标签密度。</p>';
+    }
+
+    function renderEdgeDetail(edge) {
+      const fromNode = byId.get(edge.from);
+      const toNode = byId.get(edge.to);
+      const sourceFile = typeof edge.source_file === "string" ? edge.source_file : "";
+      const sourceLine =
+        Number.isFinite(Number(edge.source_line)) && Number(edge.source_line) > 0
+          ? Number(edge.source_line)
+          : 1;
+      const sourceAction = sourceFile
+        ? `<button type="button" class="detail-action" data-open-source="1" data-file="${escapeHtml(sourceFile)}" data-line="${sourceLine}">打开来源</button>`
+        : "无";
+
+      detailBoxEl.innerHTML = `
+        <section class=\"detail-group\">
+          <h3 class=\"detail-section-title\">关系概览</h3>
+          <div class=\"detail-kv\">
+            <span class=\"detail-key\">起点</span>
+            <span class=\"detail-value\">${escapeHtml(fromNode?.label ?? edge.from)}</span>
+          </div>
+          <div class=\"detail-kv\">
+            <span class=\"detail-key\">终点</span>
+            <span class=\"detail-value\">${escapeHtml(toNode?.label ?? edge.to)}</span>
+          </div>
+          <div class=\"detail-kv\">
+            <span class=\"detail-key\">关系</span>
+            <span class=\"detail-value mono\">${escapeHtml(edge.relation ?? "")}</span>
+          </div>
+        </section>
+        <section class=\"detail-group\">
+          <h3 class=\"detail-section-title\">规则与术语</h3>
+          <div class=\"detail-kv\">
+            <span class=\"detail-key\">规则</span>
+            <span class=\"detail-value mono\">${escapeHtml(edge.rules || edge.rule || "无")}</span>
+          </div>
+          <div class=\"detail-kv\">
+            <span class=\"detail-key\">术语</span>
+            <span class=\"detail-value mono\">${escapeHtml(edge.terms || "无")}</span>
+          </div>
+        </section>
+        <section class=\"detail-group\">
+          <h3 class=\"detail-section-title\">来源与跳转</h3>
+          <div class=\"detail-kv\">
+            <span class=\"detail-key\">结构来源</span>
+            <span class=\"detail-value mono\">${sourceFile ? `${escapeHtml(sourceFile)}:${sourceLine}` : "无"}</span>
+          </div>
+          <div class=\"action-row\">${sourceAction}</div>
+        </section>
+      `;
+
+      const openBtn = detailBoxEl.querySelector("[data-open-source='1']");
+      if (openBtn) {
+        openBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const filePath = openBtn.getAttribute("data-file") || "";
+          const lineNumber = Number(openBtn.getAttribute("data-line") || "1");
+          openSourceFile(filePath, lineNumber);
+        });
+      }
+    }
+
+    function applySelectionState() {
+      const nodeId = selectedNodeId;
+      const edgeKey = selectedEdgeKey;
+      if (!nodeId && !edgeKey) {
+        for (const circle of nodeCircleMap.values()) {
+          circle.classList.remove("active", "faded");
+        }
+        for (const label of nodeLabelMap.values()) {
+          label.classList.remove("faded");
+        }
+        for (const box of nodeLabelBoxMap.values()) {
+          box.classList.remove("faded");
+        }
+        for (const edgeEl of edgeElements) {
+          edgeEl.classList.remove("active", "faded");
+        }
+        updateLabelVisibility();
+        return;
+      }
+
+      if (edgeKey) {
+        const selectedEdge = edgeElementMap.get(edgeKey)?.edge;
+        if (!selectedEdge) {
+          resetSelection();
+          return;
+        }
+        const related = new Set([selectedEdge.from, selectedEdge.to]);
+
+        for (const [id, circle] of nodeCircleMap.entries()) {
+          circle.classList.remove("active", "faded");
+          const label = nodeLabelMap.get(id);
+          const labelBox = nodeLabelBoxMap.get(id);
+          if (label) label.classList.remove("faded");
+          if (labelBox) labelBox.classList.remove("faded");
+
+          if (related.has(id)) {
+            circle.classList.add("active");
+          } else {
+            circle.classList.add("faded");
+            if (label) label.classList.add("faded");
+            if (labelBox) labelBox.classList.add("faded");
+          }
+        }
+
+        for (const edgeEl of edgeElements) {
+          edgeEl.classList.remove("active", "faded");
+          if (edgeEl.getAttribute("data-edge-key") === edgeKey) {
+            edgeEl.classList.add("active");
+          } else {
+            edgeEl.classList.add("faded");
+          }
+        }
+
+        renderEdgeDetail(selectedEdge);
+        updateLabelVisibility();
+        return;
+      }
+
       const related = new Set([nodeId]);
       const upEdges = incoming.get(nodeId) ?? [];
       const downEdges = outgoing.get(nodeId) ?? [];
@@ -2358,6 +2920,18 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       }
     }
 
+    function selectNode(nodeId) {
+      selectedNodeId = nodeId;
+      selectedEdgeKey = null;
+      applySelectionState();
+    }
+
+    function selectEdge(edgeKey) {
+      selectedNodeId = null;
+      selectedEdgeKey = edgeKey;
+      applySelectionState();
+    }
+
     function updateLabelVisibility() {
       const visible = toggleLabelsEl?.checked ?? true;
       for (const label of nodeLabelMap.values()) {
@@ -2370,6 +2944,8 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
 
     function resetSelection() {
       hideNodeHover();
+      selectedNodeId = null;
+      selectedEdgeKey = null;
       for (const group of nodeGroupMap.values()) {
         group.classList.remove("hovered");
       }
@@ -2385,10 +2961,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       for (const edgeEl of edgeElements) {
         edgeEl.classList.remove("active", "faded");
       }
-      detailBoxEl.innerHTML =
-        isFrameworkColumns
-          ? '<p class="meta detail-empty">点击左侧节点查看详情；当前图按 framework 分组展示，每个分组保留自己的本地 Lx。</p>'
-          : '<p class="meta detail-empty">点击左侧节点查看详情；可通过“显示全部标签”控制整体标签密度。</p>';
+      renderDetailEmpty();
       updateLabelVisibility();
     }
 
@@ -2424,16 +2997,22 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       });
     }
 
-    if (graphScrollEl) {
-      graphScrollEl.addEventListener("pointerdown", beginPan);
-      graphScrollEl.addEventListener("pointermove", updatePan);
-      graphScrollEl.addEventListener("pointerup", endPan);
-      graphScrollEl.addEventListener("pointercancel", endPan);
-      graphScrollEl.addEventListener("pointerleave", (event) => {
-        if (panState.active) {
-          endPan(event);
+    if (resetLayoutButtonEl) {
+      resetLayoutButtonEl.addEventListener("click", () => {
+        for (const [name] of groupState.entries()) {
+          groupState.set(name, { dx: 0, dy: 0, collapsed: false });
+        }
+        selectedNodeId = null;
+        selectedEdgeKey = null;
+        renderGraph();
+        if (graphScrollEl) {
+          graphScrollEl.scrollLeft = 0;
+          graphScrollEl.scrollTop = 0;
         }
       });
+    }
+
+    if (graphScrollEl) {
       graphScrollEl.addEventListener("scroll", () => {
         hideNodeHover();
       });
@@ -2450,6 +3029,44 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
         { passive: false }
       );
     }
+
+    graphScrollEl.addEventListener("pointerdown", beginPan, true);
+    svg.addEventListener("pointerdown", beginPan, true);
+    window.addEventListener("pointermove", updatePan);
+    window.addEventListener("pointerup", endPan);
+    window.addEventListener("pointercancel", endPan);
+
+    svg.addEventListener("pointermove", (event) => {
+      if (!groupDragState.active || event.pointerId !== groupDragState.pointerId) {
+        return;
+      }
+      const descriptor = descriptorByName.get(groupDragState.frameworkName);
+      const current = groupState.get(groupDragState.frameworkName);
+      if (!descriptor || !current) {
+        return;
+      }
+      const dx = (event.clientX - groupDragState.startClientX) / zoomLevel;
+      const dy = (event.clientY - groupDragState.startClientY) / zoomLevel;
+      if (!groupDragState.moved && Math.hypot(dx, dy) >= DRAG_THRESHOLD / Math.max(zoomLevel, 0.1)) {
+        groupDragState.moved = true;
+        groupDragState.suppressClick = true;
+      }
+      const clamped = clampGroupOffset(
+        descriptor,
+        groupDragState.startDx + dx,
+        groupDragState.startDy + dy,
+        current.collapsed
+      );
+      groupState.set(groupDragState.frameworkName, { ...current, dx: clamped.dx, dy: clamped.dy });
+      renderGraph();
+    });
+    svg.addEventListener("pointerup", endGroupDrag);
+    svg.addEventListener("pointercancel", endGroupDrag);
+    svg.addEventListener("pointerleave", (event) => {
+      if (groupDragState.active) {
+        endGroupDrag(event);
+      }
+    });
 
     sideVisible = readStoredBool(SIDE_VISIBILITY_KEY, true);
     renderSideVisibility();
@@ -2472,7 +3089,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       });
     }
     initializeZoom();
-    resetSelection();
+    renderGraph();
   </script>
 </body>
 </html>

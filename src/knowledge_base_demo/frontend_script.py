@@ -9,15 +9,16 @@ def build_chat_script(project: KnowledgeBaseProject) -> str:
     spec_json = json.dumps(project.to_spec_dict(), ensure_ascii=False)
     script = """
     <script>
-      const projectSpec = __PROJECT_SPEC__;
-      const uiSpec = projectSpec.ui_spec;
-      const backendSpec = projectSpec.backend_spec;
+      const runtimeBundle = __PROJECT_SPEC__;
+      const productSpec = runtimeBundle.product_spec;
+      const uiSpec = runtimeBundle.ui_spec;
+      const backendSpec = runtimeBundle.backend_spec;
       const messageStreamSpec = uiSpec.components.message_stream;
       const composerSpec = uiSpec.components.chat_composer;
       const drawerSpec = uiSpec.components.citation_drawer;
       const switchDialogSpec = uiSpec.components.knowledge_switch_dialog;
       const conversationSpec = uiSpec.conversation;
-      const storageKey = `archsync-kb-conversations:${projectSpec.project.project_id}`;
+      const storageKey = `archsync-kb-conversations:${productSpec.product.project_id}`;
       const state = {
         knowledgeBases: [],
         documents: [],
@@ -196,7 +197,7 @@ def build_chat_script(project: KnowledgeBaseProject) -> str:
       }
 
       function renderHeader(conversation) {
-        elements.headerTitle.textContent = conversation ? conversation.title : projectSpec.project.display_name;
+        elements.headerTitle.textContent = conversation ? conversation.title : productSpec.product.display_name;
         elements.headerSubtitle.textContent = uiSpec.components.chat_header.subtitle_template.replace("{knowledge_base_name}", currentKnowledgeBaseName());
         elements.knowledgeBadge.textContent = uiSpec.components.conversation_sidebar.knowledge_entry_label.replace(
           backendSpec.knowledge_base.knowledge_base_name,
@@ -300,14 +301,14 @@ def build_chat_script(project: KnowledgeBaseProject) -> str:
       }
 
       async function loadKnowledgeBases() {
-        const response = await fetch(projectSpec.routes.api.knowledge_bases);
+        const response = await fetch(runtimeBundle.routes.api.knowledge_bases);
         state.knowledgeBases = response.ok ? await response.json() : [];
         renderKnowledgeDialog();
         renderActiveConversation();
       }
 
       async function loadDocuments() {
-        const response = await fetch(projectSpec.routes.api.documents);
+        const response = await fetch(runtimeBundle.routes.api.documents);
         state.documents = response.ok ? await response.json() : [];
       }
 
@@ -356,7 +357,7 @@ def build_chat_script(project: KnowledgeBaseProject) -> str:
       }
 
       async function fetchSectionHtml(citation) {
-        const url = projectSpec.routes.api.section_detail
+        const url = runtimeBundle.routes.api.section_detail
           .replace("{document_id}", citation.document_id)
           .replace("{section_id}", citation.section_id);
         const response = await fetch(url);
@@ -475,7 +476,7 @@ def build_chat_script(project: KnowledgeBaseProject) -> str:
         }
 
         try {
-          const response = await fetch(projectSpec.routes.api.chat_turns, {
+          const response = await fetch(runtimeBundle.routes.api.chat_turns, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

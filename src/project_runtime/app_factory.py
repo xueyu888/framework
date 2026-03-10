@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING, Callable
 from fastapi import FastAPI
 
 from project_runtime.knowledge_base import (
-    DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE,
+    DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
     SUPPORTED_PROJECT_TEMPLATE,
     materialize_knowledge_base_project,
 )
 
-PROJECT_FILE_ENV = "SHELF_PROJECT_FILE"
+PRODUCT_SPEC_FILE_ENV = "SHELF_PRODUCT_SPEC_FILE"
 
 if TYPE_CHECKING:
     from project_runtime.knowledge_base import KnowledgeBaseProject
@@ -31,8 +31,12 @@ TEMPLATE_APP_BUILDERS: dict[str, ProjectAppBuilder] = {
 }
 
 
-def build_project_app(project_file: str | Path | None = None) -> FastAPI:
-    resolved_file = project_file or os.environ.get(PROJECT_FILE_ENV) or DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE
+def build_project_app(product_spec_file: str | Path | None = None) -> FastAPI:
+    resolved_file = (
+        product_spec_file
+        or os.environ.get(PRODUCT_SPEC_FILE_ENV)
+        or DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE
+    )
     project_config = materialize_knowledge_base_project(resolved_file)
     builder = TEMPLATE_APP_BUILDERS.get(project_config.metadata.template)
     if builder is None:

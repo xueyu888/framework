@@ -208,7 +208,7 @@ function main() {
     character: boundaryConfigRef.character,
   });
   assert(boundaryConfigResult, "instance boundary ref should resolve");
-  assert(boundaryConfigResult.filePath.endsWith("projects/knowledge_base_basic/instance.toml"));
+  assert(boundaryConfigResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(boundaryConfigResult).trim(), "[chat]");
 
   const boundaryDefinitionRef = locate(workbenchL2.text, "`CHAT` 对话边界");
@@ -231,8 +231,8 @@ function main() {
     character: boundaryConfigRef.character,
   });
   assert(boundaryConfigHoverResult, "boundary config hover should resolve");
-  assert(boundaryConfigHoverResult.markdown.includes("实例配置"));
-  assert(boundaryConfigHoverResult.markdown.includes("projects/knowledge_base_basic/instance.toml"));
+  assert(boundaryConfigHoverResult.markdown.includes("Product Spec"));
+  assert(boundaryConfigHoverResult.markdown.includes("projects/knowledge_base_basic/product_spec.toml"));
   assert(boundaryConfigHoverResult.markdown.includes("`[chat]`"));
 
   const citationConfigRef = locate(knowledgeBaseL2.text, "CITATION + SCOPE");
@@ -244,7 +244,7 @@ function main() {
     character: citationConfigRef.character,
   });
   assert(citationConfigResult, "derived citation boundary ref should resolve");
-  assert(citationConfigResult.filePath.endsWith("projects/knowledge_base_basic/instance.toml"));
+  assert(citationConfigResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(citationConfigResult).trim(), "[chat]");
 
   const citationConfigHoverResult = resolveHoverTarget({
@@ -269,7 +269,7 @@ function main() {
   });
   assert(citationReferences.length >= 3, "citation references should include usage, definition, and config");
   assert(citationReferences.some((item) => item.filePath.endsWith("framework/knowledge_base/L0-M2-对话与引用原子模块.md")));
-  assert(citationReferences.some((item) => item.filePath.endsWith("projects/knowledge_base_basic/instance.toml")));
+  assert(citationReferences.some((item) => item.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml")));
 
   const a11yConfigRef = locate(knowledgeBaseL2.text, "STATUS + A11Y");
   const a11yConfigResult = resolveDefinitionTarget({
@@ -280,7 +280,7 @@ function main() {
     character: a11yConfigRef.character + "STATUS + ".length,
   });
   assert(a11yConfigResult, "knowledge base A11Y boundary ref should resolve");
-  assert(a11yConfigResult.filePath.endsWith("projects/knowledge_base_basic/instance.toml"));
+  assert(a11yConfigResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(a11yConfigResult).trim(), "[a11y]");
 
   const frontendTokenL0 = loadFrameworkFile("framework/frontend/L0-M2-视觉语义原子模块.md");
@@ -293,7 +293,7 @@ function main() {
     character: tokenConfigRef.character,
   });
   assert(tokenConfigResult, "frontend TOKEN boundary ref should resolve");
-  assert(tokenConfigResult.filePath.endsWith("projects/knowledge_base_basic/instance.toml"));
+  assert(tokenConfigResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(tokenConfigResult).trim(), "[visual]");
 
   const frontendEntryL1 = loadFrameworkFile("framework/frontend/L1-M0-触发与选择原子模块.md");
@@ -306,7 +306,7 @@ function main() {
     character: entryA11yRef.character + "PICK + OPTION + ACTION + ".length,
   });
   assert(entryA11yResult, "frontend A11Y boundary ref should resolve");
-  assert(entryA11yResult.filePath.endsWith("projects/knowledge_base_basic/instance.toml"));
+  assert(entryA11yResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(entryA11yResult).trim(), "[a11y]");
 
   const backendL2 = loadFrameworkFile("framework/backend/L2-M0-知识库接口框架标准模块.md");
@@ -319,7 +319,7 @@ function main() {
     character: backendResultRef.character + "CHAT + ".length,
   });
   assert(backendResult, "backend RESULT boundary ref should resolve");
-  assert(backendResult.filePath.endsWith("projects/knowledge_base_basic/instance.toml"));
+  assert(backendResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(backendResult).trim(), "[return]");
 }
 

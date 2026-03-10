@@ -8,12 +8,39 @@ import unittest
 from fastapi.testclient import TestClient
 
 from project_runtime.app_factory import build_project_app
-from project_runtime.knowledge_base import DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE, load_knowledge_base_project
+from project_runtime.knowledge_base import (
+    DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
+    load_knowledge_base_project,
+)
+
+
+DEFAULT_IMPLEMENTATION_CONFIG = textwrap.dedent(
+    """
+    [frontend]
+    renderer = "knowledge_chat_client_v1"
+    style_profile = "knowledge_chat_web_v1"
+    script_profile = "knowledge_chat_browser_v1"
+
+    [backend]
+    renderer = "knowledge_chat_backend_v1"
+    transport = "http_json"
+    retrieval_strategy = "retrieval_stub"
+
+    [evidence]
+    product_spec_endpoint = "/api/public-knowledge/product-spec"
+
+    [artifacts]
+    framework_ir_json = "framework_ir.json"
+    product_spec_json = "product_spec.json"
+    implementation_bundle_py = "implementation_bundle.py"
+    generation_manifest_json = "generation_manifest.json"
+    """
+).strip()
 
 
 class ProjectRuntimeTest(unittest.TestCase):
-    def test_load_default_project_config(self) -> None:
-        project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE)
+    def test_load_default_product_spec(self) -> None:
+        project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
 
         self.assertEqual(project.metadata.project_id, "knowledge_base_basic")
         self.assertEqual(project.metadata.template, "knowledge_base_workbench")
@@ -36,15 +63,27 @@ class ProjectRuntimeTest(unittest.TestCase):
         self.assertEqual(project.backend_spec["interaction_copy"]["loading_text"], "正在检索知识库并整理回答…")
         self.assertTrue(project.validation_reports["overall"]["passed"])
 
+        product_spec = project.to_product_spec_dict()
+        self.assertEqual(product_spec["product"]["project_id"], "knowledge_base_basic")
+        self.assertEqual(product_spec["navigation"]["pages"]["chat_home"], "/knowledge-base")
+        self.assertNotIn("ui_spec", product_spec)
+        self.assertNotIn("backend_spec", product_spec)
+
+        runtime_bundle = project.to_runtime_bundle_dict()
+        self.assertEqual(runtime_bundle["product_spec"]["product"]["project_id"], "knowledge_base_basic")
+        self.assertEqual(runtime_bundle["routes"]["api"]["knowledge_bases"], "/api/knowledge/knowledge-bases")
+        self.assertIn("ui_spec", runtime_bundle)
+        self.assertIn("backend_spec", runtime_bundle)
+
     def test_generic_project_app_factory_materializes_generated_artifacts(self) -> None:
-        client = TestClient(build_project_app(DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE))
+        client = TestClient(build_project_app(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE))
 
         response = client.get("/")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["project"]["project"]["project_id"], "knowledge_base_basic")
         self.assertEqual(payload["frontend"], "/knowledge-base")
-        self.assertEqual(payload["workbench_spec"], "/api/knowledge/workbench-spec")
+        self.assertEqual(payload["product_spec"], "/api/knowledge/product-spec")
         self.assertEqual(payload["project"]["routes"]["api"]["knowledge_bases"], "/api/knowledge/knowledge-bases")
         self.assertEqual(payload["project"]["routes"]["pages"]["knowledge_list"], "/knowledge-bases")
         generated = payload["project"]["generated_artifacts"]
@@ -54,14 +93,14 @@ class ProjectRuntimeTest(unittest.TestCase):
         for rel_path in generated.values():
             self.assertTrue((Path.cwd() / rel_path).exists())
 
-    def test_custom_instance_config_changes_routes_theme_and_generated_bundle(self) -> None:
-        instance_toml = textwrap.dedent(
+    def test_custom_product_spec_changes_routes_theme_and_generated_bundle(self) -> None:
+        product_spec_toml = textwrap.dedent(
             """
             [project]
             project_id = "knowledge_base_public"
             template = "knowledge_base_workbench"
             display_name = "Knowledge Base Public"
-            description = "A public knowledge chat instance compiled from the same framework."
+            description = "A public knowledge chat product compiled from the same framework."
             version = "0.3.0"
 
             [framework]
@@ -78,7 +117,7 @@ class ProjectRuntimeTest(unittest.TestCase):
             density = "comfortable"
 
             [surface.copy]
-            hero_kicker = "Public Instance"
+            hero_kicker = "Public Product"
             hero_title = "Knowledge Base Public"
             hero_copy = "A public knowledge chat client compiled from the same framework."
             library_title = "Knowledge Bases"
@@ -103,7 +142,6 @@ class ProjectRuntimeTest(unittest.TestCase):
             knowledge_detail = "/public-knowledge/bases/details"
             document_detail_prefix = "/public-knowledge/bases/details/documents"
             api_prefix = "/api/public-knowledge"
-            workbench_spec = "/api/public-knowledge/workbench-spec"
 
             [a11y]
             reading_order = ["conversation_sidebar", "chat_header", "message_stream", "chat_composer", "citation_drawer"]
@@ -161,7 +199,7 @@ class ProjectRuntimeTest(unittest.TestCase):
             [[documents]]
             document_id = "public-guidance"
             title = "Public Guidance"
-            summary = "A public instance still uses the same framework chain and source return loop."
+            summary = "A public product still uses the same framework chain and source return loop."
             tags = ["public", "framework"]
             updated_at = "2026-03-08"
             body_markdown = \"\"\"
@@ -175,10 +213,12 @@ class ProjectRuntimeTest(unittest.TestCase):
         ).strip()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            instance_file = Path(temp_dir) / "instance.toml"
-            instance_file.write_text(instance_toml, encoding="utf-8")
+            product_spec_file = Path(temp_dir) / "product_spec.toml"
+            implementation_config_file = Path(temp_dir) / "implementation_config.toml"
+            product_spec_file.write_text(product_spec_toml, encoding="utf-8")
+            implementation_config_file.write_text(DEFAULT_IMPLEMENTATION_CONFIG, encoding="utf-8")
 
-            project = load_knowledge_base_project(instance_file)
+            project = load_knowledge_base_project(product_spec_file)
             self.assertEqual(project.visual.brand, "Public KB")
             self.assertEqual(project.route.workbench, "/public-knowledge")
             self.assertEqual(project.route.knowledge_list, "/public-knowledge/bases")
@@ -190,17 +230,17 @@ class ProjectRuntimeTest(unittest.TestCase):
             )
             self.assertTrue(project.validation_reports["overall"]["passed"])
 
-            client = TestClient(build_project_app(instance_file))
+            client = TestClient(build_project_app(product_spec_file))
 
             root_response = client.get("/")
             self.assertEqual(root_response.status_code, 200)
             root_payload = root_response.json()
             self.assertEqual(root_payload["frontend"], "/public-knowledge")
-            self.assertEqual(root_payload["workbench_spec"], "/api/public-knowledge/workbench-spec")
+            self.assertEqual(root_payload["product_spec"], "/api/public-knowledge/product-spec")
             generated = root_payload["project"]["generated_artifacts"]
             self.assertIsNotNone(generated)
             assert generated is not None
-            self.assertTrue((instance_file.parent / "generated" / "project_bundle.py").exists())
+            self.assertTrue((product_spec_file.parent / "generated" / "implementation_bundle.py").exists())
 
             page_response = client.get("/public-knowledge")
             self.assertEqual(page_response.status_code, 200)
@@ -234,14 +274,14 @@ class ProjectRuntimeTest(unittest.TestCase):
                 chat_payload["citations"][0]["document_path"],
             )
 
-    def test_rule_validation_rejects_non_conforming_instance_values(self) -> None:
-        instance_toml = textwrap.dedent(
+    def test_rule_validation_rejects_non_conforming_product_values(self) -> None:
+        invalid_product_spec = textwrap.dedent(
             """
             [project]
             project_id = "knowledge_base_invalid"
             template = "knowledge_base_workbench"
             display_name = "Knowledge Base Invalid"
-            description = "A workbench instance that violates the framework rule chain."
+            description = "A product spec that violates the framework rule chain."
             version = "0.3.0"
 
             [framework]
@@ -258,9 +298,9 @@ class ProjectRuntimeTest(unittest.TestCase):
             density = "comfortable"
 
             [surface.copy]
-            hero_kicker = "Invalid Instance"
+            hero_kicker = "Invalid Product"
             hero_title = "Knowledge Base Invalid"
-            hero_copy = "A workbench instance that violates the framework rule chain."
+            hero_copy = "A product spec that violates the framework rule chain."
             library_title = "Knowledge Bases"
             preview_title = "Citation Sources"
             toc_title = "Source Sections"
@@ -283,7 +323,6 @@ class ProjectRuntimeTest(unittest.TestCase):
             knowledge_detail = "/invalid/bases/details"
             document_detail_prefix = "/invalid/bases/details/documents"
             api_prefix = "/api/invalid"
-            workbench_spec = "/api/invalid/workbench-spec"
 
             [a11y]
             reading_order = ["conversation_sidebar", "chat_header", "message_stream", "chat_composer", "citation_drawer"]
@@ -355,11 +394,13 @@ class ProjectRuntimeTest(unittest.TestCase):
         ).strip()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            instance_file = Path(temp_dir) / "instance.toml"
-            instance_file.write_text(instance_toml, encoding="utf-8")
+            product_spec_file = Path(temp_dir) / "product_spec.toml"
+            implementation_config_file = Path(temp_dir) / "implementation_config.toml"
+            product_spec_file.write_text(invalid_product_spec, encoding="utf-8")
+            implementation_config_file.write_text(DEFAULT_IMPLEMENTATION_CONFIG.replace("/api/public-knowledge", "/api/invalid"), encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "knowledge_base\\.R4"):
-                load_knowledge_base_project(instance_file)
+                load_knowledge_base_project(product_spec_file)
 
 
 if __name__ == "__main__":

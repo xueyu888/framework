@@ -226,7 +226,7 @@ class KnowledgeRepository:
 
     def create_document(self, payload: KnowledgeDocumentCreateRequest) -> KnowledgeDocument:
         if not self.project.library.allow_create:
-            raise ValueError("document creation is disabled by the current instance configuration")
+            raise ValueError("document creation is disabled by the current product settings")
         document_id = payload.document_id or _make_document_id(payload.title)
         if document_id in self._documents:
             raise ValueError(f"document_id already exists: {document_id}")
@@ -246,7 +246,7 @@ class KnowledgeRepository:
 
     def delete_document(self, document_id: str) -> None:
         if not self.project.library.allow_delete:
-            raise ValueError("document deletion is disabled by the current instance configuration")
+            raise ValueError("document deletion is disabled by the current product settings")
         if document_id not in self._documents:
             raise KeyError(document_id)
         del self._documents[document_id]
@@ -387,7 +387,7 @@ def verify_knowledge_base_backend(project: KnowledgeBaseProject | None = None) -
             pass_criteria=[
                 "knowledge base list/detail, document list/detail, section, tag, create, delete, and chat endpoints all exist",
                 "chat answers cite concrete sections and expose drawer plus document detail paths",
-                "workbench spec endpoint exposes generated framework and instance evidence",
+                "product spec endpoint exposes compiled product truth",
             ],
             evidence={
                 "project": resolved.public_summary(),
