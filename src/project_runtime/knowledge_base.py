@@ -46,6 +46,12 @@ KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT = config_layout(
     {},
 )
 LEGACY_GENERATED_ARTIFACT_NAMES = frozenset({"project_bundle.py", "workbench_spec.json"})
+SUPPORTED_FRONTEND_RENDERERS = frozenset({"knowledge_chat_client_v1"})
+SUPPORTED_FRONTEND_STYLE_PROFILES = frozenset({"knowledge_chat_web_v1"})
+SUPPORTED_FRONTEND_SCRIPT_PROFILES = frozenset({"knowledge_chat_browser_v1"})
+SUPPORTED_BACKEND_RENDERERS = frozenset({"knowledge_chat_backend_v1"})
+SUPPORTED_BACKEND_TRANSPORTS = frozenset({"http_json"})
+SUPPORTED_BACKEND_RETRIEVAL_STRATEGIES = frozenset({"retrieval_stub"})
 
 
 def detect_project_template_id(product_spec_file: str | Path) -> str:
@@ -775,6 +781,95 @@ class KnowledgeBaseProject:
         }
 
 
+def _effective_generated_artifacts(project: KnowledgeBaseProject) -> GeneratedArtifactPaths:
+    if project.generated_artifacts is not None:
+        return project.generated_artifacts
+
+    product_spec_path = _normalize_project_path(project.product_spec_file)
+    artifact_directory = product_spec_path.parent / "generated"
+    artifact_names = project.implementation.artifacts
+    return GeneratedArtifactPaths(
+        directory=_relative_path(artifact_directory),
+        framework_ir_json=_relative_path(artifact_directory / artifact_names.framework_ir_json),
+        product_spec_json=_relative_path(artifact_directory / artifact_names.product_spec_json),
+        implementation_bundle_py=_relative_path(artifact_directory / artifact_names.implementation_bundle_py),
+        generation_manifest_json=_relative_path(artifact_directory / artifact_names.generation_manifest_json),
+        governance_manifest_json=_relative_path(artifact_directory / artifact_names.governance_manifest_json),
+        governance_tree_json=_relative_path(artifact_directory / artifact_names.governance_tree_json),
+    )
+
+
+def build_implementation_effect_manifest(project: KnowledgeBaseProject) -> dict[str, dict[str, Any]]:
+    generated_artifacts = _effective_generated_artifacts(project)
+    return {
+        "frontend.renderer": {
+            "value": project.implementation.frontend.renderer,
+            "relation": "equals",
+            "targets": ["ui_spec.implementation.frontend_renderer"],
+        },
+        "frontend.style_profile": {
+            "value": project.implementation.frontend.style_profile,
+            "relation": "equals",
+            "targets": ["ui_spec.implementation.style_profile"],
+        },
+        "frontend.script_profile": {
+            "value": project.implementation.frontend.script_profile,
+            "relation": "equals",
+            "targets": ["ui_spec.implementation.script_profile"],
+        },
+        "backend.renderer": {
+            "value": project.implementation.backend.renderer,
+            "relation": "equals",
+            "targets": ["backend_spec.implementation.backend_renderer"],
+        },
+        "backend.transport": {
+            "value": project.implementation.backend.transport,
+            "relation": "equals",
+            "targets": ["backend_spec.transport.mode"],
+        },
+        "backend.retrieval_strategy": {
+            "value": project.implementation.backend.retrieval_strategy,
+            "relation": "equals",
+            "targets": ["backend_spec.retrieval.strategy"],
+        },
+        "evidence.product_spec_endpoint": {
+            "value": project.implementation.evidence.product_spec_endpoint,
+            "relation": "equals",
+            "targets": ["backend_spec.transport.product_spec_endpoint"],
+        },
+        "artifacts.framework_ir_json": {
+            "value": project.implementation.artifacts.framework_ir_json,
+            "relation": "basename",
+            "targets": ["generated_artifacts.framework_ir_json"],
+        },
+        "artifacts.product_spec_json": {
+            "value": project.implementation.artifacts.product_spec_json,
+            "relation": "basename",
+            "targets": ["generated_artifacts.product_spec_json"],
+        },
+        "artifacts.implementation_bundle_py": {
+            "value": project.implementation.artifacts.implementation_bundle_py,
+            "relation": "basename",
+            "targets": ["generated_artifacts.implementation_bundle_py"],
+        },
+        "artifacts.generation_manifest_json": {
+            "value": project.implementation.artifacts.generation_manifest_json,
+            "relation": "basename",
+            "targets": ["generated_artifacts.generation_manifest_json"],
+        },
+        "artifacts.governance_manifest_json": {
+            "value": project.implementation.artifacts.governance_manifest_json,
+            "relation": "basename",
+            "targets": ["generated_artifacts.governance_manifest_json"],
+        },
+        "artifacts.governance_tree_json": {
+            "value": project.implementation.artifacts.governance_tree_json,
+            "relation": "basename",
+            "targets": ["generated_artifacts.governance_tree_json"],
+        },
+    }
+
+
 def _render_markdown(markdown: str) -> str:
     lines = markdown.strip().splitlines()
     html_parts: list[str] = []
@@ -1251,6 +1346,11 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                 "domain": [item.rule_id for item in project.domain_ir.rules],
             },
         },
+        "implementation": {
+            "frontend_renderer": project.implementation.frontend.renderer,
+            "style_profile": project.implementation.frontend.style_profile,
+            "script_profile": project.implementation.frontend.script_profile,
+        },
         "shell": {
             "id": project.surface.shell,
             "layout_variant": project.surface.layout_variant,
@@ -1429,6 +1529,9 @@ def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                 "backend": [item.rule_id for item in project.backend_ir.rules],
             },
         },
+        "implementation": {
+            "backend_renderer": project.implementation.backend.renderer,
+        },
         "knowledge_base": {
             "knowledge_base_id": project.library.knowledge_base_id,
             "knowledge_base_name": project.library.knowledge_base_name,
@@ -1436,7 +1539,13 @@ def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
             "source_types": list(project.library.source_types),
             "metadata_fields": list(project.library.metadata_fields),
         },
+        "transport": {
+            "mode": project.implementation.backend.transport,
+            "api_prefix": project.route.api_prefix,
+            "product_spec_endpoint": project.implementation.evidence.product_spec_endpoint,
+        },
         "retrieval": {
+            "strategy": project.implementation.backend.retrieval_strategy,
             "query_token_min_length": 3,
             "focus_section_bonus": 4,
             "token_match_bonus": 3,
@@ -1589,12 +1698,22 @@ def _validate_implementation_config(
     implementation: KnowledgeBaseImplementationConfig,
     product_spec: KnowledgeBaseProductSpec,
 ) -> None:
+    if implementation.frontend.renderer not in SUPPORTED_FRONTEND_RENDERERS:
+        raise ValueError(f"unsupported frontend.renderer: {implementation.frontend.renderer}")
+    if implementation.frontend.style_profile not in SUPPORTED_FRONTEND_STYLE_PROFILES:
+        raise ValueError(f"unsupported frontend.style_profile: {implementation.frontend.style_profile}")
+    if implementation.frontend.script_profile not in SUPPORTED_FRONTEND_SCRIPT_PROFILES:
+        raise ValueError(f"unsupported frontend.script_profile: {implementation.frontend.script_profile}")
+    if implementation.backend.renderer not in SUPPORTED_BACKEND_RENDERERS:
+        raise ValueError(f"unsupported backend.renderer: {implementation.backend.renderer}")
+    if implementation.backend.transport not in SUPPORTED_BACKEND_TRANSPORTS:
+        raise ValueError(f"unsupported backend.transport: {implementation.backend.transport}")
+    if implementation.backend.retrieval_strategy not in SUPPORTED_BACKEND_RETRIEVAL_STRATEGIES:
+        raise ValueError(f"unsupported backend.retrieval_strategy: {implementation.backend.retrieval_strategy}")
     if not implementation.evidence.product_spec_endpoint.startswith(product_spec.route.api_prefix):
         raise ValueError("evidence.product_spec_endpoint must stay under route.api_prefix")
     if implementation.backend.retrieval_strategy != product_spec.chat.mode:
         raise ValueError("backend.retrieval_strategy must match chat.mode")
-    if implementation.backend.transport != "http_json":
-        raise ValueError("backend.transport must be http_json")
 
 
 def _collect_validation_reports(project: KnowledgeBaseProject) -> dict[str, Any]:
@@ -1648,6 +1767,7 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
 
     product_spec = project.to_product_spec_dict()
     runtime_bundle = project.to_runtime_bundle_dict()
+    configuration_effects = build_implementation_effect_manifest(project)
     product_spec_text = json.dumps(product_spec, ensure_ascii=False, indent=2)
     implementation_bundle_text = "\n".join(
         [
@@ -1693,6 +1813,7 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
                 "backend": project.backend_ir.path,
                 "resolved_modules": [item.path for item in project.resolved_modules],
             },
+            "configuration_effects": configuration_effects,
             "generated_files": {
                 "framework_ir_json": generated_artifacts.framework_ir_json,
                 "product_spec_json": generated_artifacts.product_spec_json,

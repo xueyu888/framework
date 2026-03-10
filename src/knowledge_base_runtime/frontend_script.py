@@ -5,7 +5,18 @@ import json
 from project_runtime.knowledge_base import KnowledgeBaseProject
 
 
+def _require_script_profile(project: KnowledgeBaseProject) -> str:
+    implementation = project.ui_spec.get("implementation")
+    if not isinstance(implementation, dict):
+        raise ValueError("ui_spec.implementation is required for frontend script selection")
+    value = implementation.get("script_profile")
+    if value != "knowledge_chat_browser_v1":
+        raise ValueError(f"unsupported frontend script_profile: {value}")
+    return value
+
+
 def build_chat_script(project: KnowledgeBaseProject) -> str:
+    _require_script_profile(project)
     spec_json = json.dumps(project.to_spec_dict(), ensure_ascii=False)
     script = """
     <script>

@@ -3,7 +3,18 @@ from __future__ import annotations
 from project_runtime.knowledge_base import KnowledgeBaseProject
 
 
+def _require_style_profile(project: KnowledgeBaseProject) -> str:
+    implementation = project.ui_spec.get("implementation")
+    if not isinstance(implementation, dict):
+        raise ValueError("ui_spec.implementation is required for frontend style selection")
+    value = implementation.get("style_profile")
+    if value != "knowledge_chat_web_v1":
+        raise ValueError(f"unsupported frontend style_profile: {value}")
+    return value
+
+
 def build_shared_style(project: KnowledgeBaseProject) -> str:
+    _require_style_profile(project)
     visual = project.ui_spec["visual"]["tokens"]
     style = """
     :root {

@@ -16,6 +16,16 @@ def _resolve_project(project: KnowledgeBaseProject | None) -> KnowledgeBaseProje
     return project or load_knowledge_base_project()
 
 
+def _require_frontend_renderer(project: KnowledgeBaseProject) -> str:
+    implementation = project.ui_spec.get("implementation")
+    if not isinstance(implementation, dict):
+        raise ValueError("ui_spec.implementation is required for frontend renderer selection")
+    value = implementation.get("frontend_renderer")
+    if value != "knowledge_chat_client_v1":
+        raise ValueError(f"unsupported frontend renderer: {value}")
+    return value
+
+
 def _module_capabilities(project: KnowledgeBaseProject) -> tuple[Capability, ...]:
     return tuple(Capability(item.capability_id, item.statement) for item in project.frontend_ir.capabilities)
 
@@ -85,6 +95,7 @@ def verify_knowledge_base_frontend(project: KnowledgeBaseProject | None = None) 
 
 
 def _shared_style(project: KnowledgeBaseProject) -> str:
+    _require_frontend_renderer(project)
     return build_shared_style(project)
 
 
@@ -575,6 +586,7 @@ def compose_document_detail_page(
 
 
 def _chat_script(project: KnowledgeBaseProject) -> str:
+    _require_frontend_renderer(project)
     return build_chat_script(project)
 
 

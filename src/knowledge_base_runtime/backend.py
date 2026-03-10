@@ -21,6 +21,16 @@ def _resolve_project(project: KnowledgeBaseProject | None) -> KnowledgeBaseProje
     return project or load_knowledge_base_project()
 
 
+def _require_backend_renderer(project: KnowledgeBaseProject) -> str:
+    implementation = project.backend_spec.get("implementation")
+    if not isinstance(implementation, dict):
+        raise ValueError("backend_spec.implementation is required for backend renderer selection")
+    value = implementation.get("backend_renderer")
+    if value != "knowledge_chat_backend_v1":
+        raise ValueError(f"unsupported backend renderer: {value}")
+    return value
+
+
 def _module_capabilities(project: KnowledgeBaseProject) -> tuple[Capability, ...]:
     return tuple(Capability(item.capability_id, item.statement) for item in project.backend_ir.capabilities)
 
@@ -163,6 +173,7 @@ def _document_detail_path(project: KnowledgeBaseProject, document_id: str, secti
 class KnowledgeRepository:
     def __init__(self, project: KnowledgeBaseProject | None = None) -> None:
         self.project = _resolve_project(project)
+        _require_backend_renderer(self.project)
         self.backend_spec = self.project.backend_spec
         self._documents = {item.document_id: item for item in self.project.documents}
         self._document_order = [item.document_id for item in self.project.documents]
@@ -320,6 +331,18 @@ class KnowledgeRepository:
         section_id: str | None = None,
     ) -> list[RankedSection]:
         retrieval = self.backend_spec["retrieval"]
+        strategy = retrieval["strategy"]
+        if strategy == "retrieval_stub":
+            return self._rank_sections_stub(message, document_id=document_id, section_id=section_id)
+        raise ValueError(f"unsupported backend retrieval strategy: {strategy}")
+
+    def _rank_sections_stub(
+        self,
+        message: str,
+        document_id: str | None = None,
+        section_id: str | None = None,
+    ) -> list[RankedSection]:
+        retrieval = self.backend_spec["retrieval"]
         query_tokens = {
             token for token in message.lower().split() if len(token) >= retrieval["query_token_min_length"]
         }
@@ -413,6 +436,7 @@ def build_knowledge_base_router(
     repository: KnowledgeRepository | None = None,
 ) -> APIRouter:
     resolved = _resolve_project(project)
+    _require_backend_renderer(resolved)
     repo = repository or KnowledgeRepository(resolved)
     router = APIRouter(prefix=resolved.route.api_prefix, tags=[resolved.metadata.project_id])
 

@@ -15,6 +15,7 @@
 - Runs strict mapping validation on save/create/rename/delete for relevant files.
 - Runs strict mapping validation when watched files change outside VSCode and when window regains focus.
 - Auto-materializes affected `projects/*` when `framework/*.md`, `product_spec.toml`, or `implementation_config.toml` changes.
+- The validation chain includes `配置即功能` checks: effective `implementation_config.toml` fields must drive downstream compiled behavior instead of becoming dead selectors.
 - Optionally runs `mypy` after relevant Python changes under `src/`, `scripts/`, or `tests/`.
 - Guards `projects/*/generated/*` from direct edits; `strict` mode restores them by re-materializing the owning project.
 - Checks whether repository `.githooks` are enabled and offers a one-click install command when missing.

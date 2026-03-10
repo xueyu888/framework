@@ -194,6 +194,19 @@
   - `backend`
   - `evidence`
   - `artifacts`
+- `implementation_config.toml` 的非产物字段必须满足“配置即功能”：
+  - 每个实现层字段都必须进入至少一个下游生效位。
+  - 生效位必须落在编译后的 `ui_spec`、`backend_spec`、运行时路由/选择链或生成产物命名中。
+  - 仅在 bundle 中重复保存 `IMPLEMENTATION_CONFIG` 本身，不构成生效位。
+- 当前默认模板 `knowledge_base_workbench` 的以下字段必须可被自动追踪到下游效果，不允许成为死配置：
+  - `frontend.renderer`
+  - `frontend.style_profile`
+  - `frontend.script_profile`
+  - `backend.renderer`
+  - `backend.transport`
+  - `backend.retrieval_strategy`
+  - `evidence.product_spec_endpoint`
+- `scripts/validate_strict_mapping.py` 必须对“配置即功能”做自动检查；当 `implementation_config.toml` 字段缺少下游效果、效果路径失配或成为死配置时，lint 必须失败。
 - `implementation_config.toml` 的 `[artifacts]` 必须定义且唯一命名以下产物：
   - `framework_ir_json`
   - `product_spec_json`

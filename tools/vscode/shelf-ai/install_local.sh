@@ -61,6 +61,8 @@ else
 fi
 
 # Clean up existing installs so the remote host doesn't keep multiple stale versions around.
+"${CODE_BIN}" --uninstall-extension local.strict-mapping-guard >/dev/null 2>&1 || true
+"${CODE_BIN}" --uninstall-extension local.mapping >/dev/null 2>&1 || true
 "${CODE_BIN}" --uninstall-extension local.shelf-ai >/dev/null 2>&1 || true
 "${CODE_BIN}" --uninstall-extension rdshr.shelf-ai >/dev/null 2>&1 || true
 "${CODE_BIN}" --uninstall-extension local.archsync >/dev/null 2>&1 || true

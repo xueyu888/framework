@@ -316,7 +316,7 @@
         "level": 4,
         "description": "kind=code_symbol | layer=Code | project_id=knowledge_base_basic | file=src/knowledge_base_runtime/backend.py | locator=function:answer_question | symbol_id=kb.answer.behavior",
         "source_file": "src/knowledge_base_runtime/backend.py",
-        "source_line": 255,
+        "source_line": 266,
         "node_kind": "code_symbol",
         "layer": "Code",
         "project_id": "knowledge_base_basic",
@@ -345,7 +345,7 @@
         "level": 4,
         "description": "kind=code_symbol | layer=Code | project_id=knowledge_base_basic | file=src/knowledge_base_runtime/backend.py | locator=function:create_chat_turn | symbol_id=kb.api.chat_contract",
         "source_file": "src/knowledge_base_runtime/backend.py",
-        "source_line": 487,
+        "source_line": 511,
         "node_kind": "code_symbol",
         "layer": "Code",
         "project_id": "knowledge_base_basic",
@@ -374,7 +374,7 @@
         "level": 4,
         "description": "kind=code_symbol | layer=Code | project_id=knowledge_base_basic | file=src/knowledge_base_runtime/backend.py | locator=function:list_knowledge_bases | symbol_id=kb.api.library_contracts",
         "source_file": "src/knowledge_base_runtime/backend.py",
-        "source_line": 419,
+        "source_line": 443,
         "node_kind": "code_symbol",
         "layer": "Code",
         "project_id": "knowledge_base_basic",
@@ -402,7 +402,7 @@
         "level": 4,
         "description": "kind=code_symbol | layer=Code | project_id=knowledge_base_basic | file=src/project_runtime/knowledge_base.py | locator=function:_build_backend_spec | symbol_id=kb.backend.surface_spec",
         "source_file": "src/project_runtime/knowledge_base.py",
-        "source_line": 1412,
+        "source_line": 1512,
         "node_kind": "code_symbol",
         "layer": "Code",
         "project_id": "knowledge_base_basic",
@@ -464,7 +464,7 @@
         "level": 4,
         "description": "kind=code_symbol | layer=Code | project_id=knowledge_base_basic | file=src/knowledge_base_runtime/app.py | locator=function:root | symbol_id=kb.runtime.page_routes",
         "source_file": "src/knowledge_base_runtime/app.py",
-        "source_line": 27,
+        "source_line": 44,
         "node_kind": "code_symbol",
         "layer": "Code",
         "project_id": "knowledge_base_basic",
@@ -490,7 +490,7 @@
         "level": 4,
         "description": "kind=code_symbol | layer=Code | project_id=knowledge_base_basic | file=src/project_runtime/knowledge_base.py | locator=function:_build_ui_spec | symbol_id=kb.ui.surface_spec",
         "source_file": "src/project_runtime/knowledge_base.py",
-        "source_line": 1227,
+        "source_line": 1322,
         "node_kind": "code_symbol",
         "layer": "Code",
         "project_id": "knowledge_base_basic",
@@ -1852,7 +1852,7 @@
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:answer_question",
                 "annotation": "governed_symbol",
-                "line": 255
+                "line": 266
               }
             ],
             "derived_from": [
@@ -1898,7 +1898,7 @@
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:create_chat_turn",
                 "annotation": "governed_symbol",
-                "line": 487
+                "line": 511
               }
             ],
             "derived_from": [
@@ -1963,49 +1963,49 @@
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:list_knowledge_bases",
                 "annotation": "governed_symbol",
-                "line": 419
+                "line": 443
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:get_knowledge_base",
                 "annotation": "governed_symbol",
-                "line": 424
+                "line": 448
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:list_documents",
                 "annotation": "governed_symbol",
-                "line": 432
+                "line": 456
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:create_document",
                 "annotation": "governed_symbol",
-                "line": 440
+                "line": 464
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:get_document",
                 "annotation": "governed_symbol",
-                "line": 449
+                "line": 473
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:get_section",
                 "annotation": "governed_symbol",
-                "line": 457
+                "line": 481
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:delete_document",
                 "annotation": "governed_symbol",
-                "line": 471
+                "line": 495
               },
               {
                 "file": "src/knowledge_base_runtime/backend.py",
                 "locator": "function:list_tags",
                 "annotation": "governed_symbol",
-                "line": 482
+                "line": 506
               }
             ],
             "derived_from": [
@@ -2158,7 +2158,7 @@
                 "file": "src/project_runtime/knowledge_base.py",
                 "locator": "function:_build_backend_spec",
                 "annotation": "governed_symbol",
-                "line": 1412
+                "line": 1512
               }
             ],
             "derived_from": [
@@ -2449,43 +2449,43 @@
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:root",
                 "annotation": "governed_symbol",
-                "line": 27
+                "line": 44
               },
               {
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:knowledge_base_page",
                 "annotation": "governed_symbol",
-                "line": 36
+                "line": 53
               },
               {
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:basketball_showcase_page",
                 "annotation": "governed_symbol",
-                "line": 41
+                "line": 58
               },
               {
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:knowledge_base_list_page",
                 "annotation": "governed_symbol",
-                "line": 46
+                "line": 63
               },
               {
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:knowledge_base_detail_page",
                 "annotation": "governed_symbol",
-                "line": 51
+                "line": 68
               },
               {
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:document_detail_page",
                 "annotation": "governed_symbol",
-                "line": 59
+                "line": 76
               },
               {
                 "file": "src/knowledge_base_runtime/app.py",
                 "locator": "function:product_spec",
                 "annotation": "governed_symbol",
-                "line": 71
+                "line": 88
               }
             ],
             "derived_from": [
@@ -2529,7 +2529,7 @@
                 "file": "src/project_runtime/knowledge_base.py",
                 "locator": "function:_build_ui_spec",
                 "annotation": "governed_symbol",
-                "line": 1227
+                "line": 1322
               }
             ],
             "derived_from": [
