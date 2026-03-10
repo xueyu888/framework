@@ -1,4 +1,8 @@
 {
+  "archSync.uvExecutablePath": "/home/ubunt/.local/bin/uv",
+  "archSync.changeValidationCommand": "/home/ubunt/.local/bin/uv run python scripts/validate_strict_mapping.py --check-changes --json",
+  "archSync.fullValidationCommand": "/home/ubunt/.local/bin/uv run python scripts/validate_strict_mapping.py --json",
+  "archSync.frameworkTreeGenerateCommand": "/home/ubunt/.local/bin/uv run python scripts/generate_framework_tree_hierarchy.py --source framework --framework-dir framework --output-json docs/hierarchy/shelf_framework_tree.json --output-html docs/hierarchy/shelf_framework_tree.html",
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/src"

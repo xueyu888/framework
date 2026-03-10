@@ -127,6 +127,11 @@
           "default": true,
           "description": "Show notification when auto validation detects mapping issues."
         },
+        "archSync.uvExecutablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to the uv executable used by ArchSync commands when VSCode cannot resolve uv from PATH."
+        },
         "archSync.changeValidationCommand": {
           "type": "string",
           "default": "uv run python scripts/validate_strict_mapping.py --check-changes --json",

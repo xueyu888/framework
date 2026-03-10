@@ -92,10 +92,15 @@
 ## Configuration
 - `archSync.enableOnSave`
 - `archSync.notifyOnAutoFail`
+- `archSync.uvExecutablePath`
 - `archSync.changeValidationCommand`
 - `archSync.fullValidationCommand`
 - `archSync.frameworkTreeHtmlPath`
 - `archSync.frameworkTreeGenerateCommand`
+
+If VSCode shows `/bin/sh: 1: uv: not found` while the terminal can run `uv`, the extension host PATH is missing your `uv` location. ArchSync now auto-probes common install paths such as `~/.local/bin/uv`, but you can also set `archSync.uvExecutablePath` explicitly, for example:
+- `~/.local/bin/uv`
+- `/home/<user>/.cargo/bin/uv`
 
 Default commands use the repository validator:
 - `uv run python scripts/validate_strict_mapping.py --check-changes --json`

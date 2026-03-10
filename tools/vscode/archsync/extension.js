@@ -1,5 +1,6 @@
 const cp = require("child_process");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const vscode = require("vscode");
 const frameworkNavigation = require("./framework_navigation");
@@ -17,6 +18,8 @@ const STANDARDS_TREE_FILE = path.join("specs", "规范总纲与树形结构.md")
 const REGISTRY_FILE = path.join("mapping", "mapping_registry.json");
 const DEFAULT_FRAMEWORK_TREE_HTML = path.join("docs", "hierarchy", "shelf_framework_tree.html");
 const SIDEBAR_VIEW_ID = "archSync.sidebarHome";
+const UV_NOT_FOUND_PATTERN = /(^|\b)uv:\s+not found\b/i;
+const UV_COMMAND_PATTERN = /^\s*uv(?=\s|$)/;
 const DEFAULT_FRAMEWORK_TREE_GENERATE_COMMAND =
   "uv run python scripts/generate_framework_tree_hierarchy.py --source framework --framework-dir framework --output-json docs/hierarchy/shelf_framework_tree.json --output-html docs/hierarchy/shelf_framework_tree.html";
 const FRAMEWORK_RULE_HINTS = {
@@ -1016,13 +1019,170 @@ function isWatchedUri(uri, workspaceRoot) {
   return isWatchedPath(rel);
 }
 
-function execCommand(command, cwd) {
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function isUvCommand(command) {
+  return UV_COMMAND_PATTERN.test(command || "");
+}
+
+function executableExists(filePath) {
+  if (!filePath) {
+    return false;
+  }
+
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function splitPathEntries(pathValue) {
+  if (!pathValue) {
+    return [];
+  }
+  return pathValue.split(path.delimiter).filter(Boolean);
+}
+
+function buildExecEnv(extraDirs = []) {
+  const env = { ...process.env };
+  const currentEntries = splitPathEntries(env.PATH || "");
+  const mergedEntries = [...new Set([...extraDirs.filter(Boolean), ...currentEntries])];
+  env.PATH = mergedEntries.join(path.delimiter);
+  return env;
+}
+
+function candidateUvPaths() {
+  const homeDir = os.homedir();
+  return [
+    path.join(homeDir, ".local", "bin", "uv"),
+    path.join(homeDir, ".cargo", "bin", "uv"),
+    path.join(homeDir, ".uv", "bin", "uv")
+  ];
+}
+
+function findUvOnPath(searchPath) {
+  for (const entry of splitPathEntries(searchPath)) {
+    const candidate = path.join(entry, "uv");
+    if (executableExists(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function execFileCapture(file, args, options = {}) {
   return new Promise((resolve) => {
-    cp.exec(command, { cwd, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    cp.execFile(file, args, options, (error, stdout, stderr) => {
       resolve({
         code: error ? error.code ?? 1 : 0,
         stdout: stdout || "",
         stderr: stderr || ""
+      });
+    });
+  });
+}
+
+async function probeUvFromShell(shellPath, cwd, interactive) {
+  if (!shellPath || !executableExists(shellPath)) {
+    return null;
+  }
+
+  const result = await execFileCapture(
+    shellPath,
+    [interactive ? "-ic" : "-lc", "command -v uv"],
+    { cwd, env: buildExecEnv(candidateUvPaths().map((item) => path.dirname(item))), maxBuffer: 64 * 1024 }
+  );
+  if (result.code !== 0) {
+    return null;
+  }
+
+  for (const line of result.stdout.split(/\r?\n/).map((item) => item.trim())) {
+    if (line.startsWith("/") && executableExists(line)) {
+      return line;
+    }
+  }
+  return null;
+}
+
+async function resolveUvExecutable(cwd) {
+  const configured = vscode.workspace.getConfiguration("archSync").get("uvExecutablePath");
+  if (typeof configured === "string" && configured.trim()) {
+    const configuredPath = configured.startsWith("~/")
+      ? path.join(os.homedir(), configured.slice(2))
+      : configured === "~"
+        ? os.homedir()
+      : path.isAbsolute(configured)
+        ? configured
+        : path.resolve(cwd, configured);
+    if (executableExists(configuredPath)) {
+      return configuredPath;
+    }
+  }
+
+  const directPathMatch = findUvOnPath(process.env.PATH || "");
+  if (directPathMatch) {
+    return directPathMatch;
+  }
+
+  for (const candidate of candidateUvPaths()) {
+    if (executableExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  const shellCandidates = [process.env.SHELL, "/bin/bash"];
+  for (const shellPath of shellCandidates) {
+    const loginMatch = await probeUvFromShell(shellPath, cwd, false);
+    if (loginMatch) {
+      return loginMatch;
+    }
+  }
+  for (const shellPath of shellCandidates) {
+    const interactiveMatch = await probeUvFromShell(shellPath, cwd, true);
+    if (interactiveMatch) {
+      return interactiveMatch;
+    }
+  }
+
+  return null;
+}
+
+async function prepareCommand(command, cwd) {
+  if (!isUvCommand(command)) {
+    return { command, env: buildExecEnv() };
+  }
+
+  const uvExecutable = await resolveUvExecutable(cwd);
+  if (!uvExecutable) {
+    return { command, env: buildExecEnv(candidateUvPaths().map((item) => path.dirname(item))) };
+  }
+
+  return {
+    command: command.replace(UV_COMMAND_PATTERN, shellQuote(uvExecutable)),
+    env: buildExecEnv([path.dirname(uvExecutable)])
+  };
+}
+
+async function execCommand(command, cwd) {
+  const prepared = await prepareCommand(command, cwd);
+  return new Promise((resolve) => {
+    cp.exec(prepared.command, { cwd, env: prepared.env, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      let normalizedStderr = stderr || "";
+      if (error && UV_NOT_FOUND_PATTERN.test(normalizedStderr)) {
+        normalizedStderr = [
+          normalizedStderr.trim(),
+          "ArchSync could not locate `uv` from the VSCode extension host.",
+          "Set `archSync.uvExecutablePath` or install `uv` into a PATH visible to VSCode."
+        ].filter(Boolean).join("\n");
+      }
+      resolve({
+        code: error ? error.code ?? 1 : 0,
+        stdout: stdout || "",
+        stderr: normalizedStderr
       });
     });
   });
