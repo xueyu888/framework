@@ -1,818 +1,553 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
-from shelf_framework import (
+from domain import (
+    Base,
     BoundaryDefinition,
-    CombinationRules,
+    Capability,
+    DiscreteGrid,
+    EnumerationConfig,
     Footprint2D,
     Goal,
     Hypothesis,
-    LogicRecord,
     LogicStep,
+    Module,
     Opening2D,
-    ShelfCombination,
     Space3D,
     VerificationInput,
-    generate_shelf_combinations,
-    modules_to_list,
-    strict_mapping_meta,
-    validate_combination_principles,
-    verify,
 )
+from enumeration import counting_framework_summary, enumerate_structure_types
+from metrics import LoadCheckInput, simplified_load_check
+from rules import classify_combo_sets, geometric_type_combinations
+from shelf_framework import LogicRecord, strict_mapping_meta, verify
+from verification import verify_structure
+from visualization import render_structure
 
 
-def build_logic_record(goal: Goal, result_ok: bool) -> LogicRecord:
-    steps = [
-        LogicStep("G", "goal", evidence=goal.to_dict()),
-        LogicStep("M1", "rod", ["G"]),
-        LogicStep("M2", "connector", ["G"]),
-        LogicStep("M3", "panel", ["G"]),
-        LogicStep("R1", "no isolated module", ["M1", "M2", "M3"]),
-        LogicStep("R2", "connector is mandatory", ["M2"]),
-        LogicStep("R3", "layers_n >= 2 for valid structure", ["M3"]),
-        LogicStep("R4", "rods follow Z-axis and are perpendicular to panels", ["M1", "M3"]),
-        LogicStep("R5", "panels are parallel and corners connect to rods via connectors", ["M1", "M2", "M3"]),
-        LogicStep("R6", "valid set includes only results satisfying R1~R5", ["R1", "R2", "R3", "R4", "R5"]),
-        LogicStep("R7", "candidate set may include invalid samples for comparison", ["R6"]),
-        LogicStep("H1", "efficiency improves under valid constraints", ["R6"]),
-        LogicStep("V1", "verify hypothesis", ["H1"], {"passed": result_ok}),
-        LogicStep("C", "conclusion", ["V1"], {"adopt_now": result_ok}),
+def _write_text(path: str | Path, content: str) -> None:
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(content, encoding="utf-8")
+
+
+def build_assumptions() -> list[dict[str, str]]:
+    return [
+        {
+            "id": "A1",
+            "statement": "连续尺寸先离散化到有限网格，先解可计算穷举，再讨论连续优化。",
+            "config_key": "DiscreteGrid(x_cells, y_cells, layers_n)",
+        },
+        {
+            "id": "A2",
+            "statement": "默认支持同层多块矩形板分割（占用模式与分割方式分离计数）。",
+            "config_key": "partition_into_rectangles",
+        },
+        {
+            "id": "A3",
+            "statement": "冗余杆件/连接件不枚举，采用板诱导的最小必需支撑构造。",
+            "config_key": "build_geometry(topology, grid)",
+        },
+        {
+            "id": "A4",
+            "statement": "默认重力沿 -Z，层板法向沿 +Z（水平层板语义）。",
+            "config_key": "check_r4_board_parallel",
+        },
+        {
+            "id": "A5",
+            "statement": "opening_o 映射为 access_factor（宽高比均值，裁剪到 [0,1]）。",
+            "config_key": "metrics.efficiency::_access_factor",
+        },
+        {
+            "id": "A6",
+            "statement": "baseline_utilization 默认由实验输入给定，可替换为任意基准结构。",
+            "config_key": "baseline_utilization",
+        },
+        {
+            "id": "A7",
+            "statement": "未提供材料/截面/连接强度时，不声称完成真实工程安全验证，仅给简化载荷检查接口。",
+            "config_key": "simplified_load_check",
+        },
+        {
+            "id": "A8",
+            "statement": "FRAME 结构采用 V1“腔体诱导骨架”：枚举 6-邻接连通单元子集 U，并诱导最小外边界骨架。",
+            "config_key": "enumerate_connected_non_empty_cell_subsets + derive_boundary_skeleton_edges",
+        },
+        {
+            "id": "A9",
+            "statement": "FRAME 的 R4/R5/R6 视为 not applicable/pass；新增 connected、ground_contact、minimal_under_deletability 规则。",
+            "config_key": "evaluate_structural_rules(frame path)",
+        },
     ]
-    return LogicRecord.build(steps)
 
 
-def make_boundary(combo: ShelfCombination) -> BoundaryDefinition:
-    return BoundaryDefinition(
-        layers_n=combo.layers_n,
-        payload_p_per_layer=30.0,
-        space_s_per_layer=Space3D(
-            width=float(combo.footprint_width_units()),
-            depth=float(combo.footprint_depth_units()),
-            height=float(combo.layers_n),
-        ),
-        opening_o=Opening2D(width=float(combo.footprint_width_units()), height=1.0),
-        footprint_a=Footprint2D(
-            width=float(combo.footprint_width_units()),
-            depth=float(combo.footprint_depth_units()),
-        ),
+def write_architecture_doc() -> None:
+    _write_text(
+        "docs/architecture.md",
+        """# 架构说明
+
+## 项目结构
+- `src/domain/`: 核心实体与数据模型
+- `src/rules/`: 组合规则与结构规则判定
+- `src/geometry/`: 网格与几何诱导构造
+- `src/enumeration/`: 有界离散分型穷举与 canonical 去重
+- `src/metrics/`: 空间利用度与简化载荷
+- `src/verification/`: 统一验证报告
+- `src/visualization/`: 3D 渲染（Plotly + OBJ fallback）
+- `src/main.py`: 流水线入口，输出证据与文档
+
+## 数据流
+自然语言规则 -> 形式化对象 -> 枚举候选 -> 规则判定 -> 计算空间利用度 -> baseline 比较 -> 输出证据
+
+## 规则流
+- R1/R2：模块种类组合过滤（FRAME/SHELF 通用）
+- R3：对所有结构适用
+- R4/R5/R6：仅对 SHELF 适用；FRAME 视为 not applicable/pass
+- FRAME 特有规则：connected、ground_contact、minimal_under_deletability、可选 forbid_dangling_rods
+- Verification：边界有效 + 组合有效 + 空间利用度提升
+
+## 可追溯性
+核心类名与规则函数保持与 L2 -> L3 映射一致，输出 `docs/logic_record.json` 保存步骤级证据链，输出 `docs/run_summary.json` 保存运行摘要。
+""",
     )
 
 
-def build_geometry_payload(combo: ShelfCombination) -> dict[str, object]:
-    rod_heights = combo.rod_connection_heights()
-    rods = [
-        {"start": [x, y, 0], "end": [x, y, rod_heights[(x, y)]]}
-        for x, y in sorted(combo.rod_points())
-        if (x, y) in rod_heights
-    ]
+def write_math_model_doc() -> None:
+    _write_text(
+        "docs/math_model.md",
+        """# 数学模型（双族）
 
-    panels: list[list[list[int]]] = []
-    for x, y, z in combo.panel_cells():
-        panels.append(
-            [
-                [x, y, z],
-                [x + 1, y, z],
-                [x + 1, y + 1, z],
-                [x, y + 1, z],
-            ]
-        )
+## 1. 结构抽象
+定义结构为：`S = (V, E, B)`，并引入结构族：
+- `FRAME`: `B = empty`，仅含 `ROD + CONNECTOR`
+- `SHELF`: `B != empty`，含 `ROD + CONNECTOR + PANEL`
 
+结构全集：
+`Omega = Omega_frame ⊔ Omega_shelf`
+
+## 2. 离散网格
+`X={x_0<...<x_m}`, `Y={y_0<...<y_n}`, `Z={z_0<...<z_N}`
+- `X,Y` 将 footprint 离散化
+- `Z` 表示层高索引
+
+## 3. 占用变量
+`u_{ijk} in {0,1}`，表示第 `k` 层 `(i,j)` 单元是否被板覆盖。
+
+## 4. 模块组合集合
+- 类型组合：`M_type = {X subseteq {R,C,P} | |X|>=2 and C in X}`
+- 几何可实现组合：`M_geo = {{R,C},{R,C,P}}`
+说明：`{C,P}` 虽满足 R1/R2，但因 R5 的四角支撑需要 rods，被几何约束淘汰。
+
+## 5. 规则适用域
+- `R3` 对所有结构适用。
+- `R4/R5/R6` 仅对存在 panel 的结构（SHELF）适用。
+- 对 FRAME 结构，`R4/R5/R6` 视为 `not applicable / pass`，并启用 frame-specific 规则。
+
+## 6. 计数框架
+设第 `k` 层占用区域为 `Q_k`，其矩形板分割方式数为 `tau(Q_k)`。
+
+SHELF（保留原枚举器）：
+`C_raw^shelf = (T_layer)^N`，其中 `T_layer = delta_empty + sum_Q tau(Q)`。
+
+FRAME（V1，腔体诱导骨架）：
+- 三维单元集合：`C = {0..m-1} x {0..n-1} x {0..N-1}`
+- 枚举非空 6-邻接连通子集 `U subseteq C`
+- 诱导骨架：`S_frame(U) = (V_boundary(U), E_boundary(U), empty)`
+- 计数：`C_raw^frame = |{U subseteq C | U!=empty and connected_6(U)}|`
+
+总计数：
+`C_raw^all = C_raw^frame + C_raw^shelf`
+
+## 7. 空间利用度函数
+SHELF：
+`u_shelf(S) = (1/V_total) * sum_k(A_usable_k * h_clear_k * alpha_access_k)`
+
+FRAME：
+`u_frame(S) = (1/V_total) * sum_b(volume(bay_b) * access_coeff(bay_b))`
+
+说明：`V_total = footprint_area * total_height`。这样利用度会被归一化到总包络体积上，避免结果退化成带长度量纲的“高度分数”。
+
+## 8. 有限与无限边界
+连续尺寸空间通常是无限问题。
+本项目通过有界离散网格把问题转为有限可穷举问题，完备性仅在离散边界内成立。
+""",
+    )
+
+
+def write_assumptions_doc(assumptions: list[dict[str, str]]) -> None:
+    lines = ["# 默认假设\n", "以下假设全部显式参数化，可替换。\n"]
+    for item in assumptions:
+        lines.append(f"## {item['id']}\n")
+        lines.append(f"- 假设：{item['statement']}\n")
+        lines.append(f"- 配置位置：`{item['config_key']}`\n")
+    _write_text("docs/assumptions.md", "\n".join(lines) + "\n")
+
+
+def write_teaching_notes_doc() -> None:
+    _write_text(
+        "docs/teaching_notes.md",
+        """# 教学讲解笔记
+
+## 讲解主线
+1. 先区分三层对象：模块种类组合 / 拓扑分型 / 几何实例。
+2. 先离散化再穷举，避免连续空间下“总数不可判定”。
+3. 规则必须落为判定器（predicate），失败必须给原因。
+4. canonical form 用来去重等价结构，避免统计失真。
+5. 可视化是证据层，不是建模本身。
+
+## 常见误区
+- 误区1：把“组合数”当“分型数”。
+- 误区2：把“画出来”当“规则已证明”。
+- 误区3：把“简化载荷检查”当“真实工程安全验证”。
+
+## 关键认知转折
+- 从自然语言条款转到可执行约束；
+- 从单个案例演示转到全空间可枚举。
+""",
+    )
+
+
+def write_slides_outline_doc() -> None:
+    _write_text(
+        "docs/slides_outline.md",
+        """# 分享提纲（12页）
+
+1. 问题定义：从 L2 规范出发
+2. 目标与验证条件
+3. 歧义与假设闭环
+4. 三层对象分离：组合/分型/实例
+5. 离散网格建模
+6. R1-R6 规则形式化
+7. 穷举器与剪枝策略
+8. canonical 去重
+9. 空间利用度函数与 baseline
+10. 示例：3个有效 + 3个无效
+11. 3D 可视化与证据输出
+12. 结论、边界与下一步
+""",
+    )
+
+
+def write_examples_doc(
+    valid_examples: list[dict[str, object]],
+    invalid_examples: list[dict[str, object]],
+) -> None:
+    lines = ["# 示例判定\n"]
+    lines.append("## 有效结构示例\n")
+    for idx, item in enumerate(valid_examples[:3], start=1):
+        lines.append(f"### V{idx}\n")
+        lines.append(f"- canonical_key: `{item['canonical_key']}`\n")
+        lines.append(f"- panel_count: {item['panel_count']}\n")
+        lines.append(f"- target_utilization: {item['target_utilization']:.6f}\n")
+        lines.append(f"- 结论: {item['passed']}\n")
+
+    lines.append("## 无效结构示例\n")
+    for idx, item in enumerate(invalid_examples[:3], start=1):
+        lines.append(f"### I{idx}\n")
+        lines.append(f"- case: {item['case']}\n")
+        lines.append(f"- 结论: {item['passed']}\n")
+        lines.append(f"- 原因: {item['reasons']}\n")
+
+    _write_text("docs/examples.md", "\n".join(lines) + "\n")
+
+
+def build_run_summary(
+    assumptions: list[dict[str, str]],
+    combo_sets: dict[str, list[list[str]]],
+    enumeration_summary: dict[str, object],
+    valid_count: int,
+    invalid_count: int,
+) -> dict[str, object]:
     return {
-        "rods": rods,
-        "panels": panels,
-        "bounds": {
-            "width": combo.footprint_width_units(),
-            "depth": combo.footprint_depth_units(),
-            "height": combo.layers_n,
+        "goal": "提升单位占地面积下的空间利用度",
+        "metric_name": "space_utilization",
+        "formalization_chain": [
+            "自然语言规范",
+            "形式化对象",
+            "规则约束",
+            "数学模型",
+            "分型穷举",
+            "判定验证",
+            "3D 可视化",
+            "证据输出",
+        ],
+        "assumptions": assumptions,
+        "module_combinations": combo_sets,
+        "enumeration_summary": enumeration_summary,
+        "examples": {
+            "valid_count": valid_count,
+            "invalid_count": invalid_count,
         },
+        "limitations": [
+            "离散边界内完备，不代表连续空间完备",
+            "真实工程安全验证依赖材料/截面/连接强度参数",
+        ],
     }
-
-
-def render_3d_view_html(output_path: Path, payload: dict[str, object]) -> None:
-    data_json = json.dumps(payload, ensure_ascii=False)
-    html = f"""<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>组合 3D 模型</title>
-  <style>
-    :root {{
-      --bg: #f0ede6;
-      --card: #ffffff;
-      --line: #d6d3d1;
-      --ink: #111827;
-      --accent: #0f766e;
-      --soft: #d1fae5;
-      --fail: #b91c1c;
-      --ok: #166534;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      color: var(--ink);
-      font-family: "Microsoft YaHei UI", "Noto Sans SC", sans-serif;
-      background:
-        radial-gradient(1200px 400px at 10% -10%, #dbeafe, transparent 60%),
-        radial-gradient(1000px 350px at 90% -10%, #fee2e2, transparent 50%),
-        var(--bg);
-    }}
-    .wrap {{
-      max-width: 1280px;
-      margin: 20px auto;
-      padding: 0 14px;
-      display: grid;
-      gap: 12px;
-      grid-template-columns: 330px 1fr;
-    }}
-    .card {{
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: var(--card);
-      box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
-    }}
-    .side {{
-      padding: 12px;
-      display: grid;
-      gap: 10px;
-      align-content: start;
-      max-height: calc(100vh - 56px);
-      position: sticky;
-      top: 12px;
-      overflow: hidden;
-    }}
-    .controls {{
-      display: grid;
-      gap: 8px;
-    }}
-    .row {{
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }}
-    select, input, button {{
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 8px;
-      font-size: 14px;
-      background: #fff;
-    }}
-    button {{
-      cursor: pointer;
-      background: linear-gradient(90deg, #ecfeff, #ecfccb);
-    }}
-    .list {{
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      overflow: auto;
-      max-height: 54vh;
-      background: #fafaf9;
-    }}
-    .item {{
-      border-bottom: 1px solid #e7e5e4;
-      padding: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      line-height: 1.35;
-    }}
-    .item:hover {{ background: #f1f5f9; }}
-    .item.active {{
-      background: var(--soft);
-      border-left: 3px solid var(--accent);
-      padding-left: 5px;
-    }}
-    .main {{
-      padding: 10px;
-      display: grid;
-      gap: 10px;
-    }}
-    .topbar {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }}
-    .pill {{
-      font-size: 12px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 4px 10px;
-      background: #fff;
-    }}
-    .ok {{ color: var(--ok); font-weight: 700; }}
-    .fail {{ color: var(--fail); font-weight: 700; }}
-    canvas {{
-      width: 100%;
-      height: 640px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    }}
-    .meta {{
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px;
-      background: #fff;
-      font-size: 14px;
-      line-height: 1.5;
-    }}
-    @media (max-width: 960px) {{
-      .wrap {{ grid-template-columns: 1fr; }}
-      .side {{ position: static; max-height: none; }}
-      canvas {{ height: 460px; }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <aside class="card side">
-      <h3 style="margin:0;">组合筛选</h3>
-      <div class="controls">
-        <div class="row">
-          <select id="layerFilter">
-            <option value="all">层数: 全部</option>
-            <option value="1">层数: 1</option>
-            <option value="2">层数: 2</option>
-          </select>
-          <select id="areaFilter">
-            <option value="all">占地: 全部</option>
-            <option value="1">占地: 1</option>
-            <option value="2">占地: 2</option>
-            <option value="3">占地: 3</option>
-            <option value="4">占地: 4</option>
-          </select>
-        </div>
-        <input id="searchBox" type="text" placeholder="搜索组合 ID..." />
-        <div class="row">
-          <button id="prevBtn" type="button">上一个</button>
-          <button id="nextBtn" type="button">下一个</button>
-        </div>
-      </div>
-      <div class="list" id="comboList"></div>
-    </aside>
-    <main class="card main">
-      <div class="topbar">
-        <span class="pill">可旋转、可缩放（滚轮）</span>
-        <span class="pill">支持面积3与“田”字（2x2）组合</span>
-        <span class="pill">当前列表仅展示满足 R1~R5 的有效输出</span>
-        <label class="pill" style="display:flex;align-items:center;gap:8px;">
-          旋转
-          <input id="angleRange" type="range" min="0" max="360" value="30" style="width:180px;padding:0;border:none;" />
-        </label>
-      </div>
-      <canvas id="view" width="1100" height="640"></canvas>
-      <div class="meta" id="meta"></div>
-    </main>
-  </div>
-  <script>
-    const payload = {data_json};
-    const allCombos = payload.combinations;
-    const layerFilter = document.getElementById("layerFilter");
-    const areaFilter = document.getElementById("areaFilter");
-    const searchBox = document.getElementById("searchBox");
-    const prevBtn = document.getElementById("prevBtn");
-    const nextBtn = document.getElementById("nextBtn");
-    const comboList = document.getElementById("comboList");
-    const angleRange = document.getElementById("angleRange");
-    const canvas = document.getElementById("view");
-    const ctx = canvas.getContext("2d");
-    const meta = document.getElementById("meta");
-
-    let filtered = [...allCombos];
-    let currentIndex = 0;
-    let zoom = 1.0;
-
-    function sortByUsefulOrder(items) {{
-      return items.sort((a, b) =>
-        a.layers_n - b.layers_n ||
-        a.footprint_area_units - b.footprint_area_units ||
-        a.total_panel_count - b.total_panel_count ||
-        a.combination_id.localeCompare(b.combination_id)
-      );
-    }}
-
-    function applyFilters() {{
-      const layerValue = layerFilter.value;
-      const areaValue = areaFilter.value;
-      const q = searchBox.value.trim().toLowerCase();
-      filtered = allCombos.filter((item) => {{
-        if (layerValue !== "all" && String(item.layers_n) !== layerValue) return false;
-        if (areaValue !== "all" && String(item.footprint_area_units) !== areaValue) return false;
-        if (q && !item.combination_id.toLowerCase().includes(q)) return false;
-        return true;
-      }});
-      sortByUsefulOrder(filtered);
-      if (currentIndex >= filtered.length) currentIndex = 0;
-      renderList();
-      updateView();
-    }}
-
-    function renderList() {{
-      comboList.innerHTML = "";
-      if (!filtered.length) {{
-        comboList.innerHTML = '<div class="item">无匹配组合</div>';
-        return;
-      }}
-      filtered.forEach((item, idx) => {{
-        const div = document.createElement("div");
-        div.className = `item ${{idx === currentIndex ? "active" : ""}}`;
-        div.innerHTML = `
-          <div><b>${{item.combination_id}}</b></div>
-          <div>层=${{item.layers_n}} 占地=${{item.footprint_area_units}} 每层面积=${{item.layer_areas.join("/")}}</div>
-        `;
-        div.addEventListener("click", () => {{
-          currentIndex = idx;
-          renderList();
-          updateView();
-        }});
-        comboList.appendChild(div);
-      }});
-    }}
-
-    function projectPoint(p, angle) {{
-      const [x, y, z] = p;
-      const xr = x * Math.cos(angle) - y * Math.sin(angle);
-      const yr = x * Math.sin(angle) + y * Math.cos(angle);
-      return [xr, -z * 1.6 - yr * 0.65];
-    }}
-
-    function fitTransform(combo, angle) {{
-      const points = [];
-      for (const rod of combo.geometry.rods) {{
-        points.push(rod.start, rod.end);
-      }}
-      for (const panel of combo.geometry.panels) {{
-        points.push(...panel);
-      }}
-      const projected = points.map((p) => projectPoint(p, angle));
-      const xs = projected.map((p) => p[0]);
-      const ys = projected.map((p) => p[1]);
-      const minX = Math.min(...xs), maxX = Math.max(...xs);
-      const minY = Math.min(...ys), maxY = Math.max(...ys);
-      const spanX = Math.max(1e-6, maxX - minX);
-      const spanY = Math.max(1e-6, maxY - minY);
-      const scale = Math.min((canvas.width * 0.78) / spanX, (canvas.height * 0.72) / spanY) * zoom;
-      const tx = canvas.width * 0.5 - ((minX + maxX) / 2) * scale;
-      const ty = canvas.height * 0.56 - ((minY + maxY) / 2) * scale;
-      return {{ scale, tx, ty }};
-    }}
-
-    function drawCombo(combo) {{
-      const angle = (Number(angleRange.value) * Math.PI) / 180;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const tf = fitTransform(combo, angle);
-      const map = (p) => {{
-        const t = projectPoint(p, angle);
-        return [t[0] * tf.scale + tf.tx, t[1] * tf.scale + tf.ty];
-      }};
-
-      const panelPolys = combo.geometry.panels.map((panel) => {{
-        const avgDepth = panel.reduce((acc, p) => acc + p[1] + p[2], 0) / panel.length;
-        return {{ panel, avgDepth }};
-      }});
-      panelPolys.sort((a, b) => a.avgDepth - b.avgDepth);
-
-      for (const item of panelPolys) {{
-        const projected = item.panel.map((p) => map(p));
-        ctx.beginPath();
-        ctx.moveTo(projected[0][0], projected[0][1]);
-        for (let i = 1; i < projected.length; i += 1) {{
-          ctx.lineTo(projected[i][0], projected[i][1]);
-        }}
-        ctx.closePath();
-        ctx.fillStyle = "rgba(15, 118, 110, 0.22)";
-        ctx.strokeStyle = "rgba(15, 118, 110, 0.95)";
-        ctx.lineWidth = 1.8;
-        ctx.fill();
-        ctx.stroke();
-      }}
-
-      for (const rod of combo.geometry.rods) {{
-        const s = map(rod.start);
-        const e = map(rod.end);
-        ctx.beginPath();
-        ctx.moveTo(s[0], s[1]);
-        ctx.lineTo(e[0], e[1]);
-        ctx.strokeStyle = "rgba(17, 24, 39, 0.95)";
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-      }}
-    }}
-
-    function updateView() {{
-      if (!filtered.length) {{
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        meta.innerHTML = "当前筛选下无组合。";
-        return;
-      }}
-      const combo = filtered[currentIndex];
-      drawCombo(combo);
-      const stateClass = combo.verification.passed ? "ok" : "fail";
-      const stateText = combo.verification.passed ? "通过" : "失败";
-      meta.innerHTML = `
-        <div><b>${{combo.combination_id}}</b></div>
-        <div>层数=${{combo.layers_n}} | 占地面积=${{combo.footprint_area_units}} | 每层面积=${{combo.layer_areas.join("/")}} | 目标效率=${{combo.target_efficiency.toFixed(2)}}</div>
-        <div>验证：<span class="${{stateClass}}">${{stateText}}</span></div>
-        <div>原因：${{combo.verification.reasons.length ? combo.verification.reasons.join("；") : "无"}}</div>
-      `;
-    }}
-
-    layerFilter.addEventListener("change", applyFilters);
-    areaFilter.addEventListener("change", applyFilters);
-    searchBox.addEventListener("input", applyFilters);
-    angleRange.addEventListener("input", updateView);
-    prevBtn.addEventListener("click", () => {{
-      if (!filtered.length) return;
-      currentIndex = (currentIndex - 1 + filtered.length) % filtered.length;
-      renderList();
-      updateView();
-    }});
-    nextBtn.addEventListener("click", () => {{
-      if (!filtered.length) return;
-      currentIndex = (currentIndex + 1) % filtered.length;
-      renderList();
-      updateView();
-    }});
-    canvas.addEventListener("wheel", (event) => {{
-      event.preventDefault();
-      const factor = event.deltaY < 0 ? 1.06 : 0.94;
-      zoom = Math.max(0.35, Math.min(3.5, zoom * factor));
-      updateView();
-    }}, {{ passive: false }});
-
-    applyFilters();
-  </script>
-</body>
-</html>
-"""
-    output_path.write_text(html, encoding="utf-8")
-
-
-def render_validation_html(output_path: Path, payload: dict[str, object]) -> None:
-    data_json = json.dumps(payload, ensure_ascii=False)
-    html = f"""<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>组合验证结果</title>
-  <style>
-    :root {{
-      --line: #ddd6ce;
-      --ink: #111827;
-      --ok: #166534;
-      --fail: #b91c1c;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      color: var(--ink);
-      font-family: "Microsoft YaHei UI", "Noto Sans SC", sans-serif;
-      background:
-        radial-gradient(1000px 400px at 20% -20%, #fef3c7, transparent 60%),
-        radial-gradient(1000px 400px at 80% -20%, #dbeafe, transparent 55%),
-        #fafaf9;
-    }}
-    .wrap {{
-      max-width: 1260px;
-      margin: 20px auto;
-      padding: 0 14px 24px;
-      display: grid;
-      gap: 12px;
-    }}
-    .card {{
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px;
-      box-shadow: 0 8px 22px rgba(17, 24, 39, 0.08);
-    }}
-    .stats {{
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-      font-size: 14px;
-    }}
-    .pill {{
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 4px 10px;
-      background: #fff;
-    }}
-    .ok {{ color: var(--ok); font-weight: 700; }}
-    .fail {{ color: var(--fail); font-weight: 700; }}
-    .toolbar {{
-      display: grid;
-      grid-template-columns: 180px 180px 1fr;
-      gap: 8px;
-      margin-top: 10px;
-    }}
-    select, input {{
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 8px;
-      font-size: 14px;
-    }}
-    canvas {{
-      width: 100%;
-      height: 280px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      margin-top: 10px;
-      background: #fff;
-    }}
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }}
-    th, td {{
-      text-align: left;
-      padding: 8px 6px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
-    }}
-    thead th {{
-      position: sticky;
-      top: 0;
-      background: #f8fafc;
-      z-index: 1;
-    }}
-    .table-wrap {{
-      max-height: 68vh;
-      overflow: auto;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-    }}
-    @media (max-width: 900px) {{
-      .toolbar {{ grid-template-columns: 1fr; }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <section class="card">
-      <h2 style="margin:0;">组合验证结果总览</h2>
-      <div class="stats" id="summary"></div>
-      <div class="toolbar">
-        <select id="layerFilter">
-          <option value="all">层数: 全部</option>
-          <option value="1">层数: 1</option>
-          <option value="2">层数: 2</option>
-        </select>
-        <select id="stateFilter">
-          <option value="all">结果: 全部</option>
-          <option value="pass">仅通过</option>
-          <option value="fail">仅失败</option>
-        </select>
-        <input id="searchBox" type="text" placeholder="搜索 ID 或原因..." />
-      </div>
-      <canvas id="chart" width="1180" height="280"></canvas>
-    </section>
-    <section class="card">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>组合</th>
-              <th>层数</th>
-              <th>占地</th>
-              <th>每层面积</th>
-              <th>目标效率</th>
-              <th>结果</th>
-              <th>原因</th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-  <script>
-    const payload = {data_json};
-    const allItems = payload.combinations.slice();
-    const baseline = payload.baseline_efficiency;
-    const candidateSummary = payload.candidate_summary || {{ total: allItems.length, valid_by_principles: allItems.length, invalid_by_principles: 0 }};
-
-    const summary = document.getElementById("summary");
-    const rows = document.getElementById("rows");
-    const layerFilter = document.getElementById("layerFilter");
-    const stateFilter = document.getElementById("stateFilter");
-    const searchBox = document.getElementById("searchBox");
-    const canvas = document.getElementById("chart");
-    const ctx = canvas.getContext("2d");
-
-    let filtered = [];
-
-    function updateSummary(items) {{
-      const passCount = items.filter((x) => x.verification.passed).length;
-      const failCount = items.length - passCount;
-      summary.innerHTML = `
-        <span class="pill">候选总数: <b>${{candidateSummary.total}}</b></span>
-        <span class="pill">原则有效输出: <b>${{items.length}}</b></span>
-        <span class="pill">原则筛除: <b>${{candidateSummary.invalid_by_principles}}</b></span>
-        <span class="pill">通过: <span class="ok">${{passCount}}</span></span>
-        <span class="pill">失败: <span class="fail">${{failCount}}</span></span>
-        <span class="pill">基线效率: <b>${{baseline}}</b></span>
-      `;
-    }}
-
-    function applyFilters() {{
-      const layerValue = layerFilter.value;
-      const stateValue = stateFilter.value;
-      const q = searchBox.value.trim().toLowerCase();
-      filtered = allItems.filter((item) => {{
-        if (layerValue !== "all" && String(item.layers_n) !== layerValue) return false;
-        if (stateValue === "pass" && !item.verification.passed) return false;
-        if (stateValue === "fail" && item.verification.passed) return false;
-        if (q) {{
-          const blob = `${{item.combination_id}} ${{item.verification.reasons.join(" ")}}`.toLowerCase();
-          if (!blob.includes(q)) return false;
-        }}
-        return true;
-      }}).sort((a, b) =>
-        a.layers_n - b.layers_n ||
-        a.footprint_area_units - b.footprint_area_units ||
-        a.total_panel_count - b.total_panel_count ||
-        a.combination_id.localeCompare(b.combination_id)
-      );
-      renderRows(filtered);
-      renderChart(filtered);
-      updateSummary(filtered);
-    }}
-
-    function renderRows(items) {{
-      rows.innerHTML = "";
-      for (const item of items) {{
-        const tr = document.createElement("tr");
-        const stateClass = item.verification.passed ? "ok" : "fail";
-        const stateText = item.verification.passed ? "通过" : "失败";
-        tr.innerHTML = `
-          <td><b>${{item.combination_id}}</b></td>
-          <td>${{item.layers_n}}</td>
-          <td>${{item.footprint_area_units}}</td>
-          <td>${{item.layer_areas.join("/")}}</td>
-          <td>${{item.target_efficiency.toFixed(2)}}</td>
-          <td class="${{stateClass}}">${{stateText}}</td>
-          <td>${{item.verification.reasons.length ? item.verification.reasons.join("；") : "无"}}</td>
-        `;
-        rows.appendChild(tr);
-      }}
-    }}
-
-    function renderChart(items) {{
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (!items.length) return;
-
-      const pad = 36;
-      const chartW = canvas.width - pad * 2;
-      const chartH = canvas.height - pad * 2;
-      const maxY = Math.max(...items.map((x) => x.target_efficiency), baseline, 1);
-      const barW = chartW / items.length;
-
-      ctx.strokeStyle = "#6b7280";
-      ctx.beginPath();
-      ctx.moveTo(pad, canvas.height - pad);
-      ctx.lineTo(canvas.width - pad, canvas.height - pad);
-      ctx.stroke();
-
-      const baselineY = canvas.height - pad - (baseline / maxY) * chartH;
-      ctx.strokeStyle = "#b91c1c";
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.moveTo(pad, baselineY);
-      ctx.lineTo(canvas.width - pad, baselineY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      items.forEach((item, idx) => {{
-        const h = (item.target_efficiency / maxY) * chartH;
-        const x = pad + idx * barW + 1;
-        const y = canvas.height - pad - h;
-        ctx.fillStyle = item.verification.passed ? "rgba(22, 101, 52, 0.75)" : "rgba(185, 28, 28, 0.75)";
-        ctx.fillRect(x, y, Math.max(2, barW - 2), h);
-      }});
-    }}
-
-    layerFilter.addEventListener("change", applyFilters);
-    stateFilter.addEventListener("change", applyFilters);
-    searchBox.addEventListener("input", applyFilters);
-    applyFilters();
-  </script>
-</body>
-</html>
-"""
-    output_path.write_text(html, encoding="utf-8")
 
 
 def main() -> None:
-    goal = Goal("提升单位占地面积下的存取效率")
-    hypothesis = Hypothesis(
-        hypothesis_id="H1",
-        statement="在有效组合原则约束下，单位占地面积效率应提升",
+    # Optional design intent can exist, but capability remains the primary framework object.
+    goal = Goal("Increase space utilization per footprint area")
+    capabilities = [
+        Capability("C1", "Construct stable load-bearing paths and preserve structural integrity"),
+        Capability("C2", "Generate reusable storage units and access channels"),
+        Capability("C3", "Remain extensible and maintainable under scene constraints"),
+        Capability("C4", "Exclude material ornament, color style, and decorative preference"),
+    ]
+
+    boundary = BoundaryDefinition(
+        layers_n=2,
+        payload_p_per_layer=30.0,
+        space_s_per_layer=Space3D(width=80.0, depth=35.0, height=30.0),
+        opening_o=Opening2D(width=65.0, height=28.0),
+        footprint_a=Footprint2D(width=90.0, depth=40.0),
     )
+    bases = [
+        Base("B1", "load-bearing skeleton base", "L1.M0[R1]"),
+        Base("B2", "connection extension base", "L1.M0[R2]"),
+        Base("B3", "surface organization base", "L1.M0[R3]"),
+    ]
+    assumptions = build_assumptions()
 
-    max_layers_n = 2
-    max_footprint_area = 4
-    panel_unit_area = 1.0
-    baseline_efficiency = 1.0
+    combo_sets = classify_combo_sets()
+    valid_combos = geometric_type_combinations()
+    candidate_combo = {Module.ROD, Module.CONNECTOR, Module.PANEL}
 
-    rules = CombinationRules.default()
-    valid_module_combinations = rules.valid_subsets()
-    all_combinations = generate_shelf_combinations(
-        max_layers_n=max_layers_n,
-        max_footprint_area=max_footprint_area,
-        panel_unit_area=panel_unit_area,
-    )
+    baseline_efficiency = 0.08
 
-    candidate_results: list[dict[str, object]] = []
-    for combo in all_combinations:
-        boundary = make_boundary(combo)
-        geometry_ok, geometry_errors = validate_combination_principles(combo, rules)
-
-        verification_input = VerificationInput(
+    # Keep strict mapping symbol for verification mapping.
+    verification_result = verify(
+        VerificationInput(
             boundary=boundary,
-            combo=set(combo.module_combo),
-            valid_combinations=valid_module_combinations,
+            combo=candidate_combo,
+            valid_combinations=valid_combos,
             baseline_efficiency=baseline_efficiency,
-            target_efficiency=combo.target_efficiency(),
-            geometry_principles_valid=geometry_ok,
-            geometry_errors=geometry_errors,
+            target_efficiency=0.2,
         )
-        verification_result = verify(verification_input)
+    )
 
-        candidate_results.append(
+    grid = DiscreteGrid(
+        x_cells=2,
+        y_cells=2,
+        layers_n=boundary.layers_n,
+        cell_width=boundary.footprint_a.width / 2.0,
+        cell_depth=boundary.footprint_a.depth / 2.0,
+        layer_height=boundary.space_s_per_layer.height,
+    )
+
+    enum_result = enumerate_structure_types(
+        EnumerationConfig(
+            grid=grid,
+            allow_empty_layer=True,
+            mirror_equivalent=True,
+            axis_permutation_equivalent=True,
+            max_type_count=5000,
+        )
+    )
+
+    valid_candidates = enum_result.valid_candidates()
+    invalid_candidates = enum_result.invalid_candidates()
+
+    valid_reports: list[dict[str, object]] = []
+    for candidate in valid_candidates[:6]:
+        report = verify_structure(
+            topology=candidate.topology,
+            boundary=boundary,
+            grid=grid,
+            baseline_efficiency=baseline_efficiency,
+        )
+        valid_reports.append(
             {
-                **combo.to_dict(),
-                "module_combo": modules_to_list(set(combo.module_combo)),
-                "geometry": build_geometry_payload(combo),
-                "principles_valid": geometry_ok,
-                "verification": verification_result.to_dict(),
+                "canonical_key": candidate.canonical_key,
+                "panel_count": candidate.topology.panel_count(),
+                "passed": report.passed,
+                "target_utilization": report.target_utilization,
+                "reasons": report.reasons,
             }
         )
 
-    valid_results = [item for item in candidate_results if item["principles_valid"]]
-    pass_count = sum(1 for item in valid_results if item["verification"]["passed"])
+    manual_invalid_cases: list[dict[str, object]] = []
 
-    docs_dir = Path("docs")
-    docs_dir.mkdir(parents=True, exist_ok=True)
-
-    report_payload = {
-        "goal": goal.to_dict(),
-        "hypothesis": hypothesis.to_dict(),
-        "strict_mapping": strict_mapping_meta(),
-        "constraints": {
-            "panel_unit_area": panel_unit_area,
-            "max_layers_n": max_layers_n,
-            "max_footprint_area": max_footprint_area,
-        },
-        "baseline_efficiency": baseline_efficiency,
-        # R7: candidate set may contain invalid samples for comparison.
-        "candidate_summary": {
-            "total": len(candidate_results),
-            "valid_by_principles": len(valid_results),
-            "invalid_by_principles": len(candidate_results) - len(valid_results),
-        },
-        # R6/R7: final output only includes combinations satisfying R1~R5.
-        "combinations": valid_results,
-        "summary": {
-            "total": len(valid_results),
-            "passed": pass_count,
-            "failed": len(valid_results) - pass_count,
-        },
-    }
-
-    (docs_dir / "combination_validation_results.json").write_text(
-        json.dumps(report_payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    bad_boundary = BoundaryDefinition(
+        layers_n=0,
+        payload_p_per_layer=-1.0,
+        space_s_per_layer=Space3D(width=80.0, depth=35.0, height=30.0),
+        opening_o=Opening2D(width=65.0, height=28.0),
+        footprint_a=Footprint2D(width=90.0, depth=40.0),
     )
-    render_3d_view_html(docs_dir / "combination_3d_view.html", report_payload)
-    render_validation_html(docs_dir / "combination_validation_dashboard.html", report_payload)
+    bad_boundary_report = verify_structure(
+        topology=valid_candidates[0].topology if valid_candidates else invalid_candidates[0].topology,
+        boundary=bad_boundary,
+        grid=grid,
+        baseline_efficiency=baseline_efficiency,
+    )
+    manual_invalid_cases.append(
+        {
+            "case": "边界非法",
+            "passed": bad_boundary_report.passed,
+            "reasons": bad_boundary_report.reasons,
+        }
+    )
 
-    logic_record = build_logic_record(goal, pass_count > 0)
+    not_improved_report = verify_structure(
+        topology=valid_candidates[0].topology if valid_candidates else invalid_candidates[0].topology,
+        boundary=boundary,
+        grid=grid,
+        baseline_efficiency=9999.0,
+    )
+    manual_invalid_cases.append(
+        {
+            "case": "空间利用度未超过 baseline",
+            "passed": not_improved_report.passed,
+            "reasons": not_improved_report.reasons,
+        }
+    )
+
+    combo_invalid_result = verify(
+        VerificationInput(
+            boundary=boundary,
+            combo={Module.CONNECTOR, Module.PANEL},
+            valid_combinations=valid_combos,
+            baseline_efficiency=baseline_efficiency,
+            target_efficiency=0.2,
+        )
+    )
+    manual_invalid_cases.append(
+        {
+            "case": "{C,P} 组合被 R5 几何可实现性淘汰",
+            "passed": combo_invalid_result.passed,
+            "reasons": combo_invalid_result.reasons,
+        }
+    )
+
+    visualization_artifacts: list[dict[str, str]] = []
+    for idx, candidate in enumerate(valid_candidates[:3], start=1):
+        artifacts = render_structure(candidate.topology, grid, "docs/examples", f"valid_{idx}")
+        visualization_artifacts.append(artifacts)
+    for idx, candidate in enumerate(invalid_candidates[:3], start=1):
+        artifacts = render_structure(candidate.topology, grid, "docs/examples", f"invalid_{idx}")
+        visualization_artifacts.append(artifacts)
+
+    counting_summary = counting_framework_summary(enum_result, grid)
+
+    load_check = simplified_load_check(
+        LoadCheckInput(
+            payload_per_layer=boundary.payload_p_per_layer,
+            panel_capacity=None,
+            rod_capacity=None,
+            connector_capacity=None,
+            safety_factor=1.5,
+        )
+    )
+
+    write_architecture_doc()
+    write_math_model_doc()
+    write_assumptions_doc(assumptions)
+    write_teaching_notes_doc()
+    write_slides_outline_doc()
+    write_examples_doc(valid_reports, manual_invalid_cases)
+
+    logic_steps = [
+        LogicStep("G", "goal", evidence=goal.to_dict()),
+        LogicStep("B", "boundary", ["G"], evidence=boundary.to_dict()),
+        LogicStep("M", "module combinations", ["B"], evidence=combo_sets),
+        LogicStep("E", "enumeration", ["M"], evidence=asdict(enum_result.stats)),
+        LogicStep(
+            "V",
+            "verification",
+            ["E"],
+            evidence={
+                "seed_verification_passed": verification_result.passed,
+                "valid_examples": valid_reports[:3],
+                "invalid_examples": manual_invalid_cases[:3],
+            },
+        ),
+        LogicStep("C", "conclusion", ["V"], evidence={"adopt_now": bool(valid_reports)}),
+    ]
+    logic_record = LogicRecord.build(logic_steps)
     logic_record.export_json("docs/logic_record.json")
 
-    snapshot = {
-        "goal": goal.to_dict(),
-        "hypothesis": hypothesis.to_dict(),
-        "strict_mapping": strict_mapping_meta(),
-        "constraints": report_payload["constraints"],
-        "summary": report_payload["summary"],
-        "artifacts": {
-            "json": "docs/combination_validation_results.json",
-            "view_3d": "docs/combination_3d_view.html",
-            "view_validation": "docs/combination_validation_dashboard.html",
-            "logic_record_path": "docs/logic_record.json",
+    run_summary = build_run_summary(
+        assumptions=assumptions,
+        combo_sets=combo_sets,
+        enumeration_summary={
+            **counting_summary,
+            **asdict(enum_result.stats),
+            "layer_pattern_count": enum_result.layer_pattern_count,
         },
+        valid_count=len(valid_reports),
+        invalid_count=len(manual_invalid_cases),
+    )
+    run_summary["strict_mapping"] = strict_mapping_meta()
+    run_summary["load_check"] = load_check.to_dict()
+    run_summary["visualization_artifacts"] = visualization_artifacts
+    Path("docs/run_summary.json").write_text(
+        json.dumps(run_summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    hypothesis = Hypothesis(
+        hypothesis_id="H1",
+        statement="With valid boundary and combination, space utilization should improve",
+    )
+
+    output = {
+        "step_1": {
+            "formalization_summary": {
+                "capabilities": [item.to_dict() for item in capabilities],
+                "goal": goal.to_dict(),
+                "boundary": boundary.to_dict(),
+                "bases": [item.to_dict() for item in bases],
+                "modules": [item.value for item in Module],
+                "rules": [
+                    "R1",
+                    "R2",
+                    "R3(all)",
+                    "R4/R5/R6(shelf-only)",
+                    "FRAME.connected",
+                    "FRAME.ground_contact",
+                    "FRAME.minimal_under_deletability",
+                ],
+            },
+            "ambiguities": [item["statement"] for item in assumptions],
+            "default_assumptions": assumptions,
+            "math_model": counting_summary,
+            "codebase_design": [
+                "src/domain",
+                "src/rules",
+                "src/geometry",
+                "src/enumeration",
+                "src/metrics",
+                "src/verification",
+                "src/visualization",
+            ],
+        },
+        "step_3_summary": {
+            "enumeration_stats": asdict(enum_result.stats),
+            "valid_type_count": len(valid_candidates),
+            "invalid_type_count": len(invalid_candidates),
+            "valid_examples": valid_reports[:3],
+            "invalid_examples": manual_invalid_cases[:3],
+        },
+        "artifacts": {
+            "logic_record": "docs/logic_record.json",
+            "run_summary": "docs/run_summary.json",
+            "architecture": "docs/architecture.md",
+            "math_model": "docs/math_model.md",
+            "assumptions": "docs/assumptions.md",
+            "teaching_notes": "docs/teaching_notes.md",
+            "examples": "docs/examples.md",
+            "slides_outline": "docs/slides_outline.md",
+            "visualization": visualization_artifacts,
+        },
+        "strict_mapping": strict_mapping_meta(),
+        "hypothesis": hypothesis.to_dict(),
     }
-    print(json.dumps(snapshot, ensure_ascii=False, indent=2))
+
+    print(json.dumps(output, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
     main()
-

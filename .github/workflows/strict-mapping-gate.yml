@@ -2,11 +2,7 @@ name: Strict Mapping Gate
 
 on:
   push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -24,6 +20,9 @@ jobs:
 
       - name: Sync environment
         run: uv sync --frozen
+
+      - name: Materialize project artifacts
+        run: uv run python scripts/materialize_project.py
 
       - name: Validate strict mapping
         run: uv run python scripts/validate_strict_mapping.py

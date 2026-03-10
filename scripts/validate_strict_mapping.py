@@ -6,25 +6,112 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_PATH = REPO_ROOT / "standards/L3/mapping_registry.json"
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+REGISTRY_PATH = REPO_ROOT / "mapping/mapping_registry.json"
+FRAMEWORK_DIR = REPO_ROOT / "framework"
+PROJECTS_DIR = REPO_ROOT / "projects"
+CORE_L1_STANDARD_FILE = "specs/框架设计核心标准.md"
+COMPATIBILITY_FACADE_FILE = "src/shelf_framework.py"
+SHELF_DOMAIN_FILE = "src/shelf_domain.py"
 
 DEFAULT_LEVEL_ORDER = ("L0", "L1", "L2", "L3")
 VALID_NODE_KINDS = {"layer", "file"}
+LEVEL_ALLOWED_PREFIXES: dict[str, tuple[str, ...]] = {
+    "L0": ("specs/",),
+    "L1": ("specs/",),
+    "L2": ("framework/",),
+    "L3": ("mapping/",),
+}
 REQUIRED_L1_ANCHORS_PER_L2 = (
-    "## 1. 目标（Goal）",
+    "## 1. 能力声明（Capability Statement）",
     "## 2. 边界定义（Boundary）",
-    "## 3. 模块（最小可行基，Module）",
+    "## 3. 最小可行基（Bases）",
     "## 4. 组合原则（Combination Principles）",
     "## 5. 验证（Verification）",
 )
 ASSIGN_CALL_PATTERN = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\(\s*$"
 )
+LAYER_DIR_PATTERN = re.compile(r"^L(\d+)$")
+FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN = re.compile(r"^L(\d+)-M(\d+)-[^/]+\.md$")
+CANONICAL_BASE_ID_PATTERN = re.compile(r"^B(\d+)$")
+CANONICAL_CAPABILITY_ID_PATTERN = re.compile(r"^C(\d+)$")
+CANONICAL_VERIFY_ID_PATTERN = re.compile(r"^V(\d+)$")
+FRAMEWORK_L2_FILE_PATTERN = re.compile(r"^framework/[^/]+/L2-M\d+-[^/]+\.md$")
+FRAMEWORK_DIRECTIVE_LINE_PATTERN = re.compile(
+    r"^[ \t]*@framework(?:[ \t]+([^\r\n]+))?[ \t]*$",
+    re.MULTILINE,
+)
+FRAMEWORK_TITLE_LINE_PATTERN = re.compile(r"^\s*#\s+(.+?)\s*$", re.MULTILINE)
+FRAMEWORK_NUMBERED_ITEM_PATTERN = re.compile(
+    r"^\s*[-*]\s*`([A-Za-z][A-Za-z0-9]*(?:\.[0-9]+)?)`",
+    re.MULTILINE,
+)
+FRAMEWORK_BOUNDARY_ITEM_LINE_PATTERN = re.compile(
+    r"^\s*[-*]\s*`([A-Za-z][A-Za-z0-9]*)`\s+.*$",
+    re.MULTILINE,
+)
+FRAMEWORK_BASE_ITEM_LINE_PATTERN = re.compile(
+    r"^\s*[-*]\s*`(B\d+)`\s+.*$",
+    re.MULTILINE,
+)
+FRAMEWORK_SOURCE_EXPR_PATTERN = re.compile(r"来源[：:]\s*`([^`]+)`")
+FRAMEWORK_LEGACY_UPSTREAM_CLAUSE_PATTERN = re.compile(r"上游模块[：:]")
+FRAMEWORK_SOURCE_TOKEN_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:\.[0-9]+)?")
+FRAMEWORK_INLINE_UPSTREAM_TERM_PATTERN = re.compile(
+    r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.M(?P<module>\d+)(?:\[(?P<rules>.*?)\])?$"
+)
+FRAMEWORK_RULE_ID_PATTERN = re.compile(r"^R\d+(?:\.\d+)?$")
+FRAMEWORK_RULE_TOP_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(R\d+)`\s*(.*)$")
+FRAMEWORK_RULE_CHILD_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(R\d+\.\d+)`\s*(.*)$")
+FRAMEWORK_BACKTICK_CONTENT_PATTERN = re.compile(r"`([^`]+)`")
+FRAMEWORK_SYMBOL_TOKEN_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS = (
+    "## 1. 能力声明",
+    "## 2. 边界定义",
+    "## 3. 最小可行基",
+    "## 4. 基组合原则",
+    "## 5. 验证",
+)
+PROJECT_ALLOWED_TOP_LEVEL_DIRS = {"assets", "generated"}
+PROJECT_ALLOWED_ROOT_FILES = {"product_spec.toml", "implementation_config.toml"}
+PROJECT_ALLOWED_DOC_SUFFIXES = {".md"}
+PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS = {
+    "project",
+    "framework",
+    "surface",
+    "visual",
+    "route",
+    "a11y",
+    "library",
+    "preview",
+    "chat",
+    "context",
+    "return",
+    "documents",
+}
+PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS = set(PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS)
+PRODUCT_SPEC_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {
+    "surface": {"copy"},
+    "library": {"copy"},
+    "chat": {"copy"},
+}
+PRODUCT_SPEC_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {
+    key: set(value) for key, value in PRODUCT_SPEC_REQUIRED_NESTED_TABLES.items()
+}
+IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS = {"frontend", "backend", "evidence", "artifacts"}
+IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS = set(IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS)
+IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {}
+IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {}
 
 Issue = dict[str, Any]
 
@@ -33,6 +120,8 @@ Issue = dict[str, Any]
 class ParsedRegistry:
     level_order: list[str]
     level_files: dict[str, set[str]]
+    impl_files: set[str]
+    framework_layer_files: set[str]
 
 
 def make_issue(
@@ -160,14 +249,1200 @@ def collect_changed_files() -> set[str]:
     return changed
 
 
-def discover_domain_standards() -> list[str]:
-    standards_dir = REPO_ROOT / "standards" / "L2"
-    if not standards_dir.exists():
+def discover_project_product_spec_files(projects_dir: Path = PROJECTS_DIR) -> list[Path]:
+    if not projects_dir.exists():
         return []
-    return [
-        path.relative_to(REPO_ROOT).as_posix()
-        for path in sorted(standards_dir.glob("*.md"))
-    ]
+    return sorted(projects_dir.glob("*/product_spec.toml"))
+
+
+def implementation_config_path_for(product_spec_file: Path) -> Path:
+    return product_spec_file.parent / "implementation_config.toml"
+
+
+def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
+    implementation_config_file = implementation_config_path_for(product_spec_file)
+    _, data = _load_toml_text_and_data(implementation_config_file)
+    artifacts = data.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise ValueError("implementation_config.toml must define [artifacts]")
+    names: list[str] = []
+    for key in (
+        "framework_ir_json",
+        "product_spec_json",
+        "implementation_bundle_py",
+        "generation_manifest_json",
+    ):
+        value = artifacts.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"implementation_config.toml missing artifacts.{key}")
+        names.append(value.strip())
+    if len(set(names)) != len(names):
+        raise ValueError("artifact file names in implementation_config.toml must be unique")
+    return tuple(names)
+
+
+def _read_file_bytes(path: Path) -> bytes:
+    return path.read_bytes()
+
+
+def _load_toml_text_and_data(path: Path) -> tuple[str, dict[str, Any]]:
+    text = read_text(path)
+    data = tomllib.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path.name} must decode into a table")
+    return text, data
+
+
+def _validate_project_toml_layout(
+    file_path: Path,
+    *,
+    required_top_level_keys: set[str],
+    allowed_top_level_keys: set[str],
+    required_nested_tables: dict[str, set[str]],
+    allowed_nested_tables: dict[str, set[str]],
+    parse_error_code: str,
+    missing_section_code: str,
+    unknown_section_code: str,
+    missing_nested_code: str,
+    unknown_nested_code: str,
+    kind_label: str,
+) -> list[Issue]:
+    issues: list[Issue] = []
+    rel_file = file_path.relative_to(REPO_ROOT).as_posix()
+    try:
+        text, data = _load_toml_text_and_data(file_path)
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"failed to parse {kind_label}: {exc}",
+                rel_file,
+                1,
+                code=parse_error_code,
+            )
+        )
+        return issues
+
+    top_level_keys = set(data)
+    for key in sorted(required_top_level_keys - top_level_keys):
+        issues.append(
+            make_issue(
+                f"missing required {kind_label} section or array: {key}",
+                rel_file,
+                1,
+                code=missing_section_code,
+            )
+        )
+
+    for key in sorted(top_level_keys - allowed_top_level_keys):
+        line = find_line(text, f"[{key}]")
+        if line == 1:
+            line = find_line(text, f"[[{key}]]")
+        issues.append(
+            make_issue(
+                f"unknown {kind_label} top-level section: {key}",
+                rel_file,
+                line,
+                code=unknown_section_code,
+            )
+        )
+
+    for parent, required_children in required_nested_tables.items():
+        parent_value = data.get(parent)
+        if not isinstance(parent_value, dict):
+            continue
+        nested_table_keys = {key for key, value in parent_value.items() if isinstance(value, dict)}
+        for child in sorted(required_children - nested_table_keys):
+            issues.append(
+                make_issue(
+                    f"missing required nested {kind_label} section: [{parent}.{child}]",
+                    rel_file,
+                    find_line(text, f"[{parent}]"),
+                    code=missing_nested_code,
+                )
+            )
+        allowed_children = allowed_nested_tables.get(parent, set())
+        for child in sorted(nested_table_keys - allowed_children):
+            issues.append(
+                make_issue(
+                    f"unknown nested {kind_label} section: [{parent}.{child}]",
+                    rel_file,
+                    find_line(text, f"[{parent}.{child}]"),
+                    code=unknown_nested_code,
+                )
+            )
+
+    return issues
+
+
+def validate_project_configuration_layout(product_spec_files: list[Path] | None = None) -> list[Issue]:
+    issues: list[Issue] = []
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    if not project_product_spec_files:
+        return issues
+
+    for product_spec_file in project_product_spec_files:
+        issues.extend(
+            _validate_project_toml_layout(
+                product_spec_file,
+                required_top_level_keys=PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS,
+                allowed_top_level_keys=PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS,
+                required_nested_tables=PRODUCT_SPEC_REQUIRED_NESTED_TABLES,
+                allowed_nested_tables=PRODUCT_SPEC_ALLOWED_NESTED_TABLES,
+                parse_error_code="PROJECT_PRODUCT_SPEC_PARSE_FAILED",
+                missing_section_code="PROJECT_PRODUCT_SPEC_SECTION_MISSING",
+                unknown_section_code="PROJECT_PRODUCT_SPEC_SECTION_UNKNOWN",
+                missing_nested_code="PROJECT_PRODUCT_SPEC_NESTED_SECTION_MISSING",
+                unknown_nested_code="PROJECT_PRODUCT_SPEC_NESTED_SECTION_UNKNOWN",
+                kind_label="product_spec.toml",
+            )
+        )
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        if not implementation_config_file.exists():
+            issues.append(
+                make_issue(
+                    "missing implementation_config.toml next to product_spec.toml",
+                    product_spec_file.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="PROJECT_IMPLEMENTATION_CONFIG_MISSING",
+                    related=[
+                        {
+                            "message": "Expected implementation config",
+                            "file": implementation_config_file.relative_to(REPO_ROOT).as_posix(),
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+            )
+            continue
+        issues.extend(
+            _validate_project_toml_layout(
+                implementation_config_file,
+                required_top_level_keys=IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS,
+                allowed_top_level_keys=IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS,
+                required_nested_tables=IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES,
+                allowed_nested_tables=IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES,
+                parse_error_code="PROJECT_IMPLEMENTATION_CONFIG_PARSE_FAILED",
+                missing_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_MISSING",
+                unknown_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_UNKNOWN",
+                missing_nested_code="PROJECT_IMPLEMENTATION_CONFIG_NESTED_SECTION_MISSING",
+                unknown_nested_code="PROJECT_IMPLEMENTATION_CONFIG_NESTED_SECTION_UNKNOWN",
+                kind_label="implementation_config.toml",
+            )
+        )
+    return issues
+
+
+def validate_project_generation_discipline(
+    product_spec_files: list[Path] | None = None,
+) -> list[Issue]:
+    issues: list[Issue] = []
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    if not project_product_spec_files:
+        return issues
+
+    issues.extend(validate_project_configuration_layout(project_product_spec_files))
+
+    try:
+        from project_runtime.knowledge_base import materialize_knowledge_base_project
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"failed to import project materializer: {exc}",
+                REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                1,
+                code="PROJECT_GENERATOR_IMPORT_FAILED",
+            )
+        )
+        return issues
+
+    for product_spec_file in project_product_spec_files:
+        product_spec_file = product_spec_file.resolve()
+        project_dir = product_spec_file.parent
+        rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        rel_implementation_config_file = implementation_config_file.relative_to(REPO_ROOT).as_posix()
+        try:
+            expected_generated_files = expected_generated_files_for(product_spec_file)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to resolve generated artifact names for {rel_product_spec_file}: {exc}",
+                    rel_implementation_config_file,
+                    1,
+                    code="PROJECT_IMPLEMENTATION_CONFIG_INVALID",
+                )
+            )
+            continue
+
+        for file_path in sorted(project_dir.rglob("*")):
+            if not file_path.is_file():
+                continue
+            rel_parts = file_path.relative_to(project_dir).parts
+            top_level = rel_parts[0]
+            if top_level in PROJECT_ALLOWED_TOP_LEVEL_DIRS:
+                continue
+            if len(rel_parts) == 1 and file_path.name in PROJECT_ALLOWED_ROOT_FILES:
+                continue
+            if file_path.suffix.lower() in PROJECT_ALLOWED_DOC_SUFFIXES:
+                continue
+            issues.append(
+                make_issue(
+                    (
+                        "project configuration directories must not contain direct implementation files "
+                        "outside generated/ or assets/; change framework markdown, product_spec.toml, "
+                        "or implementation_config.toml instead"
+                    ),
+                    file_path.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="PROJECT_DIRECT_CODE_FORBIDDEN",
+                    related=[
+                        {
+                            "message": "Project product spec",
+                            "file": rel_product_spec_file,
+                            "line": 1,
+                            "column": 1,
+                        },
+                        {
+                            "message": "Project implementation config",
+                            "file": rel_implementation_config_file,
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+            )
+
+        actual_generated_dir = project_dir / "generated"
+        if not actual_generated_dir.exists():
+            issues.append(
+                make_issue(
+                    (
+                        "missing generated project artifacts; run "
+                        f"`uv run python scripts/materialize_project.py --project {rel_product_spec_file}`"
+                    ),
+                    rel_product_spec_file,
+                    1,
+                    code="PROJECT_GENERATED_MISSING",
+                )
+            )
+            continue
+
+        try:
+            with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+                temp_generated_dir = Path(temp_dir) / "generated"
+                materialize_knowledge_base_project(product_spec_file, output_dir=temp_generated_dir)
+                for required_name in expected_generated_files:
+                    actual_file = actual_generated_dir / required_name
+                    expected_file = temp_generated_dir / required_name
+                    if not actual_file.exists():
+                        issues.append(
+                            make_issue(
+                                f"missing generated artifact: {required_name}",
+                                rel_product_spec_file,
+                                1,
+                                code="PROJECT_GENERATED_FILE_MISSING",
+                                related=[
+                                    {
+                                        "message": "Expected generated file",
+                                        "file": actual_file.relative_to(REPO_ROOT).as_posix(),
+                                        "line": 1,
+                                        "column": 1,
+                                    }
+                                ],
+                            )
+                        )
+                        continue
+                    if _read_file_bytes(actual_file) != _read_file_bytes(expected_file):
+                        issues.append(
+                            make_issue(
+                                (
+                                    f"generated artifact is stale or manually edited: {required_name}; "
+                                    "re-materialize from framework markdown, product spec, and implementation config"
+                                ),
+                                actual_file.relative_to(REPO_ROOT).as_posix(),
+                                1,
+                                code="PROJECT_GENERATED_OUT_OF_SYNC",
+                                related=[
+                                    {
+                                        "message": "Project product spec",
+                                        "file": rel_product_spec_file,
+                                        "line": 1,
+                                        "column": 1,
+                                    },
+                                    {
+                                        "message": "Project implementation config",
+                                        "file": rel_implementation_config_file,
+                                        "line": 1,
+                                        "column": 1,
+                                    }
+                                ],
+                            )
+                        )
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"project materialization failed for {rel_product_spec_file}: {exc}",
+                    rel_product_spec_file,
+                    1,
+                    code="PROJECT_GENERATION_FAILED",
+                )
+            )
+
+    return issues
+
+
+def line_from_offset(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def find_first_h1_title(text: str) -> tuple[int, str] | None:
+    for match in FRAMEWORK_TITLE_LINE_PATTERN.finditer(text):
+        line = line_from_offset(text, match.start())
+        title = match.group(1).strip()
+        if title:
+            return line, title
+    return None
+
+
+def iter_section_bullet_lines(text: str, heading_prefix: str) -> list[tuple[int, str]]:
+    lines = text.splitlines()
+    in_section = False
+    bullets: list[tuple[int, str]] = []
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if in_section:
+                break
+            if stripped.startswith(heading_prefix):
+                in_section = True
+            continue
+        if not in_section:
+            continue
+        if stripped.startswith("- ") or stripped.startswith("* "):
+            bullets.append((idx, line))
+    return bullets
+
+
+def extract_backtick_tokens(text: str) -> list[str]:
+    tokens: list[str] = []
+    for segment in FRAMEWORK_BACKTICK_CONTENT_PATTERN.findall(text):
+        for token in FRAMEWORK_SYMBOL_TOKEN_PATTERN.findall(segment):
+            tokens.append(token)
+    return tokens
+
+
+def extract_framework_base_inline_expr(base_line: str) -> str:
+    source_split = re.split(r"来源[：:]", base_line, maxsplit=1)
+    before_source = source_split[0].strip()
+    if "：" in before_source:
+        _, _, expr_tail = before_source.partition("：")
+    else:
+        _, _, expr_tail = before_source.partition(":")
+    return expr_tail.strip().rstrip("。.;；")
+
+
+def parse_framework_base_inline_refs(expr: str) -> list[tuple[str | None, int, int, str]]:
+    refs: list[tuple[str | None, int, int, str]] = []
+    for part in expr.split("+"):
+        term = part.strip()
+        if not term:
+            return []
+        match = FRAMEWORK_INLINE_UPSTREAM_TERM_PATTERN.fullmatch(term)
+        if match is None:
+            return []
+        framework_name = match.group("framework")
+        refs.append(
+            (
+                framework_name.strip() if framework_name else None,
+                int(match.group("level")),
+                int(match.group("module")),
+                (match.group("rules") or "").strip(),
+            )
+        )
+    return refs
+
+
+def iter_framework_layer_markdown() -> list[tuple[str, int, Path]]:
+    docs: list[tuple[str, int, Path]] = []
+    if not FRAMEWORK_DIR.exists():
+        return docs
+
+    for module_dir in sorted(FRAMEWORK_DIR.iterdir()):
+        if not module_dir.is_dir():
+            continue
+        module_name = module_dir.name
+        for markdown_file in sorted(module_dir.glob("*.md")):
+            layer_match = FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(markdown_file.name)
+            if layer_match is None:
+                continue
+            layer_num = int(layer_match.group(1))
+            docs.append((module_name, layer_num, markdown_file))
+    return docs
+
+
+def is_allowed_level_path(level: str, file_name: str) -> bool:
+    allowed_prefixes = LEVEL_ALLOWED_PREFIXES.get(level, ())
+    if allowed_prefixes and not any(file_name.startswith(prefix) for prefix in allowed_prefixes):
+        return False
+    if level == "L2":
+        return FRAMEWORK_L2_FILE_PATTERN.fullmatch(file_name) is not None
+    return True
+
+
+def discover_domain_standards() -> list[str]:
+    standards: list[str] = []
+    for module_name, layer_num, file_path in iter_framework_layer_markdown():
+        if layer_num != 2:
+            continue
+        rel = file_path.relative_to(REPO_ROOT).as_posix()
+        if FRAMEWORK_L2_FILE_PATTERN.fullmatch(rel) is not None:
+            standards.append(rel)
+    return sorted(set(standards))
+
+
+def discover_framework_layer_docs() -> set[str]:
+    return {path.relative_to(REPO_ROOT).as_posix() for _, _, path in iter_framework_layer_markdown()}
+
+
+def make_framework_module_key(module_name: str, level_num: int, module_num: int) -> str:
+    return f"{module_name}:L{level_num}.M{module_num}"
+
+
+def format_framework_module_key(module_key: str) -> str:
+    framework_name, _, local_ref = module_key.partition(":")
+    if not framework_name or not local_ref:
+        return module_key
+    return f"{framework_name}.{local_ref}"
+
+
+def validate_framework_reference_graph(
+    module_ref_edges: list[dict[str, Any]],
+    module_files_by_key: dict[str, str],
+) -> list[Issue]:
+    issues: list[Issue] = []
+    graph: dict[str, list[str]] = {module_key: [] for module_key in module_files_by_key}
+    closing_edges: dict[tuple[str, str], dict[str, Any]] = {}
+
+    for edge in module_ref_edges:
+        source = str(edge["source"])
+        target = str(edge["target"])
+        graph.setdefault(source, []).append(target)
+        graph.setdefault(target, [])
+        closing_edges.setdefault((source, target), edge)
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    stack: list[str] = []
+    reported_edges: set[tuple[str, str]] = set()
+
+    def dfs(module_key: str) -> None:
+        visiting.add(module_key)
+        stack.append(module_key)
+
+        for target_key in graph.get(module_key, []):
+            if target_key in visiting:
+                edge_key = (module_key, target_key)
+                if edge_key not in reported_edges:
+                    reported_edges.add(edge_key)
+                    edge = closing_edges.get(edge_key, {})
+                    try:
+                        target_index = stack.index(target_key)
+                    except ValueError:
+                        target_index = 0
+                    cycle_keys = stack[target_index:] + [target_key]
+                    cycle_text = " -> ".join(format_framework_module_key(item) for item in cycle_keys)
+                    issues.append(
+                        make_issue(
+                            f"framework inline refs must be acyclic; detected cycle: {cycle_text}",
+                            str(edge.get("file") or module_files_by_key.get(module_key) or ""),
+                            int(edge.get("line") or 1),
+                            code="FW029",
+                        )
+                    )
+                continue
+            if target_key in visited:
+                continue
+            dfs(target_key)
+
+        stack.pop()
+        visiting.remove(module_key)
+        visited.add(module_key)
+
+    for module_key in sorted(graph):
+        if module_key in visited:
+            continue
+        dfs(module_key)
+
+    return issues
+
+
+def validate_framework_layers() -> tuple[list[Issue], set[str]]:
+    issues: list[Issue] = []
+    layer_files: set[str] = set()
+    module_levels: dict[str, set[int]] = {}
+    module_level_module_ids: dict[str, dict[int, set[int]]] = {}
+    module_files_by_key: dict[str, str] = {}
+    module_ref_edges: list[dict[str, Any]] = []
+
+    if not FRAMEWORK_DIR.exists():
+        issues.append(
+            make_issue(
+                "framework directory is missing",
+                REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                1,
+                code="FRAMEWORK_DIR_MISSING",
+            )
+        )
+        return issues, layer_files
+
+    for module_dir in sorted(FRAMEWORK_DIR.iterdir()):
+        if not module_dir.is_dir():
+            continue
+        module_name = module_dir.name
+        module_levels.setdefault(module_name, set())
+
+        for entry in sorted(module_dir.iterdir()):
+            if entry.is_file() and entry.suffix == ".md":
+                if FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(entry.name) is not None:
+                    continue
+                rel = entry.relative_to(REPO_ROOT).as_posix()
+                issues.append(
+                    make_issue(
+                        "framework markdown filename must use Lx-Mn- prefix, e.g. L2-M0-xxx.md",
+                        rel,
+                        1,
+                        code="FRAMEWORK_FILE_LEVEL_PREFIX_INVALID",
+                    )
+                )
+            if entry.is_dir():
+                rel = entry.relative_to(REPO_ROOT).as_posix()
+                issues.append(
+                    make_issue(
+                        "framework module must store markdown directly under module directory; use Lx-Mn-*.md files",
+                        rel,
+                        1,
+                        code="FRAMEWORK_SUBDIR_FORBIDDEN",
+                    )
+                )
+
+    framework_docs = iter_framework_layer_markdown()
+    for module_name, level_num, markdown_file in framework_docs:
+        layer_match = FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(markdown_file.name)
+        if layer_match is None:
+            continue
+        module_num = int(layer_match.group(2))
+        module_level_module_ids.setdefault(module_name, {}).setdefault(level_num, set()).add(module_num)
+        module_files_by_key[make_framework_module_key(module_name, level_num, module_num)] = (
+            markdown_file.relative_to(REPO_ROOT).as_posix()
+        )
+
+    module_min_levels = {
+        module_name: min(level_map)
+        for module_name, level_map in module_level_module_ids.items()
+        if level_map
+    }
+
+    for module_name, level_num, markdown_file in framework_docs:
+        rel_file = markdown_file.relative_to(REPO_ROOT).as_posix()
+        layer_files.add(rel_file)
+        module_levels.setdefault(module_name, set()).add(level_num)
+        layer_match = FRAMEWORK_FILE_LEVEL_PREFIX_PATTERN.fullmatch(markdown_file.name)
+        if layer_match is None:
+            continue
+        module_num = int(layer_match.group(2))
+        source_module_key = make_framework_module_key(module_name, level_num, module_num)
+        root_level_num = module_min_levels.get(module_name, 0)
+        file_text = read_text(markdown_file)
+
+        framework_directive_match = FRAMEWORK_DIRECTIVE_LINE_PATTERN.search(file_text)
+        if framework_directive_match is None:
+            issues.append(
+                make_issue(
+                    "framework file must include plain @framework directive",
+                    rel_file,
+                    1,
+                    code="FW001",
+                )
+            )
+            continue
+
+        directive_line = line_from_offset(file_text, framework_directive_match.start())
+        directive_args = (framework_directive_match.group(1) or "").strip()
+        if directive_args:
+            issues.append(
+                make_issue(
+                    "@framework must be plain directive without arguments",
+                    rel_file,
+                    directive_line,
+                    code="FW002",
+                )
+            )
+
+        h1_title = find_first_h1_title(file_text)
+        if h1_title is None:
+            issues.append(
+                make_issue(
+                    "framework file must have a level-1 title line",
+                    rel_file,
+                    1,
+                    code="FW003",
+                )
+            )
+        else:
+            title_line, title_text = h1_title
+            if ":" not in title_text:
+                issues.append(
+                    make_issue(
+                        "framework title must include Chinese and English names separated by ':'",
+                        rel_file,
+                        title_line,
+                        code="FW003",
+                    )
+                )
+            else:
+                left, right = title_text.split(":", 1)
+                if not left.strip() or not right.strip():
+                    issues.append(
+                        make_issue(
+                            "framework title around ':' cannot be empty",
+                            rel_file,
+                            title_line,
+                            code="FW003",
+                        )
+                    )
+                if re.search(r"[A-Za-z]", right) is None:
+                    issues.append(
+                        make_issue(
+                            "framework title English part must contain ASCII letters",
+                            rel_file,
+                            title_line,
+                            code="FW003",
+                        )
+                    )
+
+        file_identifiers: set[str] = set()
+        file_identifier_origin: dict[str, int] = {}
+        for id_match in FRAMEWORK_NUMBERED_ITEM_PATTERN.finditer(file_text):
+            identifier = id_match.group(1)
+            line_num = line_from_offset(file_text, id_match.start(1))
+            previous_line = file_identifier_origin.get(identifier)
+            if previous_line is not None:
+                issues.append(
+                    make_issue(
+                        f"framework identifier must be unique inside current framework file: {identifier}",
+                        rel_file,
+                        line_num,
+                        code="FW010",
+                        related=[
+                            {
+                                "message": "previous declaration",
+                                "file": rel_file,
+                                "line": previous_line,
+                                "column": 1,
+                            }
+                        ],
+                    )
+                )
+                continue
+            file_identifier_origin[identifier] = line_num
+            file_identifiers.add(identifier)
+
+        for identifier in sorted(file_identifiers):
+            line_num = file_identifier_origin.get(identifier, 1)
+            if re.fullmatch(r"C\d.*", identifier) and CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(identifier) is None:
+                issues.append(
+                    make_issue(
+                        f"invalid capability identifier format: {identifier}; expected C<number>",
+                        rel_file,
+                        line_num,
+                        code="FW011",
+                    )
+                )
+            if re.fullmatch(r"B\d.*", identifier) and CANONICAL_BASE_ID_PATTERN.fullmatch(identifier) is None:
+                issues.append(
+                    make_issue(
+                        f"invalid base identifier format: {identifier}; expected B<number>",
+                        rel_file,
+                        line_num,
+                        code="FW011",
+                    )
+                )
+            if re.fullmatch(r"V\d.*", identifier) and CANONICAL_VERIFY_ID_PATTERN.fullmatch(identifier) is None:
+                issues.append(
+                    make_issue(
+                        f"invalid verification identifier format: {identifier}; expected V<number>",
+                        rel_file,
+                        line_num,
+                        code="FW011",
+                    )
+                )
+
+        capability_ids = {
+            identifier
+            for identifier in file_identifiers
+            if CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(identifier) is not None
+        }
+        boundary_ids: set[str] = set()
+
+        for base_item_match in FRAMEWORK_BASE_ITEM_LINE_PATTERN.finditer(file_text):
+            base_id = base_item_match.group(1)
+            base_line = base_item_match.group(0)
+            base_line_num = line_from_offset(file_text, base_item_match.start(1))
+            inline_expr = extract_framework_base_inline_expr(base_line)
+            inline_refs = parse_framework_base_inline_refs(inline_expr)
+            if FRAMEWORK_LEGACY_UPSTREAM_CLAUSE_PATTERN.search(base_line):
+                issues.append(
+                    make_issue(
+                        (
+                            f"{base_id} must inline upstream module refs before source expression; "
+                            "legacy '上游模块：...' clause is forbidden"
+                        ),
+                        rel_file,
+                        base_line_num,
+                        code="FW023",
+                    )
+                )
+            local_inline_refs: list[tuple[int, int, str]] = []
+            external_inline_refs: list[tuple[str, int, int, str]] = []
+            for ref_framework, ref_level, ref_module_num, ref_rules in inline_refs:
+                normalized_framework = ref_framework or module_name
+                if normalized_framework == module_name:
+                    local_inline_refs.append((ref_level, ref_module_num, ref_rules))
+                else:
+                    external_inline_refs.append(
+                        (
+                            normalized_framework,
+                            ref_level,
+                            ref_module_num,
+                            ref_rules,
+                        )
+                    )
+
+            if level_num == root_level_num and local_inline_refs:
+                issues.append(
+                    make_issue(
+                        (
+                            f"{base_id} in current framework root layer L{root_level_num} cannot reference "
+                            "local upstream modules; root bases must stay self-contained inside current framework"
+                        ),
+                        rel_file,
+                        base_line_num,
+                        code="FW026",
+                    )
+                )
+
+            if external_inline_refs:
+                for ext_framework, ref_level, ref_module_num, _ in external_inline_refs:
+                    available_external_ids = module_level_module_ids.get(ext_framework, {}).get(ref_level, set())
+                    if ref_module_num not in available_external_ids:
+                        issues.append(
+                            make_issue(
+                                (
+                                    f"{base_id} external inline ref points to missing framework module: "
+                                    f"{ext_framework}.L{ref_level}.M{ref_module_num}"
+                                ),
+                                rel_file,
+                                base_line_num,
+                                code="FW028",
+                            )
+                        )
+                        continue
+
+                    module_ref_edges.append(
+                        {
+                            "source": source_module_key,
+                            "target": make_framework_module_key(ext_framework, ref_level, ref_module_num),
+                            "file": rel_file,
+                            "line": base_line_num,
+                            "base_id": base_id,
+                        }
+                    )
+
+            if level_num > root_level_num:
+                if not inline_expr:
+                    issues.append(
+                        make_issue(
+                            (
+                                f"{base_id} must inline local upstream module refs before source "
+                                "expression, e.g. L0.M0[R1] + L0.M1[R2]"
+                            ),
+                            rel_file,
+                            base_line_num,
+                            code="FW024",
+                        )
+                    )
+                elif not inline_refs:
+                    issues.append(
+                        make_issue(
+                            (
+                                f"{base_id} inline upstream module expression is invalid: {inline_expr}; "
+                                "expected Lx.My[...] or framework.Lx.My[...] terms joined by '+'"
+                            ),
+                            rel_file,
+                            base_line_num,
+                            code="FW024",
+                        )
+                    )
+                else:
+                    if not local_inline_refs:
+                        issues.append(
+                            make_issue(
+                                (
+                                    f"{base_id} must include at least one local upstream ref "
+                                    "inside current framework before relying on external refs"
+                                ),
+                                rel_file,
+                                base_line_num,
+                                code="FW024",
+                            )
+                        )
+                    for ref_level, ref_module_num, _ in local_inline_refs:
+                        if ref_level >= level_num:
+                            issues.append(
+                                make_issue(
+                                    (
+                                        f"{base_id} inline upstream ref must target a lower local layer "
+                                        f"than L{level_num}: L{ref_level}.M{ref_module_num}"
+                                    ),
+                                    rel_file,
+                                    base_line_num,
+                                    code="FW025",
+                                )
+                            )
+                            continue
+                        if ref_level < root_level_num:
+                            issues.append(
+                                make_issue(
+                                    (
+                                        f"{base_id} inline upstream ref points below current framework root "
+                                        f"L{root_level_num}: L{ref_level}.M{ref_module_num}"
+                                    ),
+                                    rel_file,
+                                    base_line_num,
+                                    code="FW025",
+                                )
+                            )
+                            continue
+                        available_ids = module_level_module_ids.get(module_name, {}).get(ref_level, set())
+                        if ref_module_num not in available_ids:
+                            issues.append(
+                                make_issue(
+                                    (
+                                        f"{base_id} inline upstream ref points to missing module file "
+                                        f"in current framework directory: L{ref_level}.M{ref_module_num}"
+                                    ),
+                                    rel_file,
+                                    base_line_num,
+                                    code="FW025",
+                                )
+                            )
+                            continue
+
+                        module_ref_edges.append(
+                            {
+                                "source": source_module_key,
+                                "target": make_framework_module_key(module_name, ref_level, ref_module_num),
+                                "file": rel_file,
+                                "line": base_line_num,
+                                "base_id": base_id,
+                            }
+                        )
+            source_match = FRAMEWORK_SOURCE_EXPR_PATTERN.search(base_line)
+            if source_match is None:
+                issues.append(
+                    make_issue(
+                        f"{base_id} must declare source expression using '来源：`...`'",
+                        rel_file,
+                        base_line_num,
+                        code="FW020",
+                    )
+                )
+                continue
+
+            source_expr = source_match.group(1).strip()
+            if not source_expr:
+                issues.append(
+                    make_issue(
+                        f"{base_id} source expression cannot be empty",
+                        rel_file,
+                        base_line_num,
+                        code="FW021",
+                    )
+                )
+                continue
+
+            source_tokens = FRAMEWORK_SOURCE_TOKEN_PATTERN.findall(source_expr)
+            if not source_tokens:
+                issues.append(
+                    make_issue(
+                        f"{base_id} source expression is invalid: {source_expr}",
+                        rel_file,
+                        base_line_num,
+                        code="FW021",
+                    )
+                )
+                continue
+
+            for token in source_tokens:
+                if token not in file_identifiers:
+                    issues.append(
+                        make_issue(
+                            f"{base_id} source references undefined identifier: {token}",
+                            rel_file,
+                            base_line_num,
+                            code="FW021",
+                        )
+                    )
+
+            has_capability_ref = any(re.fullmatch(r"C\d+", token) for token in source_tokens)
+            has_boundary_ref = any(not re.fullmatch(r"C\d+", token) for token in source_tokens)
+            if not has_capability_ref or not has_boundary_ref:
+                issues.append(
+                    make_issue(
+                        (
+                            f"{base_id} source must include at least one capability id (C*) "
+                            "and one boundary/parameter identifier"
+                        ),
+                        rel_file,
+                        base_line_num,
+                        code="FW022",
+                    )
+                )
+
+        for boundary_line_num, boundary_line in iter_section_bullet_lines(file_text, "## 2. 边界定义"):
+            boundary_match = FRAMEWORK_BOUNDARY_ITEM_LINE_PATTERN.match(boundary_line)
+            if boundary_match is None:
+                continue
+            boundary_id = boundary_match.group(1)
+            boundary_ids.add(boundary_id)
+            source_match = FRAMEWORK_SOURCE_EXPR_PATTERN.search(boundary_line)
+            if source_match is None:
+                issues.append(
+                    make_issue(
+                        f"{boundary_id} must declare source expression using '来源：`...`'",
+                        rel_file,
+                        boundary_line_num,
+                        code="FW030",
+                    )
+                )
+                continue
+
+            source_expr = source_match.group(1).strip()
+            source_tokens = FRAMEWORK_SOURCE_TOKEN_PATTERN.findall(source_expr)
+            if not source_tokens:
+                issues.append(
+                    make_issue(
+                        f"{boundary_id} source expression is invalid: {source_expr}",
+                        rel_file,
+                        boundary_line_num,
+                        code="FW031",
+                    )
+                )
+                continue
+
+            for token in source_tokens:
+                if token not in file_identifiers:
+                    issues.append(
+                        make_issue(
+                            f"{boundary_id} source references undefined identifier: {token}",
+                            rel_file,
+                            boundary_line_num,
+                            code="FW031",
+                        )
+                    )
+
+            has_capability_ref = any(re.fullmatch(r"C\d+", token) for token in source_tokens)
+            if not has_capability_ref:
+                issues.append(
+                    make_issue(
+                        f"{boundary_id} source must include at least one capability id (C*)",
+                        rel_file,
+                        boundary_line_num,
+                        code="FW031",
+                    )
+                )
+
+        for identifier in sorted(file_identifiers):
+            if re.fullmatch(r"R\d.*", identifier) is None:
+                continue
+            if FRAMEWORK_RULE_ID_PATTERN.fullmatch(identifier) is None:
+                line_num = file_identifier_origin.get(identifier, 1)
+                issues.append(
+                    make_issue(
+                        f"invalid rule identifier format: {identifier}; expected R<number> or R<number>.<number>",
+                        rel_file,
+                        line_num,
+                        code="FW040",
+                    )
+                )
+                continue
+            if "." in identifier:
+                parent = identifier.split(".", 1)[0]
+                if parent not in file_identifiers:
+                    line_num = file_identifier_origin.get(identifier, 1)
+                    issues.append(
+                        make_issue(
+                            f"rule child identifier requires parent declaration: {identifier} (missing {parent})",
+                            rel_file,
+                            line_num,
+                            code="FW040",
+                        )
+                    )
+
+        rule_top_lines: dict[str, int] = {}
+        rule_child_items: dict[str, list[tuple[int, str]]] = {}
+        rule_declared_symbols: dict[str, set[str]] = {}
+        for rule_line_num, rule_line in iter_section_bullet_lines(file_text, "## 4. 基组合原则"):
+            top_match = FRAMEWORK_RULE_TOP_LINE_PATTERN.match(rule_line)
+            if top_match is not None:
+                parent_rule = top_match.group(1)
+                rule_top_lines.setdefault(parent_rule, rule_line_num)
+                rule_child_items.setdefault(parent_rule, [])
+                continue
+
+            child_match = FRAMEWORK_RULE_CHILD_LINE_PATTERN.match(rule_line)
+            if child_match is None:
+                continue
+            child_rule = child_match.group(1)
+            parent_rule = child_rule.split(".", 1)[0]
+            content = child_match.group(2).strip()
+            rule_child_items.setdefault(parent_rule, []).append((rule_line_num, content))
+
+            if "输出结构" in content:
+                for token in extract_backtick_tokens(content):
+                    if token in file_identifiers or token in boundary_ids:
+                        continue
+                    if (
+                        CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(token) is not None
+                        or CANONICAL_BASE_ID_PATTERN.fullmatch(token) is not None
+                        or FRAMEWORK_RULE_ID_PATTERN.fullmatch(token) is not None
+                        or CANONICAL_VERIFY_ID_PATTERN.fullmatch(token) is not None
+                    ):
+                        continue
+                    rule_declared_symbols.setdefault(parent_rule, set()).add(token)
+
+        for parent_rule, parent_line in sorted(rule_top_lines.items()):
+            child_items = rule_child_items.get(parent_rule, [])
+            required_keywords = ("参与基", "组合方式", "输出能力", "边界绑定")
+            for keyword in required_keywords:
+                if any(keyword in content for _, content in child_items):
+                    continue
+                issues.append(
+                    make_issue(
+                        f"{parent_rule} missing required field: {keyword}",
+                        rel_file,
+                        parent_line,
+                        code="FW041",
+                    )
+                )
+
+        for parent_rule, child_items in rule_child_items.items():
+            for child_line, content in child_items:
+                if "输出能力" not in content:
+                    continue
+                capability_refs = re.findall(r"C\d+", content)
+                if not capability_refs:
+                    issues.append(
+                        make_issue(
+                            f"{parent_rule} output capability must reference at least one C*",
+                            rel_file,
+                            child_line,
+                            code="FW050",
+                        )
+                    )
+                    continue
+                for cap_id in capability_refs:
+                    if cap_id in capability_ids:
+                        continue
+                    issues.append(
+                        make_issue(
+                            f"{parent_rule} output capability references undefined identifier: {cap_id}",
+                            rel_file,
+                            child_line,
+                            code="FW050",
+                        )
+                    )
+
+        declared_by_order: list[tuple[int, set[str]]] = []
+        for parent_rule, symbols in rule_declared_symbols.items():
+            try:
+                parent_num = int(parent_rule[1:])
+            except ValueError:
+                continue
+            declared_by_order.append((parent_num, symbols))
+        declared_by_order.sort(key=lambda item: item[0])
+
+        for parent_rule, child_items in rule_child_items.items():
+            try:
+                parent_num = int(parent_rule[1:])
+            except ValueError:
+                continue
+            for child_line, content in child_items:
+                for token in extract_backtick_tokens(content):
+                    if token in file_identifiers or token in boundary_ids:
+                        continue
+                    if (
+                        CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(token) is not None
+                        or CANONICAL_BASE_ID_PATTERN.fullmatch(token) is not None
+                        or FRAMEWORK_RULE_ID_PATTERN.fullmatch(token) is not None
+                        or CANONICAL_VERIFY_ID_PATTERN.fullmatch(token) is not None
+                    ):
+                        continue
+
+                    declared_in_same = token in rule_declared_symbols.get(parent_rule, set())
+                    if declared_in_same:
+                        continue
+
+                    declared_in_upstream = False
+                    for upstream_num, symbols in declared_by_order:
+                        if upstream_num >= parent_num:
+                            break
+                        if token in symbols:
+                            declared_in_upstream = True
+                            break
+                    if declared_in_upstream:
+                        continue
+
+                    issues.append(
+                        make_issue(
+                            (
+                                f"rule symbol '{token}' is used without declaration via '输出结构' "
+                                f"in same or upstream rules for {parent_rule}"
+                            ),
+                            rel_file,
+                            child_line,
+                            code="FW060",
+                        )
+                    )
+        for required_heading in REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS:
+            if required_heading not in file_text:
+                issues.append(
+                    make_issue(
+                        f"missing required section heading: {required_heading}",
+                        rel_file,
+                        1,
+                        code="FRAMEWORK_LAYER_SECTION_MISSING",
+                    )
+                )
+
+    for module_name, levels in module_levels.items():
+        if not levels:
+            continue
+        if len(levels) > 1 and 0 not in levels:
+            issues.append(
+                make_issue(
+                    f"module '{module_name}' has multi-layer docs but missing L0",
+                    REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="FRAMEWORK_LAYER_ZERO_MISSING",
+                )
+            )
+
+    issues.extend(validate_framework_reference_graph(module_ref_edges, module_files_by_key))
+
+    return issues, layer_files
+
 
 
 def parse_level_order(registry: dict[str, Any], registry_text: str) -> tuple[list[str], list[Issue]]:
@@ -378,12 +1653,11 @@ def walk_tree_and_collect(
                     seen_files.add(file_name)
                     level_files[level].add(file_name)
 
-                if file_name.startswith("standards/") and not file_name.startswith(
-                    f"standards/{level}/"
-                ):
+                if not is_allowed_level_path(level, file_name):
+                    allowed_prefixes = LEVEL_ALLOWED_PREFIXES.get(level, ())
                     issues.append(
                         make_issue(
-                            f"{node_id}: standards file must be under standards/{level}/",
+                            f"{node_id}: {level} file path is invalid for level constraints; allowed prefixes={list(allowed_prefixes)}",
                             REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
                             line,
                             code="TREE_STANDARDS_PATH_LEVEL_MISMATCH",
@@ -423,6 +1697,7 @@ def validate_registry_structure(
     registry: dict[str, Any], registry_text: str
 ) -> tuple[list[Issue], ParsedRegistry | None]:
     issues: list[Issue] = []
+    framework_layer_files: set[str] = set()
 
     level_order, level_issues = parse_level_order(registry, registry_text)
     issues.extend(level_issues)
@@ -458,7 +1733,7 @@ def validate_registry_structure(
         if standard_file not in declared_l2:
             issues.append(
                 make_issue(
-                    "mapping_registry.json: unregistered domain standard in standards/L2/: "
+                    "mapping_registry.json: unregistered domain standard under framework/*/L2-Mn-*.md: "
                     f"{standard_file}",
                     REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
                     find_line(registry_text, '"L2"'),
@@ -474,6 +1749,9 @@ def validate_registry_structure(
                 )
             )
 
+    framework_issues, framework_layer_files = validate_framework_layers()
+    issues.extend(framework_issues)
+
     mappings = registry.get("mappings", [])
     if not isinstance(mappings, list) or not mappings:
         issues.append(
@@ -483,10 +1761,16 @@ def validate_registry_structure(
                 find_line(registry_text, '"mappings"'),
                 code="REGISTRY_MAPPINGS_EMPTY",
             )
+            )
+        return issues, ParsedRegistry(
+            level_order=level_order,
+            level_files=level_files,
+            impl_files=set(),
+            framework_layer_files=framework_layer_files,
         )
-        return issues, ParsedRegistry(level_order=level_order, level_files=level_files)
 
     mapping_ids: set[str] = set()
+    impl_files: set[str] = set()
     l2_to_l1_anchors: dict[str, set[str]] = {
         file_name: set() for file_name in level_files.get("L2", set())
     }
@@ -564,20 +1848,16 @@ def validate_registry_structure(
             )
             continue
 
-        l3_files = level_files.get("L3", set())
         for symbol_ref in symbols:
-            file_name = symbol_ref.get("file") if isinstance(symbol_ref, dict) else None
-            if not isinstance(file_name, str) or not file_name:
+            if not isinstance(symbol_ref, dict):
                 continue
-            if file_name not in l3_files:
-                issues.append(
-                    make_issue(
-                        f"{map_id}: impl symbol file must be registered in L3 tree: {file_name}",
-                        REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
-                        find_mapping_symbol_line(registry_text, map_id, file_name, ""),
-                        code="REGISTRY_IMPL_FILE_NOT_IN_TREE",
-                    )
-                )
+            file_name = symbol_ref.get("file")
+            if isinstance(file_name, str) and file_name:
+                impl_files.add(file_name)
+
+        # The framework tree is pure L0-L3 standards hierarchy.
+        # Implementation files are validated via `impl_symbols` existence checks,
+        # and do not need to appear as L3 tree nodes.
 
     for l2_file, anchors in l2_to_l1_anchors.items():
         if not anchors:
@@ -613,7 +1893,7 @@ def validate_registry_structure(
                     related=[
                         {
                             "message": "Expected these L1 anchors to be mapped",
-                            "file": "standards/L1/框架设计核心标准.md",
+                            "file": CORE_L1_STANDARD_FILE,
                             "line": 1,
                             "column": 1,
                         }
@@ -621,7 +1901,12 @@ def validate_registry_structure(
                 )
             )
 
-    return issues, ParsedRegistry(level_order=level_order, level_files=level_files)
+    return issues, ParsedRegistry(
+        level_order=level_order,
+        level_files=level_files,
+        impl_files=impl_files,
+        framework_layer_files=framework_layer_files,
+    )
 
 
 def validate_mapping_content(
@@ -705,6 +1990,61 @@ def validate_mapping_content(
                     )
                 )
 
+        issues.extend(validate_impl_mapping_semantics(item, registry_text))
+
+    return issues
+
+
+def validate_impl_mapping_semantics(item: dict[str, Any], registry_text: str) -> list[Issue]:
+    issues: list[Issue] = []
+    map_id = item["id"]
+    l2_file = item["l2_file"]
+    l2_anchor = item["l2_anchor"]
+    impl_files = {
+        file_name
+        for file_name in (
+            symbol_ref.get("file")
+            for symbol_ref in item.get("impl_symbols", [])
+            if isinstance(symbol_ref, dict)
+        )
+        if isinstance(file_name, str) and file_name
+    }
+
+    if COMPATIBILITY_FACADE_FILE in impl_files:
+        issues.append(
+            make_issue(
+                f"{map_id}: impl_symbols must not reference compatibility facade {COMPATIBILITY_FACADE_FILE}",
+                REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                find_mapping_key_line(registry_text, map_id, "impl_symbols"),
+                code="IMPL_SYMBOL_COMPAT_FACADE_FORBIDDEN",
+            )
+        )
+
+    if not l2_file.startswith("framework/shelf/") and SHELF_DOMAIN_FILE in impl_files:
+        issues.append(
+            make_issue(
+                f"{map_id}: non-shelf mapping must not reference shelf-specific domain file {SHELF_DOMAIN_FILE}",
+                REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                find_mapping_key_line(registry_text, map_id, "impl_symbols"),
+                code="IMPL_SYMBOL_SHELF_DOMAIN_SCOPE_INVALID",
+            )
+        )
+
+    if l2_file.startswith("framework/shelf/"):
+        shelf_required_anchors = {
+            "## 2. 边界定义（Boundary / 参数）",
+            "## 5. 验证（Verification）",
+        }
+        if l2_anchor in shelf_required_anchors and SHELF_DOMAIN_FILE not in impl_files:
+            issues.append(
+                make_issue(
+                    f"{map_id}: shelf mapping for '{l2_anchor}' must include {SHELF_DOMAIN_FILE}",
+                    REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                    find_mapping_key_line(registry_text, map_id, "impl_symbols"),
+                    code="IMPL_SYMBOL_SHELF_DOMAIN_REQUIRED",
+                )
+            )
+
     return issues
 
 
@@ -776,10 +2116,17 @@ def validate_change_propagation(
 
     level_order = parsed_registry.level_order
     level_files = parsed_registry.level_files
+    impl_files = parsed_registry.impl_files
+    framework_layer_files = parsed_registry.framework_layer_files
     level_index = {level: idx for idx, level in enumerate(level_order)}
 
     def touched(level: str) -> bool:
-        return bool(changed_files.intersection(level_files.get(level, set())))
+        candidates = set(level_files.get(level, set()))
+        if level == "L2":
+            candidates.update(framework_layer_files)
+        if level == "L3":
+            candidates.update(impl_files)
+        return bool(changed_files.intersection(candidates))
 
     for src_level in level_order:
         if src_level == "L3":
@@ -789,7 +2136,9 @@ def validate_change_propagation(
 
         src_idx = level_index[src_level]
         for target_level in level_order[src_idx + 1 :]:
-            target_candidates = level_files.get(target_level, set())
+            target_candidates = set(level_files.get(target_level, set()))
+            if target_level == "L3":
+                target_candidates.update(impl_files)
             if not target_candidates:
                 continue
             if touched(target_level):
@@ -869,6 +2218,9 @@ def main() -> int:
                     code="MAPPING_CONTENT_VALIDATION_FAILED",
                 )
             )
+
+    if not issues:
+        issues.extend(validate_project_generation_discipline())
 
     if args.check_changes and parsed_registry is not None:
         changed = collect_changed_files()
