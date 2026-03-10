@@ -22,6 +22,11 @@ from project_runtime import (
     materialize_registered_project,
     resolve_project_template_registration,
 )
+from project_runtime.governance import (
+    compare_project_to_manifest,
+    parse_governance_manifest,
+    validate_manifest_closure,
+)
 
 REGISTRY_PATH = REPO_ROOT / "mapping/mapping_registry.json"
 FRAMEWORK_DIR = REPO_ROOT / "framework"
@@ -251,6 +256,7 @@ def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
         "product_spec_json",
         "implementation_bundle_py",
         "generation_manifest_json",
+        "governance_manifest_json",
     ):
         value = artifacts.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -593,6 +599,119 @@ def validate_project_generation_discipline(
                     code="PROJECT_GENERATION_FAILED",
                 )
             )
+
+    return issues
+
+
+def validate_project_governance(
+    product_spec_files: list[Path] | None = None,
+) -> list[Issue]:
+    issues: list[Issue] = []
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    for product_spec_file in project_product_spec_files:
+        rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        rel_implementation_config_file = implementation_config_file.relative_to(REPO_ROOT).as_posix()
+        try:
+            _, implementation_data = _load_toml_text_and_data(implementation_config_file)
+            artifacts = implementation_data.get("artifacts")
+            if not isinstance(artifacts, dict):
+                raise ValueError("implementation_config.toml must define [artifacts]")
+            governance_file_name = artifacts.get("governance_manifest_json")
+            if not isinstance(governance_file_name, str) or not governance_file_name.strip():
+                raise ValueError("implementation_config.toml missing artifacts.governance_manifest_json")
+            governance_manifest_path = product_spec_file.parent / "generated" / governance_file_name.strip()
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to resolve governance manifest path for {rel_product_spec_file}: {exc}",
+                    rel_implementation_config_file,
+                    1,
+                    code="GOVERNANCE_CONFIG_INVALID",
+                )
+            )
+            continue
+
+        if not governance_manifest_path.exists():
+            issues.append(
+                make_issue(
+                    "missing governance manifest; run "
+                    f"`uv run python scripts/materialize_project.py --project {rel_product_spec_file}`",
+                    rel_product_spec_file,
+                    1,
+                    code="STALE_EVIDENCE",
+                    related=[
+                        {
+                            "message": "Expected governance manifest",
+                            "file": governance_manifest_path.relative_to(REPO_ROOT).as_posix(),
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+            )
+            continue
+
+        try:
+            manifest_payload = parse_governance_manifest(governance_manifest_path)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"invalid governance manifest for {rel_product_spec_file}: {exc}",
+                    governance_manifest_path.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="GOVERNANCE_MANIFEST_INVALID",
+                )
+            )
+            continue
+
+        stale_issues = validate_manifest_closure(manifest_payload)
+        if stale_issues:
+            for stale in stale_issues:
+                issue = make_issue(
+                    stale["message"],
+                    stale.get("file") or governance_manifest_path.relative_to(REPO_ROOT).as_posix(),
+                    int(stale.get("line", 1)),
+                    code=str(stale["code"]),
+                    related=[
+                        {
+                            "message": "Materialize this project to refresh governance evidence",
+                            "file": rel_product_spec_file,
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+                if "ref" in stale:
+                    issue["ref"] = stale["ref"]
+                issues.append(issue)
+            continue
+
+        try:
+            registration = resolve_project_template_registration(product_spec_file)
+            project = registration.load_project(product_spec_file)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to load project for governance validation: {exc}",
+                    rel_product_spec_file,
+                    1,
+                    code="GOVERNANCE_PROJECT_LOAD_FAILED",
+                )
+            )
+            continue
+
+        for finding in compare_project_to_manifest(project, manifest_payload):
+            issue = make_issue(
+                str(finding["message"]),
+                str(finding.get("file") or rel_product_spec_file),
+                int(finding.get("line", 1)),
+                code=str(finding["code"]),
+            )
+            for key in ("symbol_id", "owner", "kind", "expected", "actual", "locator"):
+                if key in finding:
+                    issue[key] = finding[key]
+            issues.append(issue)
 
     return issues
 
@@ -2226,6 +2345,9 @@ def main() -> int:
 
     if not issues:
         issues.extend(validate_project_generation_discipline())
+
+    if not issues:
+        issues.extend(validate_project_governance())
 
     if args.check_changes and parsed_registry is not None:
         changed = collect_changed_files()

@@ -38,6 +38,7 @@ DEFAULT_IMPLEMENTATION_CONFIG = textwrap.dedent(
     product_spec_json = "product_spec.json"
     implementation_bundle_py = "implementation_bundle.py"
     generation_manifest_json = "generation_manifest.json"
+    governance_manifest_json = "governance_manifest.json"
     """
 ).strip()
 

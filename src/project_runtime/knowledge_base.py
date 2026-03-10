@@ -10,6 +10,7 @@ import tomllib
 from typing import Any
 
 from framework_ir import FrameworkModuleIR, load_framework_registry, parse_framework_module
+from project_runtime.governance import build_governance_manifest
 from project_runtime.template_registry import (
     ProjectTemplateRegistration,
     config_layout,
@@ -443,6 +444,7 @@ class ArtifactConfig:
     product_spec_json: str
     implementation_bundle_py: str
     generation_manifest_json: str
+    governance_manifest_json: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -543,6 +545,7 @@ class GeneratedArtifactPaths:
     product_spec_json: str
     implementation_bundle_py: str
     generation_manifest_json: str
+    governance_manifest_json: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1037,6 +1040,7 @@ def _load_implementation_config(implementation_config_path: Path) -> KnowledgeBa
             product_spec_json=_require_string(artifacts_table, "product_spec_json"),
             implementation_bundle_py=_require_string(artifacts_table, "implementation_bundle_py"),
             generation_manifest_json=_require_string(artifacts_table, "generation_manifest_json"),
+            governance_manifest_json=_require_string(artifacts_table, "governance_manifest_json"),
         ),
     )
 
@@ -1156,6 +1160,7 @@ def _derive_copy(
     }
 
 
+# @governed_symbol id=kb.ui.surface_spec owner=framework kind=ui_surface risk=high
 def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     knowledge_base_detail_path = f"{project.route.knowledge_detail}/{{knowledge_base_id}}"
     document_detail_path = f"{project.route.document_detail_prefix}/{{document_id}}"
@@ -1325,6 +1330,7 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     }
 
 
+# @governed_symbol id=kb.backend.surface_spec owner=implementation_config kind=backend_surface risk=high
 def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     return {
         "derived_from": {
@@ -1575,6 +1581,11 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
             "",
         ]
     )
+    governance_manifest_text = json.dumps(
+        build_governance_manifest(project),
+        ensure_ascii=False,
+        indent=2,
+    )
     generation_manifest_text = json.dumps(
         {
             "project_id": project.metadata.project_id,
@@ -1599,11 +1610,13 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
                 "product_spec_json": generated_artifacts.product_spec_json,
                 "implementation_bundle_py": generated_artifacts.implementation_bundle_py,
                 "generation_manifest_json": generated_artifacts.generation_manifest_json,
+                "governance_manifest_json": generated_artifacts.governance_manifest_json,
             },
             "content_sha256": {
                 "framework_ir_json": _sha256_text(framework_ir_text),
                 "product_spec_json": _sha256_text(product_spec_text),
                 "implementation_bundle_py": _sha256_text(implementation_bundle_text),
+                "governance_manifest_json": _sha256_text(governance_manifest_text),
             },
         },
         ensure_ascii=False,
@@ -1614,6 +1627,7 @@ def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> dict[st
         "product_spec_json": product_spec_text,
         "implementation_bundle_py": implementation_bundle_text,
         "generation_manifest_json": generation_manifest_text,
+        "governance_manifest_json": governance_manifest_text,
     }
 
 
@@ -1694,14 +1708,20 @@ def materialize_knowledge_base_project(
     product_spec_path_json = output_path / artifact_names.product_spec_json
     implementation_bundle_path = output_path / artifact_names.implementation_bundle_py
     generation_manifest_path = output_path / artifact_names.generation_manifest_json
+    governance_manifest_path = output_path / artifact_names.governance_manifest_json
+    # Keep generated evidence stable even when callers materialize into a temp directory.
+    # The output path controls where files are written, but the manifest and runtime bundle
+    # should continue to point at the project's canonical generated directory.
+    artifact_directory = generated_dir
     project = replace(
         project,
         generated_artifacts=GeneratedArtifactPaths(
-            directory=_relative_path(generated_dir),
-            framework_ir_json=_relative_path(generated_dir / artifact_names.framework_ir_json),
-            product_spec_json=_relative_path(generated_dir / artifact_names.product_spec_json),
-            implementation_bundle_py=_relative_path(generated_dir / artifact_names.implementation_bundle_py),
-            generation_manifest_json=_relative_path(generated_dir / artifact_names.generation_manifest_json),
+            directory=_relative_path(artifact_directory),
+            framework_ir_json=_relative_path(artifact_directory / artifact_names.framework_ir_json),
+            product_spec_json=_relative_path(artifact_directory / artifact_names.product_spec_json),
+            implementation_bundle_py=_relative_path(artifact_directory / artifact_names.implementation_bundle_py),
+            generation_manifest_json=_relative_path(artifact_directory / artifact_names.generation_manifest_json),
+            governance_manifest_json=_relative_path(artifact_directory / artifact_names.governance_manifest_json),
         ),
     )
     payloads = _build_generated_artifact_payloads(project)
@@ -1709,6 +1729,7 @@ def materialize_knowledge_base_project(
     product_spec_path_json.write_text(payloads["product_spec_json"], encoding="utf-8")
     implementation_bundle_path.write_text(payloads["implementation_bundle_py"], encoding="utf-8")
     generation_manifest_path.write_text(payloads["generation_manifest_json"], encoding="utf-8")
+    governance_manifest_path.write_text(payloads["governance_manifest_json"], encoding="utf-8")
 
     return project
 
