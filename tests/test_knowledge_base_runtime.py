@@ -23,6 +23,11 @@ class KnowledgeBaseRuntimeTest(unittest.TestCase):
         self.assertIn("gap: var(--shell-gap);", response.text)
 
     def test_auxiliary_pages_exist(self) -> None:
+        showcase_response = self.client.get("/knowledge-base/cxk-basketball")
+        self.assertEqual(showcase_response.status_code, 200)
+        self.assertIn("蔡徐坤打球特别页", showcase_response.text)
+        self.assertIn("返回知识聊天", showcase_response.text)
+
         list_response = self.client.get("/knowledge-bases")
         self.assertEqual(list_response.status_code, 200)
         self.assertIn("知识库列表", list_response.text)
@@ -45,6 +50,7 @@ class KnowledgeBaseRuntimeTest(unittest.TestCase):
         self.assertEqual(payload["project"]["project"]["project_id"], "knowledge_base_basic")
         self.assertEqual(payload["frontend"], "/knowledge-base")
         self.assertEqual(payload["product_spec"], "/api/knowledge/product-spec")
+        self.assertIn("basketball_showcase", payload["project"]["ui_spec_summary"]["page_ids"])
         self.assertIn("chat_home", payload["project"]["ui_spec_summary"]["page_ids"])
         self.assertEqual(payload["project"]["backend_spec_summary"]["answer_policy"]["citation_style"], "inline_refs")
 
@@ -136,8 +142,10 @@ class KnowledgeBaseRuntimeTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["product"]["project_id"], "knowledge_base_basic")
         self.assertEqual(payload["navigation"]["pages"]["chat_home"], "/knowledge-base")
+        self.assertEqual(payload["navigation"]["pages"]["basketball_showcase"], "/knowledge-base/cxk-basketball")
         self.assertEqual(payload["library"]["knowledge_base_id"], "research-and-standards")
         self.assertEqual(payload["chat"]["citation_style"], "inline_refs")
+        self.assertEqual(payload["showcase_page"]["title"], "蔡徐坤打球特别页")
         self.assertEqual(payload["interaction_model"]["workspace_flow"][0]["stage_id"], "knowledge_base_select")
         self.assertEqual(payload["interaction_model"]["citation_return"]["query_keys"], ["document", "section", "citation"])
         self.assertNotIn("ui_spec", payload)

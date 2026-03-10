@@ -76,10 +76,24 @@ font_scale = "md"
 [route]
 home = "/"
 workbench = "/knowledge-base"
+basketball_showcase = "/knowledge-base/cxk-basketball"
 knowledge_list = "/knowledge-bases"
 knowledge_detail = "/knowledge-bases/details"
 document_detail_prefix = "/knowledge-bases/details/documents"
 api_prefix = "/api/knowledge"
+
+# [showcase_page] 定义不抢占主聊天链的二级专题页。
+# 这里记录的是“这个专题页对用户呈现什么主题、入口文案如何表达、从哪里返回”，
+# 属于产品对外承诺的一部分，而不是某个前端组件、动画实现或 CSS 技巧。
+# 它是 chat-first 客户端中的一个轻量彩蛋页：可以被访问、被讨论、被审查，
+# 但不参与知识检索、引用回路和知识库主流程的真相定义。
+[showcase_page]
+title = "蔡徐坤打球特别页"
+kicker = "Chat-First Special Page"
+headline = "蔡徐坤打球 · 轻量前端专题页"
+intro = "这个页面把聚光灯、节奏和打球动作收成一个轻量专题体验，用来展示前端扩展页也可以挂在知识库产品的治理树里。"
+back_to_chat_label = "返回知识聊天"
+browse_knowledge_label = "去知识库列表"
 
 # [a11y] 定义产品层的可访问规则。
 # 它回答“用户应该以什么顺序读到界面、键盘如何主要移动、系统需要播报哪些状态”，

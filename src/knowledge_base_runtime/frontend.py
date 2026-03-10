@@ -96,6 +96,7 @@ def _aux_sidebar(project: KnowledgeBaseProject, active: str) -> str:
     )
     items = (
         ("chat", ui_spec["pages"]["chat_home"]["path"], aux_sidebar["nav"]["chat"]),
+        ("basketball-showcase", ui_spec["pages"]["basketball_showcase"]["path"], aux_sidebar["nav"]["basketball_showcase"]),
         ("knowledge-list", ui_spec["pages"]["knowledge_list"]["path"], aux_sidebar["nav"]["knowledge_list"]),
         ("knowledge-detail", knowledge_detail_href, aux_sidebar["nav"]["knowledge_detail"]),
     )
@@ -133,6 +134,284 @@ def _render_page(title: str, style: str, body: str) -> str:
   </body>
 </html>
 """
+
+
+def compose_basketball_showcase_page(project: KnowledgeBaseProject) -> str:
+    style = (
+        _shared_style(project)
+        + """
+    .showcase-stage {
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
+      padding: 32px;
+      min-height: 420px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 205, 96, 0.45), transparent 26%),
+        radial-gradient(circle at right 20%, rgba(255, 120, 64, 0.35), transparent 24%),
+        linear-gradient(140deg, rgba(15, 23, 42, 0.95), rgba(28, 28, 44, 0.96));
+      box-shadow: 0 28px 64px rgba(15, 23, 42, 0.22);
+      color: #f8fafc;
+    }
+    .showcase-stage::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border: 1px solid rgba(248, 250, 252, 0.16);
+      border-radius: 22px;
+      pointer-events: none;
+    }
+    .showcase-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(248, 250, 252, 0.1);
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .showcase-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+      margin-top: 24px;
+    }
+    .showcase-copy h2 {
+      margin: 0;
+      font-size: clamp(38px, 6vw, 72px);
+      line-height: 0.94;
+      letter-spacing: -0.05em;
+    }
+    .showcase-copy p {
+      max-width: 40rem;
+      margin: 18px 0 0;
+      color: rgba(248, 250, 252, 0.82);
+      line-height: 1.7;
+    }
+    .showcase-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+    .showcase-metric {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(248, 250, 252, 0.08);
+      border: 1px solid rgba(248, 250, 252, 0.08);
+    }
+    .showcase-metric strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.1;
+    }
+    .showcase-court {
+      position: relative;
+      min-height: 300px;
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.12), transparent 18%),
+        linear-gradient(180deg, rgba(255, 168, 76, 0.2), rgba(255, 119, 48, 0.08)),
+        rgba(12, 18, 32, 0.78);
+      border: 1px solid rgba(248, 250, 252, 0.12);
+    }
+    .showcase-court::before,
+    .showcase-court::after {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border: 2px solid rgba(248, 250, 252, 0.18);
+      border-radius: 20px;
+    }
+    .showcase-court::after {
+      inset: 50% 18px auto;
+      height: 0;
+      border-width: 0 0 2px;
+      border-radius: 0;
+    }
+    .showcase-ball {
+      position: absolute;
+      right: 20%;
+      top: 18%;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 28% 28%, rgba(255, 248, 220, 0.7), transparent 18%),
+        linear-gradient(145deg, #ffb347, #ff6b35);
+      box-shadow: 0 16px 40px rgba(255, 107, 53, 0.35);
+      animation: float-ball 2.8s ease-in-out infinite;
+    }
+    .showcase-ball::before,
+    .showcase-ball::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(47, 24, 10, 0.45);
+    }
+    .showcase-ball::after {
+      inset: 12px 40px;
+      border-left: 0;
+      border-right: 0;
+    }
+    .showcase-player {
+      position: absolute;
+      left: 18%;
+      bottom: 12%;
+      width: 160px;
+      height: 220px;
+    }
+    .showcase-player .head,
+    .showcase-player .torso,
+    .showcase-player .arm,
+    .showcase-player .leg {
+      position: absolute;
+      background: #f8fafc;
+      transform-origin: top center;
+    }
+    .showcase-player .head {
+      left: 56px;
+      top: 6px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #f8fafc, #d8e4f7);
+    }
+    .showcase-player .torso {
+      left: 58px;
+      top: 40px;
+      width: 34px;
+      height: 82px;
+      border-radius: 18px;
+      transform: skew(-10deg);
+      background: linear-gradient(180deg, #f97316, #fb7185);
+    }
+    .showcase-player .arm {
+      width: 18px;
+      height: 92px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #f8fafc, #cbd5f5);
+    }
+    .showcase-player .arm.left {
+      left: 48px;
+      top: 50px;
+      transform: rotate(48deg);
+    }
+    .showcase-player .arm.right {
+      left: 92px;
+      top: 48px;
+      transform: rotate(-44deg);
+    }
+    .showcase-player .leg {
+      width: 18px;
+      height: 102px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #f8fafc, #cbd5f5);
+      top: 112px;
+    }
+    .showcase-player .leg.left {
+      left: 58px;
+      transform: rotate(16deg);
+    }
+    .showcase-player .leg.right {
+      left: 88px;
+      transform: rotate(-20deg);
+    }
+    .showcase-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+    .showcase-cta a {
+      text-decoration: none;
+    }
+    .showcase-note {
+      margin-top: 18px;
+      color: rgba(248, 250, 252, 0.72);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    @keyframes float-ball {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-16px); }
+    }
+    @media (max-width: 900px) {
+      .showcase-grid {
+        grid-template-columns: 1fr;
+      }
+      .showcase-metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+    """
+    )
+    ui_spec = project.ui_spec
+    page_spec = ui_spec["pages"]["basketball_showcase"]
+    body = f"""
+    <div class="aux-shell">
+      {_aux_sidebar(project, "basketball-showcase")}
+      <main class="aux-main">
+        <header class="aux-header">
+          <div class="header-copy">
+            <div class="header-title">{escape(page_spec['title'])}</div>
+            <div class="header-subtitle">{escape(page_spec['intro'])}</div>
+          </div>
+          <div class="header-actions">
+            <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['back_to_chat_label'])}</a>
+            <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(page_spec['browse_knowledge_label'])}</a>
+          </div>
+        </header>
+        <section class="aux-content">
+          <article class="showcase-stage">
+            <span class="showcase-kicker">{escape(page_spec['kicker'])}</span>
+            <div class="showcase-grid">
+              <div class="showcase-copy">
+                <h2>{escape(page_spec['headline'])}</h2>
+                <p>{escape(page_spec['intro'])}</p>
+                <div class="showcase-metrics">
+                  <div class="showcase-metric">
+                    <strong>前端扩展页</strong>
+                    <span>不离开知识库工作台，也能挂一个独立专题页。</span>
+                  </div>
+                  <div class="showcase-metric">
+                    <strong>治理树可追踪</strong>
+                    <span>路由、surface contract、ui spec 会一起收敛，不是树外彩蛋。</span>
+                  </div>
+                  <div class="showcase-metric">
+                    <strong>视觉可变体</strong>
+                    <span>主界面保持知识问答秩序，专题页允许更强的视觉表达。</span>
+                  </div>
+                </div>
+                <div class="showcase-cta">
+                  <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['back_to_chat_label'])}</a>
+                  <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(page_spec['browse_knowledge_label'])}</a>
+                </div>
+                <div class="showcase-note">页面主题是“蔡徐坤打球”，这里把它做成一个纯前端视觉专题，用来验证知识库产品也能承接轻量扩展场景。</div>
+              </div>
+              <div class="showcase-court" aria-hidden="true">
+                <div class="showcase-ball"></div>
+                <div class="showcase-player">
+                  <div class="head"></div>
+                  <div class="torso"></div>
+                  <div class="arm left"></div>
+                  <div class="arm right"></div>
+                  <div class="leg left"></div>
+                  <div class="leg right"></div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+    """
+    return _render_page(page_spec["title"], style, body)
 
 
 def compose_knowledge_base_list_page(project: KnowledgeBaseProject, repository: "KnowledgeRepository") -> str:
@@ -328,6 +607,7 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
         <section class="sidebar-footer">
           <button class="sidebar-primary-btn" type="button" data-open-knowledge-switch="true" id="knowledge-badge"></button>
           <a class="secondary-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(sidebar_spec['browse_knowledge_label'])}</a>
+          <a class="secondary-link" href="{escape(ui_spec['pages']['basketball_showcase']['path'])}">{escape(sidebar_spec['basketball_showcase_label'])}</a>
         </section>
       </aside>
 
@@ -340,6 +620,7 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
           <div class="header-actions">
             <button class="pill-button" type="button" data-open-knowledge-switch="true" id="knowledge-badge-secondary"></button>
             <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(header_spec['knowledge_entry_link_label'])}</a>
+            <a class="ghost-link" href="{escape(ui_spec['pages']['basketball_showcase']['path'])}">{escape(header_spec['showcase_link_label'])}</a>
           </div>
         </header>
 
@@ -374,6 +655,7 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
               <div class="left">
                 <span class="source-chip">{escape(composer_spec['mode_label'])}</span>
                 <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(composer_spec['knowledge_link_label'])}</a>
+                <a class="ghost-link" href="{escape(ui_spec['pages']['basketball_showcase']['path'])}">{escape(composer_spec['showcase_link_label'])}</a>
               </div>
               <button class="primary-btn" type="submit">{escape(composer_spec['submit_label'])}</button>
             </div>

@@ -46,6 +46,7 @@ def build_workbench_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
             "conversation_sidebar",
             "chat_main",
             "citation_drawer",
+            "basketball_showcase_page",
             "knowledge_list_page",
             "knowledge_detail_page",
             "document_detail_page",

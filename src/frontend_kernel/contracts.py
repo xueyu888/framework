@@ -17,6 +17,7 @@ def build_frontend_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
         {"action_id": "submit_chat", "boundary": "INTERACT"},
         {"action_id": "open_citation_drawer", "boundary": "INTERACT"},
         {"action_id": "browse_knowledge_bases", "boundary": "ROUTE"},
+        {"action_id": "open_basketball_showcase", "boundary": "ROUTE"},
         {"action_id": "open_knowledge_base_detail", "boundary": "ROUTE"},
         {"action_id": "open_document_detail", "boundary": "ROUTE"},
         {"action_id": "return_from_citation", "boundary": "ROUTE"},
@@ -42,6 +43,7 @@ def build_frontend_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
             "main": ["chat_header", "message_stream", "chat_composer"],
             "overlay": ["citation_drawer", "knowledge_switch_dialog"],
             "secondary_pages": [
+                "basketball_showcase_page",
                 "knowledge_list_page",
                 "knowledge_detail_page",
                 "document_detail_page",

@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 
 from knowledge_base_runtime.backend import KnowledgeRepository, build_knowledge_base_router
 from knowledge_base_runtime.frontend import (
+    compose_basketball_showcase_page,
     compose_document_detail_page,
     compose_knowledge_base_detail_page,
     compose_knowledge_base_list_page,
@@ -36,6 +37,11 @@ def build_knowledge_base_runtime_app(project: KnowledgeBaseProject | None = None
     @app.get(resolved.route.workbench, response_class=HTMLResponse, include_in_schema=False)
     def knowledge_base_page() -> str:
         return compose_knowledge_base_page(resolved)
+
+    # @governed_symbol id=kb.runtime.page_routes owner=framework kind=runtime_routes risk=high
+    @app.get(resolved.route.basketball_showcase, response_class=HTMLResponse, include_in_schema=False)
+    def basketball_showcase_page() -> str:
+        return compose_basketball_showcase_page(resolved)
 
     # @governed_symbol id=kb.runtime.page_routes owner=framework kind=runtime_routes risk=high
     @app.get(resolved.route.knowledge_list, response_class=HTMLResponse, include_in_schema=False)

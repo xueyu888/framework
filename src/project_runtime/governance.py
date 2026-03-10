@@ -382,6 +382,7 @@ def _expected_runtime_page_routes(project: KnowledgeBaseProject) -> dict[str, An
     return {
         "home": project.route.home,
         "chat_home": project.route.workbench,
+        "basketball_showcase": project.route.basketball_showcase,
         "knowledge_list": project.route.knowledge_list,
         "knowledge_detail": _route_detail_path(project),
         "document_detail": _document_detail_path(project),
@@ -396,6 +397,7 @@ def _actual_runtime_page_routes(project: KnowledgeBaseProject) -> dict[str, Any]
     expected_names = {
         "root": "home",
         "knowledge_base_page": "chat_home",
+        "basketball_showcase_page": "basketball_showcase",
         "knowledge_base_list_page": "knowledge_list",
         "knowledge_base_detail_page": "knowledge_detail",
         "document_detail_page": "document_detail",
@@ -422,6 +424,7 @@ def _expected_frontend_surface_contract(project: KnowledgeBaseProject) -> dict[s
         "submit_chat",
         "open_citation_drawer",
         "browse_knowledge_bases",
+        "open_basketball_showcase",
         "open_knowledge_base_detail",
         "open_document_detail",
         "return_from_citation",
@@ -501,6 +504,7 @@ def _expected_workbench_surface_contract(project: KnowledgeBaseProject) -> dict[
             "conversation_sidebar",
             "chat_main",
             "citation_drawer",
+            "basketball_showcase_page",
             "knowledge_list_page",
             "knowledge_detail_page",
             "document_detail_page",
@@ -622,7 +626,7 @@ def _expected_ui_surface_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
             "id": project.surface.shell,
             "layout_variant": project.surface.layout_variant,
             "regions": ["conversation_sidebar", "chat_main", "citation_drawer"],
-            "secondary_pages": ["knowledge_list", "knowledge_detail", "document_detail"],
+            "secondary_pages": ["basketball_showcase", "knowledge_list", "knowledge_detail", "document_detail"],
             "preview_mode": project.surface.preview_mode,
             "density": project.surface.density,
         },
@@ -637,6 +641,10 @@ def _expected_ui_surface_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                     "citation_drawer",
                     "knowledge_switch_dialog",
                 ],
+            },
+            "basketball_showcase": {
+                "path": project.route.basketball_showcase,
+                "title": project.showcase_page.title,
             },
             "knowledge_list": {
                 "path": project.route.knowledge_list,
@@ -677,6 +685,10 @@ def _actual_ui_surface_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
             "chat_home": {
                 "path": project.ui_spec["pages"]["chat_home"]["path"],
                 "slots": project.ui_spec["pages"]["chat_home"]["slots"],
+            },
+            "basketball_showcase": {
+                "path": project.ui_spec["pages"]["basketball_showcase"]["path"],
+                "title": project.ui_spec["pages"]["basketball_showcase"]["title"],
             },
             "knowledge_list": {
                 "path": project.ui_spec["pages"]["knowledge_list"]["path"],
@@ -1031,6 +1043,7 @@ def _definitions(project: KnowledgeBaseProject) -> tuple[SymbolDefinition, ...]:
             required_bindings=(
                 ("src/knowledge_base_runtime/app.py", "function:root"),
                 ("src/knowledge_base_runtime/app.py", "function:knowledge_base_page"),
+                ("src/knowledge_base_runtime/app.py", "function:basketball_showcase_page"),
                 ("src/knowledge_base_runtime/app.py", "function:knowledge_base_list_page"),
                 ("src/knowledge_base_runtime/app.py", "function:knowledge_base_detail_page"),
                 ("src/knowledge_base_runtime/app.py", "function:document_detail_page"),
@@ -1079,7 +1092,7 @@ def _definitions(project: KnowledgeBaseProject) -> tuple[SymbolDefinition, ...]:
             comparator="surface_contract_exact.v1",
             upstream_ref_builder=lambda current: (
                 *frontend_refs,
-                *_product_section_refs(product_spec_file, "surface", "route", "chat", "return"),
+                *_product_section_refs(product_spec_file, "surface", "route", "showcase_page", "chat", "return"),
             ),
             required_bindings=(("src/project_runtime/knowledge_base.py", "function:_build_ui_spec"),),
         ),

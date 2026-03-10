@@ -30,6 +30,7 @@ KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT = config_layout(
         "surface",
         "visual",
         "route",
+        "showcase_page",
         "a11y",
         "library",
         "preview",
@@ -293,10 +294,24 @@ class FeatureConfig:
 class RouteConfig:
     home: str
     workbench: str
+    basketball_showcase: str
     knowledge_list: str
     knowledge_detail: str
     document_detail_prefix: str
     api_prefix: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ShowcasePageConfig:
+    title: str
+    kicker: str
+    headline: str
+    intro: str
+    back_to_chat_label: str
+    browse_knowledge_label: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -489,6 +504,7 @@ class KnowledgeBaseProductSpec:
     visual: VisualConfig
     features: FeatureConfig
     route: RouteConfig
+    showcase_page: ShowcasePageConfig
     a11y: A11yConfig
     library: LibraryConfig
     preview: PreviewConfig
@@ -565,6 +581,7 @@ class KnowledgeBaseProject:
     visual_tokens: dict[str, str]
     features: FeatureConfig
     route: RouteConfig
+    showcase_page: ShowcasePageConfig
     a11y: A11yConfig
     library: LibraryConfig
     preview: PreviewConfig
@@ -600,6 +617,7 @@ class KnowledgeBaseProject:
         return {
             "home": self.route.home,
             "chat_home": self.route.workbench,
+            "basketball_showcase": self.route.basketball_showcase,
             "knowledge_list": self.route.knowledge_list,
             "knowledge_detail": f"{self.route.knowledge_detail}/{{knowledge_base_id}}",
             "document_detail": f"{self.route.document_detail_prefix}/{{document_id}}",
@@ -630,6 +648,7 @@ class KnowledgeBaseProject:
             },
             "features": self.features.to_dict(),
             "route": self.route.to_dict(),
+            "showcase_page": self.showcase_page.to_dict(),
             "a11y": self.a11y.to_dict(),
             "library": self.library.to_dict(),
             "preview": self.preview.to_dict(),
@@ -890,6 +909,7 @@ def _load_product_spec(product_spec_path: Path) -> KnowledgeBaseProductSpec:
     surface_copy_table = _require_table(surface_table, "copy")
     visual_table = _require_table(raw, "visual")
     route_table = _require_table(raw, "route")
+    showcase_page_table = _require_table(raw, "showcase_page")
     a11y_table = _require_table(raw, "a11y")
     library_table = _require_table(raw, "library")
     library_copy_table = _require_table(library_table, "copy")
@@ -959,10 +979,19 @@ def _load_product_spec(product_spec_path: Path) -> KnowledgeBaseProductSpec:
         route=RouteConfig(
             home=_require_string(route_table, "home"),
             workbench=_require_string(route_table, "workbench"),
+            basketball_showcase=_require_string(route_table, "basketball_showcase"),
             knowledge_list=_require_string(route_table, "knowledge_list"),
             knowledge_detail=_require_string(route_table, "knowledge_detail"),
             document_detail_prefix=_require_string(route_table, "document_detail_prefix"),
             api_prefix=_require_string(route_table, "api_prefix"),
+        ),
+        showcase_page=ShowcasePageConfig(
+            title=_require_string(showcase_page_table, "title"),
+            kicker=_require_string(showcase_page_table, "kicker"),
+            headline=_require_string(showcase_page_table, "headline"),
+            intro=_require_string(showcase_page_table, "intro"),
+            back_to_chat_label=_require_string(showcase_page_table, "back_to_chat_label"),
+            browse_knowledge_label=_require_string(showcase_page_table, "browse_knowledge_label"),
         ),
         a11y=A11yConfig(
             reading_order=_require_string_tuple(a11y_table, "reading_order"),
@@ -1167,6 +1196,7 @@ def _derive_copy(
 def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     knowledge_base_detail_path = f"{project.route.knowledge_detail}/{{knowledge_base_id}}"
     document_detail_path = f"{project.route.document_detail_prefix}/{{document_id}}"
+    basketball_showcase_path = project.route.basketball_showcase
     return {
         "derived_from": {
             "framework_modules": {
@@ -1193,7 +1223,7 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
             "id": project.surface.shell,
             "layout_variant": project.surface.layout_variant,
             "regions": ["conversation_sidebar", "chat_main", "citation_drawer"],
-            "secondary_pages": ["knowledge_list", "knowledge_detail", "document_detail"],
+            "secondary_pages": ["basketball_showcase", "knowledge_list", "knowledge_detail", "document_detail"],
             "default_page": "chat_home",
             "preview_mode": project.surface.preview_mode,
             "density": project.surface.density,
@@ -1215,6 +1245,16 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                     "knowledge_switch_dialog",
                 ],
                 "entry_state": "welcome_prompts",
+            },
+            "basketball_showcase": {
+                "path": basketball_showcase_path,
+                "title": project.showcase_page.title,
+                "kicker": project.showcase_page.kicker,
+                "headline": project.showcase_page.headline,
+                "intro": project.showcase_page.intro,
+                "back_to_chat_label": project.showcase_page.back_to_chat_label,
+                "browse_knowledge_label": project.showcase_page.browse_knowledge_label,
+                "slots": ["aux_sidebar", "page_header", "showcase_stage"],
             },
             "knowledge_list": {
                 "path": project.route.knowledge_list,
@@ -1253,11 +1293,13 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                 "actions": ["start_new_chat", "select_session", "open_knowledge_switch"],
                 "new_chat_label": "新建聊天",
                 "browse_knowledge_label": "浏览知识库与文档",
+                "basketball_showcase_label": project.showcase_page.title,
                 "knowledge_entry_label": f"知识库 · {project.library.knowledge_base_name}",
             },
             "aux_sidebar": {
                 "nav": {
                     "chat": "返回聊天",
+                    "basketball_showcase": project.showcase_page.title,
                     "knowledge_list": "知识库列表",
                     "knowledge_detail": "当前知识库详情",
                 },
@@ -1268,6 +1310,7 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                 "subtitle_template": "知识库 · {knowledge_base_name}",
                 "knowledge_badge_template": "基于：{knowledge_base_name}",
                 "knowledge_entry_link_label": "知识库入口",
+                "showcase_link_label": project.showcase_page.title,
             },
             "message_stream": {
                 "max_width": project.visual_tokens["message_width"],
@@ -1287,6 +1330,7 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
                 "citation_hint": "引用默认轻量展示，点击后打开来源抽屉",
                 "mode_label": "知识问答",
                 "knowledge_link_label": "查看知识库",
+                "showcase_link_label": project.showcase_page.title,
             },
             "citation_drawer": {
                 "title": project.copy["preview_title"],
@@ -1444,6 +1488,8 @@ def _validate_product_spec(
         raise ValueError("knowledge_base_workbench requires library, preview, chat, citations, and return")
     if not product_spec.route.home.startswith("/") or not product_spec.route.workbench.startswith("/"):
         raise ValueError("route.home and route.workbench must start with '/'")
+    if not product_spec.route.basketball_showcase.startswith("/"):
+        raise ValueError("route.basketball_showcase must start with '/'")
     if not product_spec.route.knowledge_list.startswith("/") or not product_spec.route.knowledge_detail.startswith("/"):
         raise ValueError("route.knowledge_list and route.knowledge_detail must start with '/'")
     if not product_spec.route.document_detail_prefix.startswith("/"):
@@ -1454,6 +1500,8 @@ def _validate_product_spec(
         raise ValueError("route.knowledge_detail must stay under route.knowledge_list")
     if not product_spec.route.document_detail_prefix.startswith(product_spec.route.knowledge_detail):
         raise ValueError("route.document_detail_prefix must stay under route.knowledge_detail")
+    if not product_spec.route.basketball_showcase.startswith(product_spec.route.workbench):
+        raise ValueError("route.basketball_showcase must stay under route.workbench")
     if not product_spec.library.knowledge_base_id.strip():
         raise ValueError("library.knowledge_base_id must be non-empty")
     if "markdown" not in product_spec.library.source_types:
@@ -1666,6 +1714,7 @@ def _compile_project(
         visual_tokens=_build_visual_tokens(product_spec.visual, product_spec.surface, product_spec.preview),
         features=product_spec.features,
         route=product_spec.route,
+        showcase_page=product_spec.showcase_page,
         a11y=product_spec.a11y,
         library=product_spec.library,
         preview=product_spec.preview,

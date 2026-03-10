@@ -56,6 +56,7 @@ class ProjectRuntimeTest(unittest.TestCase):
             DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE.resolve(),
         )
         self.assertIn("project", resolved_registration.product_spec_layout.required_top_level_keys)
+        self.assertIn("showcase_page", resolved_registration.product_spec_layout.required_top_level_keys)
         self.assertIn("frontend", resolved_registration.implementation_config_layout.required_top_level_keys)
 
     def test_load_default_product_spec(self) -> None:
@@ -64,6 +65,7 @@ class ProjectRuntimeTest(unittest.TestCase):
         self.assertEqual(project.metadata.project_id, "knowledge_base_basic")
         self.assertEqual(project.metadata.template, "knowledge_base_workbench")
         self.assertEqual(project.route.workbench, "/knowledge-base")
+        self.assertEqual(project.route.basketball_showcase, "/knowledge-base/cxk-basketball")
         self.assertEqual(project.route.knowledge_list, "/knowledge-bases")
         self.assertEqual(project.route.api_prefix, "/api/knowledge")
         self.assertEqual(project.surface.layout_variant, "chatgpt_knowledge_client")
@@ -85,6 +87,7 @@ class ProjectRuntimeTest(unittest.TestCase):
         product_spec = project.to_product_spec_dict()
         self.assertEqual(product_spec["product"]["project_id"], "knowledge_base_basic")
         self.assertEqual(product_spec["navigation"]["pages"]["chat_home"], "/knowledge-base")
+        self.assertEqual(product_spec["showcase_page"]["title"], "蔡徐坤打球特别页")
         self.assertNotIn("ui_spec", product_spec)
         self.assertNotIn("backend_spec", product_spec)
 
@@ -157,10 +160,19 @@ class ProjectRuntimeTest(unittest.TestCase):
             [route]
             home = "/"
             workbench = "/public-knowledge"
+            basketball_showcase = "/public-knowledge/cxk-basketball"
             knowledge_list = "/public-knowledge/bases"
             knowledge_detail = "/public-knowledge/bases/details"
             document_detail_prefix = "/public-knowledge/bases/details/documents"
             api_prefix = "/api/public-knowledge"
+
+            [showcase_page]
+            title = "Public Showcase"
+            kicker = "Public Highlight"
+            headline = "Public Basketball Showcase"
+            intro = "A lightweight themed page that still stays inside the same governed knowledge-base tree."
+            back_to_chat_label = "Back to chat"
+            browse_knowledge_label = "Browse knowledge bases"
 
             [a11y]
             reading_order = ["conversation_sidebar", "chat_header", "message_stream", "chat_composer", "citation_drawer"]
@@ -240,9 +252,11 @@ class ProjectRuntimeTest(unittest.TestCase):
             project = load_knowledge_base_project(product_spec_file)
             self.assertEqual(project.visual.brand, "Public KB")
             self.assertEqual(project.route.workbench, "/public-knowledge")
+            self.assertEqual(project.route.basketball_showcase, "/public-knowledge/cxk-basketball")
             self.assertEqual(project.route.knowledge_list, "/public-knowledge/bases")
             self.assertEqual(len(project.documents), 1)
             self.assertEqual(project.ui_spec["pages"]["chat_home"]["title"], "Knowledge Base Public")
+            self.assertEqual(project.ui_spec["pages"]["basketball_showcase"]["title"], "Public Showcase")
             self.assertEqual(
                 project.backend_spec["return_policy"]["document_detail_path"],
                 "/public-knowledge/bases/details/documents/{document_id}",
@@ -265,6 +279,10 @@ class ProjectRuntimeTest(unittest.TestCase):
             self.assertEqual(page_response.status_code, 200)
             self.assertIn("今天想了解什么？", page_response.text)
             self.assertIn("Knowledge Base Public", page_response.text)
+
+            showcase_response = client.get("/public-knowledge/cxk-basketball")
+            self.assertEqual(showcase_response.status_code, 200)
+            self.assertIn("Public Showcase", showcase_response.text)
 
             knowledge_base_response = client.get("/api/public-knowledge/knowledge-bases")
             self.assertEqual(knowledge_base_response.status_code, 200)
@@ -338,10 +356,19 @@ class ProjectRuntimeTest(unittest.TestCase):
             [route]
             home = "/"
             workbench = "/invalid"
+            basketball_showcase = "/invalid/cxk-basketball"
             knowledge_list = "/invalid/bases"
             knowledge_detail = "/invalid/bases/details"
             document_detail_prefix = "/invalid/bases/details/documents"
             api_prefix = "/api/invalid"
+
+            [showcase_page]
+            title = "Invalid Showcase"
+            kicker = "Invalid Highlight"
+            headline = "Invalid Basketball Showcase"
+            intro = "Even the invalid fixture must still declare the product-facing themed page."
+            back_to_chat_label = "Back to chat"
+            browse_knowledge_label = "Browse knowledge bases"
 
             [a11y]
             reading_order = ["conversation_sidebar", "chat_header", "message_stream", "chat_composer", "citation_drawer"]
