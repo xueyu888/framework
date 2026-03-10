@@ -85,33 +85,6 @@ REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS = (
 PROJECT_ALLOWED_TOP_LEVEL_DIRS = {"assets", "generated"}
 PROJECT_ALLOWED_ROOT_FILES = {"product_spec.toml", "implementation_config.toml"}
 PROJECT_ALLOWED_DOC_SUFFIXES = {".md"}
-PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS = {
-    "project",
-    "framework",
-    "surface",
-    "visual",
-    "route",
-    "a11y",
-    "library",
-    "preview",
-    "chat",
-    "context",
-    "return",
-    "documents",
-}
-PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS = set(PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS)
-PRODUCT_SPEC_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {
-    "surface": {"copy"},
-    "library": {"copy"},
-    "chat": {"copy"},
-}
-PRODUCT_SPEC_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {
-    key: set(value) for key, value in PRODUCT_SPEC_REQUIRED_NESTED_TABLES.items()
-}
-IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS = {"frontend", "backend", "evidence", "artifacts"}
-IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS = set(IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS)
-IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {}
-IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {}
 
 Issue = dict[str, Any]
 
@@ -122,6 +95,128 @@ class ParsedRegistry:
     level_files: dict[str, set[str]]
     impl_files: set[str]
     framework_layer_files: set[str]
+
+
+@dataclass(frozen=True)
+class ProjectTomlSchema:
+    required_top_level_keys: set[str]
+    allowed_top_level_keys: set[str]
+    required_nested_tables: dict[str, set[str]]
+    allowed_nested_tables: dict[str, set[str]]
+
+
+KNOWLEDGE_BASE_PRODUCT_SPEC_SCHEMA = ProjectTomlSchema(
+    required_top_level_keys={
+        "project",
+        "framework",
+        "surface",
+        "visual",
+        "route",
+        "a11y",
+        "library",
+        "preview",
+        "chat",
+        "context",
+        "return",
+        "documents",
+    },
+    allowed_top_level_keys={
+        "project",
+        "framework",
+        "surface",
+        "visual",
+        "route",
+        "a11y",
+        "library",
+        "preview",
+        "chat",
+        "context",
+        "return",
+        "documents",
+    },
+    required_nested_tables={
+        "surface": {"copy"},
+        "library": {"copy"},
+        "chat": {"copy"},
+    },
+    allowed_nested_tables={
+        "surface": {"copy"},
+        "library": {"copy"},
+        "chat": {"copy"},
+    },
+)
+KNOWLEDGE_BASE_IMPLEMENTATION_SCHEMA = ProjectTomlSchema(
+    required_top_level_keys={"frontend", "backend", "evidence", "artifacts"},
+    allowed_top_level_keys={"frontend", "backend", "evidence", "artifacts"},
+    required_nested_tables={},
+    allowed_nested_tables={},
+)
+AITRANS_PRODUCT_SPEC_SCHEMA = ProjectTomlSchema(
+    required_top_level_keys={
+        "project",
+        "framework",
+        "surface",
+        "visual",
+        "a11y",
+        "desktop",
+        "capture",
+        "pipeline",
+        "presentation",
+        "governance",
+    },
+    allowed_top_level_keys={
+        "project",
+        "framework",
+        "surface",
+        "visual",
+        "a11y",
+        "desktop",
+        "capture",
+        "pipeline",
+        "presentation",
+        "governance",
+    },
+    required_nested_tables={
+        "surface": {"copy"},
+        "presentation": {"copy"},
+    },
+    allowed_nested_tables={
+        "surface": {"copy"},
+        "presentation": {"copy"},
+    },
+)
+AITRANS_IMPLEMENTATION_SCHEMA = ProjectTomlSchema(
+    required_top_level_keys={
+        "desktop_runtime",
+        "capture_runtime",
+        "providers",
+        "presentation_runtime",
+        "release",
+        "evidence",
+        "artifacts",
+    },
+    allowed_top_level_keys={
+        "desktop_runtime",
+        "capture_runtime",
+        "providers",
+        "presentation_runtime",
+        "release",
+        "evidence",
+        "artifacts",
+    },
+    required_nested_tables={},
+    allowed_nested_tables={},
+)
+PROJECT_TEMPLATE_SCHEMAS: dict[str, dict[str, ProjectTomlSchema]] = {
+    "knowledge_base_workbench": {
+        "product_spec": KNOWLEDGE_BASE_PRODUCT_SPEC_SCHEMA,
+        "implementation_config": KNOWLEDGE_BASE_IMPLEMENTATION_SCHEMA,
+    },
+    "desktop_screenshot_translate": {
+        "product_spec": AITRANS_PRODUCT_SPEC_SCHEMA,
+        "implementation_config": AITRANS_IMPLEMENTATION_SCHEMA,
+    },
+}
 
 
 def make_issue(
@@ -374,6 +469,61 @@ def _validate_project_toml_layout(
     return issues
 
 
+def _load_project_template(file_path: Path) -> tuple[str | None, list[Issue]]:
+    issues: list[Issue] = []
+    rel_file = file_path.relative_to(REPO_ROOT).as_posix()
+    try:
+        _, data = _load_toml_text_and_data(file_path)
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"failed to parse product_spec.toml: {exc}",
+                rel_file,
+                1,
+                code="PROJECT_PRODUCT_SPEC_PARSE_FAILED",
+            )
+        )
+        return None, issues
+
+    project = data.get("project")
+    if not isinstance(project, dict):
+        issues.append(
+            make_issue(
+                "missing required product_spec.toml section or array: project",
+                rel_file,
+                1,
+                code="PROJECT_PRODUCT_SPEC_SECTION_MISSING",
+            )
+        )
+        return None, issues
+
+    template = project.get("template")
+    if not isinstance(template, str) or not template.strip():
+        issues.append(
+            make_issue(
+                "missing required project.template",
+                rel_file,
+                find_line(read_text(file_path), "[project]"),
+                code="PROJECT_TEMPLATE_MISSING",
+            )
+        )
+        return None, issues
+
+    template = template.strip()
+    if template not in PROJECT_TEMPLATE_SCHEMAS:
+        issues.append(
+            make_issue(
+                f"unsupported project template: {template}",
+                rel_file,
+                find_line(read_text(file_path), "template ="),
+                code="PROJECT_TEMPLATE_UNSUPPORTED",
+            )
+        )
+        return None, issues
+
+    return template, issues
+
+
 def validate_project_configuration_layout(product_spec_files: list[Path] | None = None) -> list[Issue]:
     issues: list[Issue] = []
     project_product_spec_files = product_spec_files or discover_project_product_spec_files()
@@ -381,13 +531,18 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
         return issues
 
     for product_spec_file in project_product_spec_files:
+        template, template_issues = _load_project_template(product_spec_file)
+        issues.extend(template_issues)
+        if template is None:
+            continue
+        product_schema = PROJECT_TEMPLATE_SCHEMAS[template]["product_spec"]
         issues.extend(
             _validate_project_toml_layout(
                 product_spec_file,
-                required_top_level_keys=PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS,
-                allowed_top_level_keys=PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS,
-                required_nested_tables=PRODUCT_SPEC_REQUIRED_NESTED_TABLES,
-                allowed_nested_tables=PRODUCT_SPEC_ALLOWED_NESTED_TABLES,
+                required_top_level_keys=product_schema.required_top_level_keys,
+                allowed_top_level_keys=product_schema.allowed_top_level_keys,
+                required_nested_tables=product_schema.required_nested_tables,
+                allowed_nested_tables=product_schema.allowed_nested_tables,
                 parse_error_code="PROJECT_PRODUCT_SPEC_PARSE_FAILED",
                 missing_section_code="PROJECT_PRODUCT_SPEC_SECTION_MISSING",
                 unknown_section_code="PROJECT_PRODUCT_SPEC_SECTION_UNKNOWN",
@@ -418,10 +573,10 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
         issues.extend(
             _validate_project_toml_layout(
                 implementation_config_file,
-                required_top_level_keys=IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS,
-                allowed_top_level_keys=IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS,
-                required_nested_tables=IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES,
-                allowed_nested_tables=IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES,
+                required_top_level_keys=PROJECT_TEMPLATE_SCHEMAS[template]["implementation_config"].required_top_level_keys,
+                allowed_top_level_keys=PROJECT_TEMPLATE_SCHEMAS[template]["implementation_config"].allowed_top_level_keys,
+                required_nested_tables=PROJECT_TEMPLATE_SCHEMAS[template]["implementation_config"].required_nested_tables,
+                allowed_nested_tables=PROJECT_TEMPLATE_SCHEMAS[template]["implementation_config"].allowed_nested_tables,
                 parse_error_code="PROJECT_IMPLEMENTATION_CONFIG_PARSE_FAILED",
                 missing_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_MISSING",
                 unknown_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_UNKNOWN",
@@ -444,7 +599,7 @@ def validate_project_generation_discipline(
     issues.extend(validate_project_configuration_layout(project_product_spec_files))
 
     try:
-        from project_runtime.knowledge_base import materialize_knowledge_base_project
+        from project_runtime.dispatcher import materialize_project
     except Exception as exc:
         issues.append(
             make_issue(
@@ -531,7 +686,7 @@ def validate_project_generation_discipline(
         try:
             with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
                 temp_generated_dir = Path(temp_dir) / "generated"
-                materialize_knowledge_base_project(product_spec_file, output_dir=temp_generated_dir)
+                materialize_project(product_spec_file, output_dir=temp_generated_dir)
                 for required_name in expected_generated_files:
                     actual_file = actual_generated_dir / required_name
                     expected_file = temp_generated_dir / required_name

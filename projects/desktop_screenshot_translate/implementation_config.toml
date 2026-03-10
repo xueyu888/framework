@@ -1,0 +1,68 @@
+# Implementation Config 只回答一件事：
+# 在不改写 product_spec.toml 已经确定的产品真相前提下，
+# 这个仓库准备如何把“桌面截图翻译工具”落到一条具体实现路径上。
+# 它可以选择桌面宿主、采集链、Provider 链和发布方式，
+# 但不能反过来改变用户入口、平台承诺、结果面板交互或产品时延目标。
+#
+# 当前文件同样作为人与 AI 讨论实现细化的入口，所以注释优先说明：
+# 1. 当前 section 细化的是哪类实现决定；
+# 2. 它如何服务既定产品真相；
+# 3. 哪些决定明确不该由这里冒充成“产品真相”。
+#
+# 当前阶段说明：
+# 这个实现配置面向“Windows MVP 优先”落地。
+# 这不是在改写产品层“最终支持 Windows / macOS”的真相，
+# 而是在同一产品真相下先选择一条 Windows 优先的实现与验证路径。
+
+# [desktop_runtime] 细化桌面宿主实现路径。
+# 它决定运行时和桥接方式，不改写产品层已经承诺的托盘/快捷键/悬浮面板体验。
+[desktop_runtime]
+host = "electron"
+shell_profile = "electron_windows_tray_overlay_v1"
+preload_bridge = "context_isolated_ipc"
+window_state_store = "local_json"
+
+# [capture_runtime] 细化截图采集链。
+# 它决定屏幕帧获取、位图中转和坐标补偿实现，不改变产品层截图模式和交互真相。
+[capture_runtime]
+frame_source = "desktop_capturer"
+bitmap_pipeline = "native_image_png"
+coordinate_profile = "windows_per_monitor_dpi_compensation"
+
+# [providers] 细化 OCR / 翻译提供方与密钥来源。
+# 这里负责“怎么实现 provider 切换与 secrets 接入”，
+# 不负责决定用户最终看到哪些字段和交互动作。
+[providers]
+ocr_chain = ["windows_ocr_api", "tesseract"]
+translation_chain = ["openai_translation", "fallback_stub"]
+source_language_detection = "provider_auto"
+secret_source = "windows_credential_manager_or_env"
+
+# [presentation_runtime] 细化结果面板与系统剪贴板实现。
+# 它决定浮层渲染方案，不改变产品层动作集合和面板语义。
+[presentation_runtime]
+renderer = "floating_panel_html_v1"
+overlay_profile = "frameless_transparent_always_on_top"
+clipboard_bridge = "native_clipboard"
+
+# [release] 细化打包与更新路径。
+# 它决定发布产物和自动更新策略，但不能更改产品层兼容矩阵与更新通道的语义。
+[release]
+targets = ["win-x64", "darwin-universal"]
+package_formats = ["nsis", "dmg"]
+auto_update = true
+channel = "stable"
+
+# [evidence] 细化实现层证据出口。
+# 这些路径用于调试、验证和自动化消费，不属于产品真相本身。
+[evidence]
+product_spec_endpoint = "/api/aitrans/product-spec"
+runtime_bundle_endpoint = "/api/aitrans/runtime-bundle"
+
+# [artifacts] 约定生成产物命名。
+# 这些文件都应由生成器物化，不允许人工手改。
+[artifacts]
+framework_ir_json = "framework_ir.json"
+product_spec_json = "product_spec.json"
+implementation_bundle_py = "implementation_bundle.py"
+generation_manifest_json = "generation_manifest.json"

@@ -1,0 +1,304 @@
+# desktop_screenshot_translate Windows MVP 实施方案
+
+## 1. 文档定位
+
+本文件不是新的框架文档，也不改写 `framework/aitrans/*.md` 的共同结构语言。
+
+它只负责回答一件事：
+
+在已经确定的 `Framework -> Product Spec -> Implementation Config` 前提下，
+这个具体项目如何优先落地 `Windows MVP`。
+
+因此它属于项目层实施文档，服务于：
+
+- 下一阶段开发排序
+- 目录与模块映射
+- Windows / WSL 双环境分工
+- 里程碑与验收口径
+
+## 2. 当前前提
+
+已固定的上游输入：
+
+- Framework：
+  - `framework/aitrans/L3-M0-桌面截图翻译框架.md`
+  - `framework/frontend/L2-M0-前端框架标准模块.md`
+  - `framework/runtime_env/L0-M0-运行环境识别模块.md`
+- Product Spec：
+  - `projects/desktop_screenshot_translate/product_spec.toml`
+- Implementation Config：
+  - `projects/desktop_screenshot_translate/implementation_config.toml`
+
+当前不再继续压框架，除非真实落地时发现现有框架无法表达新的跨实例稳定共同结构。
+
+## 3. MVP 目标
+
+Windows MVP 的交付目标只定义最小闭环，不追求一次做完最终产品。
+
+必须交付：
+
+1. 用户可以通过托盘或全局快捷键进入截图。
+2. 用户可以在 Windows 桌面上拖选一个区域完成截图。
+3. 截图结果可以进入 OCR 与翻译主链。
+4. 译文可以在悬浮结果面板中展示。
+5. 结果面板至少支持：
+   - 复制译文
+   - 关闭面板
+   - 重新截图
+6. 主链关键事件可以被记录并追踪问题。
+
+暂不作为 MVP 必须项：
+
+- 自动更新完整闭环
+- macOS 实机对齐
+- 复杂排版还原
+- 术语表、历史记录、多任务列表
+- 本地离线高质量翻译模型
+
+## 4. 环境分工
+
+当前开发环境是 `Windows + WSL`。
+
+这意味着职责必须拆开：
+
+### 4.1 WSL 负责
+
+- 仓库文档、框架、项目配置维护
+- Python 生成器与校验器
+- 纯逻辑代码与单元测试
+- `uv` 环境、严格映射、物化、类型检查
+
+### 4.2 Windows 原生环境负责
+
+- Electron 主进程运行
+- 托盘、全局快捷键、窗口、浮层
+- Windows 截图链联调
+- 原生 OCR / 剪贴板 / 凭据管理接线
+- Windows 安装包生成与实际验证
+
+### 4.3 结论
+
+WSL 是“规范与生成链开发环境”，不是最终的 Windows 桌面运行环境。
+
+因此 Windows MVP 的真实联调、截图、快捷键、悬浮窗和打包，必须在 Windows 侧完成。
+
+## 5. 实现路线
+
+当前建议路线：
+
+- 桌面宿主：`Electron`
+- 应用分层：`Electron shell + Python sidecar`
+
+原因：
+
+- 当前仓库已经有 `uv`、Python 生成链、项目运行时和校验器
+- Electron 更适合先打通 Windows 托盘、全局快捷键、悬浮窗和截图主链
+- Python sidecar 可继续承接配置解析、生成物消费、部分 OCR / 翻译编排与证据输出
+
+这里的关键约束是：
+
+- Electron 不能绕开 `projects/desktop_screenshot_translate/*`
+- 桌面应用行为必须仍由 `framework + product_spec + implementation_config` 驱动
+- 不能把真实产品真相偷偷移回代码硬编码
+
+## 6. 目录建议
+
+建议新增真实实现目录：
+
+- `apps/desktop_screenshot_translate/`
+
+建议分层：
+
+- `apps/desktop_screenshot_translate/electron/`
+  - `main/`：托盘、快捷键、窗口、IPC 注册
+  - `preload/`：受限桥接
+  - `renderer/`：截图遮罩页、结果面板页
+- `apps/desktop_screenshot_translate/python_sidecar/`
+  - `service/`：项目加载、配置装配、OCR/翻译编排
+  - `adapters/`：provider 适配
+  - `contracts/`：Electron <-> Python 的请求响应契约
+
+说明：
+
+- `projects/*` 继续放产品真相与实现细化
+- `generated/*` 继续放编译产物
+- `apps/*` 才是接下来的真实实现代码落点
+
+## 7. 框架到实现的映射
+
+### 7.1 L2-M0 桌面宿主层
+
+落地到：
+
+- Electron tray
+- globalShortcut
+- BrowserWindow 生命周期
+- 权限检测与引导
+
+### 7.2 L2-M1 截图交互层
+
+落地到：
+
+- 全屏透明遮罩窗口
+- 鼠标拖选区域
+- 多屏坐标换算
+- 截图位图裁剪与标准化
+
+### 7.3 L2-M2 识别翻译层
+
+落地到：
+
+- Python sidecar 任务入口
+- OCR provider 适配
+- translation provider 适配
+- timeout / retry / fallback
+
+### 7.4 L2-M3 结果展示层
+
+落地到：
+
+- 悬浮结果面板
+- 原文 / 译文 / 状态展示
+- copy / close / recapture
+
+### 7.5 L2-M4 运行治理层
+
+落地到：
+
+- IPC 白名单
+- 配置装配
+- 审计与观测
+- release / auto-update 接入点
+
+## 8. 分阶段计划
+
+### 阶段 1：Windows 桌面壳可运行
+
+目标：
+
+- Electron 应用可在 Windows 上启动
+- 托盘可见
+- 全局快捷键可注册
+- 可以打开截图遮罩窗口和结果面板 stub
+
+验收：
+
+- 按快捷键能拉起截图遮罩
+- 点击托盘菜单也能触发同一路径
+- 面板能显示假数据
+
+### 阶段 2：截图链打通
+
+目标：
+
+- 在 Windows 上完成真实区域截图
+- 输出标准位图对象
+- 完成多屏与 DPI 校正
+
+验收：
+
+- 单屏与双屏都能正确选区
+- 高分屏下裁剪区域不偏移
+- 取消截图不会留下脏窗口
+
+### 阶段 3：OCR + 翻译主链打通
+
+目标：
+
+- 截图结果送入 Python sidecar
+- 先完成 OCR
+- 再完成翻译
+- 失败时显示状态和错误来源
+
+验收：
+
+- 正常图片能得到原文与译文
+- OCR / 翻译失败时有确定性结果
+- 超时后能回退或报错
+
+### 阶段 4：结果交付面稳定
+
+目标：
+
+- 悬浮面板展示原文 / 译文 / 状态
+- 复制、关闭、重新截图动作稳定
+
+验收：
+
+- 复制动作成功率稳定
+- 关闭不影响下一次截图
+- 重新截图可以复用主链
+
+### 阶段 5：治理与发布
+
+目标：
+
+- 审计与观测事件补齐
+- 配置与 secrets 接入稳定
+- Windows 安装包可生成
+
+验收：
+
+- 关键事件有记录
+- secrets 不直接暴露在 renderer
+- 能产出 Windows 安装包
+
+## 9. 第一批必须落的代码
+
+优先实现：
+
+1. `apps/desktop_screenshot_translate/electron/main/`
+   - 托盘入口
+   - 全局快捷键
+   - 窗口管理器
+2. `apps/desktop_screenshot_translate/electron/renderer/overlay`
+   - 截图遮罩页
+   - 拖选交互
+3. `apps/desktop_screenshot_translate/electron/renderer/panel`
+   - 结果面板页
+   - 假数据渲染
+4. `apps/desktop_screenshot_translate/python_sidecar/service`
+   - 读取 `generated/implementation_bundle.py`
+   - 暴露 OCR / 翻译任务入口
+5. `apps/desktop_screenshot_translate/contracts`
+   - capture request / result
+   - translate request / result
+
+## 10. 当前技术决定
+
+本阶段默认采用：
+
+- 宿主：`Electron`
+- Windows 截图链：`desktopCapturer + overlay selection`
+- Windows OCR 首选：`windows_ocr_api`
+- OCR fallback：`tesseract`
+- 翻译首选：`openai_translation`
+- 结果面板：`frameless_transparent_always_on_top`
+- 密钥来源：`windows_credential_manager_or_env`
+
+这些决定已经同步到了 `implementation_config.toml`，但仍属于可替换的实现路径，不是框架定义。
+
+## 11. 风险与注意项
+
+### 11.1 WSL 与 Windows 路径切换
+
+- 代码可以在 WSL 编辑
+- 但 Electron 真正运行时必须在 Windows 工具链中验证
+- 不应把 GUI 联调完全押在 WSL 上
+
+### 11.2 截图与 DPI
+
+Windows 多屏与 DPI 是 MVP 的高风险点，必须尽早验证，不要拖到 OCR 后再处理。
+
+### 11.3 Provider 不可用
+
+OCR 与翻译 provider 必须允许 stub / fallback，否则主链联调会被外部依赖卡死。
+
+## 12. 下一步动作
+
+下一会话如果继续实现，建议直接开始：
+
+1. 新建 `apps/desktop_screenshot_translate/` 目录骨架
+2. 先完成 Electron Windows 壳
+3. 再完成截图遮罩与 stub 结果面板
+4. 然后接入 Python sidecar 和真实 OCR / 翻译链

@@ -1,0 +1,144 @@
+# Product Spec 只回答一件事：这个桌面截图翻译工具最终应该是什么。
+# 这里定义的是用户实际会体验到的产品真相：
+# 如何触发截图、翻译结果以什么形式出现、支持哪些平台与交互闭环。
+# 它不决定 Electron / Tauri、OCR SDK、翻译服务或打包方案，这些属于 implementation_config.toml。
+#
+# 当前文件默认作为人与 AI 讨论该产品的主入口，所以注释优先讲清楚：
+# 1. 当前 section 固定了哪一层产品真相；
+# 2. 它和 framework / implementation config 的边界在哪里；
+# 3. 哪些决定必须留给实现层，不应在这里偷渡。
+
+# [project] 固定这个实例化产品的稳定身份。
+# 这里回答“它叫什么、对外是什么产品、版本如何被识别”，
+# 不回答生成目录怎么命名、代码怎么组织。
+[project]
+project_id = "desktop_screenshot_translate"
+template = "desktop_screenshot_translate"
+display_name = "ArchSync 截图翻译"
+description = "A desktop screenshot translation tool compiled from framework standards, one product truth, and one implementation path."
+version = "0.1.0"
+
+# [framework] 声明这个产品实例依附于哪些共同结构语言。
+# frontend 约束可见界面壳体与交互边界；
+# domain 约束截图翻译主链；
+# runtime 约束运行环境识别边界。
+# 这里写的是框架来源，不是实现库名字。
+[framework]
+frontend = "framework/frontend/L2-M0-前端框架标准模块.md"
+domain = "framework/aitrans/L3-M0-桌面截图翻译框架.md"
+runtime = "framework/runtime_env/L0-M0-运行环境识别模块.md"
+preset = "desktop_capture_translate_panel"
+
+# [surface] 固定用户首先感知到的产品壳体。
+# 它描述“从哪里进入、结果怎样出现、整体呈现形态是什么”，
+# 但不涉及某个前端组件树或桌面窗口库。
+[surface]
+shell = "tray_hotkey_capture_overlay"
+layout_variant = "single_result_floating_panel"
+entry_mode = "tray_and_shortcut"
+result_mode = "floating_panel"
+density = "comfortable"
+
+# [surface.copy] 收纳壳体直接向用户说出的文案。
+# 这些文案会塑造用户对“这是不是一个一键截图翻译工具”的第一认知。
+[surface.copy]
+app_name = "ArchSync 截图翻译"
+tagline = "截一块，立刻看到译文"
+capture_hint = "按下截图快捷键后拖选区域，松开即可开始识别和翻译。"
+empty_title = "准备截图"
+empty_copy = "从托盘或全局快捷键开始，拖选一个区域后自动输出译文。"
+processing_title = "正在翻译"
+processing_copy = "正在识别文字并生成译文，结果会在悬浮面板中出现。"
+
+# [visual] 固定视觉语义，而不是实现 token。
+# 这里讨论的是产品气质、明暗、圆角和视觉密度，不直接写 CSS 或设计工具导出值。
+[visual]
+brand = "ArchSync"
+accent = "#0f766e"
+surface_preset = "mist"
+radius_scale = "lg"
+shadow_level = "md"
+font_scale = "md"
+
+# [a11y] 固定产品层的可访问体验。
+# 这里定义键盘主路径、阅读顺序和状态播报，不下沉到具体 aria 实现。
+[a11y]
+reading_order = ["tray_entry", "capture_overlay", "result_actions", "source_text", "translated_text"]
+keyboard_nav = ["start-capture", "cancel-capture", "copy-translation", "retry-translation", "close-panel"]
+announcements = ["capture started", "capture cancelled", "translation ready", "translation failed"]
+
+# [desktop] 固定桌面产品真相。
+# 这一段定义用户可见的平台承诺、入口方式和权限降级体验，
+# 但不决定具体运行时、权限 API 或窗口实现库。
+[desktop]
+platforms = ["windows", "macos"]
+entry_points = ["tray", "global_shortcut"]
+single_instance = true
+permissions = ["screen_recording", "accessibility"]
+degrade_policy = "permission_guided_downgrade"
+hotkey_behavior = "rebindable"
+window_strategy = "hidden_shell_plus_overlay_panel"
+focus_restore = true
+
+# [capture] 固定截图体验真相。
+# 这里回答用户如何框选、如何取消、是否支持多屏和高分屏；
+# 不决定底层走哪个屏幕采集 API。
+[capture]
+modes = ["region", "fullscreen"]
+selection_shape = "rectangle"
+cancel_methods = ["esc", "right_click"]
+include_cursor = false
+multi_display = true
+high_dpi = true
+session_policy = "one_capture_one_session"
+image_format = "png_bitmap"
+
+# [pipeline] 固定识别翻译链路对用户承诺的结果语义。
+# 这里定义目标语言、交付字段、回退策略和总时延预算；
+# 不定义具体 OCR / 翻译 provider 名字。
+[pipeline]
+source_languages = ["auto", "zh", "en", "ja"]
+target_language = "zh-Hans"
+deliverables = ["source_text", "translated_text", "source_language", "stage_status", "error_origin"]
+fallback_policy = "retry_then_switch_provider"
+timeout_budget_ms = 5000
+latency_budget_p95_ms = 4500
+ocr_confidence_visible = false
+
+# [presentation] 固定结果交付面真相。
+# 它回答结果面板默认展示什么、有哪些动作、是否允许拖拽与关闭；
+# 不决定窗口类、DOM 结构或 CSS 布局细节。
+[presentation]
+panel_variant = "floating_compact_dual_column"
+show_source_text = true
+show_translated_text = true
+show_status = true
+show_error_reason = true
+default_pinned = false
+actions = ["copy_translation", "retry_translation", "close_panel", "recapture"]
+auto_hide = "manual_only"
+
+# [presentation.copy] 收纳结果面板上的直接文案。
+# 如果动作不变但提示语要调整，应优先改这里而不是混进实现层。
+[presentation.copy]
+copy_success = "译文已复制"
+retry_label = "重试翻译"
+close_label = "关闭"
+recapture_label = "重新截图"
+failure_title = "翻译失败"
+empty_translation = "未识别到可翻译文本"
+
+# [governance] 固定产品层可感知的治理真相。
+# 这里定义隐私姿态、更新通道、兼容矩阵和性能预算；
+# 但不定义日志 SDK、更新服务或密钥存放实现。
+[governance]
+event_scope = ["capture", "ocr", "translation", "render", "release"]
+audit_fields = ["capture_session_id", "task_id", "provider", "result_state"]
+privacy_mode = "sensitive_text_not_persisted_by_default"
+update_channel = "stable"
+compat_matrix = ["windows-11+", "macos-13+"]
+offline_policy = "allow_local_capture_and_local_ocr_only"
+capture_p95_ms = 120
+ocr_p95_ms = 2200
+translation_p95_ms = 1800
+render_p95_ms = 300

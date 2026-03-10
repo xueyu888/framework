@@ -50,3 +50,12 @@
     - `generated/product_spec.json`
     - `generated/implementation_bundle.py`
     - `generated/generation_manifest.json`
+- `desktop_screenshot_translate`
+  - Product Spec：[product_spec.toml](./desktop_screenshot_translate/product_spec.toml)
+  - Implementation Config：[implementation_config.toml](./desktop_screenshot_translate/implementation_config.toml)
+  - 严格映射基线：[框架严格映射基线.md](./desktop_screenshot_translate/框架严格映射基线.md)
+  - 生成产物：
+    - `generated/framework_ir.json`
+    - `generated/product_spec.json`
+    - `generated/implementation_bundle.py`
+    - `generated/generation_manifest.json`
