@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GOVERNANCE_MANIFEST_VERSION = "governance-manifest/v1"
+GOVERNANCE_TREE_VERSION = "governance-tree/v1"
 GOVERNANCE_GENERATOR_VERSION = "project_runtime.governance/v1"
 
 ANNOTATION_LINE_PATTERN = re.compile(r"^\s*#\s*@governed_symbol\s+(.*)$")
@@ -98,6 +99,29 @@ def _relative(path: Path | str) -> str:
         except ValueError:
             return str(candidate)
     return candidate.as_posix()
+
+
+def _expected_generated_artifact_paths(project: KnowledgeBaseProject) -> dict[str, str]:
+    if project.generated_artifacts is not None:
+        return {
+            "framework_ir_json": project.generated_artifacts.framework_ir_json,
+            "product_spec_json": project.generated_artifacts.product_spec_json,
+            "implementation_bundle_py": project.generated_artifacts.implementation_bundle_py,
+            "generation_manifest_json": project.generated_artifacts.generation_manifest_json,
+            "governance_manifest_json": project.generated_artifacts.governance_manifest_json,
+            "governance_tree_json": project.generated_artifacts.governance_tree_json,
+        }
+
+    generated_dir = Path(project.product_spec_file).parent / "generated"
+    artifact_names = project.implementation.artifacts
+    return {
+        "framework_ir_json": _relative(generated_dir / artifact_names.framework_ir_json),
+        "product_spec_json": _relative(generated_dir / artifact_names.product_spec_json),
+        "implementation_bundle_py": _relative(generated_dir / artifact_names.implementation_bundle_py),
+        "generation_manifest_json": _relative(generated_dir / artifact_names.generation_manifest_json),
+        "governance_manifest_json": _relative(generated_dir / artifact_names.governance_manifest_json),
+        "governance_tree_json": _relative(generated_dir / artifact_names.governance_tree_json),
+    }
 
 
 def _metadata_pairs(fragment: str) -> dict[str, str]:
@@ -1145,7 +1169,7 @@ def governed_files_for_project(project: KnowledgeBaseProject) -> list[str]:
     return sorted(files)
 
 
-def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
+def _build_governance_snapshot(project: KnowledgeBaseProject) -> dict[str, Any]:
     definitions = _definitions(project)
     bindings_by_symbol = collect_governed_bindings(governed_files_for_project(project))
     binding_issues = _binding_validation_issues(bindings_by_symbol, definitions)
@@ -1208,11 +1232,212 @@ def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
         for (layer, file_name, ref_kind, ref_id), digest in sorted(upstream_closure.items())
     ]
     return {
+        "definitions": definitions,
+        "symbols": symbols,
+        "upstream_closure": closure_items,
+    }
+
+
+def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
+    snapshot = _build_governance_snapshot(project)
+    return {
         "manifest_version": GOVERNANCE_MANIFEST_VERSION,
         "project_id": project.metadata.project_id,
         "generator_version": GOVERNANCE_GENERATOR_VERSION,
-        "upstream_closure": closure_items,
-        "symbols": symbols,
+        "upstream_closure": snapshot["upstream_closure"],
+        "symbols": snapshot["symbols"],
+    }
+
+
+def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
+    snapshot = _build_governance_snapshot(project)
+    project_root_id = f"project:{project.metadata.project_id}"
+    framework_root_id = f"{project_root_id}:framework"
+    product_root_id = f"{project_root_id}:product_spec"
+    implementation_root_id = f"{project_root_id}:implementation_config"
+    code_root_id = f"{project_root_id}:code"
+    evidence_root_id = f"{project_root_id}:evidence"
+
+    nodes: dict[str, dict[str, Any]] = {}
+
+    def add_node(node_id: str, *, parent: str | None, **payload: Any) -> dict[str, Any]:
+        existing = nodes.get(node_id)
+        if existing is None:
+            existing = {
+                "node_id": node_id,
+                "parent": parent,
+                "children": [],
+            }
+            existing.update(payload)
+            nodes[node_id] = existing
+        if parent is not None and parent in nodes and node_id not in nodes[parent]["children"]:
+            nodes[parent]["children"].append(node_id)
+        return existing
+
+    add_node(
+        project_root_id,
+        parent=None,
+        kind="project_root",
+        layer="Project",
+        title=project.metadata.display_name,
+        file=project.product_spec_file,
+    )
+    add_node(framework_root_id, parent=project_root_id, kind="framework_root", layer="Framework", title="Framework")
+    add_node(product_root_id, parent=project_root_id, kind="product_root", layer="Product Spec", title="Product Spec")
+    add_node(
+        implementation_root_id,
+        parent=project_root_id,
+        kind="implementation_root",
+        layer="Implementation Config",
+        title="Implementation Config",
+    )
+    add_node(code_root_id, parent=project_root_id, kind="code_root", layer="Code", title="Code")
+    add_node(evidence_root_id, parent=project_root_id, kind="evidence_root", layer="Evidence", title="Evidence")
+
+    framework_modules: dict[str, FrameworkModuleIR] = {}
+    for item in snapshot["upstream_closure"]:
+        layer = str(item["layer"])
+        file_name = str(item["file"])
+        ref_kind = str(item["ref_kind"])
+        ref_id = str(item["ref_id"])
+        digest = str(item["digest"])
+        if layer == "framework":
+            module = framework_modules.get(file_name)
+            if module is None:
+                module = parse_framework_module(REPO_ROOT / file_name)
+                framework_modules[file_name] = module
+            module_node_id = f"{framework_root_id}:module:{module.module_id}"
+            add_node(
+                module_node_id,
+                parent=framework_root_id,
+                kind="framework_module",
+                layer="Framework",
+                title=module.module_id,
+                file=file_name,
+            )
+            rule_node_id = f"{module_node_id}:rule:{ref_id}"
+            add_node(
+                rule_node_id,
+                parent=module_node_id,
+                kind="framework_rule",
+                layer="Framework",
+                title=ref_id,
+                file=file_name,
+                ref_kind=ref_kind,
+                ref_id=ref_id,
+                digest=digest,
+            )
+            continue
+        if layer == "product_spec":
+            file_node_id = f"{product_root_id}:file:{file_name}"
+            add_node(
+                file_node_id,
+                parent=product_root_id,
+                kind="product_file",
+                layer="Product Spec",
+                title=Path(file_name).name,
+                file=file_name,
+            )
+            section_node_id = f"{file_node_id}:section:{ref_id}"
+            add_node(
+                section_node_id,
+                parent=file_node_id,
+                kind="product_section",
+                layer="Product Spec",
+                title=ref_id,
+                file=file_name,
+                ref_kind=ref_kind,
+                ref_id=ref_id,
+                digest=digest,
+            )
+            continue
+        if layer == "implementation_config":
+            file_node_id = f"{implementation_root_id}:file:{file_name}"
+            add_node(
+                file_node_id,
+                parent=implementation_root_id,
+                kind="implementation_file",
+                layer="Implementation Config",
+                title=Path(file_name).name,
+                file=file_name,
+            )
+            section_node_id = f"{file_node_id}:section:{ref_id}"
+            add_node(
+                section_node_id,
+                parent=file_node_id,
+                kind="implementation_section",
+                layer="Implementation Config",
+                title=ref_id,
+                file=file_name,
+                ref_kind=ref_kind,
+                ref_id=ref_id,
+                digest=digest,
+            )
+
+    for symbol in snapshot["symbols"]:
+        symbol_id = str(symbol["symbol_id"])
+        upstream_node_ids: list[str] = []
+        for ref in symbol["upstream_refs"]:
+            ref_layer = str(ref["layer"])
+            ref_file = str(ref["file"])
+            ref_id = str(ref["ref_id"])
+            if ref_layer == "framework":
+                module = framework_modules.get(ref_file)
+                if module is None:
+                    module = parse_framework_module(REPO_ROOT / ref_file)
+                    framework_modules[ref_file] = module
+                upstream_node_ids.append(f"{framework_root_id}:module:{module.module_id}:rule:{ref_id}")
+            elif ref_layer == "product_spec":
+                upstream_node_ids.append(f"{product_root_id}:file:{ref_file}:section:{ref_id}")
+            elif ref_layer == "implementation_config":
+                upstream_node_ids.append(f"{implementation_root_id}:file:{ref_file}:section:{ref_id}")
+        primary_binding = symbol["bindings"][0] if symbol["bindings"] else {}
+        add_node(
+            f"{code_root_id}:symbol:{symbol_id}",
+            parent=code_root_id,
+            kind="code_symbol",
+            layer="Code",
+            title=symbol_id,
+            symbol_id=symbol_id,
+            owner=symbol["owner"],
+            symbol_kind=symbol["kind"],
+            risk=symbol["risk"],
+            file=primary_binding.get("file"),
+            locator=primary_binding.get("locator"),
+            bindings=symbol["bindings"],
+            derived_from=upstream_node_ids,
+            validator="governed_symbol_compare",
+            expected=symbol["expected"],
+        )
+
+    generated_paths = _expected_generated_artifact_paths(project)
+    evidence_dependencies = {
+        "framework_ir_json": [framework_root_id],
+        "product_spec_json": [product_root_id],
+        "implementation_bundle_py": [framework_root_id, product_root_id, implementation_root_id, code_root_id],
+        "generation_manifest_json": [project_root_id],
+        "governance_manifest_json": [framework_root_id, product_root_id, implementation_root_id, code_root_id],
+        "governance_tree_json": [project_root_id],
+    }
+    for artifact_key, rel_path in generated_paths.items():
+        add_node(
+            f"{evidence_root_id}:artifact:{artifact_key}",
+            parent=evidence_root_id,
+            kind="evidence_artifact",
+            layer="Evidence",
+            title=artifact_key,
+            artifact=artifact_key,
+            file=rel_path,
+            derived_from=evidence_dependencies.get(artifact_key, [project_root_id]),
+        )
+
+    return {
+        "tree_version": GOVERNANCE_TREE_VERSION,
+        "project_id": project.metadata.project_id,
+        "generator_version": GOVERNANCE_GENERATOR_VERSION,
+        "root_node_id": project_root_id,
+        "upstream_closure": snapshot["upstream_closure"],
+        "nodes": [nodes[node_id] for node_id in sorted(nodes)],
     }
 
 
@@ -1262,6 +1487,21 @@ def parse_governance_manifest(path: Path) -> dict[str, Any]:
     return payload
 
 
+def parse_governance_tree(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("governance tree must decode into object")
+    if payload.get("tree_version") != GOVERNANCE_TREE_VERSION:
+        raise ValueError(f"unsupported governance tree version: {payload.get('tree_version')}")
+    if not isinstance(payload.get("root_node_id"), str) or not payload.get("root_node_id"):
+        raise ValueError("governance tree missing root_node_id")
+    if not isinstance(payload.get("nodes"), list):
+        raise ValueError("governance tree missing nodes list")
+    if not isinstance(payload.get("upstream_closure"), list):
+        raise ValueError("governance tree missing upstream_closure list")
+    return payload
+
+
 def validate_manifest_closure(payload: dict[str, Any]) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     for item in payload.get("upstream_closure", []):
@@ -1298,6 +1538,134 @@ def validate_manifest_closure(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "ref": ref.to_manifest_dict(),
             }
         )
+    return issues
+
+
+def _tree_node_index(payload: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    issues: list[dict[str, Any]] = []
+    node_index: dict[str, dict[str, Any]] = {}
+    for entry in payload.get("nodes", []):
+        if not isinstance(entry, dict):
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": "governance tree node entry must be an object",
+                    "file": "",
+                    "line": 1,
+                }
+            )
+            continue
+        node_id = str(entry.get("node_id") or "").strip()
+        if not node_id:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": "governance tree node entry is missing node_id",
+                    "file": "",
+                    "line": 1,
+                }
+            )
+            continue
+        if node_id in node_index:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"duplicate governance tree node entry: {node_id}",
+                    "file": "",
+                    "line": 1,
+                    "node_id": node_id,
+                }
+            )
+            continue
+        node_index[node_id] = entry
+    return node_index, issues
+
+
+def validate_tree_closure(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    node_index, node_issues = _tree_node_index(payload)
+    issues.extend(node_issues)
+    root_node_id = str(payload.get("root_node_id") or "").strip()
+    if not root_node_id:
+        issues.append(
+            {
+                "code": "GOVERNANCE_TREE_INVALID",
+                "message": "governance tree is missing root_node_id",
+                "file": "",
+                "line": 1,
+            }
+        )
+    elif root_node_id not in node_index:
+        issues.append(
+            {
+                "code": "GOVERNANCE_TREE_INVALID",
+                "message": f"governance tree root node does not exist: {root_node_id}",
+                "file": "",
+                "line": 1,
+                "node_id": root_node_id,
+            }
+        )
+    else:
+        if node_index[root_node_id].get("parent") is not None:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": "governance tree root node must not have a parent",
+                    "file": "",
+                    "line": 1,
+                    "node_id": root_node_id,
+                }
+            )
+    for node_id, node in node_index.items():
+        children = node.get("children")
+        if not isinstance(children, list):
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree node must define children list: {node_id}",
+                    "file": "",
+                    "line": 1,
+                    "node_id": node_id,
+                }
+            )
+            children = []
+        parent = node.get("parent")
+        if parent is not None and parent not in node_index:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree node references missing parent: {node_id} -> {parent}",
+                    "file": "",
+                    "line": 1,
+                    "node_id": node_id,
+                }
+            )
+        for child_id in children:
+            if child_id not in node_index:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": f"governance tree node references missing child: {node_id} -> {child_id}",
+                        "file": "",
+                        "line": 1,
+                        "node_id": node_id,
+                    }
+                )
+                continue
+            if node_index[child_id].get("parent") != node_id:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": (
+                            f"governance tree parent/child relationship is inconsistent: "
+                            f"{node_id} -> {child_id}"
+                        ),
+                        "file": "",
+                        "line": 1,
+                        "node_id": node_id,
+                    }
+                )
+    issues.extend(validate_manifest_closure(payload))
     return issues
 
 
@@ -1381,6 +1749,243 @@ def compare_project_to_manifest(project: KnowledgeBaseProject, payload: dict[str
         actual_evidence = definition.actual_extractor(project)
         actual_fingerprint = _fingerprint(actual_evidence)
         expected = symbol.get("expected", {})
+        if expected.get("fingerprint") == actual_fingerprint:
+            continue
+        issues.append(
+            {
+                "code": "EXPECTATION_MISMATCH",
+                "message": f"governed symbol no longer matches derived expectation: {symbol_id}",
+                "file": definition.required_bindings[0][0],
+                "line": 1,
+                "symbol_id": symbol_id,
+                "owner": definition.owner,
+                "kind": definition.kind,
+                "expected": expected.get("evidence"),
+                "actual": actual_evidence,
+            }
+        )
+    for item in find_unbound_high_risk_structures():
+        issues.append(
+            {
+                "code": "MISSING_BINDING",
+                "message": item["message"],
+                "file": item["file"],
+                "line": item["line"],
+                "locator": item["locator"],
+            }
+        )
+    return issues
+
+
+def compare_project_to_tree(project: KnowledgeBaseProject, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    definition_items = _definitions(project)
+    definitions = {item.symbol_id: item for item in definition_items}
+    binding_index = collect_governed_bindings(governed_files_for_project(project))
+    issues: list[dict[str, Any]] = []
+    issues.extend(_binding_validation_issues(binding_index, definition_items))
+
+    node_index, node_issues = _tree_node_index(payload)
+    issues.extend(node_issues)
+    code_symbol_nodes: dict[str, dict[str, Any]] = {}
+    evidence_artifact_nodes: dict[str, dict[str, Any]] = {}
+
+    for node in node_index.values():
+        kind = str(node.get("kind") or "").strip()
+        if kind == "code_symbol":
+            symbol_id = str(node.get("symbol_id") or "").strip()
+            if not symbol_id:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": "governance tree code symbol node is missing symbol_id",
+                        "file": "",
+                        "line": 1,
+                        "node_id": node["node_id"],
+                    }
+                )
+                continue
+            if symbol_id in code_symbol_nodes:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": f"duplicate governance tree code symbol node: {symbol_id}",
+                        "file": "",
+                        "line": 1,
+                        "symbol_id": symbol_id,
+                    }
+                )
+                continue
+            code_symbol_nodes[symbol_id] = node
+            continue
+        if kind == "evidence_artifact":
+            artifact = str(node.get("artifact") or "").strip()
+            if not artifact:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": "governance tree evidence artifact node is missing artifact",
+                        "file": "",
+                        "line": 1,
+                        "node_id": node["node_id"],
+                    }
+                )
+                continue
+            if artifact in evidence_artifact_nodes:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": f"duplicate governance tree evidence artifact node: {artifact}",
+                        "file": "",
+                        "line": 1,
+                        "artifact": artifact,
+                    }
+                )
+                continue
+            evidence_artifact_nodes[artifact] = node
+
+    expected_artifacts = _expected_generated_artifact_paths(project)
+    for artifact_key, rel_path in expected_artifacts.items():
+        artifact_node: dict[str, Any] | None = evidence_artifact_nodes.get(artifact_key)
+        if artifact_node is None:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree is missing evidence artifact node: {artifact_key}",
+                    "file": "",
+                    "line": 1,
+                    "artifact": artifact_key,
+                }
+            )
+            continue
+        if artifact_node.get("file") != rel_path:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": (
+                        f"governance tree evidence artifact path drifted for {artifact_key}: "
+                        f"expected {rel_path}"
+                    ),
+                    "file": "",
+                    "line": 1,
+                    "artifact": artifact_key,
+                }
+            )
+    for artifact_key in sorted(set(evidence_artifact_nodes) - set(expected_artifacts)):
+        issues.append(
+            {
+                "code": "GOVERNANCE_TREE_INVALID",
+                "message": f"unknown evidence artifact node in governance tree: {artifact_key}",
+                "file": "",
+                "line": 1,
+                "artifact": artifact_key,
+            }
+        )
+
+    for symbol_id in sorted(set(code_symbol_nodes) - set(definitions)):
+        issues.append(
+            {
+                "code": "GOVERNANCE_TREE_INVALID",
+                "message": f"unknown code symbol in governance tree: {symbol_id}",
+                "file": "",
+                "line": 1,
+                "symbol_id": symbol_id,
+            }
+        )
+
+    for symbol_id, definition in definitions.items():
+        symbol_node: dict[str, Any] | None = code_symbol_nodes.get(symbol_id)
+        if symbol_node is None:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree is missing code symbol node: {symbol_id}",
+                    "file": "",
+                    "line": 1,
+                    "symbol_id": symbol_id,
+                }
+            )
+            continue
+        if (
+            symbol_node.get("owner") != definition.owner
+            or symbol_node.get("symbol_kind") != definition.kind
+            or symbol_node.get("kind") != "code_symbol"
+        ):
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree metadata mismatch for code symbol: {symbol_id}",
+                    "file": str(symbol_node.get("file") or ""),
+                    "line": 1,
+                    "symbol_id": symbol_id,
+                }
+            )
+        if symbol_node.get("risk") != definition.risk:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree risk metadata mismatch for code symbol: {symbol_id}",
+                    "file": str(symbol_node.get("file") or ""),
+                    "line": 1,
+                    "symbol_id": symbol_id,
+                }
+            )
+        tree_bindings = symbol_node.get("bindings")
+        if not isinstance(tree_bindings, list):
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree code symbol bindings must be a list: {symbol_id}",
+                    "file": str(symbol_node.get("file") or ""),
+                    "line": 1,
+                    "symbol_id": symbol_id,
+                }
+            )
+        else:
+            expected_binding_set = {
+                (item.file, item.locator)
+                for item in binding_index.get(symbol_id, [])
+            }
+            actual_binding_set = {
+                (str(item.get("file") or ""), str(item.get("locator") or ""))
+                for item in tree_bindings
+                if isinstance(item, dict)
+            }
+            if expected_binding_set != actual_binding_set:
+                issues.append(
+                    {
+                        "code": "GOVERNANCE_TREE_INVALID",
+                        "message": f"governance tree binding set drifted for {symbol_id}",
+                        "file": str(symbol_node.get("file") or ""),
+                        "line": 1,
+                        "symbol_id": symbol_id,
+                        "expected": sorted(expected_binding_set),
+                        "actual": sorted(actual_binding_set),
+                    }
+                )
+        for rel_file, locator in definition.required_bindings:
+            if not _binding_exists(binding_index, symbol_id, rel_file, locator):
+                issues.append(
+                    {
+                        "code": "MISSING_BINDING",
+                        "message": f"required governed binding is missing for {symbol_id}: {rel_file} -> {locator}",
+                        "file": rel_file,
+                        "line": 1,
+                    }
+                )
+        actual_evidence = definition.actual_extractor(project)
+        actual_fingerprint = _fingerprint(actual_evidence)
+        expected = symbol_node.get("expected", {})
+        if not isinstance(expected, dict):
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree code symbol expected payload must be an object: {symbol_id}",
+                    "file": str(symbol_node.get("file") or ""),
+                    "line": 1,
+                    "symbol_id": symbol_id,
+                }
+            )
+            continue
         if expected.get("fingerprint") == actual_fingerprint:
             continue
         issues.append(

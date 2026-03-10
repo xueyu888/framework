@@ -33,6 +33,7 @@ class FrameworkIrTest(unittest.TestCase):
         self.assertTrue(project.generated_artifacts.implementation_bundle_py.endswith("implementation_bundle.py"))
         self.assertTrue(project.generated_artifacts.generation_manifest_json.endswith("generation_manifest.json"))
         self.assertTrue(project.generated_artifacts.governance_manifest_json.endswith("governance_manifest.json"))
+        self.assertTrue(project.generated_artifacts.governance_tree_json.endswith("governance_tree.json"))
 
 
 if __name__ == "__main__":

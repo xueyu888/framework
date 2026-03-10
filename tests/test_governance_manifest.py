@@ -9,10 +9,13 @@ from unittest import mock
 from project_runtime.governance import (
     GovernedBinding,
     build_governance_manifest,
+    build_governance_tree,
     collect_governed_bindings,
     compare_project_to_manifest,
+    compare_project_to_tree,
     governed_files_for_project,
     parse_governance_manifest,
+    parse_governance_tree,
 )
 from project_runtime.knowledge_base import (
     DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
@@ -41,6 +44,30 @@ class GovernanceManifestTest(unittest.TestCase):
         self.assertIn("kb.api.chat_contract", symbol_ids)
         self.assertIn("kb.answer.behavior", symbol_ids)
 
+    def test_materialize_writes_governance_tree_with_expected_roots_and_symbols(self) -> None:
+        project = materialize_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
+        assert project.generated_artifacts is not None
+        tree_path = Path(project.generated_artifacts.governance_tree_json)
+
+        payload = parse_governance_tree(tree_path)
+        node_ids = {item["node_id"] for item in payload["nodes"]}
+        symbol_ids = {
+            item["symbol_id"]
+            for item in payload["nodes"]
+            if item.get("kind") == "code_symbol"
+        }
+
+        self.assertEqual(payload["project_id"], "knowledge_base_basic")
+        self.assertEqual(payload["root_node_id"], "project:knowledge_base_basic")
+        self.assertIn("project:knowledge_base_basic:framework", node_ids)
+        self.assertIn("project:knowledge_base_basic:product_spec", node_ids)
+        self.assertIn("project:knowledge_base_basic:implementation_config", node_ids)
+        self.assertIn("project:knowledge_base_basic:code", node_ids)
+        self.assertIn("project:knowledge_base_basic:evidence", node_ids)
+        self.assertIn("kb.runtime.page_routes", symbol_ids)
+        self.assertIn("kb.frontend.surface_contract", symbol_ids)
+        self.assertIn("kb.answer.behavior", symbol_ids)
+
     def test_temp_output_materialization_stays_byte_stable(self) -> None:
         materialize_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
         canonical_generated_dir = Path("projects/knowledge_base_basic/generated")
@@ -58,6 +85,7 @@ class GovernanceManifestTest(unittest.TestCase):
                 "implementation_bundle.py",
                 "generation_manifest.json",
                 "governance_manifest.json",
+                "governance_tree.json",
             ):
                 self.assertEqual(
                     (canonical_generated_dir / file_name).read_bytes(),
@@ -214,6 +242,50 @@ class GovernanceManifestTest(unittest.TestCase):
         issues = compare_project_to_manifest(project, payload)
 
         self.assertTrue(any(issue["code"] == "GOVERNANCE_MANIFEST_INVALID" for issue in issues))
+
+    def test_compare_project_to_tree_accepts_current_project(self) -> None:
+        project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
+        payload = build_governance_tree(project)
+
+        issues = compare_project_to_tree(project, payload)
+
+        self.assertFalse(any(issue["code"] == "EXPECTATION_MISMATCH" for issue in issues))
+
+    def test_compare_project_to_tree_detects_code_drift(self) -> None:
+        project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
+        payload = build_governance_tree(project)
+        drifted_project = replace(
+            project,
+            frontend_contract={
+                **project.frontend_contract,
+                "interaction_actions": [
+                    *project.frontend_contract["interaction_actions"],
+                    {"action_id": "rogue_action", "boundary": "INTERACT"},
+                ],
+            },
+        )
+
+        issues = compare_project_to_tree(drifted_project, payload)
+
+        self.assertTrue(
+            any(
+                issue["code"] == "EXPECTATION_MISMATCH" and issue["symbol_id"] == "kb.frontend.surface_contract"
+                for issue in issues
+            )
+        )
+
+    def test_compare_project_to_tree_detects_missing_tree_symbol(self) -> None:
+        project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
+        payload = build_governance_tree(project)
+        payload["nodes"] = [
+            item
+            for item in payload["nodes"]
+            if item.get("symbol_id") != "kb.answer.behavior"
+        ]
+
+        issues = compare_project_to_tree(project, payload)
+
+        self.assertTrue(any(issue["code"] == "GOVERNANCE_TREE_INVALID" for issue in issues))
 
 
 if __name__ == "__main__":

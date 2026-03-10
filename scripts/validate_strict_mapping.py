@@ -23,9 +23,9 @@ from project_runtime import (
     resolve_project_template_registration,
 )
 from project_runtime.governance import (
-    compare_project_to_manifest,
-    parse_governance_manifest,
-    validate_manifest_closure,
+    compare_project_to_tree,
+    parse_governance_tree,
+    validate_tree_closure,
 )
 
 REGISTRY_PATH = REPO_ROOT / "mapping/mapping_registry.json"
@@ -257,6 +257,7 @@ def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
         "implementation_bundle_py",
         "generation_manifest_json",
         "governance_manifest_json",
+        "governance_tree_json",
     ):
         value = artifacts.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -617,14 +618,14 @@ def validate_project_governance(
             artifacts = implementation_data.get("artifacts")
             if not isinstance(artifacts, dict):
                 raise ValueError("implementation_config.toml must define [artifacts]")
-            governance_file_name = artifacts.get("governance_manifest_json")
+            governance_file_name = artifacts.get("governance_tree_json")
             if not isinstance(governance_file_name, str) or not governance_file_name.strip():
-                raise ValueError("implementation_config.toml missing artifacts.governance_manifest_json")
-            governance_manifest_path = product_spec_file.parent / "generated" / governance_file_name.strip()
+                raise ValueError("implementation_config.toml missing artifacts.governance_tree_json")
+            governance_tree_path = product_spec_file.parent / "generated" / governance_file_name.strip()
         except Exception as exc:
             issues.append(
                 make_issue(
-                    f"failed to resolve governance manifest path for {rel_product_spec_file}: {exc}",
+                    f"failed to resolve governance tree path for {rel_product_spec_file}: {exc}",
                     rel_implementation_config_file,
                     1,
                     code="GOVERNANCE_CONFIG_INVALID",
@@ -632,18 +633,18 @@ def validate_project_governance(
             )
             continue
 
-        if not governance_manifest_path.exists():
+        if not governance_tree_path.exists():
             issues.append(
                 make_issue(
-                    "missing governance manifest; run "
+                    "missing governance tree; run "
                     f"`uv run python scripts/materialize_project.py --project {rel_product_spec_file}`",
                     rel_product_spec_file,
                     1,
                     code="STALE_EVIDENCE",
                     related=[
                         {
-                            "message": "Expected governance manifest",
-                            "file": governance_manifest_path.relative_to(REPO_ROOT).as_posix(),
+                            "message": "Expected governance tree",
+                            "file": governance_tree_path.relative_to(REPO_ROOT).as_posix(),
                             "line": 1,
                             "column": 1,
                         }
@@ -653,24 +654,24 @@ def validate_project_governance(
             continue
 
         try:
-            manifest_payload = parse_governance_manifest(governance_manifest_path)
+            tree_payload = parse_governance_tree(governance_tree_path)
         except Exception as exc:
             issues.append(
                 make_issue(
-                    f"invalid governance manifest for {rel_product_spec_file}: {exc}",
-                    governance_manifest_path.relative_to(REPO_ROOT).as_posix(),
+                    f"invalid governance tree for {rel_product_spec_file}: {exc}",
+                    governance_tree_path.relative_to(REPO_ROOT).as_posix(),
                     1,
-                    code="GOVERNANCE_MANIFEST_INVALID",
+                    code="GOVERNANCE_TREE_INVALID",
                 )
             )
             continue
 
-        stale_issues = validate_manifest_closure(manifest_payload)
-        if stale_issues:
-            for stale in stale_issues:
+        tree_issues = validate_tree_closure(tree_payload)
+        if tree_issues:
+            for stale in tree_issues:
                 issue = make_issue(
                     stale["message"],
-                    stale.get("file") or governance_manifest_path.relative_to(REPO_ROOT).as_posix(),
+                    stale.get("file") or governance_tree_path.relative_to(REPO_ROOT).as_posix(),
                     int(stale.get("line", 1)),
                     code=str(stale["code"]),
                     related=[
@@ -701,7 +702,7 @@ def validate_project_governance(
             )
             continue
 
-        for finding in compare_project_to_manifest(project, manifest_payload):
+        for finding in compare_project_to_tree(project, tree_payload):
             issue = make_issue(
                 str(finding["message"]),
                 str(finding.get("file") or rel_product_spec_file),
