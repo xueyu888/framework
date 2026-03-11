@@ -12,7 +12,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         default=None,
-        help="Path to the JSON config file. Defaults to data_station/prj/config/default.json or DATA_STATION_PRJ_CONFIG.",
+        help="Path to the JSON config file. Defaults to archive/data_station/prj/config/default.json or DATA_STATION_PRJ_CONFIG.",
     )
     return parser.parse_args()
 

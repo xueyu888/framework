@@ -1,12 +1,12 @@
 # 可配置内容说明
 
-配置文件：`data_station/prj/config/default.json`
+配置文件：`archive/data_station/prj/config/default.json`
 
 加载优先级：
 
 1. `--config <path>`
 2. 环境变量 `DATA_STATION_PRJ_CONFIG`
-3. 默认文件 `data_station/prj/config/default.json`
+3. 默认文件 `archive/data_station/prj/config/default.json`
 
 ## 1. 服务与路径
 

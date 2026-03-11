@@ -15,7 +15,7 @@
 在仓库根目录执行：
 
 ```bash
-uv run python data_station/example/upload_server.py
+uv run python archive/data_station/example/upload_server.py
 ```
 
 浏览器打开：
@@ -37,7 +37,7 @@ http://127.0.0.1:8000
 
 - 接收上传请求
 - 检查文件名和文件大小
-- 把文件保存到 `data_station/example/uploads/`
+- 把文件保存到 `archive/data_station/example/uploads/`
 - 返回上传结果 JSON
 
 ## 注意

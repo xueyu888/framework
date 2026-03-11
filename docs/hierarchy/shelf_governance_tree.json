@@ -221,7 +221,7 @@
         "raw_node_id": "NODE-L2-LAYER"
       },
       {
-        "id": "standards:NODE-L2-SHELF",
+        "id": "standards:NODE-L2-SHELF-L2-M0",
         "label": "L2-M0-置物架框架标准模块",
         "level": 5,
         "description": "kind=file | layer=Standards | file=framework/shelf/L2-M0-置物架框架标准模块.md",
@@ -230,10 +230,10 @@
         "node_kind": "file",
         "layer": "Standards",
         "registry_level": "L2",
-        "raw_node_id": "NODE-L2-SHELF"
+        "raw_node_id": "NODE-L2-SHELF-L2-M0"
       },
       {
-        "id": "standards:NODE-L2-CURTAIN",
+        "id": "standards:NODE-L2-CURTAIN-L2-M0",
         "label": "L2-M0-窗帘框架标准模块",
         "level": 5,
         "description": "kind=file | layer=Standards | file=framework/curtain/L2-M0-窗帘框架标准模块.md",
@@ -242,10 +242,10 @@
         "node_kind": "file",
         "layer": "Standards",
         "registry_level": "L2",
-        "raw_node_id": "NODE-L2-CURTAIN"
+        "raw_node_id": "NODE-L2-CURTAIN-L2-M0"
       },
       {
-        "id": "standards:NODE-L2-BACKEND",
+        "id": "standards:NODE-L2-BACKEND-L2-M0",
         "label": "L2-M0-知识库接口框架标准模块",
         "level": 5,
         "description": "kind=file | layer=Standards | file=framework/backend/L2-M0-知识库接口框架标准模块.md",
@@ -254,10 +254,10 @@
         "node_kind": "file",
         "layer": "Standards",
         "registry_level": "L2",
-        "raw_node_id": "NODE-L2-BACKEND"
+        "raw_node_id": "NODE-L2-BACKEND-L2-M0"
       },
       {
-        "id": "standards:NODE-L2-FRONTEND",
+        "id": "standards:NODE-L2-FRONTEND-L2-M0",
         "label": "L2-M0-前端框架标准模块",
         "level": 5,
         "description": "kind=file | layer=Standards | file=framework/frontend/L2-M0-前端框架标准模块.md",
@@ -266,10 +266,10 @@
         "node_kind": "file",
         "layer": "Standards",
         "registry_level": "L2",
-        "raw_node_id": "NODE-L2-FRONTEND"
+        "raw_node_id": "NODE-L2-FRONTEND-L2-M0"
       },
       {
-        "id": "standards:NODE-L2-KNOWLEDGE-BASE",
+        "id": "standards:NODE-L2-KNOWLEDGE-BASE-L2-M0",
         "label": "L2-M0-知识库工作台场景模块",
         "level": 5,
         "description": "kind=file | layer=Standards | file=framework/knowledge_base/L2-M0-知识库工作台场景模块.md",
@@ -278,7 +278,31 @@
         "node_kind": "file",
         "layer": "Standards",
         "registry_level": "L2",
-        "raw_node_id": "NODE-L2-KNOWLEDGE-BASE"
+        "raw_node_id": "NODE-L2-KNOWLEDGE-BASE-L2-M0"
+      },
+      {
+        "id": "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M0",
+        "label": "L2-M0-段落分界模板",
+        "level": 5,
+        "description": "kind=file | layer=Standards | file=framework/document_chunking/L2-M0-段落分界模板.md",
+        "source_file": "framework/document_chunking/L2-M0-段落分界模板.md",
+        "source_line": 1,
+        "node_kind": "file",
+        "layer": "Standards",
+        "registry_level": "L2",
+        "raw_node_id": "NODE-L2-DOCUMENT-CHUNKING-L2-M0"
+      },
+      {
+        "id": "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M1",
+        "label": "L2-M1-段落块",
+        "level": 5,
+        "description": "kind=file | layer=Standards | file=framework/document_chunking/L2-M1-段落块.md",
+        "source_file": "framework/document_chunking/L2-M1-段落块.md",
+        "source_line": 1,
+        "node_kind": "file",
+        "layer": "Standards",
+        "registry_level": "L2",
+        "raw_node_id": "NODE-L2-DOCUMENT-CHUNKING-L2-M1"
       },
       {
         "id": "standards:NODE-L3-LAYER",
@@ -7358,27 +7382,37 @@
       },
       {
         "from": "standards:NODE-L2-LAYER",
-        "to": "standards:NODE-L2-SHELF",
+        "to": "standards:NODE-L2-SHELF-L2-M0",
         "relation": "tree_child"
       },
       {
         "from": "standards:NODE-L2-LAYER",
-        "to": "standards:NODE-L2-CURTAIN",
+        "to": "standards:NODE-L2-CURTAIN-L2-M0",
         "relation": "tree_child"
       },
       {
         "from": "standards:NODE-L2-LAYER",
-        "to": "standards:NODE-L2-BACKEND",
+        "to": "standards:NODE-L2-BACKEND-L2-M0",
         "relation": "tree_child"
       },
       {
         "from": "standards:NODE-L2-LAYER",
-        "to": "standards:NODE-L2-FRONTEND",
+        "to": "standards:NODE-L2-FRONTEND-L2-M0",
         "relation": "tree_child"
       },
       {
         "from": "standards:NODE-L2-LAYER",
-        "to": "standards:NODE-L2-KNOWLEDGE-BASE",
+        "to": "standards:NODE-L2-KNOWLEDGE-BASE-L2-M0",
+        "relation": "tree_child"
+      },
+      {
+        "from": "standards:NODE-L2-LAYER",
+        "to": "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M0",
+        "relation": "tree_child"
+      },
+      {
+        "from": "standards:NODE-L2-LAYER",
+        "to": "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M1",
         "relation": "tree_child"
       },
       {
@@ -26737,17 +26771,23 @@
         "project:knowledge_base_basic:framework:module:backend.L2.M0:rule:R2",
         "project:knowledge_base_basic:framework:module:backend.L2.M0:rule:R3",
         "project:knowledge_base_basic:framework:module:backend.L2.M0:rule:R4",
-        "standards:NODE-L2-BACKEND"
+        "standards:NODE-L2-BACKEND-L2-M0"
       ],
       "framework/curtain/L2-M0-窗帘框架标准模块.md": [
-        "standards:NODE-L2-CURTAIN"
+        "standards:NODE-L2-CURTAIN-L2-M0"
+      ],
+      "framework/document_chunking/L2-M0-段落分界模板.md": [
+        "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M0"
+      ],
+      "framework/document_chunking/L2-M1-段落块.md": [
+        "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M1"
       ],
       "framework/frontend/L2-M0-前端框架标准模块.md": [
         "project:knowledge_base_basic:framework:module:frontend.L2.M0",
         "project:knowledge_base_basic:framework:module:frontend.L2.M0:rule:R1",
         "project:knowledge_base_basic:framework:module:frontend.L2.M0:rule:R2",
         "project:knowledge_base_basic:framework:module:frontend.L2.M0:rule:R3",
-        "standards:NODE-L2-FRONTEND"
+        "standards:NODE-L2-FRONTEND-L2-M0"
       ],
       "framework/knowledge_base/L2-M0-知识库工作台场景模块.md": [
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0",
@@ -26755,10 +26795,10 @@
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R2",
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R3",
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R4",
-        "standards:NODE-L2-KNOWLEDGE-BASE"
+        "standards:NODE-L2-KNOWLEDGE-BASE-L2-M0"
       ],
       "framework/shelf/L2-M0-置物架框架标准模块.md": [
-        "standards:NODE-L2-SHELF"
+        "standards:NODE-L2-SHELF-L2-M0"
       ],
       "mapping/mapping_registry.json": [
         "standards:NODE-L1-LAYER",
@@ -27075,11 +27115,13 @@
       "standards:NODE-L1-REDUCIBILITY": null,
       "standards:NODE-L1-CODE-PYTHON": null,
       "standards:NODE-L2-LAYER": null,
-      "standards:NODE-L2-SHELF": null,
-      "standards:NODE-L2-CURTAIN": null,
-      "standards:NODE-L2-BACKEND": null,
-      "standards:NODE-L2-FRONTEND": null,
-      "standards:NODE-L2-KNOWLEDGE-BASE": null,
+      "standards:NODE-L2-SHELF-L2-M0": null,
+      "standards:NODE-L2-CURTAIN-L2-M0": null,
+      "standards:NODE-L2-BACKEND-L2-M0": null,
+      "standards:NODE-L2-FRONTEND-L2-M0": null,
+      "standards:NODE-L2-KNOWLEDGE-BASE-L2-M0": null,
+      "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M0": null,
+      "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M1": null,
       "standards:NODE-L3-LAYER": null,
       "standards:NODE-L3-REGISTRY": null,
       "project:knowledge_base_basic": "workspace:shelf:projects",
@@ -27884,12 +27926,14 @@
       "standards:NODE-L1-LINT": [],
       "standards:NODE-L1-REDUCIBILITY": [],
       "standards:NODE-L1-TRACEABILITY": [],
-      "standards:NODE-L2-BACKEND": [],
-      "standards:NODE-L2-CURTAIN": [],
-      "standards:NODE-L2-FRONTEND": [],
-      "standards:NODE-L2-KNOWLEDGE-BASE": [],
+      "standards:NODE-L2-BACKEND-L2-M0": [],
+      "standards:NODE-L2-CURTAIN-L2-M0": [],
+      "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M0": [],
+      "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M1": [],
+      "standards:NODE-L2-FRONTEND-L2-M0": [],
+      "standards:NODE-L2-KNOWLEDGE-BASE-L2-M0": [],
       "standards:NODE-L2-LAYER": [],
-      "standards:NODE-L2-SHELF": [],
+      "standards:NODE-L2-SHELF-L2-M0": [],
       "standards:NODE-L3-LAYER": [],
       "standards:NODE-L3-REGISTRY": [],
       "workspace:shelf": [
@@ -28890,12 +28934,14 @@
       "standards:NODE-L1-LINT": [],
       "standards:NODE-L1-REDUCIBILITY": [],
       "standards:NODE-L1-TRACEABILITY": [],
-      "standards:NODE-L2-BACKEND": [],
-      "standards:NODE-L2-CURTAIN": [],
-      "standards:NODE-L2-FRONTEND": [],
-      "standards:NODE-L2-KNOWLEDGE-BASE": [],
+      "standards:NODE-L2-BACKEND-L2-M0": [],
+      "standards:NODE-L2-CURTAIN-L2-M0": [],
+      "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M0": [],
+      "standards:NODE-L2-DOCUMENT-CHUNKING-L2-M1": [],
+      "standards:NODE-L2-FRONTEND-L2-M0": [],
+      "standards:NODE-L2-KNOWLEDGE-BASE-L2-M0": [],
       "standards:NODE-L2-LAYER": [],
-      "standards:NODE-L2-SHELF": [],
+      "standards:NODE-L2-SHELF-L2-M0": [],
       "standards:NODE-L3-LAYER": [],
       "standards:NODE-L3-REGISTRY": [],
       "workspace:shelf": [],

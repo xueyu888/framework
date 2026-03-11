@@ -1,6 +1,6 @@
 # Data Station PRJ
 
-`data_station/prj` 是基于 `framework/` 模块标准落地的本地参考工程。
+`archive/data_station/prj` 是基于 `framework/` 模块标准落地的本地参考工程。
 
 当前实现重点：
 
@@ -21,7 +21,7 @@
 在仓库根目录执行：
 
 ```bash
-uv run python data_station/prj/main.py
+uv run python archive/data_station/prj/main.py
 ```
 
 访问地址：
@@ -56,7 +56,7 @@ http://127.0.0.1:8010
 运行后，用户文件默认写入：
 
 ```text
-data_station/prj/runtime/users/
+archive/data_station/prj/runtime/users/
 ```
 
 每个用户单独一个 `.json` 文件，包含：
@@ -80,29 +80,29 @@ data_station/prj/runtime/users/
 ## 5. 功能结构
 
 - 认证与会话
-  - [authentication.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/authentication.py)
+  - [authentication.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/authentication.py)
 - 文件树目录
-  - [folders.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/folders.py)
+  - [folders.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/folders.py)
 - 上传链路
-  - [upload.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/upload.py)
+  - [upload.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/upload.py)
 - 状态管理
-  - [state.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/state.py)
+  - [state.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/state.py)
 - 追溯管理
-  - [trace.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/trace.py)
+  - [trace.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/trace.py)
 - 权限治理
-  - [authorization.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/authorization.py)
+  - [authorization.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/authorization.py)
 - 处理审核
-  - [processing_review.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/processing_review.py)
+  - [processing_review.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/processing_review.py)
 - 展示导出
-  - [display.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/modules/display.py)
+  - [display.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/modules/display.py)
 - 组合服务
-  - [service.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/service.py)
+  - [service.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/service.py)
 - HTTP 入口
-  - [http_server.py](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/app/http_server.py)
+  - [http_server.py](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/app/http_server.py)
 - 前端页面
-  - [index.html](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/web/index.html)
-  - [app.js](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/web/app.js)
-  - [style.css](/home/wuyz/Ability_Enhance/frame/shelf/data_station/prj/web/style.css)
+  - [index.html](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/web/index.html)
+  - [app.js](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/web/app.js)
+  - [style.css](/home/wuyz/Ability_Enhance/frame/shelf/archive/data_station/prj/web/style.css)
 
 ## 6. 目录说明
 

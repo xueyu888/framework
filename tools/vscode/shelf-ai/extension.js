@@ -265,13 +265,17 @@ function activate(context) {
     output.clear();
     pruneSuppressedGeneratedDirectories();
 
-    const relPaths = task.triggerUris
+  const relPaths = task.triggerUris
       .map((uri) => workspaceGuard.normalizeRelPath(path.relative(repoRoot, uri.fsPath)))
       .filter(Boolean)
       .filter((relPath) => !isSuppressedGeneratedPath(relPath));
     const governanceJsonPath = resolveGovernanceTreeJsonPath(
       repoRoot,
       config.get("governanceTreeJsonPath") || config.get("frameworkTreeJsonPath")
+    );
+    const governanceHtmlPath = resolveGovernanceTreeHtmlPath(
+      repoRoot,
+      config.get("governanceTreeHtmlPath") || config.get("frameworkTreeHtmlPath")
     );
     const governanceGenerateCommand = String(
       config.get("governanceTreeGenerateCommand")
@@ -286,7 +290,19 @@ function activate(context) {
     let governancePayload = null;
     let changePlan = workspaceGuard.classifyWorkspaceChanges(repoRoot, relPaths);
     try {
-      governancePayload = governanceTree.readGovernanceTree(repoRoot, path.relative(repoRoot, governanceJsonPath));
+      const governanceLoad = await readGovernanceTreeWithRecovery(
+        repoRoot,
+        governanceJsonPath,
+        governanceGenerateCommand,
+        output
+      );
+      governancePayload = governanceLoad.payload;
+      if (governanceLoad.regenerated) {
+        suppressArtifactEvents([
+          path.relative(repoRoot, governanceJsonPath),
+          path.relative(repoRoot, governanceHtmlPath),
+        ]);
+      }
       changePlan = governanceTree.classifyWorkspaceChanges(repoRoot, relPaths, governancePayload);
     } catch (error) {
       combinedIssues.push(normalizeIssue({
@@ -584,12 +600,14 @@ function activate(context) {
       repoRoot,
       config.get("governanceTreeHtmlPath") || config.get("frameworkTreeHtmlPath")
     );
+    const generateCommand = String(
+      config.get("governanceTreeGenerateCommand")
+      || config.get("frameworkTreeGenerateCommand")
+      || DEFAULT_GOVERNANCE_TREE_GENERATE_COMMAND
+    );
 
     if (options.regenerateIfMissing && !fs.existsSync(htmlPath)) {
-      const generateCommand = config.get("governanceTreeGenerateCommand")
-        || config.get("frameworkTreeGenerateCommand")
-        || DEFAULT_GOVERNANCE_TREE_GENERATE_COMMAND;
-      await generateFrameworkTree(repoRoot, String(generateCommand), output);
+      await generateFrameworkTree(repoRoot, generateCommand, output);
     }
 
     const panel = ensureFrameworkTreePanel();
@@ -607,6 +625,17 @@ function activate(context) {
     try {
       panel.webview.html = fs.readFileSync(htmlPath, "utf8");
     } catch (error) {
+      if (options.regenerateIfMissing) {
+        const regenerated = await generateFrameworkTree(repoRoot, generateCommand, output);
+        if (regenerated && fs.existsSync(htmlPath)) {
+          try {
+            panel.webview.html = fs.readFileSync(htmlPath, "utf8");
+            return;
+          } catch (retryError) {
+            error = retryError;
+          }
+        }
+      }
       panel.webview.html = buildFrameworkTreeFallbackHtml(
         `Failed to read governance tree HTML: ${String(error)}`
       );
@@ -1448,6 +1477,35 @@ async function generateFrameworkTree(repoRoot, command, output) {
   output.appendLine(result.stderr || "");
   output.appendLine(`[framework-tree] exit=${result.code}`);
   return result.code === 0;
+}
+
+async function readGovernanceTreeWithRecovery(repoRoot, governanceJsonPath, generateCommand, output) {
+  const relJsonPath = path.relative(repoRoot, governanceJsonPath);
+  try {
+    return {
+      payload: governanceTree.readGovernanceTree(repoRoot, relJsonPath),
+      regenerated: false
+    };
+  } catch (initialError) {
+    output.appendLine(
+      `[governance-tree] failed to load ${relJsonPath}: ${String(initialError)}`
+    );
+    const regenerated = await generateFrameworkTree(repoRoot, generateCommand, output);
+    if (!regenerated) {
+      throw initialError;
+    }
+    try {
+      return {
+        payload: governanceTree.readGovernanceTree(repoRoot, relJsonPath),
+        regenerated: true
+      };
+    } catch (retryError) {
+      output.appendLine(
+        `[governance-tree] retry failed for ${relJsonPath}: ${String(retryError)}`
+      );
+      throw retryError;
+    }
+  }
 }
 
 function shellQuote(value) {

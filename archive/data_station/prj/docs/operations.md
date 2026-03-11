@@ -5,7 +5,7 @@
 启动：
 
 ```bash
-uv run python data_station/prj/main.py
+uv run python archive/data_station/prj/main.py
 ```
 
 停止：
@@ -67,7 +67,7 @@ curl --noproxy '*' http://127.0.0.1:8010/api/health
 
 ## 5. 运行期文件
 
-默认目录：`data_station/prj/runtime/`
+默认目录：`archive/data_station/prj/runtime/`
 
 - `documents.json`：文档主数据
 - `folders.json`：目录树数据
@@ -82,7 +82,7 @@ curl --noproxy '*' http://127.0.0.1:8010/api/health
 ### 清空本地数据
 
 ```bash
-rm -rf data_station/prj/runtime
+rm -rf archive/data_station/prj/runtime
 ```
 
 下次启动会自动重建运行目录和空数据文件，并重新写入 root 种子账号。
@@ -90,26 +90,26 @@ rm -rf data_station/prj/runtime
 ### 查看用户文件
 
 ```bash
-ls data_station/prj/runtime/users
-cat data_station/prj/runtime/users/root.local.json
+ls archive/data_station/prj/runtime/users
+cat archive/data_station/prj/runtime/users/root.local.json
 ```
 
 ### 查看目录树数据
 
 ```bash
-cat data_station/prj/runtime/folders.json
+cat archive/data_station/prj/runtime/folders.json
 ```
 
 ### 查看会话数据
 
 ```bash
-cat data_station/prj/runtime/sessions.json
+cat archive/data_station/prj/runtime/sessions.json
 ```
 
 ### 查看最近追溯记录
 
 ```bash
-tail -n 20 data_station/prj/runtime/traces.jsonl
+tail -n 20 archive/data_station/prj/runtime/traces.jsonl
 ```
 
 ### 手动修改用户密码
