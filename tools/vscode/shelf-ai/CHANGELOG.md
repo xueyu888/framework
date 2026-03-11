@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.0.43 - 2026-03-11
+- Clarified the current governance-tree scope in the packaged Shelf AI docs: the mainline now explicitly means the path that carries `Framework -> Product Spec -> Implementation Config -> Code -> Evidence` convergence plus the reverse-check chain back to upstream structure.
+- Documented the current coverage boundary more precisely: Shelf AI strongly governs the structural mainline carriers, while lower-level rendering and presentation details remain only partially governed instead of being overstated as fully closed.
+- Synced this release with the repository-side second-round audit so packaged guidance, GitHub release notes, and the current governance posture no longer drift apart.
+
 ## 0.0.40 - 2026-03-10
 - Switched Shelf AI from a framework-tree-only view to a workspace governance-tree flow. The extension now reads the workspace governance tree, opens the governance-tree view directly, and surfaces the recent touched / affected node closure inside the sidebar.
 - Moved strict validation to the same workspace-governance source used by the extension. Validation now resolves affected projects and checks through governance-tree closure instead of relying on framework-tree-only path heuristics.

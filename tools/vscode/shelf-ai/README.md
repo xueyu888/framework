@@ -3,6 +3,8 @@
 ## What It Does
 - Adds an Activity Bar icon entry (`Shelf AI`) for direct plugin access from the sidebar.
 - Sidebar home view provides one-click actions: open tree, refresh tree, run validation, show issues.
+- Treats the current governance scope as mainline-first: Shelf strongly guards the structural path that carries `Framework -> Product Spec -> Implementation Config -> Code -> Evidence` plus the reverse validation path back to upstream structure.
+- Makes the current coverage boundary explicit instead of overstating it: runtime assembly, compiled contracts/specs, evidence, and governance compare are strongly covered; lower-level renderer/style/script details can still be only partially governed.
 - Opens governance tree structure HTML in Webview (`docs/hierarchy/shelf_governance_tree.html`).
 - Refreshes governance tree artifacts by running the generator script.
 - Supports node-to-source jump: click a node, then use `打开源文件` in detail panel to jump to the mapped markdown line.

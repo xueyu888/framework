@@ -2,7 +2,7 @@
   "name": "shelf-ai",
   "displayName": "Shelf AI",
   "description": "Shelf AI: governance-tree-first workspace and strict mapping guard.",
-  "version": "0.0.42",
+  "version": "0.0.43",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
