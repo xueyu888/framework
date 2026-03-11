@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from importlib import import_module
 import json
 import re
 import subprocess
@@ -12,10 +13,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    _hierarchy_module = import_module("scripts.generate_module_hierarchy_html")
+except ModuleNotFoundError:
+    _hierarchy_module = import_module("generate_module_hierarchy_html")
+
+load_hierarchy_graph = _hierarchy_module.load_hierarchy
+render_hierarchy_html = _hierarchy_module.render_html
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+
+from project_runtime import (
+    KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT,
+    KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT,
+    KNOWLEDGE_BASE_TEMPLATE_ID,
+    build_implementation_effect_manifest,
+    detect_project_template_id,
+    load_knowledge_base_project,
+    materialize_knowledge_base_project,
+)
+from project_runtime.governance import (
+    compare_project_to_tree,
+    parse_governance_tree,
+    validate_tree_closure,
+)
+from standards_tree import build_standards_tree, level_files_from_tree
+from workspace_governance import (
+    DEFAULT_WORKSPACE_GOVERNANCE_HTML,
+    DEFAULT_WORKSPACE_GOVERNANCE_JSON,
+    build_workspace_governance_payload,
+    parse_workspace_governance_payload,
+    resolve_workspace_change_context,
+)
+
 REGISTRY_PATH = REPO_ROOT / "mapping/mapping_registry.json"
 FRAMEWORK_DIR = REPO_ROOT / "framework"
 PROJECTS_DIR = REPO_ROOT / "projects"
@@ -85,33 +118,6 @@ REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS = (
 PROJECT_ALLOWED_TOP_LEVEL_DIRS = {"assets", "generated"}
 PROJECT_ALLOWED_ROOT_FILES = {"product_spec.toml", "implementation_config.toml"}
 PROJECT_ALLOWED_DOC_SUFFIXES = {".md"}
-PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS = {
-    "project",
-    "framework",
-    "surface",
-    "visual",
-    "route",
-    "a11y",
-    "library",
-    "preview",
-    "chat",
-    "context",
-    "return",
-    "documents",
-}
-PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS = set(PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS)
-PRODUCT_SPEC_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {
-    "surface": {"copy"},
-    "library": {"copy"},
-    "chat": {"copy"},
-}
-PRODUCT_SPEC_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {
-    key: set(value) for key, value in PRODUCT_SPEC_REQUIRED_NESTED_TABLES.items()
-}
-IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS = {"frontend", "backend", "evidence", "artifacts"}
-IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS = set(IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS)
-IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES: dict[str, set[str]] = {}
-IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES: dict[str, set[str]] = {}
 
 Issue = dict[str, Any]
 
@@ -271,6 +277,8 @@ def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
         "product_spec_json",
         "implementation_bundle_py",
         "generation_manifest_json",
+        "governance_manifest_json",
+        "governance_tree_json",
     ):
         value = artifacts.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -291,6 +299,64 @@ def _load_toml_text_and_data(path: Path) -> tuple[str, dict[str, Any]]:
     if not isinstance(data, dict):
         raise ValueError(f"{path.name} must decode into a table")
     return text, data
+
+
+_MISSING = object()
+
+
+def _collect_leaf_paths(payload: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+    items: dict[str, Any] = {}
+    for key, value in payload.items():
+        dotted = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            items.update(_collect_leaf_paths(value, dotted))
+            continue
+        items[dotted] = value
+    return items
+
+
+def _get_dotted_value(payload: dict[str, Any], dotted_path: str) -> Any:
+    current: Any = payload
+    for part in dotted_path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return _MISSING
+        current = current[part]
+    return current
+
+
+def _derived_generated_artifacts_payload(
+    product_spec_file: Path,
+    implementation_data: dict[str, Any],
+) -> dict[str, str]:
+    artifacts = implementation_data.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise ValueError("implementation_config.toml must define [artifacts]")
+    generated_dir = product_spec_file.parent / "generated"
+    rel_generated_dir = generated_dir.relative_to(REPO_ROOT).as_posix()
+
+    def rel_path(name_key: str) -> str:
+        value = artifacts.get(name_key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"implementation_config.toml missing artifacts.{name_key}")
+        return f"{rel_generated_dir}/{value.strip()}"
+
+    return {
+        "directory": rel_generated_dir,
+        "framework_ir_json": rel_path("framework_ir_json"),
+        "product_spec_json": rel_path("product_spec_json"),
+        "implementation_bundle_py": rel_path("implementation_bundle_py"),
+        "generation_manifest_json": rel_path("generation_manifest_json"),
+        "governance_manifest_json": rel_path("governance_manifest_json"),
+        "governance_tree_json": rel_path("governance_tree_json"),
+    }
+
+
+def _relation_matches(relation: str, config_value: Any, target_value: Any) -> bool:
+    if relation == "equals":
+        return target_value == config_value
+    if relation == "basename":
+        return Path(str(target_value)).name == str(config_value)
+    raise ValueError(f"unsupported configuration effect relation: {relation}")
 
 
 def _validate_project_toml_layout(
@@ -381,13 +447,43 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
         return issues
 
     for product_spec_file in project_product_spec_files:
+        try:
+            template_id = detect_project_template_id(product_spec_file)
+        except Exception as exc:
+            rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+            issues.append(
+                make_issue(
+                    str(exc),
+                    rel_product_spec_file,
+                    find_line(read_text(product_spec_file), 'template = "'),
+                    code="PROJECT_TEMPLATE_UNSUPPORTED",
+                )
+            )
+            template_id = KNOWLEDGE_BASE_TEMPLATE_ID
+
+        if template_id != KNOWLEDGE_BASE_TEMPLATE_ID:
+            rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+            issues.append(
+                make_issue(
+                    f"unsupported project template: {template_id}",
+                    rel_product_spec_file,
+                    find_line(read_text(product_spec_file), 'template = "'),
+                    code="PROJECT_TEMPLATE_UNSUPPORTED",
+                )
+            )
+
+        product_spec_layout = KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT
         issues.extend(
             _validate_project_toml_layout(
                 product_spec_file,
-                required_top_level_keys=PRODUCT_SPEC_REQUIRED_TOP_LEVEL_KEYS,
-                allowed_top_level_keys=PRODUCT_SPEC_ALLOWED_TOP_LEVEL_KEYS,
-                required_nested_tables=PRODUCT_SPEC_REQUIRED_NESTED_TABLES,
-                allowed_nested_tables=PRODUCT_SPEC_ALLOWED_NESTED_TABLES,
+                required_top_level_keys=set(product_spec_layout.required_top_level_keys),
+                allowed_top_level_keys=set(product_spec_layout.allowed_top_level_keys),
+                required_nested_tables={
+                    key: set(value) for key, value in product_spec_layout.required_nested_tables.items()
+                },
+                allowed_nested_tables={
+                    key: set(value) for key, value in product_spec_layout.allowed_nested_tables.items()
+                },
                 parse_error_code="PROJECT_PRODUCT_SPEC_PARSE_FAILED",
                 missing_section_code="PROJECT_PRODUCT_SPEC_SECTION_MISSING",
                 unknown_section_code="PROJECT_PRODUCT_SPEC_SECTION_UNKNOWN",
@@ -415,13 +511,18 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
                 )
             )
             continue
+        implementation_layout = KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT
         issues.extend(
             _validate_project_toml_layout(
                 implementation_config_file,
-                required_top_level_keys=IMPLEMENTATION_CONFIG_REQUIRED_TOP_LEVEL_KEYS,
-                allowed_top_level_keys=IMPLEMENTATION_CONFIG_ALLOWED_TOP_LEVEL_KEYS,
-                required_nested_tables=IMPLEMENTATION_CONFIG_REQUIRED_NESTED_TABLES,
-                allowed_nested_tables=IMPLEMENTATION_CONFIG_ALLOWED_NESTED_TABLES,
+                required_top_level_keys=set(implementation_layout.required_top_level_keys),
+                allowed_top_level_keys=set(implementation_layout.allowed_top_level_keys),
+                required_nested_tables={
+                    key: set(value) for key, value in implementation_layout.required_nested_tables.items()
+                },
+                allowed_nested_tables={
+                    key: set(value) for key, value in implementation_layout.allowed_nested_tables.items()
+                },
                 parse_error_code="PROJECT_IMPLEMENTATION_CONFIG_PARSE_FAILED",
                 missing_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_MISSING",
                 unknown_section_code="PROJECT_IMPLEMENTATION_CONFIG_SECTION_UNKNOWN",
@@ -444,7 +545,7 @@ def validate_project_generation_discipline(
     issues.extend(validate_project_configuration_layout(project_product_spec_files))
 
     try:
-        from project_runtime.knowledge_base import materialize_knowledge_base_project
+        materialize_knowledge_base_project
     except Exception as exc:
         issues.append(
             make_issue(
@@ -528,6 +629,30 @@ def validate_project_generation_discipline(
             )
             continue
 
+        expected_generated_file_set = set(expected_generated_files)
+        actual_generated_files = {path.name for path in actual_generated_dir.iterdir() if path.is_file()}
+        unexpected_generated_files = sorted(actual_generated_files - expected_generated_file_set)
+        for extra_name in unexpected_generated_files:
+            issues.append(
+                make_issue(
+                    (
+                        f"unexpected generated artifact: {extra_name}; generated/ must only contain "
+                        "the canonical artifact set declared in implementation_config.toml"
+                    ),
+                    (actual_generated_dir / extra_name).relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="PROJECT_GENERATED_EXTRA_FILE",
+                    related=[
+                        {
+                            "message": "Project implementation config",
+                            "file": rel_implementation_config_file,
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+            )
+
         try:
             with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
                 temp_generated_dir = Path(temp_dir) / "generated"
@@ -588,6 +713,372 @@ def validate_project_generation_discipline(
                     code="PROJECT_GENERATION_FAILED",
                 )
             )
+
+    return issues
+
+
+def validate_implementation_config_effects(
+    product_spec_files: list[Path] | None = None,
+) -> list[Issue]:
+    issues: list[Issue] = []
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    for product_spec_file in project_product_spec_files:
+        rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        rel_implementation_config_file = implementation_config_file.relative_to(REPO_ROOT).as_posix()
+        try:
+            _, implementation_data = _load_toml_text_and_data(implementation_config_file)
+            implementation_leaf_values = _collect_leaf_paths(implementation_data)
+            project = load_knowledge_base_project(product_spec_file)
+            runtime_bundle = project.to_runtime_bundle_dict()
+            runtime_bundle["generated_artifacts"] = _derived_generated_artifacts_payload(
+                product_spec_file,
+                implementation_data,
+            )
+            effect_manifest = build_implementation_effect_manifest(project)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to build implementation effect graph for {rel_product_spec_file}: {exc}",
+                    rel_implementation_config_file,
+                    1,
+                    code="PROJECT_IMPLEMENTATION_EFFECT_BUILD_FAILED",
+                )
+            )
+            continue
+
+        effect_keys = set(effect_manifest)
+        leaf_keys = set(implementation_leaf_values)
+
+        for field_path in sorted(leaf_keys - effect_keys):
+            issues.append(
+                make_issue(
+                    f"implementation_config field has no downstream effect declaration: {field_path}",
+                    rel_implementation_config_file,
+                    1,
+                    code="PROJECT_IMPLEMENTATION_CONFIG_DEAD_FIELD",
+                )
+            )
+
+        for field_path in sorted(effect_keys - leaf_keys):
+            issues.append(
+                make_issue(
+                    f"implementation effect manifest references unknown config field: {field_path}",
+                    rel_implementation_config_file,
+                    1,
+                    code="PROJECT_IMPLEMENTATION_EFFECT_STALE",
+                )
+            )
+
+        for field_path in sorted(effect_keys & leaf_keys):
+            expected_value = implementation_leaf_values[field_path]
+            effect_entry = effect_manifest[field_path]
+            manifest_value = effect_entry.get("value")
+            if manifest_value != expected_value:
+                issues.append(
+                    make_issue(
+                        (
+                            f"implementation effect manifest value mismatch for {field_path}: "
+                            f"expected {expected_value!r}, got {manifest_value!r}"
+                        ),
+                        rel_implementation_config_file,
+                        1,
+                        code="PROJECT_IMPLEMENTATION_EFFECT_VALUE_MISMATCH",
+                    )
+                )
+                continue
+
+            relation = effect_entry.get("relation")
+            if not isinstance(relation, str) or not relation:
+                issues.append(
+                    make_issue(
+                        f"implementation effect manifest missing relation for {field_path}",
+                        rel_implementation_config_file,
+                        1,
+                        code="PROJECT_IMPLEMENTATION_EFFECT_RELATION_MISSING",
+                    )
+                )
+                continue
+
+            targets = effect_entry.get("targets")
+            if not isinstance(targets, list) or not targets:
+                issues.append(
+                    make_issue(
+                        f"implementation_config field lacks downstream targets: {field_path}",
+                        rel_implementation_config_file,
+                        1,
+                        code="PROJECT_IMPLEMENTATION_EFFECT_TARGETS_MISSING",
+                    )
+                )
+                continue
+
+            for target_path in targets:
+                if not isinstance(target_path, str) or not target_path.strip():
+                    issues.append(
+                        make_issue(
+                            f"implementation effect target must be a non-empty dotted path for {field_path}",
+                            rel_implementation_config_file,
+                            1,
+                            code="PROJECT_IMPLEMENTATION_EFFECT_TARGET_INVALID",
+                        )
+                    )
+                    continue
+                if target_path.startswith("implementation_config."):
+                    issues.append(
+                        make_issue(
+                            (
+                                f"{field_path} only points back to implementation_config; "
+                                "configuration effects must land in downstream compiled/runtime structures"
+                            ),
+                            rel_implementation_config_file,
+                            1,
+                            code="PROJECT_IMPLEMENTATION_EFFECT_SELF_REFERENCE",
+                        )
+                    )
+                    continue
+                target_value = _get_dotted_value(runtime_bundle, target_path)
+                if target_value is _MISSING:
+                    issues.append(
+                        make_issue(
+                            f"implementation effect target is missing for {field_path}: {target_path}",
+                            rel_product_spec_file,
+                            1,
+                            code="PROJECT_IMPLEMENTATION_EFFECT_TARGET_MISSING",
+                            related=[
+                                {
+                                    "message": "Implementation config",
+                                    "file": rel_implementation_config_file,
+                                    "line": 1,
+                                    "column": 1,
+                                }
+                            ],
+                        )
+                    )
+                    continue
+                try:
+                    matches = _relation_matches(relation, expected_value, target_value)
+                except Exception as exc:
+                    issues.append(
+                        make_issue(
+                            f"failed to evaluate implementation effect for {field_path}: {exc}",
+                            rel_implementation_config_file,
+                            1,
+                            code="PROJECT_IMPLEMENTATION_EFFECT_RELATION_INVALID",
+                        )
+                    )
+                    continue
+                if matches:
+                    continue
+                issues.append(
+                    make_issue(
+                        (
+                            f"implementation effect mismatch for {field_path}: target {target_path} "
+                            f"does not reflect configured value {expected_value!r}"
+                        ),
+                        rel_product_spec_file,
+                        1,
+                        code="PROJECT_IMPLEMENTATION_EFFECT_MISMATCH",
+                        related=[
+                            {
+                                "message": f"Downstream target {target_path} resolved to {target_value!r}",
+                                "file": rel_implementation_config_file,
+                                "line": 1,
+                                "column": 1,
+                            }
+                        ],
+                    )
+                )
+
+    return issues
+
+
+def validate_project_governance(
+    product_spec_files: list[Path] | None = None,
+) -> list[Issue]:
+    issues: list[Issue] = []
+    project_product_spec_files = product_spec_files or discover_project_product_spec_files()
+    for product_spec_file in project_product_spec_files:
+        rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
+        implementation_config_file = implementation_config_path_for(product_spec_file)
+        rel_implementation_config_file = implementation_config_file.relative_to(REPO_ROOT).as_posix()
+        try:
+            _, implementation_data = _load_toml_text_and_data(implementation_config_file)
+            artifacts = implementation_data.get("artifacts")
+            if not isinstance(artifacts, dict):
+                raise ValueError("implementation_config.toml must define [artifacts]")
+            governance_file_name = artifacts.get("governance_tree_json")
+            if not isinstance(governance_file_name, str) or not governance_file_name.strip():
+                raise ValueError("implementation_config.toml missing artifacts.governance_tree_json")
+            governance_tree_path = product_spec_file.parent / "generated" / governance_file_name.strip()
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to resolve governance tree path for {rel_product_spec_file}: {exc}",
+                    rel_implementation_config_file,
+                    1,
+                    code="GOVERNANCE_CONFIG_INVALID",
+                )
+            )
+            continue
+
+        if not governance_tree_path.exists():
+            issues.append(
+                make_issue(
+                    "missing governance tree; run "
+                    f"`uv run python scripts/materialize_project.py --project {rel_product_spec_file}`",
+                    rel_product_spec_file,
+                    1,
+                    code="STALE_EVIDENCE",
+                    related=[
+                        {
+                            "message": "Expected governance tree",
+                            "file": governance_tree_path.relative_to(REPO_ROOT).as_posix(),
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+            )
+            continue
+
+        try:
+            tree_payload = parse_governance_tree(governance_tree_path)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"invalid governance tree for {rel_product_spec_file}: {exc}",
+                    governance_tree_path.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="GOVERNANCE_TREE_INVALID",
+                )
+            )
+            continue
+
+        tree_issues = validate_tree_closure(tree_payload)
+        if tree_issues:
+            for stale in tree_issues:
+                issue = make_issue(
+                    stale["message"],
+                    stale.get("file") or governance_tree_path.relative_to(REPO_ROOT).as_posix(),
+                    int(stale.get("line", 1)),
+                    code=str(stale["code"]),
+                    related=[
+                        {
+                            "message": "Materialize this project to refresh governance evidence",
+                            "file": rel_product_spec_file,
+                            "line": 1,
+                            "column": 1,
+                        }
+                    ],
+                )
+                if "ref" in stale:
+                    issue["ref"] = stale["ref"]
+                issues.append(issue)
+            continue
+
+        try:
+            project = load_knowledge_base_project(product_spec_file)
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to load project for governance validation: {exc}",
+                    rel_product_spec_file,
+                    1,
+                    code="GOVERNANCE_PROJECT_LOAD_FAILED",
+                )
+            )
+            continue
+
+        for finding in compare_project_to_tree(project, tree_payload):
+            issue = make_issue(
+                str(finding["message"]),
+                str(finding.get("file") or rel_product_spec_file),
+                int(finding.get("line", 1)),
+                code=str(finding["code"]),
+            )
+            for key in ("symbol_id", "owner", "kind", "expected", "actual", "locator"):
+                if key in finding:
+                    issue[key] = finding[key]
+            issues.append(issue)
+
+    return issues
+
+
+def validate_workspace_governance_artifacts() -> list[Issue]:
+    issues: list[Issue] = []
+    rel_json = DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix()
+    rel_html = DEFAULT_WORKSPACE_GOVERNANCE_HTML.relative_to(REPO_ROOT).as_posix()
+
+    if not DEFAULT_WORKSPACE_GOVERNANCE_JSON.exists():
+        issues.append(
+            make_issue(
+                "missing workspace governance tree JSON; run `uv run python scripts/materialize_project.py`",
+                rel_json,
+                1,
+                code="WORKSPACE_GOVERNANCE_MISSING",
+            )
+        )
+        return issues
+
+    if not DEFAULT_WORKSPACE_GOVERNANCE_HTML.exists():
+        issues.append(
+            make_issue(
+                "missing workspace governance tree HTML; run `uv run python scripts/materialize_project.py`",
+                rel_html,
+                1,
+                code="WORKSPACE_GOVERNANCE_MISSING",
+            )
+        )
+        return issues
+
+    try:
+        parse_workspace_governance_payload(DEFAULT_WORKSPACE_GOVERNANCE_JSON)
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"invalid workspace governance tree JSON: {exc}",
+                rel_json,
+                1,
+                code="WORKSPACE_GOVERNANCE_INVALID",
+            )
+        )
+        return issues
+
+    try:
+        fresh_payload = build_workspace_governance_payload()
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+            temp_json = Path(temp_dir) / "shelf_governance_tree.json"
+            temp_html = Path(temp_dir) / "shelf_governance_tree.html"
+            temp_json.write_text(json.dumps(fresh_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            graph = load_hierarchy_graph(temp_json)
+            render_hierarchy_html(graph, temp_html, width=1680, height=1080)
+            if _read_file_bytes(DEFAULT_WORKSPACE_GOVERNANCE_JSON) != _read_file_bytes(temp_json):
+                issues.append(
+                    make_issue(
+                        "workspace governance tree JSON is stale or manually edited; re-materialize the workspace tree",
+                        rel_json,
+                        1,
+                        code="WORKSPACE_GOVERNANCE_OUT_OF_SYNC",
+                    )
+                )
+            if _read_file_bytes(DEFAULT_WORKSPACE_GOVERNANCE_HTML) != _read_file_bytes(temp_html):
+                issues.append(
+                    make_issue(
+                        "workspace governance tree HTML is stale or manually edited; re-materialize the workspace tree",
+                        rel_html,
+                        1,
+                        code="WORKSPACE_GOVERNANCE_OUT_OF_SYNC",
+                    )
+                )
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"failed to rebuild workspace governance tree: {exc}",
+                rel_json,
+                1,
+                code="WORKSPACE_GOVERNANCE_BUILD_FAILED",
+            )
+        )
 
     return issues
 
@@ -983,7 +1474,22 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
             for identifier in file_identifiers
             if CANONICAL_CAPABILITY_ID_PATTERN.fullmatch(identifier) is not None
         }
+        non_capability_ids: set[str] = set()
+        for capability_line_num, capability_line in iter_section_bullet_lines(file_text, "## 1. 能力声明"):
+            capability_match = FRAMEWORK_NUMBERED_ITEM_PATTERN.match(capability_line)
+            if capability_match is None:
+                continue
+            capability_id = capability_match.group(1)
+            if capability_id not in capability_ids:
+                continue
+            if "非能力项" in capability_line:
+                non_capability_ids.add(capability_id)
+        positive_capability_ids = capability_ids - non_capability_ids
+        base_ids = {
+            identifier for identifier in file_identifiers if CANONICAL_BASE_ID_PATTERN.fullmatch(identifier)
+        }
         boundary_ids: set[str] = set()
+        base_source_tokens_by_base: dict[str, set[str]] = {}
 
         for base_item_match in FRAMEWORK_BASE_ITEM_LINE_PATTERN.finditer(file_text):
             base_id = base_item_match.group(1)
@@ -1184,6 +1690,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                 )
                 continue
 
+            base_source_tokens_by_base[base_id] = set(source_tokens)
             for token in source_tokens:
                 if token not in file_identifiers:
                     issues.append(
@@ -1293,12 +1800,18 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
         rule_top_lines: dict[str, int] = {}
         rule_child_items: dict[str, list[tuple[int, str]]] = {}
         rule_declared_symbols: dict[str, set[str]] = {}
+        rule_participant_bases: dict[str, set[str]] = {}
+        rule_output_capabilities: dict[str, set[str]] = {}
+        rule_boundary_bindings: dict[str, set[str]] = {}
         for rule_line_num, rule_line in iter_section_bullet_lines(file_text, "## 4. 基组合原则"):
             top_match = FRAMEWORK_RULE_TOP_LINE_PATTERN.match(rule_line)
             if top_match is not None:
                 parent_rule = top_match.group(1)
                 rule_top_lines.setdefault(parent_rule, rule_line_num)
                 rule_child_items.setdefault(parent_rule, [])
+                rule_participant_bases.setdefault(parent_rule, set())
+                rule_output_capabilities.setdefault(parent_rule, set())
+                rule_boundary_bindings.setdefault(parent_rule, set())
                 continue
 
             child_match = FRAMEWORK_RULE_CHILD_LINE_PATTERN.match(rule_line)
@@ -1308,6 +1821,61 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
             parent_rule = child_rule.split(".", 1)[0]
             content = child_match.group(2).strip()
             rule_child_items.setdefault(parent_rule, []).append((rule_line_num, content))
+            child_tokens = extract_backtick_tokens(content)
+
+            if "参与基" in content:
+                participant_bases = {
+                    token for token in child_tokens if CANONICAL_BASE_ID_PATTERN.fullmatch(token) is not None
+                }
+                rule_participant_bases.setdefault(parent_rule, set()).update(participant_bases)
+                if not participant_bases:
+                    issues.append(
+                        make_issue(
+                            f"{parent_rule} participating bases must reference at least one B*",
+                            rel_file,
+                            rule_line_num,
+                            code="FW042",
+                        )
+                    )
+                for token in child_tokens:
+                    if token in base_ids:
+                        continue
+                    issues.append(
+                        make_issue(
+                            f"{parent_rule} participating bases reference undefined base: {token}",
+                            rel_file,
+                            rule_line_num,
+                            code="FW042",
+                        )
+                    )
+
+            if "输出能力" in content:
+                output_capabilities = set(re.findall(r"C\d+", content))
+                rule_output_capabilities.setdefault(parent_rule, set()).update(output_capabilities)
+
+            if "边界绑定" in content:
+                boundary_refs = {token for token in child_tokens if token in boundary_ids}
+                rule_boundary_bindings.setdefault(parent_rule, set()).update(boundary_refs)
+                if not boundary_refs:
+                    issues.append(
+                        make_issue(
+                            f"{parent_rule} boundary binding must reference at least one declared boundary",
+                            rel_file,
+                            rule_line_num,
+                            code="FW043",
+                        )
+                    )
+                for token in child_tokens:
+                    if token in boundary_ids:
+                        continue
+                    issues.append(
+                        make_issue(
+                            f"{parent_rule} boundary binding references undefined boundary: {token}",
+                            rel_file,
+                            rule_line_num,
+                            code="FW043",
+                        )
+                    )
 
             if "输出结构" in content:
                 for token in extract_backtick_tokens(content):
@@ -1363,6 +1931,101 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                             code="FW050",
                         )
                     )
+
+        capability_source_bases: dict[str, set[str]] = {cap_id: set() for cap_id in positive_capability_ids}
+        for base_ref_id, base_source_tokens in base_source_tokens_by_base.items():
+            for capability_id in positive_capability_ids:
+                if capability_id in base_source_tokens:
+                    capability_source_bases.setdefault(capability_id, set()).add(base_ref_id)
+
+        capability_output_rules: dict[str, set[str]] = {cap_id: set() for cap_id in positive_capability_ids}
+        for parent_rule, output_capability_refs in rule_output_capabilities.items():
+            for capability_id in positive_capability_ids:
+                if capability_id in output_capability_refs:
+                    capability_output_rules.setdefault(capability_id, set()).add(parent_rule)
+
+        for capability_id in sorted(positive_capability_ids):
+            capability_line_num = int(file_identifier_origin.get(capability_id, 1))
+            supporting_bases = capability_source_bases.get(capability_id, set())
+            output_rules = capability_output_rules.get(capability_id, set())
+            if not supporting_bases:
+                issues.append(
+                    make_issue(
+                        (
+                            f"{capability_id} lacks weak sufficiency support: no B* source expression "
+                            "references this capability"
+                        ),
+                        rel_file,
+                        capability_line_num,
+                        code="FW070",
+                    )
+                )
+            if not output_rules:
+                issues.append(
+                    make_issue(
+                        (
+                            f"{capability_id} lacks weak sufficiency support: no R* output capability "
+                            "references this capability"
+                        ),
+                        rel_file,
+                        capability_line_num,
+                        code="FW071",
+                    )
+                )
+            if supporting_bases and output_rules:
+                has_chain = any(
+                    bool(rule_participant_bases.get(parent_rule, set()).intersection(supporting_bases))
+                    for parent_rule in output_rules
+                )
+                if not has_chain:
+                    issues.append(
+                        make_issue(
+                            (
+                                f"{capability_id} lacks weak sufficiency chain: expected at least one "
+                                "B -> R -> C derivation path"
+                            ),
+                            rel_file,
+                            capability_line_num,
+                            code="FW072",
+                        )
+                    )
+
+        used_bases = {
+            base_id
+            for base_refs in rule_participant_bases.values()
+            for base_id in base_refs
+        }
+        for base_id in sorted(base_ids):
+            if base_id in used_bases:
+                continue
+            issues.append(
+                make_issue(
+                    f"{base_id} is never used by any R* participating bases",
+                    rel_file,
+                    file_identifier_origin.get(base_id, 1),
+                    code="FW073",
+                )
+            )
+
+        used_boundaries = {
+            boundary_id
+            for boundary_refs in rule_boundary_bindings.values()
+            for boundary_id in boundary_refs
+        }
+        for boundary_id in sorted(boundary_ids):
+            used_in_base_source = any(
+                boundary_id in source_tokens for source_tokens in base_source_tokens_by_base.values()
+            )
+            if used_in_base_source or boundary_id in used_boundaries:
+                continue
+            issues.append(
+                make_issue(
+                    f"{boundary_id} is not used by any B* source or R* boundary binding",
+                    rel_file,
+                    file_identifier_origin.get(boundary_id, 1),
+                    code="FW074",
+                )
+            )
 
         declared_by_order: list[tuple[int, set[str]]] = []
         for parent_rule, symbols in rule_declared_symbols.items():
@@ -1703,6 +2366,7 @@ def validate_registry_structure(
     issues.extend(level_issues)
 
     tree = registry.get("tree")
+    expected_tree = build_standards_tree()
     if not isinstance(tree, dict):
         issues.append(
             make_issue(
@@ -1712,10 +2376,26 @@ def validate_registry_structure(
                 code="REGISTRY_TREE_TYPE",
             )
         )
-        return issues, None
+        tree = expected_tree
+    else:
+        if json.dumps(tree, ensure_ascii=False, sort_keys=True) != json.dumps(
+            expected_tree,
+            ensure_ascii=False,
+            sort_keys=True,
+        ):
+            issues.append(
+                make_issue(
+                    (
+                        "mapping_registry.json: tree is out of sync with the canonical standards tree; "
+                        "run `uv run python scripts/sync_mapping_registry.py`"
+                    ),
+                    REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
+                    find_line(registry_text, '"tree"'),
+                    code="REGISTRY_TREE_STALE",
+                )
+            )
 
-    level_files, tree_issues = walk_tree_and_collect(tree, registry_text, level_order)
-    issues.extend(tree_issues)
+    level_files = level_files_from_tree(expected_tree)
 
     for level in level_order:
         if not level_files.get(level):
@@ -2107,61 +2787,47 @@ def python_assign_call_exists(tree: ast.AST, target_name: str, func_name: str) -
     return False
 
 
-def validate_change_propagation(
-    registry_text: str,
-    parsed_registry: ParsedRegistry,
-    changed_files: set[str],
-) -> list[Issue]:
+def validate_change_propagation(change_context: dict[str, Any], changed_files: set[str]) -> list[Issue]:
     issues: list[Issue] = []
+    touched_nodes = list(change_context.get("touched_nodes", []))
+    affected_nodes = list(change_context.get("affected_nodes", []))
 
-    level_order = parsed_registry.level_order
-    level_files = parsed_registry.level_files
-    impl_files = parsed_registry.impl_files
-    framework_layer_files = parsed_registry.framework_layer_files
-    level_index = {level: idx for idx, level in enumerate(level_order)}
-
-    def touched(level: str) -> bool:
-        candidates = set(level_files.get(level, set()))
-        if level == "L2":
-            candidates.update(framework_layer_files)
-        if level == "L3":
-            candidates.update(impl_files)
-        return bool(changed_files.intersection(candidates))
-
-    for src_level in level_order:
-        if src_level == "L3":
-            continue
-        if not touched(src_level):
-            continue
-
-        src_idx = level_index[src_level]
-        for target_level in level_order[src_idx + 1 :]:
-            target_candidates = set(level_files.get(target_level, set()))
-            if target_level == "L3":
-                target_candidates.update(impl_files)
-            if not target_candidates:
-                continue
-            if touched(target_level):
-                continue
-
-            missing_target = sorted(target_candidates)[0]
-            issues.append(
-                make_issue(
-                    f"change propagation violation: {src_level} changed but {target_level} not updated",
-                    REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
-                    find_level_order_line(registry_text, src_level),
-                    code="PROPAGATION_MISSING_TARGET",
-                    related=[
-                        {
-                            "message": f"Expected changed file in {target_level}",
-                            "file": missing_target,
-                            "line": 1,
-                            "column": 1,
-                        }
-                    ],
-                )
+    governed_prefixes = ("framework/", "specs/", "mapping/", "projects/", "src/")
+    ignored_governance_artifacts = {
+        DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix(),
+        DEFAULT_WORKSPACE_GOVERNANCE_HTML.relative_to(REPO_ROOT).as_posix(),
+    }
+    governed_changed_files = sorted(
+        path
+        for path in changed_files
+        if path.startswith(governed_prefixes) and path not in ignored_governance_artifacts
+    )
+    if governed_changed_files and not touched_nodes:
+        issues.append(
+            make_issue(
+                "changed governed files do not map to any workspace governance node; regenerate the governance tree and verify node coverage",
+                DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix(),
+                1,
+                code="PROPAGATION_NODE_UNRESOLVED",
+                related=[
+                    {
+                        "message": "First unresolved governed file",
+                        "file": governed_changed_files[0],
+                        "line": 1,
+                        "column": 1,
+                    }
+                ],
             )
-
+        )
+    if touched_nodes and not affected_nodes:
+        issues.append(
+            make_issue(
+                "workspace governance tree resolved touched nodes but produced no affected closure",
+                DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix(),
+                1,
+                code="PROPAGATION_CLOSURE_EMPTY",
+            )
+        )
     return issues
 
 
@@ -2203,6 +2869,30 @@ def main() -> int:
         return 1
 
     issues: list[Issue] = []
+    changed: set[str] = set()
+    change_context: dict[str, Any] | None = None
+    scoped_project_spec_files: list[Path] | None = None
+
+    if args.check_changes:
+        changed = collect_changed_files()
+        try:
+            workspace_payload = build_workspace_governance_payload()
+            change_context = resolve_workspace_change_context(workspace_payload, changed)
+            affected_files = [
+                (REPO_ROOT / item).resolve() if not Path(item).is_absolute() else Path(item).resolve()
+                for item in list(change_context.get("affected_project_spec_files", []))
+            ]
+            if affected_files:
+                scoped_project_spec_files = affected_files
+        except Exception as exc:
+            issues.append(
+                make_issue(
+                    f"failed to resolve workspace governance change context: {exc}",
+                    DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix(),
+                    1,
+                    code="WORKSPACE_GOVERNANCE_CONTEXT_FAILED",
+                )
+            )
     structure_issues, parsed_registry = validate_registry_structure(registry, registry_text)
     issues.extend(structure_issues)
 
@@ -2220,11 +2910,19 @@ def main() -> int:
             )
 
     if not issues:
-        issues.extend(validate_project_generation_discipline())
+        issues.extend(validate_project_generation_discipline(scoped_project_spec_files))
 
-    if args.check_changes and parsed_registry is not None:
-        changed = collect_changed_files()
-        issues.extend(validate_change_propagation(registry_text, parsed_registry, changed))
+    if not issues:
+        issues.extend(validate_implementation_config_effects(scoped_project_spec_files))
+
+    if not issues:
+        issues.extend(validate_project_governance(scoped_project_spec_files))
+
+    if not issues:
+        issues.extend(validate_workspace_governance_artifacts())
+
+    if args.check_changes and change_context is not None:
+        issues.extend(validate_change_propagation(change_context, changed))
 
     passed = len(issues) == 0
     result_payload = {
@@ -2232,6 +2930,8 @@ def main() -> int:
         "checked_changes": args.check_changes,
         "errors": issues,
     }
+    if change_context is not None:
+        result_payload["change_context"] = change_context
 
     if args.json:
         print(json.dumps(result_payload, ensure_ascii=False))

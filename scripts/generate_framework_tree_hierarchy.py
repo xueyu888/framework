@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from standards_tree import build_standards_tree
+
 DEFAULT_REGISTRY = REPO_ROOT / "mapping/mapping_registry.json"
 DEFAULT_FRAMEWORK_DIR = REPO_ROOT / "framework"
 DEFAULT_OUTPUT_JSON = REPO_ROOT / "docs/hierarchy/shelf_framework_tree.json"
@@ -69,10 +75,8 @@ def find_first_h1_text(file_text: str, fallback: str) -> str:
 
 
 def build_payload_from_registry(registry_path: Path) -> dict[str, Any]:
-    raw = json.loads(registry_path.read_text(encoding="utf-8"))
-    tree = raw.get("tree")
-    if not isinstance(tree, dict):
-        raise ValueError("mapping_registry.json: tree must be an object")
+    _ = json.loads(registry_path.read_text(encoding="utf-8"))
+    tree = build_standards_tree()
 
     seen_ids: set[str] = set()
     level_order_counter: dict[int, int] = {}
@@ -145,8 +149,7 @@ def build_payload_from_registry(registry_path: Path) -> dict[str, Any]:
     root = {
         "title": "框架标准树结构图",
         "description": (
-            "从 mapping/mapping_registry.json 的 tree 自动生成，"
-            "展示框架标准树父子关系。"
+            "从仓库规范标准集自动生成，展示框架标准树父子关系。"
         ),
         "level_labels": level_labels,
         "nodes": nodes,
