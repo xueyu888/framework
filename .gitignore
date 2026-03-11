@@ -38,3 +38,5 @@ tools/vscode/shelf-ai/releases/
 
 # Local presentation exports
 docs/presentations/*.pptx
+
+apps/desktop_screenshot_translate/electron/renderer/panel-dist/
