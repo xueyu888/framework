@@ -1,0 +1,209 @@
+{
+  "name": "shelf-ai",
+  "displayName": "Shelf AI",
+  "description": "Shelf AI: governance-tree-first workspace and strict mapping guard.",
+  "version": "0.0.43",
+  "publisher": "rdshr",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xueyu888/shelf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xueyu888/shelf/issues"
+  },
+  "homepage": "https://github.com/xueyu888/shelf/tree/main/tools/vscode/shelf-ai",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE.txt",
+    "README.md",
+    "extension.js",
+    "guarding.js",
+    "governance_tree.js",
+    "framework_completion.js",
+    "framework_navigation.js",
+    "media/**",
+    "snippets/**"
+  ],
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:shelf.sidebarHome",
+    "onCommand:shelf.insertFrameworkModuleTemplate",
+    "onCommand:shelf.installGitHooks",
+    "onCommand:shelf.validateNow",
+    "onCommand:shelf.openFrameworkTree",
+    "onCommand:shelf.refreshFrameworkTree"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "snippets": [
+      {
+        "language": "markdown",
+        "path": "./snippets/markdown.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "shelf.insertFrameworkModuleTemplate",
+        "title": "Shelf: Insert Framework Module Template"
+      },
+      {
+        "command": "shelf.validateNow",
+        "title": "Shelf: Validate Mapping Now"
+      },
+      {
+        "command": "shelf.installGitHooks",
+        "title": "Shelf: Install Git Hooks"
+      },
+      {
+        "command": "shelf.showIssues",
+        "title": "Shelf: Show Mapping Issues"
+      },
+      {
+        "command": "shelf.openFrameworkTree",
+        "title": "Shelf: Open Governance Tree"
+      },
+      {
+        "command": "shelf.refreshFrameworkTree",
+        "title": "Shelf: Refresh Governance Tree"
+      }
+    ],
+    "icons": {
+      "shelf-logo": {
+        "description": "Shelf AI Activity Bar icon",
+        "default": {
+          "fontPath": "media/shelf-ai-icons.woff2",
+          "fontCharacter": "\\ea01"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "shelfSidebar",
+          "title": "Shelf",
+          "icon": "$(shelf-logo)"
+        }
+      ]
+    },
+    "views": {
+      "shelfSidebar": [
+        {
+          "id": "shelf.sidebarHome",
+          "name": "Shelf",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "shelf.openFrameworkTree",
+          "when": "view == shelf.sidebarHome",
+          "group": "navigation@1"
+        },
+        {
+          "command": "shelf.refreshFrameworkTree",
+          "when": "view == shelf.sidebarHome",
+          "group": "navigation@2"
+        },
+        {
+          "command": "shelf.validateNow",
+          "when": "view == shelf.sidebarHome",
+          "group": "navigation@3"
+        },
+        {
+          "command": "shelf.installGitHooks",
+          "when": "view == shelf.sidebarHome",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Shelf",
+      "properties": {
+        "shelf.enableOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run strict mapping validation when a relevant file is saved."
+        },
+        "shelf.notifyOnAutoFail": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when auto validation detects mapping issues."
+        },
+        "shelf.guardMode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "strict"
+          ],
+          "default": "normal",
+          "description": "Choose whether Shelf only reports generated-artifact edits or automatically restores them."
+        },
+        "shelf.autoMaterialize": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run project materialization when framework, product spec, or implementation config changes."
+        },
+        "shelf.runMypyOnPythonChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run mypy after relevant Python changes under src/, scripts/, or tests/."
+        },
+        "shelf.protectGeneratedFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Guard projects/*/generated/* from direct edits."
+        },
+        "shelf.promptInstallGitHooks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prompt once per session to enable the repository .githooks path when missing."
+        },
+        "shelf.changeValidationCommand": {
+          "type": "string",
+          "default": "uv run python scripts/validate_strict_mapping.py --check-changes --json",
+          "description": "Command used for save-triggered validation."
+        },
+        "shelf.fullValidationCommand": {
+          "type": "string",
+          "default": "uv run python scripts/validate_strict_mapping.py --json",
+          "description": "Command used for manual full validation."
+        },
+        "shelf.governanceTreeJsonPath": {
+          "type": "string",
+          "default": "docs/hierarchy/shelf_governance_tree.json",
+          "description": "Workspace-relative path of generated governance tree JSON."
+        },
+        "shelf.governanceTreeHtmlPath": {
+          "type": "string",
+          "default": "docs/hierarchy/shelf_governance_tree.html",
+          "description": "Workspace-relative path of generated governance tree HTML."
+        },
+        "shelf.governanceTreeGenerateCommand": {
+          "type": "string",
+          "default": "uv run python scripts/generate_governance_tree_hierarchy.py --output-json docs/hierarchy/shelf_governance_tree.json --output-html docs/hierarchy/shelf_governance_tree.html",
+          "description": "Command used by 'Refresh Governance Tree'."
+        },
+        "shelf.materializeCommand": {
+          "type": "string",
+          "default": "uv run python scripts/materialize_project.py",
+          "description": "Base command used for Shelf auto-materialization. Shelf appends --project arguments for affected product specs."
+        },
+        "shelf.typeCheckCommand": {
+          "type": "string",
+          "default": "uv run mypy",
+          "description": "Command used when Shelf runs Python type checks after relevant source changes."
+        }
+      }
+    }
+  }
+}
