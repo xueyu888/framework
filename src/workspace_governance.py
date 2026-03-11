@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 from typing import Any, cast
 
-from project_runtime import load_knowledge_base_project
+from project_runtime import discover_framework_driven_projects, load_registered_project
 from project_runtime.governance import build_governance_tree
 from standards_tree import build_standards_tree
 
@@ -20,9 +20,10 @@ SECTION_HEADER_PATTERN = re.compile(r"^\s*\[([A-Za-z0-9_.-]+)\]\s*$")
 
 def discover_workspace_product_spec_files(projects_dir: Path | None = None) -> list[Path]:
     root = projects_dir or (REPO_ROOT / "projects")
-    if not root.exists():
-        return []
-    return sorted(path.resolve() for path in root.glob("*/product_spec.toml"))
+    return [
+        (REPO_ROOT / item.product_spec_file).resolve()
+        for item in discover_framework_driven_projects(root)
+    ]
 
 
 def _relative(path: Path | str) -> str:
@@ -72,7 +73,18 @@ def _node_label(title: str | None, fallback: str) -> str:
 
 def _node_description(parts: dict[str, Any]) -> str:
     ordered: list[str] = []
-    for key in ("kind", "layer", "project_id", "file", "locator", "symbol_id", "artifact"):
+    for key in (
+        "kind",
+        "layer",
+        "project_id",
+        "file",
+        "locator",
+        "object_id",
+        "role_id",
+        "candidate_id",
+        "symbol_id",
+        "artifact",
+    ):
         value = parts.get(key)
         if value in (None, "", [], {}):
             continue
@@ -216,6 +228,9 @@ def _project_tree_to_hierarchy_nodes(
                         "project_id": project_id,
                         "file": rel_file,
                         "locator": node.get("locator"),
+                        "object_id": node.get("object_id"),
+                        "role_id": node.get("role_id"),
+                        "candidate_id": node.get("candidate_id"),
                         "symbol_id": node.get("symbol_id"),
                         "artifact": node.get("artifact"),
                     }
@@ -231,6 +246,9 @@ def _project_tree_to_hierarchy_nodes(
                 "owner": node.get("owner"),
                 "artifact": node.get("artifact"),
                 "symbol_id": node.get("symbol_id"),
+                "object_id": node.get("object_id"),
+                "role_id": node.get("role_id"),
+                "candidate_id": node.get("candidate_id"),
                 "symbol_kind": node.get("symbol_kind"),
                 "risk": node.get("risk"),
                 "validator": node.get("validator"),
@@ -395,7 +413,7 @@ def build_workspace_governance_payload(
     project_roots: dict[str, str] = {}
 
     for product_spec_file in requested_product_spec_files:
-        project = load_knowledge_base_project(product_spec_file)
+        project = load_registered_project(product_spec_file)
         project_tree = build_governance_tree(project)
         project_id = str(project_tree.get("project_id") or project.metadata.project_id)
         rel_product_spec_file = _relative(product_spec_file)

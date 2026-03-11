@@ -11,7 +11,16 @@ from typing import Any
 
 from framework_ir import FrameworkModuleIR, load_framework_registry, parse_framework_module
 from project_runtime.config_layout import config_layout
-from project_runtime.governance import build_governance_manifest, build_governance_tree
+from project_runtime.governance import (
+    build_governance_closure,
+    build_governance_manifest,
+    build_governance_tree,
+)
+from project_runtime.template_registry import (
+    ProjectTemplateRegistration,
+    detect_project_template_id as detect_registered_project_template_id,
+    register_project_template,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE = REPO_ROOT / "projects/knowledge_base_basic/product_spec.toml"
@@ -55,18 +64,7 @@ SUPPORTED_BACKEND_RETRIEVAL_STRATEGIES = frozenset({"retrieval_stub"})
 
 
 def detect_project_template_id(product_spec_file: str | Path) -> str:
-    product_spec_path = Path(product_spec_file)
-    with product_spec_path.open("rb") as fh:
-        data = tomllib.load(fh)
-    if not isinstance(data, dict):
-        raise ValueError(f"project config must decode into object: {product_spec_path}")
-    project_table = data.get("project")
-    if not isinstance(project_table, dict):
-        raise ValueError(f"missing required table: project in {product_spec_path}")
-    template_id = project_table.get("template")
-    if not isinstance(template_id, str) or not template_id.strip():
-        raise ValueError(f"missing required string: project.template in {product_spec_path}")
-    return template_id.strip()
+    return detect_registered_project_template_id(product_spec_file)
 
 
 def assert_supported_project_template(product_spec_file: str | Path) -> str:
@@ -1968,3 +1966,19 @@ def build_knowledge_base_runtime_app_from_spec(
 
     project = materialize_knowledge_base_project(product_spec_file)
     return build_knowledge_base_runtime_app(project)
+
+
+register_project_template(
+    ProjectTemplateRegistration(
+        template_id=KNOWLEDGE_BASE_TEMPLATE_ID,
+        default_product_spec_file=DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
+        product_spec_layout=KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT,
+        implementation_config_layout=KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT,
+        load_project=load_knowledge_base_project,
+        materialize_project=materialize_knowledge_base_project,
+        build_runtime_app_from_spec=build_knowledge_base_runtime_app_from_spec,
+        build_governance_closure=build_governance_closure,
+        build_implementation_effect_manifest=build_implementation_effect_manifest,
+        default=True,
+    )
+)

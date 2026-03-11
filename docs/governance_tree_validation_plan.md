@@ -1,216 +1,389 @@
-# 当前治理树实现方案
+# 双向治理当前实现说明
 
-## 1. 结论
+## 1. 当前结论
 
-当前仓库已经落到这条主链：
+仓库现在已经不是“只对知识库几个文件打补丁”的状态，而是进入了一个可扩展的双向治理骨架：
 
-`Standards -> Project(Framework -> Product Spec -> Implementation Config -> Code -> Evidence) -> Workspace Evidence`
+- 先自动发现 `projects/<project_id>/` 下的框架驱动项目
+- 再按模板注册加载项目
+- 再为每个项目构建 object-first 的项目治理闭包
+- 再从治理闭包自动推导 strict zone
+- 再扫描 strict zone 中的高置信结构候选
+- 再把候选全部消解为 `governed / attached / internal`
+- 最后把 expected / actual compare、strict zone、workspace tree 一起并入 `materialize` / `validate` / Shelf guard 主链
 
-这不是早期那种“标准树 + 项目 manifest”并行的双中心实现了。现在真正的主模型是：
+当前仓库自动发现到的框架驱动项目集合只有一个：
 
-- 工作区统一治理树：`docs/hierarchy/shelf_governance_tree.json`
-- 项目治理树：`projects/<project_id>/generated/governance_tree.json`
+- `knowledge_base_basic`
+
+这是发现结果，不是硬编码前提。
+
+## 2. 主入口与实现位置
+
+### 2.1 项目注册与发现
+
+- 模板注册：`src/project_runtime/template_registry.py`
+- 项目自动发现：`src/project_runtime/project_governance.py` 里的 `discover_framework_driven_projects`
+- 注册到知识库模板：`src/project_runtime/knowledge_base.py`
+
+### 2.2 object-first 治理
+
+- 通用对象模型、candidate scanner、strict zone 推导：`src/project_runtime/project_governance.py`
+- 知识库模板如何把上游语义编译成结构对象：`src/project_runtime/governance.py`
+
+### 2.3 主链接入
+
+- 项目物化主入口：`scripts/materialize_project.py`
 - 严格校验主入口：`scripts/validate_strict_mapping.py`
-- 插件工作视图与自动守卫：`tools/vscode/shelf-ai`
+- 工作区治理树：`src/workspace_governance.py`
+- VSCode / Shelf AI 后台守卫读取的治理树：`docs/hierarchy/shelf_governance_tree.json`
 
-当前已经做到：
+## 3. 框架驱动项目的发现规则
 
-- 全局一棵树
-- 节点变化驱动相关检查
-- 插件直接围绕治理树工作
+项目发现不是按模板名白名单做的，而是按以下规则自动识别：
 
-但也有仍然保留的兼容/工程债，下面会明说，不隐藏。
+1. 位于 `projects/<project_id>/`
+2. 存在 `product_spec.toml`
+3. 存在同目录 `implementation_config.toml`
+4. `project_spec.toml` 中存在 `project.template`
+5. `project.template` 能解析到已注册模板
+6. 该模板能通过 `load_project(...)` 成功加载
+7. 加载后的项目对象能给出 framework 引用和 generated artifact 契约
 
-## 2. 当前结构
+发现结果会形成 `FrameworkDrivenProjectRecord`，包含：
 
-### 2.1 工作区治理树
+- `project_id`
+- `template_id`
+- `product_spec_file`
+- `implementation_config_file`
+- `generated_dir`
+- `discovery_reasons`
+- `framework_refs`
+- `artifact_contract`
 
-工作区树由 [src/workspace_governance.py](/home/xue/code/shelf/src/workspace_governance.py) 负责生成，产物是：
+这批信息会进入项目级治理闭包和工作区治理树。
 
-- [shelf_governance_tree.json](/home/xue/code/shelf/docs/hierarchy/shelf_governance_tree.json)
-- [shelf_governance_tree.html](/home/xue/code/shelf/docs/hierarchy/shelf_governance_tree.html)
+## 4. object-first 模型
 
-树顶层现在包含三个正式根分支：
+治理中心已经从 `file-first` / `symbol-first` 升成 `object-first`。
 
-- `Standards`
-- `Projects`
-- `Workspace Evidence`
+当前主对象类型定义在 `src/project_runtime/project_governance.py`：
+
+- `StructuralObject`
+- `RequiredRole`
+- `StructuralCandidate`
+- `ResolvedRoleBinding`
+- `StrictZoneEntry`
+- `ProjectGovernanceClosure`
+
+每个 `StructuralObject` 至少包含：
+
+- `object_id`
+- `project_id`
+- `kind`
+- `sources_framework`
+- `sources_product`
+- `sources_implementation`
+- `semantic`
+- `required_roles`
+- `risk_level`
+- `cardinality`
+- `status`
+- `expected_evidence`
+- `expected_fingerprint`
+- `actual_evidence`
+- `actual_fingerprint`
+- `comparator`
+- `extractor`
+
+### 4.1 当前知识库对象全集
+
+知识库模板当前已经进入治理闭包的对象包括：
+
+- `kb.runtime.page_routes`
+- `kb.frontend.surface_contract`
+- `kb.workbench.surface_contract`
+- `kb.ui.surface_spec`
+- `kb.backend.surface_spec`
+- `kb.api.library_contracts`
+- `kb.api.chat_contract`
+- `kb.answer.behavior`
+- `knowledge_base_basic.config_effect.*`
+
+最后一类 `config_effect` 不是手工点名文件，而是从 `build_implementation_effect_manifest(...)` 自动提升出来的实现配置对象。
+
+## 5. strict zone 的推导规则
+
+strict zone 不再是固定文件白名单。
+
+当前实现规则是：
+
+1. 先根据项目结构对象的 `required_roles` 生成角色要求
+2. 再做全仓 Python 结构候选扫描
+3. 再用 `required_roles` 去匹配候选对象
+4. 先做一轮 seed role binding
+5. 从 seed role binding + evidence artifact contract 推导 strict zone
+6. 再只保留 strict zone 内的高置信候选
+7. 再做正式 role binding、candidate classification 和 strict zone 收敛
+
+形式上可以理解成：
+
+`strict_zone(project) = 承载该项目结构对象 required_roles 的最小实现闭包 + 必需 evidence carrier`
+
+### 5.1 strict zone 为什么可审计
+
+每个 strict zone 文件都会落成 `StrictZoneEntry`，里面明确记录：
+
+- `file`
+- `object_ids`
+- `role_ids`
+- `candidate_ids`
+- `reasons`
+
+所以每个进入 strict zone 的文件都有“因为哪些对象、哪些角色、哪些 evidence reason 进入”的解释。
+
+## 6. Python 第一版 candidate scanner
+
+当前只把 Python 做到第一版闭环，扫描规则在 `src/project_runtime/project_governance.py`。
+
+扫描范围：
+
+- `src/**/*.py`
+- `scripts/**/*.py`
+
+当前会扫描的高置信结构候选包括：
+
+### 6.1 route 候选
+
+- FastAPI / APIRouter decorator 的 handler
+- router builder / app builder
+- `include_router` / `add_api_route` / router construction
+
+### 6.2 schema 候选
+
+- `BaseModel`
+- `TypedDict`
+- `Enum`
+- `dataclass`
+
+### 6.3 builder / compiler / resolver / materializer 候选
+
+- `build_*`
+- `_build_*`
+- `compile_*`
+- `resolve_*`
+- `create_*`
+- `materialize_*`
+- `_expected_*`
+- `_actual_*`
+
+并叠加职责信号：
+
+- router construction
+- route registration
+- artifact write
+- governance / manifest / tree / generated 文本信号
+- implementation / ui_spec / backend_spec / generated_artifacts effect sink 信号
+
+### 6.4 行为候选
+
+- 函数名命中 `answer / retrieval / citation / merge / context / return`
+
+## 7. governed / attached / internal 消解
+
+scanner 输出的高置信候选不会停留在“扫到了但没人管”的状态。
+
+当前实现里：
+
+- 直接满足某个 `required_role` 的候选：`governed`
+- 没直接绑定 role，但和某个 governed object 共享 strict zone carrier file：`attached`
+- 仍然留在 strict zone 内、但不承担治理角色的高置信候选：`internal`
+
+这一步由 `classify_candidates(...)` 完成。
+
+当前策略是保守的：
+
+- 先保证没有未解释的高置信候选
+- 再逐步细化哪些 attached 应该进一步提升为 governed object
+
+这意味着第一版对“高风险结构不许隐身”已经成立，但“所有 attached 都已经抽象成独立 object”还没有完全做完。
+
+## 8. role closure 规则
+
+`RequiredRole` 不是摆设，现在已经参与真实校验。
+
+每个对象都会声明自己的 `required_roles`，当前知识库对象会自动带上这些角色类型：
+
+- 主要实现承载 role
+  - route handler
+  - route registration
+  - spec builder
+  - behavior orchestrator
+  - effect sink
+- 治理与 evidence role
+  - expected builder
+  - actual extractor
+  - effect evidence
+
+校验时会做：
+
+1. role -> candidate 解析
+2. candidate -> role binding
+3. role status 是否为 `satisfied`
+4. 缺 role 直接报 `ROLE_CLOSURE_MISSING`
+
+## 9. expected / actual compare
+
+主规则已经不是“这轮是否一起改了上游文件”。
+
+现在的主规则是：
+
+- 从上游结构对象闭包推导 `expected_evidence`
+- 从实现闭包提取 `actual_evidence`
+- 用 `fingerprint + evidence` 做 compare
+
+当前已经进入 compare 的面包括：
+
+- page route contract
+- frontend surface contract
+- workbench surface contract
+- ui surface spec
+- backend surface spec
+- library API contract
+- chat API contract
+- answer behavior
+- implementation_config effect objects
 
 其中：
 
-- `Standards` 来自 [mapping_registry.json](/home/xue/code/shelf/mapping/mapping_registry.json)
-- `Projects` 下面挂每个项目的 `Framework / Product Spec / Implementation Config / Code / Evidence`
-- `Workspace Evidence` 下面挂工作区治理树自己的 JSON / HTML 产物
+- `fingerprint` 负责快速比较
+- `evidence` 负责解释 mismatch
 
-所以 `docs/hierarchy/shelf_governance_tree.json/html` 不再是树外脚本副产物，而是树上的 evidence 节点。
+## 10. 工作区治理树
 
-### 2.2 项目治理树
+工作区不再只是 standards tree。
 
-知识库项目的治理树仍由 [governance.py](/home/xue/code/shelf/src/project_runtime/governance.py) 生成，但现在它是工作区树的子树，不再是树外补丁。
+现在 `src/workspace_governance.py` 会把下面两部分合成一棵工作区树：
 
-项目树已经覆盖：
+- Standards tree
+- 每个自动发现的 framework-driven project tree
+
+项目树当前包含这些层：
 
 - `Framework`
 - `Product Spec`
 - `Implementation Config`
+- `Project Structure`
 - `Code`
 - `Evidence`
 
-并且 code symbol 节点直接挂在树上，而不是只存在于 manifest 中。
-
-### 2.3 manifest 的当前角色
-
-[governance_manifest.json](/home/xue/code/shelf/projects/knowledge_base_basic/generated/governance_manifest.json) 还保留，但它现在只是辅助证据。
-
-当前真实优先级是：
-
-1. `governance_tree.json`
-2. `governance_manifest.json`
-
-也就是说：
-
-- tree 是主结构
-- manifest 是辅助展开视图
-
-## 3. 当前校验是怎么做的
-
-### 3.1 从上到下
-
-当 `framework/*.md`、`product_spec.toml`、`implementation_config.toml` 变更时：
-
-1. 工作区治理树根据变更文件定位触发节点
-2. 通过 `parent / children / derived_from / reverse_derived` 计算受影响闭包
-3. 若命中项目上游节点，插件会自动物化对应项目
-4. 严格校验读取项目治理树与工作区治理树
-5. 若上游闭包 digest 与当前树证据不一致，报 `STALE_EVIDENCE`
-
-所以现在不再是“这一轮是否顺手改了上游文件”的流程检查，而是：
-
-**当前代码和 evidence 是否仍然符合当前树上游闭包。**
-
-### 3.2 从下到上
-
-当知识库代码变更时：
-
-1. 工作区治理树先定位被触碰的 `code_symbol`
-2. 找到其 `derived_from` 上游节点
-3. 从当前项目抽取 actual evidence
-4. 与树里记录的 expected evidence / fingerprint 比较
-5. 不一致时报 `EXPECTATION_MISMATCH`
-
-所以“代码回查上游”现在走的是树闭包，而不是独立 symbol-manifest 比较。
-
-### 3.3 直接非法目标
-
-以下内容现在都被当成派生 evidence，不允许直接手改：
-
-- `projects/*/generated/*`
-- `docs/hierarchy/shelf_governance_tree.json`
-- `docs/hierarchy/shelf_governance_tree.html`
-
-严格模式下：
-
-- 项目 evidence 会自动重新 materialize
-- 工作区治理树 evidence 会自动重新 generate
-
-## 4. 插件现在怎么围绕治理树工作
-
-[extension.js](/home/xue/code/shelf/tools/vscode/shelf-ai/extension.js) 现在的主流程已经切到治理树：
-
-1. 读取 `docs/hierarchy/shelf_governance_tree.json`
-2. 用 [governance_tree.js](/home/xue/code/shelf/tools/vscode/shelf-ai/governance_tree.js) 解析 `file_index / parent_index / children_index / derived_index / reverse_derived_index`
-3. 把本次保存/创建/删除/重命名命中的文件映射到治理树节点
-4. 生成 `touched_nodes / affected_nodes / materialize_project_spec_files`
-5. 按节点闭包决定：
-   - 是否自动物化
-   - 是否跑 `mypy`
-   - 是否保护 evidence
-6. 再调用唯一权威入口 [validate_strict_mapping.py](/home/xue/code/shelf/scripts/validate_strict_mapping.py)
-
-插件侧边栏也已经不是单纯“打开树图”：
-
-- 打开治理树
-- 刷新治理树
-- 展示最近一次 `touched / affected` 节点闭包
-- 展示严格校验问题
-- 展示 hooks / guard mode / tree readiness
-
-也就是说，插件现在的工作视角已经是治理树，不再只是 framework tree。
-
-## 5. 现在真正能保证什么
-
-在知识库项目范围内，当前已经能保证：
-
-- 改 framework / product / implementation，会自动命中相关项目和相关节点闭包
-- 改 code，会回查其上游节点并比对 evidence
-- 改 generated evidence，会被识别成非法目标
-- 工作区治理树自身 evidence 被手改，也会被识别和恢复
-- `pre-push` / CLI / 插件 都通过同一个严格校验入口收口
-
-所以现在不是“AI 靠自觉遵守框架”，而是：
-
-**仓库通过治理树知道这次改动碰到了哪个节点、它影响谁、以及当前代码是否仍然与上游派生定义一致。**
-
-## 6. 仍然存在的问题
-
-这些问题当前还存在，但它们已经不是主链路缺口，而是工程债或兼容层。
-
-### 6.1 旧命名兼容仍在
-
-插件内部还保留了旧命令 id 和旧配置 fallback，例如：
-
-- `shelf.openFrameworkTree`
-- `shelf.refreshFrameworkTree`
-- `frameworkTreeHtmlPath`
-- `frameworkTreeGenerateCommand`
-
-这不是因为架构还没切过来，而是为了兼容已有用户配置和命令绑定。
-
-### 6.2 工作区树目前按 `projects/*/product_spec.toml` 自动发现项目
-
-也就是说：
-
-- 工作区树已经是全局树
-- 但“全局”的项目发现机制目前仍基于仓库当前目录结构约定
-
-这在当前仓库是合理的，但如果未来项目注册方式变化，需要一起升级发现逻辑。
-
-### 6.3 文件系统触发仍是路径级，闭包执行是节点级
-
-插件监听 VSCode 文件事件时，第一层仍然需要靠 watched paths 触发；
-但从“触发后怎么判断影响面”开始，已经是治理树节点闭包。
-
-这意味着：
-
-- 触发入口还是路径
-- 决策与校验已经是树
-
-这不是逻辑缺陷，但要明确它的分层。
-
-## 7. 这套实现现在靠什么验证
-
-当前本地已经验证通过：
-
-- `uv run python scripts/materialize_project.py`
-- `uv run mypy`
-- `uv run pytest -q`
-- `uv run python scripts/validate_strict_mapping.py`
-- `uv run python scripts/validate_strict_mapping.py --check-changes`
-- `node tools/vscode/shelf-ai/test_governance_tree.js`
-- `node tools/vscode/shelf-ai/test_guarding.js`
-- `node tools/vscode/shelf-ai/test_snippets.js`
-- `bash tools/vscode/shelf-ai/install_local.sh`
-
 其中：
 
-- `test_workspace_governance.py` 验证工作区树生成和变更闭包
-- `test_governance_manifest.py` 验证项目治理树/治理 evidence 的正确性
-- 插件测试验证治理树分类、README/命令/配置契约和守卫行为
+- `Project Structure` 放 structural objects 和 required roles
+- `Code` 放 strict zone files 和 structural candidates
+- `Evidence` 放 generated artifact nodes
 
-## 8. 一句话总结
+因此 Shelf AI 现在看到的不是“几个路径前缀”，而是“节点闭包 + derived_from”。
 
-当前实现已经不是“框架树 + 一些补丁校验”。
+## 11. materialize / validate / guard / pre-push / CI 的接入情况
 
-它现在的真实形态是：
+### 11.1 materialize
 
-**一个工作区统一治理树，下面挂标准、项目和 evidence；节点变化驱动局部闭包检查；插件直接围绕这棵树做自动物化、问题反馈和 evidence 保护。**
+`scripts/materialize_project.py`
+
+- 先自动发现框架驱动项目
+- 再通过模板注册物化每个项目
+- 再刷新工作区治理树
+
+### 11.2 validate
+
+`scripts/validate_strict_mapping.py`
+
+继续是唯一权威校验入口，但内部已经接了：
+
+- 项目自动发现
+- 模板注册解析
+- project governance tree compare
+- object-first role closure / strict zone / candidate consistency
+
+### 11.3 guard / pre-push / CI
+
+VSCode guard、git hook、CI 仍然走：
+
+- `scripts/materialize_project.py`
+- `scripts/validate_strict_mapping.py`
+
+没有新建另一个竞争性的“真正权威 CLI”。
+
+## 12. 当前已知问题，不隐藏
+
+这套系统已经能跑、能验、能扩，但还没有到终局。当前明确还存在这些边界：
+
+### 12.1 当前只有一个已注册模板真正跑通
+
+虽然主链已经泛化到“通过模板注册处理项目”，但仓库里目前只有 `knowledge_base_workbench` 一个成熟模板实现了完整治理闭包。
+
+### 12.2 Python 优先，其他语言还没有第一版 scanner
+
+object model 和 role model 是语言无关的，但当前 candidate scanner 只实现了 Python。
+
+还没实现：
+
+- JS / TS
+- Go
+- Rust
+
+### 12.3 attached 仍然偏保守
+
+现在的 attached 判定会优先保证“没有未解释的高置信候选”，所以有一部分共享 strict-zone carrier file 的候选会先归为 attached，而不是立刻升级成独立 object。
+
+这不是错误，但说明对象全集还可以继续扩。
+
+### 12.4 config effect sink 仍是模板内映射
+
+`implementation_effect` 对象已经自动化了，但 effect target -> sink locator 的映射，当前仍由知识库模板内部规则提供。
+
+这不影响主链泛化，但说明“effect sink role discovery”还没完全做到模板无知识。
+
+### 12.5 governance manifest 还保留了兼容 `symbols`
+
+主模型已经是 `structural_objects`，但 manifest 仍保留了 `symbols` 兼容字段，方便旧检查和旧调试脚本过渡。
+
+当前它是兼容层，不再是主真相。
+
+## 13. 如何扩展到 Python 以外语言
+
+当前扩展路线已经清楚：
+
+1. 复用 `StructuralObject / RequiredRole / StructuralCandidate / StrictZoneEntry`
+2. 新增语言级 scanner
+3. 让 scanner 输出同样的 candidate shape
+4. 继续复用 role binding / strict zone / compare 主链
+
+例如未来新增：
+
+- `scan_typescript_structural_candidates(...)`
+- `scan_go_structural_candidates(...)`
+- `scan_rust_structural_candidates(...)`
+
+它们不需要重写治理系统，只需要产出同一类 candidate 对象。
+
+## 14. 当前验收状态
+
+已经满足的点：
+
+- 自动发现当前仓库里的 framework-driven projects
+- 自动生成项目治理闭包
+- strict zone 由 object/role/candidate 推导，而不是固定文件白名单
+- 至少一个自动发现项目端到端打通
+- 已进入主链命令
+
+仍在持续扩展但不阻塞当前闭环的点：
+
+- 多模板覆盖
+- 非 Python scanner
+- attached -> governed 的更细粒度提升策略
+
+一句话总结：
+
+**当前仓库已经具备“从 Framework 到 Code，再从 Code 反查回 Framework”的 object-first 双向治理骨架，并已在自动发现出的知识库项目上打通端到端闭环；但它仍是 Python-first、单成熟模板先行的第一版，而不是多语言多模板全部完善的终局。**

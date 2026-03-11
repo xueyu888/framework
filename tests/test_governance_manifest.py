@@ -26,35 +26,45 @@ from scripts import validate_strict_mapping
 
 
 class GovernanceManifestTest(unittest.TestCase):
-    def test_materialize_writes_governance_manifest_with_expected_symbols(self) -> None:
+    def test_materialize_writes_governance_manifest_with_expected_structural_objects(self) -> None:
         project = materialize_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
         assert project.generated_artifacts is not None
         manifest_path = Path(project.generated_artifacts.governance_manifest_json)
 
         payload = parse_governance_manifest(manifest_path)
-        symbol_ids = {item["symbol_id"] for item in payload["symbols"]}
+        object_ids = {item["object_id"] for item in payload["structural_objects"]}
+        candidate_ids = {item["candidate_id"] for item in payload["candidates"]}
+        strict_zone_files = {item["file"] for item in payload["strict_zone"]}
 
         self.assertEqual(payload["project_id"], "knowledge_base_basic")
-        self.assertIn("kb.runtime.page_routes", symbol_ids)
-        self.assertIn("kb.frontend.surface_contract", symbol_ids)
-        self.assertIn("kb.workbench.surface_contract", symbol_ids)
-        self.assertIn("kb.ui.surface_spec", symbol_ids)
-        self.assertIn("kb.backend.surface_spec", symbol_ids)
-        self.assertIn("kb.api.library_contracts", symbol_ids)
-        self.assertIn("kb.api.chat_contract", symbol_ids)
-        self.assertIn("kb.answer.behavior", symbol_ids)
+        self.assertIn("kb.runtime.page_routes", object_ids)
+        self.assertIn("kb.frontend.surface_contract", object_ids)
+        self.assertIn("kb.workbench.surface_contract", object_ids)
+        self.assertIn("kb.ui.surface_spec", object_ids)
+        self.assertIn("kb.backend.surface_spec", object_ids)
+        self.assertIn("kb.api.library_contracts", object_ids)
+        self.assertIn("kb.api.chat_contract", object_ids)
+        self.assertIn("kb.answer.behavior", object_ids)
+        self.assertIn("knowledge_base_basic.config_effect.backend.transport", object_ids)
+        self.assertTrue(any(candidate_id.endswith("function:build_knowledge_base_router") for candidate_id in candidate_ids))
+        self.assertIn("src/knowledge_base_runtime/backend.py", strict_zone_files)
 
-    def test_materialize_writes_governance_tree_with_expected_roots_and_symbols(self) -> None:
+    def test_materialize_writes_governance_tree_with_expected_roots_and_structural_objects(self) -> None:
         project = materialize_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
         assert project.generated_artifacts is not None
         tree_path = Path(project.generated_artifacts.governance_tree_json)
 
         payload = parse_governance_tree(tree_path)
         node_ids = {item["node_id"] for item in payload["nodes"]}
-        symbol_ids = {
-            item["symbol_id"]
+        object_ids = {
+            item["object_id"]
             for item in payload["nodes"]
-            if item.get("kind") == "code_symbol"
+            if item.get("kind") == "structural_object"
+        }
+        candidate_node_ids = {
+            item["candidate_id"]
+            for item in payload["nodes"]
+            if item.get("kind") == "structural_candidate"
         }
 
         self.assertEqual(payload["project_id"], "knowledge_base_basic")
@@ -62,11 +72,13 @@ class GovernanceManifestTest(unittest.TestCase):
         self.assertIn("project:knowledge_base_basic:framework", node_ids)
         self.assertIn("project:knowledge_base_basic:product_spec", node_ids)
         self.assertIn("project:knowledge_base_basic:implementation_config", node_ids)
+        self.assertIn("project:knowledge_base_basic:structure", node_ids)
         self.assertIn("project:knowledge_base_basic:code", node_ids)
         self.assertIn("project:knowledge_base_basic:evidence", node_ids)
-        self.assertIn("kb.runtime.page_routes", symbol_ids)
-        self.assertIn("kb.frontend.surface_contract", symbol_ids)
-        self.assertIn("kb.answer.behavior", symbol_ids)
+        self.assertIn("kb.runtime.page_routes", object_ids)
+        self.assertIn("kb.frontend.surface_contract", object_ids)
+        self.assertIn("kb.answer.behavior", object_ids)
+        self.assertTrue(any(candidate_id.endswith("function:build_frontend_contract") for candidate_id in candidate_node_ids))
 
     def test_temp_output_materialization_stays_byte_stable(self) -> None:
         materialize_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
@@ -115,18 +127,20 @@ class GovernanceManifestTest(unittest.TestCase):
 
         self.assertTrue(any(issue["code"] == "STALE_EVIDENCE" for issue in issues))
 
-    def test_compare_project_to_manifest_detects_expectation_mismatch(self) -> None:
+    def test_compare_project_to_manifest_detects_manifest_expectation_drift(self) -> None:
         project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
         payload = build_governance_manifest(project)
-        symbol = next(item for item in payload["symbols"] if item["symbol_id"] == "kb.frontend.surface_contract")
-        symbol["expected"]["evidence"]["layout_variant"] = "broken_variant"
-        symbol["expected"]["fingerprint"] = "sha256:broken"
+        structural_object = next(
+            item for item in payload["structural_objects"] if item["object_id"] == "kb.frontend.surface_contract"
+        )
+        structural_object["expected_evidence"]["layout_variant"] = "broken_variant"
+        structural_object["expected_fingerprint"] = "sha256:broken"
 
         issues = compare_project_to_manifest(project, payload)
 
         self.assertTrue(
             any(
-                issue["code"] == "EXPECTATION_MISMATCH" and issue["symbol_id"] == "kb.frontend.surface_contract"
+                issue["code"] == "GOVERNANCE_MANIFEST_INVALID" and issue["symbol_id"] == "kb.frontend.surface_contract"
                 for issue in issues
             )
         )
@@ -235,8 +249,8 @@ class GovernanceManifestTest(unittest.TestCase):
     def test_compare_project_to_manifest_detects_missing_manifest_symbol(self) -> None:
         project = load_knowledge_base_project(DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE)
         payload = build_governance_manifest(project)
-        payload["symbols"] = [
-            item for item in payload["symbols"] if item["symbol_id"] != "kb.answer.behavior"
+        payload["structural_objects"] = [
+            item for item in payload["structural_objects"] if item["object_id"] != "kb.answer.behavior"
         ]
 
         issues = compare_project_to_manifest(project, payload)
@@ -280,7 +294,7 @@ class GovernanceManifestTest(unittest.TestCase):
         payload["nodes"] = [
             item
             for item in payload["nodes"]
-            if item.get("symbol_id") != "kb.answer.behavior"
+            if item.get("object_id") != "kb.answer.behavior"
         ]
 
         issues = compare_project_to_tree(project, payload)

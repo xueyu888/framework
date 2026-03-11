@@ -7,17 +7,19 @@ import sys
 
 import uvicorn
 
-from project_runtime.knowledge_base import (
-    DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
-    materialize_knowledge_base_project,
+from examples.legacy_shelf.reference_pipeline import run_reference_pipeline
+from project_runtime import (
+    get_default_project_template_registration,
+    materialize_registered_project,
 )
+from project_runtime.app_factory import build_project_app
 
 SRC_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SRC_DIR.parent
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 KNOWN_COMMANDS = {"serve", "legacy-reference-shelf", "reference-shelf"}
-DEFAULT_PRODUCT_SPEC_FILE = DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE
+DEFAULT_PRODUCT_SPEC_FILE = get_default_project_template_registration().default_product_spec_file
 PRODUCT_SPEC_FILE_ENV = "SHELF_PRODUCT_SPEC_FILE"
 RELOAD_DIRS = [
     SRC_DIR,
@@ -83,8 +85,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _serve_project(product_spec_file: str | Path, *, host: str, port: int, reload: bool) -> None:
-    from project_runtime.app_factory import build_project_app
-
     resolved_product_spec = Path(product_spec_file)
     if not resolved_product_spec.is_absolute():
         resolved_product_spec = (SRC_DIR.parent / resolved_product_spec).resolve()
@@ -93,7 +93,7 @@ def _serve_project(product_spec_file: str | Path, *, host: str, port: int, reloa
 
     if reload:
         # Fail fast and keep generated evidence synchronized before the reload server starts.
-        materialize_knowledge_base_project(resolved_product_spec)
+        materialize_registered_project(resolved_product_spec)
         uvicorn.run(
             "project_runtime.app_factory:app",
             host=host,
@@ -114,8 +114,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(_normalize_argv(list(sys.argv[1:] if argv is None else argv)))
 
     if args.command in {"legacy-reference-shelf", "reference-shelf"}:
-        from examples.legacy_shelf.reference_pipeline import run_reference_pipeline
-
         run_reference_pipeline()
         return 0
 

@@ -27,13 +27,11 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from project_runtime import (
-    KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT,
-    KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT,
-    KNOWLEDGE_BASE_TEMPLATE_ID,
-    build_implementation_effect_manifest,
     detect_project_template_id,
-    load_knowledge_base_project,
-    materialize_knowledge_base_project,
+    discover_framework_driven_projects,
+    load_registered_project,
+    materialize_registered_project,
+    resolve_project_template_registration,
 )
 from project_runtime.governance import (
     compare_project_to_tree,
@@ -256,9 +254,10 @@ def collect_changed_files() -> set[str]:
 
 
 def discover_project_product_spec_files(projects_dir: Path = PROJECTS_DIR) -> list[Path]:
-    if not projects_dir.exists():
-        return []
-    return sorted(projects_dir.glob("*/product_spec.toml"))
+    return [
+        (REPO_ROOT / item.product_spec_file).resolve()
+        for item in discover_framework_driven_projects(projects_dir)
+    ]
 
 
 def implementation_config_path_for(product_spec_file: Path) -> Path:
@@ -447,10 +446,11 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
         return issues
 
     for product_spec_file in project_product_spec_files:
+        rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
         try:
             template_id = detect_project_template_id(product_spec_file)
+            registration = resolve_project_template_registration(product_spec_file)
         except Exception as exc:
-            rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
             issues.append(
                 make_issue(
                     str(exc),
@@ -459,20 +459,9 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
                     code="PROJECT_TEMPLATE_UNSUPPORTED",
                 )
             )
-            template_id = KNOWLEDGE_BASE_TEMPLATE_ID
+            continue
 
-        if template_id != KNOWLEDGE_BASE_TEMPLATE_ID:
-            rel_product_spec_file = product_spec_file.relative_to(REPO_ROOT).as_posix()
-            issues.append(
-                make_issue(
-                    f"unsupported project template: {template_id}",
-                    rel_product_spec_file,
-                    find_line(read_text(product_spec_file), 'template = "'),
-                    code="PROJECT_TEMPLATE_UNSUPPORTED",
-                )
-            )
-
-        product_spec_layout = KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT
+        product_spec_layout = registration.product_spec_layout
         issues.extend(
             _validate_project_toml_layout(
                 product_spec_file,
@@ -511,7 +500,7 @@ def validate_project_configuration_layout(product_spec_files: list[Path] | None 
                 )
             )
             continue
-        implementation_layout = KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT
+        implementation_layout = registration.implementation_config_layout
         issues.extend(
             _validate_project_toml_layout(
                 implementation_config_file,
@@ -543,19 +532,6 @@ def validate_project_generation_discipline(
         return issues
 
     issues.extend(validate_project_configuration_layout(project_product_spec_files))
-
-    try:
-        materialize_knowledge_base_project
-    except Exception as exc:
-        issues.append(
-            make_issue(
-                f"failed to import project materializer: {exc}",
-                REGISTRY_PATH.relative_to(REPO_ROOT).as_posix(),
-                1,
-                code="PROJECT_GENERATOR_IMPORT_FAILED",
-            )
-        )
-        return issues
 
     for product_spec_file in project_product_spec_files:
         product_spec_file = product_spec_file.resolve()
@@ -656,7 +632,7 @@ def validate_project_generation_discipline(
         try:
             with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
                 temp_generated_dir = Path(temp_dir) / "generated"
-                materialize_knowledge_base_project(product_spec_file, output_dir=temp_generated_dir)
+                materialize_registered_project(product_spec_file, output_dir=temp_generated_dir)
                 for required_name in expected_generated_files:
                     actual_file = actual_generated_dir / required_name
                     expected_file = temp_generated_dir / required_name
@@ -729,13 +705,14 @@ def validate_implementation_config_effects(
         try:
             _, implementation_data = _load_toml_text_and_data(implementation_config_file)
             implementation_leaf_values = _collect_leaf_paths(implementation_data)
-            project = load_knowledge_base_project(product_spec_file)
+            registration = resolve_project_template_registration(product_spec_file)
+            project = load_registered_project(product_spec_file)
             runtime_bundle = project.to_runtime_bundle_dict()
             runtime_bundle["generated_artifacts"] = _derived_generated_artifacts_payload(
                 product_spec_file,
                 implementation_data,
             )
-            effect_manifest = build_implementation_effect_manifest(project)
+            effect_manifest = registration.build_implementation_effect_manifest(project)
         except Exception as exc:
             issues.append(
                 make_issue(
@@ -977,7 +954,7 @@ def validate_project_governance(
             continue
 
         try:
-            project = load_knowledge_base_project(product_spec_file)
+            project = load_registered_project(product_spec_file)
         except Exception as exc:
             issues.append(
                 make_issue(

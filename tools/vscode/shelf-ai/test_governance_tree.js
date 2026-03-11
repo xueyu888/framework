@@ -30,8 +30,12 @@ function main() {
   );
   assert.strictEqual(codePlan.shouldMaterialize, false, "code-only governed changes should not auto-materialize");
   assert(
-    codePlan.changeContext.touchedNodes.some((item) => item.includes("kb.answer.behavior")),
-    "code change should resolve touched governed code symbols"
+    codePlan.changeContext.touchedNodes.some((item) => item.includes("src/knowledge_base_runtime/backend.py")),
+    "code change should resolve touched strict-zone code carriers"
+  );
+  assert(
+    codePlan.changeContext.affectedNodes.some((item) => item.includes("kb.answer.behavior")),
+    "code change should still propagate to affected structural objects"
   );
 
   const summary = summarizeChangeContext(payload, frameworkPlan.changeContext, 2);

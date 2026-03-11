@@ -21,7 +21,7 @@ class WorkspaceGovernanceTest(unittest.TestCase):
         self.assertIn("workspace:shelf:standards", node_ids)
         self.assertIn("workspace:shelf:projects", node_ids)
         self.assertIn("project:knowledge_base_basic", node_ids)
-        self.assertIn("project:knowledge_base_basic:code:symbol:kb.answer.behavior", node_ids)
+        self.assertIn("project:knowledge_base_basic:structure:object:kb.answer.behavior", node_ids)
         self.assertIn("knowledge_base_basic", governance["project_trees"])
 
     def test_resolve_workspace_change_context_maps_framework_change_to_project(self) -> None:
