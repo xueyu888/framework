@@ -1,0 +1,84 @@
+{
+  "document_name": "框架设计核心标准",
+  "source_path": "/home/wuyz/Ability_Enhance/frame/shelf/specs/框架设计核心标准.md",
+  "passed": true,
+  "items": [
+    {
+      "validation_id": "V1",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V2",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V3",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V4",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V5",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V6",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V7",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V8",
+      "passed": true,
+      "reasons": []
+    },
+    {
+      "validation_id": "V9",
+      "passed": true,
+      "reasons": []
+    }
+  ],
+  "evidence": {
+    "paragraph_block_count": 31,
+    "text_chunk_count": 14,
+    "ownership_record_count": 31,
+    "invalid_record_count": 0,
+    "chunk_match_count": 14,
+    "minimality_matrix": {
+      "B1": [
+        "V2"
+      ],
+      "B2": [
+        "V2",
+        "V6"
+      ],
+      "B3": [
+        "V3",
+        "V4"
+      ],
+      "B4": [
+        "V4",
+        "V5",
+        "V6"
+      ],
+      "B5": [
+        "V5",
+        "V6"
+      ],
+      "B6": [
+        "V6"
+      ]
+    }
+  }
+}
