@@ -17,7 +17,7 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from shelf_framework import (
+from legacy_shelf_framework import (
     BoundaryDefinition,
     CombinationRules,
     ConnectorPlacement,

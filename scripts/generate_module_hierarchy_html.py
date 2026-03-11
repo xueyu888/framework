@@ -42,6 +42,7 @@ class HierarchyGraph:
     edges: list[HierarchyEdge]
     layout_mode: str = "global_levels"
     framework_groups: list[HierarchyFrameworkGroup] | None = None
+    storage_key_stem: str | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ def load_hierarchy(path: Path) -> HierarchyGraph:
 
     title = _expect_str(root.get("title"), "title")
     description = _expect_str(root.get("description"), "description")
+    storage_key_stem = _expect_optional_str(root.get("storage_key_stem"), "storage_key_stem")
 
     raw_level_labels = _expect_dict(root.get("level_labels"), "level_labels")
     level_labels: dict[int, str] = {}
@@ -213,6 +215,7 @@ def load_hierarchy(path: Path) -> HierarchyGraph:
         edges=edges,
         layout_mode=layout_mode,
         framework_groups=framework_groups,
+        storage_key_stem=storage_key_stem,
     )
 
 
@@ -534,6 +537,7 @@ def _build_payload(
         "level_node_counts": {str(level): level_to_node_count.get(level, 0) for level in level_values},
         "relation_counts": relation_counts,
         "layout_mode": graph.layout_mode,
+        "storage_key_stem": graph.storage_key_stem,
         "framework_groups": [
             {
                 "name": group.name,
@@ -1426,7 +1430,10 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     const graphData = __PAYLOAD_JSON__;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : null;
-    const SIDE_VISIBILITY_KEY = "archsync.frameworkTree.sideVisible";
+    const storageKeyStem = typeof graphData.storage_key_stem === "string" && graphData.storage_key_stem
+      ? graphData.storage_key_stem
+      : "frameworkTree";
+    const SIDE_VISIBILITY_KEY = `shelf.${storageKeyStem}.sideVisible`;
 
     const layoutEl = document.querySelector(".layout");
     const graphCardEl = document.querySelector(".graph-card");
@@ -1681,6 +1688,36 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       return Boolean(target.closest("button, input, label, a, [data-pan-ignore='1']"));
     }
 
+    function safeSetPointerCapture(element, pointerId) {
+      if (!element || typeof element.setPointerCapture !== "function") {
+        return false;
+      }
+      try {
+        element.setPointerCapture(pointerId);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    function safeReleasePointerCapture(element, pointerId) {
+      if (
+        !element ||
+        typeof element.releasePointerCapture !== "function" ||
+        typeof element.hasPointerCapture !== "function" ||
+        pointerId === null
+      ) {
+        return;
+      }
+      try {
+        if (element.hasPointerCapture(pointerId)) {
+          element.releasePointerCapture(pointerId);
+        }
+      } catch (_error) {
+        // Ignore capture teardown failures so drag cleanup still completes.
+      }
+    }
+
     function beginPan(event) {
       if (!graphScrollEl || panState.active || event.button !== 0) {
         return;
@@ -1715,10 +1752,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
           event.preventDefault();
         }
         graphScrollEl.classList.add("dragging");
-        if (typeof graphScrollEl.setPointerCapture === "function") {
-          graphScrollEl.setPointerCapture(event.pointerId);
-          panState.captured = true;
-        }
+        panState.captured = safeSetPointerCapture(graphScrollEl, event.pointerId);
       }
       if (!panState.moved) {
         return;
@@ -1734,14 +1768,8 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       if (event && event.pointerId !== undefined && event.pointerId !== panState.pointerId) {
         return;
       }
-      if (
-        typeof graphScrollEl.releasePointerCapture === "function" &&
-        panState.captured &&
-        panState.pointerId !== null &&
-        typeof graphScrollEl.hasPointerCapture === "function" &&
-        graphScrollEl.hasPointerCapture(panState.pointerId)
-      ) {
-        graphScrollEl.releasePointerCapture(panState.pointerId);
+      if (panState.captured) {
+        safeReleasePointerCapture(graphScrollEl, panState.pointerId);
       }
       panState.active = false;
       panState.pointerId = null;
@@ -1770,9 +1798,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       groupDragState.startDx = current.dx;
       groupDragState.startDy = current.dy;
       groupDragState.moved = false;
-      if (typeof svg.setPointerCapture === "function") {
-        svg.setPointerCapture(event.pointerId);
-      }
+      safeSetPointerCapture(svg, event.pointerId);
     }
 
     function endGroupDrag(event) {
@@ -1782,14 +1808,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       if (event && event.pointerId !== undefined && event.pointerId !== groupDragState.pointerId) {
         return;
       }
-      if (
-        typeof svg.releasePointerCapture === "function" &&
-        groupDragState.pointerId !== null &&
-        typeof svg.hasPointerCapture === "function" &&
-        svg.hasPointerCapture(groupDragState.pointerId)
-      ) {
-        svg.releasePointerCapture(groupDragState.pointerId);
-      }
+      safeReleasePointerCapture(svg, groupDragState.pointerId);
       groupDragState.active = false;
       groupDragState.pointerId = null;
       groupDragState.frameworkName = "";
@@ -2663,7 +2682,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       const safeLine = Number.isFinite(Number(lineNumber)) ? Math.max(1, Number(lineNumber)) : 1;
       if (vscodeApi) {
         vscodeApi.postMessage({
-          type: "archSync.openSource",
+          type: "shelf.openSource",
           file: String(filePath || ""),
           line: safeLine
         });
@@ -3018,7 +3037,8 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       );
     }
 
-    window.addEventListener("pointerdown", beginPan, true);
+    graphScrollEl.addEventListener("pointerdown", beginPan, true);
+    svg.addEventListener("pointerdown", beginPan, true);
     window.addEventListener("pointermove", updatePan);
     window.addEventListener("pointerup", endPan);
     window.addEventListener("pointercancel", endPan);

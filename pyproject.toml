@@ -5,9 +5,30 @@ description = "Logic-consistent shelf framework with executable Python reference
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "openpyxl>=3.1.5",
-    "pillow>=12.1.1",
+    "fastapi>=0.135.1",
+    "httpx>=0.28.1",
+    "matplotlib>=3.10.8",
+    "mypy>=1.19.1",
+    "plotly>=6.5.2",
+    "pyqt6>=6.10.2",
+    "python-pptx>=1.0.2",
+    "uvicorn>=0.41.0",
 ]
 
 [tool.uv]
 package = false
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "scripts"]
+mypy_path = "src"
+explicit_package_bases = true
+ignore_missing_imports = true
+warn_unused_configs = true
+show_error_codes = true
+
+[dependency-groups]
+dev = [
+    "playwright>=1.58.0",
+    "pytest>=9.0.2",
+]

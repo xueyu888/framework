@@ -1,215 +1,134 @@
 from __future__ import annotations
 
-import json
+import argparse
+import os
+from pathlib import Path
+import sys
 
-from shelf_framework import (
-    BoundaryDefinition,
-    CombinationRules,
-    ConnectorPlacement,
-    ConnectorUnit,
-    Footprint2D,
-    Goal,
-    Hypothesis,
-    LogicRecord,
-    LogicStep,
-    Module,
-    Opening2D,
-    PanelCorner,
-    PanelLayer,
-    RodPanelConnection,
-    ShelfStructure,
-    Space3D,
-    SupportKind,
-    SupportOrientation,
-    SupportUnit,
-    VerificationInput,
-    VerificationResult,
-    modules_to_list,
-    strict_mapping_meta,
-    verify,
+import uvicorn
+
+from examples.legacy_shelf.reference_pipeline import run_reference_pipeline
+from project_runtime import (
+    get_default_project_template_registration,
+    materialize_registered_project,
 )
+from project_runtime.app_factory import build_project_app
+
+SRC_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SRC_DIR.parent
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8000
+KNOWN_COMMANDS = {"serve", "legacy-reference-shelf", "reference-shelf"}
+DEFAULT_PRODUCT_SPEC_FILE = get_default_project_template_registration().default_product_spec_file
+PRODUCT_SPEC_FILE_ENV = "SHELF_PRODUCT_SPEC_FILE"
+RELOAD_DIRS = [
+    SRC_DIR,
+    REPO_ROOT / "framework",
+    REPO_ROOT / "projects",
+    REPO_ROOT / "mapping",
+]
+RELOAD_INCLUDES = ["*.py", "*.md", "*.toml", "*.json"]
 
 
-def build_demo_structure(boundary: BoundaryDefinition) -> ShelfStructure:
-    supports = tuple(
-        SupportUnit(
-            support_id=f"rod-{idx}",
-            kind=SupportKind.ROD,
-            orientation=SupportOrientation.VERTICAL,
+def _normalize_argv(argv: list[str]) -> list[str]:
+    if not argv:
+        return ["serve"]
+    if argv[0] in {"-h", "--help"}:
+        return argv
+    if argv[0] in KNOWN_COMMANDS:
+        return argv
+    return ["serve", *argv]
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Shelf repository entrypoint. Default behavior serves the project-driven "
+            "knowledge-base demo compiled from framework markdown, product spec, and "
+            "implementation config."
         )
-        for idx in range(1, 5)
     )
-    support_ids = tuple(item.support_id for item in supports)
+    subparsers = parser.add_subparsers(dest="command")
 
-    layers: list[PanelLayer] = []
-    connectors: list[ConnectorUnit] = []
-    connections: list[RodPanelConnection] = []
-    corner_by_support: dict[str, PanelCorner] = {
-        support_ids[0]: PanelCorner.FRONT_LEFT,
-        support_ids[1]: PanelCorner.FRONT_RIGHT,
-        support_ids[2]: PanelCorner.BACK_LEFT,
-        support_ids[3]: PanelCorner.BACK_RIGHT,
-    }
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="materialize the selected project and start the knowledge-base demo server",
+    )
+    serve_parser.add_argument(
+        "--product-spec-file",
+        default=str(DEFAULT_PRODUCT_SPEC_FILE.relative_to(REPO_ROOT)),
+        help=(
+            "path to the product spec file. Defaults to "
+            "projects/knowledge_base_basic/product_spec.toml."
+        ),
+    )
+    serve_parser.add_argument("--host", default=DEFAULT_HOST, help=f"bind host (default: {DEFAULT_HOST})")
+    serve_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"bind port (default: {DEFAULT_PORT})")
+    serve_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="enable uvicorn reload mode for local development",
+    )
 
-    for level in range(1, boundary.layers_n + 1):
-        panel_id = f"panel-{level}"
-        layers.append(
-            PanelLayer(
-                panel_id=panel_id,
-                level_index=level,
-                width=boundary.space_s_per_layer.width,
-                depth=boundary.space_s_per_layer.depth,
-                layer_height=boundary.space_s_per_layer.height,
-                opening=Opening2D(
-                    width=boundary.opening_o.width,
-                    height=boundary.opening_o.height,
-                ),
-                support_unit_ids=support_ids,
-                normal_axis="z",
-                contour_offset=0.0,
-            )
+    subparsers.add_parser(
+        "legacy-reference-shelf",
+        help=(
+            "run the legacy shelf reference pipeline that generates docs/legacy_shelf/* "
+            "for the historical shelf domain sample"
+        ),
+    )
+    subparsers.add_parser(
+        "reference-shelf",
+        help=argparse.SUPPRESS,
+    )
+    return parser
+
+
+def _serve_project(product_spec_file: str | Path, *, host: str, port: int, reload: bool) -> None:
+    resolved_product_spec = Path(product_spec_file)
+    if not resolved_product_spec.is_absolute():
+        resolved_product_spec = (SRC_DIR.parent / resolved_product_spec).resolve()
+
+    os.environ[PRODUCT_SPEC_FILE_ENV] = str(resolved_product_spec)
+
+    if reload:
+        # Fail fast and keep generated evidence synchronized before the reload server starts.
+        materialize_registered_project(resolved_product_spec)
+        uvicorn.run(
+            "project_runtime.app_factory:app",
+            host=host,
+            port=port,
+            reload=True,
+            app_dir=str(SRC_DIR),
+            reload_dirs=[str(path) for path in RELOAD_DIRS],
+            reload_includes=RELOAD_INCLUDES,
         )
+        return
 
-        for support_id in support_ids:
-            connector_id = f"conn-{panel_id}-{support_id}"
-            connectors.append(
-                ConnectorUnit(
-                    connector_id=connector_id,
-                    placement=ConnectorPlacement.CORNER,
-                )
-            )
-            connections.append(
-                RodPanelConnection(
-                    support_unit_id=support_id,
-                    panel_id=panel_id,
-                    connector_id=connector_id,
-                    uses_defined_interface=True,
-                    panel_corner=corner_by_support[support_id],
-                    illegal_intersection=False,
-                    floating=False,
-                )
-            )
-
-    return ShelfStructure(
-        layers=tuple(layers),
-        support_units=supports,
-        connectors=tuple(connectors),
-        connections=tuple(connections),
-        opening_direction="front",
-    )
+    app = build_project_app(resolved_product_spec)
+    uvicorn.run(app, host=host, port=port)
 
 
-def build_logic_record(
-    goal: Goal,
-    boundary: BoundaryDefinition,
-    result: VerificationResult,
-) -> LogicRecord:
-    """构建可追溯逻辑记录，用于输出 L3 证据文件。"""
-    assessments = result.deletion_assessment
-    mandatory_conflicts = [item for item in assessments if item["mandatory_conflict"]]
-    rule = result.rule_results
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(_normalize_argv(list(sys.argv[1:] if argv is None else argv)))
 
-    steps = [
-        LogicStep("G", "goal", evidence=goal.to_dict()),
-        LogicStep("B1", "layers", ["G"], {"N": boundary.layers_n}),
-        LogicStep("B2", "payload", ["G"], {"P": boundary.payload_p_per_layer}),
-        LogicStep("B3", "space", ["G"], {"S": boundary.space_s_per_layer.__dict__}),
-        LogicStep("B4", "opening", ["G"], {"O": boundary.opening_o.__dict__}),
-        LogicStep("B5", "footprint", ["G"], {"A": boundary.footprint_a.__dict__}),
-        LogicStep("M1", "rod", ["B1", "B2"], {"module": Module.ROD.value}),
-        LogicStep("M2", "connector", ["B1", "B4"], {"module": Module.CONNECTOR.value}),
-        LogicStep("M3", "panel", ["B2", "B3"], {"module": Module.PANEL.value}),
-        LogicStep("R1", "support structure uses rod-only supports", ["M1"], {"passed": rule.get("R1")}),
-        LogicStep("R2", "each panel is supported by 4 rods at 4 corners", ["M1", "M2", "M3"], {"passed": rule.get("R2")}),
-        LogicStep("R3", "structure is 3D and layered by monotonic height", ["R2"], {"passed": rule.get("R3")}),
-        LogicStep("R4", "all links pass legal connector interfaces", ["R3"], {"passed": rule.get("R4")}),
-        LogicStep("R5", "each layer forms a closed four-corner support frame", ["R2", "R4"], {"passed": rule.get("R5")}),
-        LogicStep("R6", "whole structure graph is single connected", ["R4", "R5"], {"passed": rule.get("R6")}),
-        LogicStep("R7", "continuous load path satisfies N/x/y/h/O/A boundary", ["B1", "B3", "B4", "B5", "R5"], {"passed": rule.get("R7")}),
-        LogicStep(
-            "D1",
-            "rule deletion assessment",
-            ["R1", "R2", "R3", "R4", "R5", "R6", "R7"],
-            {
-                "items": assessments,
-                "mandatory_conflict_count": len(mandatory_conflicts),
-            },
-        ),
-        LogicStep(
-            "H1",
-            "efficiency improves under valid constraints",
-            ["R1", "R2", "R3", "R4", "R5", "R6", "R7"],
-            {"statement_valid": result.mandatory_rules_passed},
-        ),
-        LogicStep(
-            "V1",
-            "verify hypothesis",
-            ["H1", "D1"],
-            {
-                "passed": result.passed,
-                "boundary_valid": result.boundary_valid,
-                "combination_valid": result.combination_valid,
-                "efficiency_improved": result.efficiency_improved,
-                "reasons": result.reasons,
-            },
-        ),
-        LogicStep("C", "conclusion", ["V1"], {"adopt_now": result.passed}),
-    ]
-    return LogicRecord.build(steps)
+    if args.command in {"legacy-reference-shelf", "reference-shelf"}:
+        run_reference_pipeline()
+        return 0
 
+    if args.command == "serve":
+        _serve_project(
+            args.product_spec_file,
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+        )
+        return 0
 
-def main() -> None:
-    """运行置物架框架示例并输出验证快照。"""
-    goal = Goal("Increase storage access efficiency per footprint area")
-
-    boundary = BoundaryDefinition(
-        layers_n=4,
-        payload_p_per_layer=30.0,
-        space_s_per_layer=Space3D(width=80.0, depth=35.0, height=30.0),
-        opening_o=Opening2D(width=65.0, height=28.0),
-        footprint_a=Footprint2D(width=90.0, depth=40.0),
-    )
-
-    rules = CombinationRules.default()
-    valid_combos = rules.valid_subsets()
-    candidate_combo = {Module.ROD, Module.CONNECTOR, Module.PANEL}
-    structure = build_demo_structure(boundary)
-
-    hypothesis = Hypothesis(
-        hypothesis_id="H1",
-        statement="With valid boundary and combination, access efficiency should improve",
-    )
-
-    verification_input = VerificationInput(
-        boundary=boundary,
-        combo=candidate_combo,
-        valid_combinations=valid_combos,
-        baseline_efficiency=1.0,
-        target_efficiency=1.22,
-        structure=structure,
-        rules=rules,
-        disabled_rules=(),
-        include_recommended_rules=False,
-    )
-    verification_result = verify(verification_input)
-
-    logic_record = build_logic_record(goal, boundary, verification_result)
-    logic_record.export_json("docs/logic_record.json")
-
-    snapshot = {
-        "goal": goal.to_dict(),
-        "boundary": boundary.to_dict(),
-        "structure": structure.to_dict(),
-        "hypothesis": hypothesis.to_dict(),
-        "strict_mapping": strict_mapping_meta(),
-        "candidate_combo": modules_to_list(candidate_combo),
-        "valid_combinations": [modules_to_list(item) for item in valid_combos],
-        "verification": verification_result.to_dict(),
-        "logic_record_path": "docs/logic_record.json",
-    }
-
-    print(json.dumps(snapshot, ensure_ascii=False, indent=2))
+    parser.print_help()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

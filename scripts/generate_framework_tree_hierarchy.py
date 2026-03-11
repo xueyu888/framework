@@ -10,7 +10,13 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_REGISTRY = REPO_ROOT / "standards/L3/mapping_registry.json"
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from standards_tree import build_standards_tree
+
+DEFAULT_REGISTRY = REPO_ROOT / "mapping/mapping_registry.json"
 DEFAULT_FRAMEWORK_DIR = REPO_ROOT / "framework"
 DEFAULT_OUTPUT_JSON = REPO_ROOT / "docs/hierarchy/shelf_framework_tree.json"
 DEFAULT_OUTPUT_HTML = REPO_ROOT / "docs/hierarchy/shelf_framework_tree.html"
@@ -20,9 +26,6 @@ FRAMEWORK_CAPABILITY_ITEM_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(C(\d+))`\s*(.
 FRAMEWORK_BASE_ITEM_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(B(\d+))`\s*(.*)$")
 FRAMEWORK_UPSTREAM_TERM_PATTERN = re.compile(
     r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?(?P<ref>L\d+\.M\d+)(?:\[(?P<rules>.*?)\])?$"
-)
-FRAMEWORK_UPSTREAM_SCAN_PATTERN = re.compile(
-    r"`?(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?(?P<ref>L\d+\.M\d+)(?:\[(?P<rules>[^\]]*?)\])?`?"
 )
 
 
@@ -72,10 +75,8 @@ def find_first_h1_text(file_text: str, fallback: str) -> str:
 
 
 def build_payload_from_registry(registry_path: Path) -> dict[str, Any]:
-    raw = json.loads(registry_path.read_text(encoding="utf-8"))
-    tree = raw.get("tree")
-    if not isinstance(tree, dict):
-        raise ValueError("mapping_registry.json: tree must be an object")
+    _ = json.loads(registry_path.read_text(encoding="utf-8"))
+    tree = build_standards_tree()
 
     seen_ids: set[str] = set()
     level_order_counter: dict[int, int] = {}
@@ -148,8 +149,7 @@ def build_payload_from_registry(registry_path: Path) -> dict[str, Any]:
     root = {
         "title": "框架标准树结构图",
         "description": (
-            "从 standards/L3/mapping_registry.json 的 tree 自动生成，"
-            "展示框架标准树父子关系。"
+            "从仓库规范标准集自动生成，展示框架标准树父子关系。"
         ),
         "level_labels": level_labels,
         "nodes": nodes,
@@ -167,7 +167,7 @@ def iter_framework_docs(framework_dir: Path) -> list[tuple[str, int, int, Path]]
         if not module_dir.is_dir():
             continue
         module_name = module_dir.name
-        for markdown_file in sorted(module_dir.rglob("*.md")):
+        for markdown_file in sorted(module_dir.glob("*.md")):
             module_match = FRAMEWORK_FILE_LEVEL_MODULE_PATTERN.fullmatch(markdown_file.name)
             if module_match is None:
                 continue
@@ -238,20 +238,6 @@ def parse_upstream_refs(raw_text: str) -> list[tuple[str, str]]:
     if "L" not in expr:
         return refs
     refs.extend(parse_upstream_expr(expr))
-    if refs:
-        return refs
-
-    seen: set[tuple[str, str]] = set()
-    for term_match in FRAMEWORK_UPSTREAM_SCAN_PATTERN.finditer(expr):
-        framework_name = term_match.group("framework")
-        ref = term_match.group("ref")
-        rules = (term_match.group("rules") or "").strip()
-        qualified_ref = f"{framework_name}.{ref}" if framework_name else ref
-        ref_pair = (qualified_ref, rules)
-        if ref_pair in seen:
-            continue
-        seen.add(ref_pair)
-        refs.append(ref_pair)
     return refs
 
 
@@ -430,11 +416,6 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
             add_warning(
                 f"module '{module_name}' has no L0 base (lowest existing level: L{levels[0]})."
             )
-    max_level_by_module = {
-        module_name: max(levels)
-        for module_name, levels in module_level_files.items()
-        if levels
-    }
 
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -541,11 +522,11 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
                 source_ref_local = f"L{source_level}.{source_module}"
                 qualified_lookup = f"{source_framework}:{source_ref_local}"
 
-                if source_framework == module_name and source_ref_local == target_ref:
+                if source_framework == module_name and source_level >= level_num:
                     add_warning(
                         (
-                            f"{source_file}:{source_line}: self module ref ignored "
-                            f"({source_ref} -> {target_ref})"
+                            f"{source_file}:{source_line}: local upstream ref ignored "
+                            f"({source_ref} -> {target_ref}); local refs must point to a lower layer than L{level_num}"
                         )
                     )
                     continue
@@ -582,7 +563,7 @@ def build_payload_from_framework(framework_dir: Path) -> tuple[dict[str, Any], l
                     edge_bucket["terms"].add(source_ref)
             continue
 
-        if level_num == 0 or level_num == max_level_by_module.get(module_name, level_num):
+        if level_num == 0:
             continue
 
         add_warning(
