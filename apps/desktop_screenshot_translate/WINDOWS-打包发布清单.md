@@ -24,6 +24,7 @@ Windows 可发布安装包至少要求：
 - `electron/vendor/tesseract/tessdata/eng.traineddata`
 - `electron/vendor/tesseract/tessdata/chi_sim.traineddata`
 - `electron/vendor/tesseract/tessdata/jpn.traineddata`
+- `electron/vendor/tesseract/tessdata/osd.traineddata`
 
 项目生成产物也必须存在：
 
@@ -94,7 +95,18 @@ OCR 运行时已随安装包分发，不应再要求用户手工安装 `tesserac
 - `AITRANS_OPENAI_API_KEY`
 - `AITRANS_OPENAI_BASE_URL`
 
-## 6. 当前边界
+## 6. 已踩坑后的强制检查项
+
+在准备对外分发前，至少要再检查一遍：
+
+1. `NSIS` 安装器能直接双击启动，不要求“以管理员身份运行”
+2. 安装完成后的首次启动会自动生成 `%APPDATA%\\AiTrans\\runtime-overrides.json`
+3. 未配置翻译端点时会自动弹出首次配置窗口
+4. 配好 `base_url / api_key` 后，第一次截图即可完成 OCR 与翻译
+5. `win-unpacked` 与安装版都能正常调用 bundled Tesseract
+6. 首次截图若命中空 OCR，不应直接报错给用户，而应由应用内部吸收短时重试
+
+## 7. 当前边界
 
 - 当前已能构建 Windows `NSIS` 安装包与 `portable` 产物
 - `NSIS` 目标默认走当前用户安装路径，不应要求管理员权限

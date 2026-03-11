@@ -24,6 +24,10 @@ window_state_store = "local_json"
 
 # [capture_runtime] 细化截图采集链。
 # 它决定屏幕帧获取、位图中转和坐标补偿实现，不改变产品层截图模式和交互真相。
+# 当前 Windows 路径补充：
+# - 截图前必须先隐藏首次配置窗与结果面板，避免它们残留在合成层里污染首帧截图
+# - 截图触发后需要留出短暂的合成稳定时间，再读取 desktopCapturer 位图
+# - 首次配置完成后的第一次截图必须直接可用，不能要求用户“再截一次才恢复”
 [capture_runtime]
 frame_source = "desktop_capturer"
 bitmap_pipeline = "native_image_png"
@@ -36,6 +40,15 @@ coordinate_profile = "windows_per_monitor_dpi_compensation"
 # - 正式发布路径默认把 OCR 运行时依赖随应用一起分发，不把“用户手工安装 tesseract”作为标准交付方式
 # - 当前开发联调阶段仍允许通过环境变量覆盖 OCR 可执行路径，避免在 bundling 尚未落地前阻塞主链
 # - `windows_ocr_api` 仍保留为后续 packaged / package-identity 形态下的升级入口
+# - bundled OCR runtime 必须是“可执行整体”而不是只有 `tesseract.exe`
+#   也就是说，发布目录中必须同时携带：
+#   - `tesseract.exe`
+#   - 同目录运行所需 `*.dll`
+#   - `tessdata/eng.traineddata`
+#   - `tessdata/chi_sim.traineddata`
+#   - `tessdata/jpn.traineddata`
+#   - `tessdata/osd.traineddata`
+# - 对 `tesseract returned empty OCR text` 这类首帧空识别，需要在实现层作为可恢复场景处理，而不是直接暴露给用户
 # - 翻译侧仍只保留 `openai_translation` 这一提供方面，但它指向“OpenAI 兼容端点”而不是只绑定 OpenAI 官方
 # - 当前默认本地模型选择为 `qwen3-30b-a3b-instruct-2507`，以适配局域网部署的兼容端点
 [providers]
@@ -66,8 +79,10 @@ clipboard_bridge = "native_clipboard"
 # 当前 Windows 路径补充：
 # - 安装产物使用 `NSIS`
 # - Windows 安装器默认走 `per-user` 路径，不应要求管理员权限
+# - 安装器必须关闭默认提权依赖，不能把“必须管理员运行安装器”当成正常用户路径
 # - OCR 运行时与项目生成产物会在打包时一并进入安装包资源目录
 # - 翻译端点凭据不应硬编码进安装包，优先通过运行时覆盖文件或环境变量提供
+# - 首次启动应自动生成运行时覆盖文件模板，并在翻译端点缺失时自动打开配置引导
 [release]
 targets = ["win-x64", "darwin-universal"]
 package_formats = ["nsis", "dmg"]
