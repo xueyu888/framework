@@ -76,7 +76,7 @@
       },
       {
         "id": "SYNC-20260307-knowledge-base-ai-coding",
-        "note": "Refactor the AI-coding sample into a structure-first stack: generic frontend structures, knowledge-base domain structures, backend knowledge contracts, and a project-instantiated knowledge_base_demo bound to the L2 framework standards."
+        "note": "Refactor the AI-coding sample into a structure-first stack: generic frontend structures, knowledge-base domain structures, backend knowledge contracts, and a project-instantiated knowledge_base_runtime bound to the L2 framework standards."
       },
       {
         "id": "SYNC-20260307-frontend-primitive-sink",
@@ -92,7 +92,7 @@
       },
       {
         "id": "SYNC-20260308-frontend-extreme-compression",
-        "note": "Rework the frontend framework into a cleaner compressed chain: L0 carrier/state/visual atoms, L1 trigger-text-display-navigation-feedback atomic families, L2 standard contract, and L3 page-runtime orchestration; then realign knowledge_base and ArchSync navigation fixtures to the new module graph."
+        "note": "Rework the frontend framework into a cleaner compressed chain: L0 carrier/state/visual atoms, L1 trigger-text-display-navigation-feedback atomic families, L2 standard contract, and L3 page-runtime orchestration; then realign knowledge_base and Shelf AI navigation fixtures to the new module graph."
       }
     ]
   },
@@ -238,7 +238,12 @@
     ]
   },
   "validation": {
-    "level_order": ["L0", "L1", "L2", "L3"],
+    "level_order": [
+      "L0",
+      "L1",
+      "L2",
+      "L3"
+    ],
     "reverse_validation_command": "uv run python scripts/validate_strict_mapping.py --check-changes"
   },
   "mappings": [
@@ -256,7 +261,7 @@
           "symbol": "class Capability"
         },
         {
-          "file": "src/main.py",
+          "file": "src/examples/legacy_shelf/reference_pipeline.py",
           "symbol": "capabilities = ["
         }
       ]
@@ -303,7 +308,7 @@
           "symbol": "class Base"
         },
         {
-          "file": "src/main.py",
+          "file": "src/examples/legacy_shelf/reference_pipeline.py",
           "symbol": "bases = ["
         }
       ]
@@ -377,7 +382,7 @@
           "symbol": "def verify("
         },
         {
-          "file": "src/main.py",
+          "file": "src/examples/legacy_shelf/reference_pipeline.py",
           "symbol": "verification_result = verify("
         }
       ]
@@ -483,7 +488,7 @@
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/frontend.py",
+          "file": "src/knowledge_base_runtime/frontend.py",
           "symbol": "KNOWLEDGE_BASE_FRONTEND_CAPABILITIES = ("
         }
       ]
@@ -498,7 +503,7 @@
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/frontend.py",
+          "file": "src/knowledge_base_runtime/frontend.py",
           "symbol": "KNOWLEDGE_BASE_FRONTEND_BOUNDARY = BoundaryDefinition("
         }
       ]
@@ -513,7 +518,7 @@
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/frontend.py",
+          "file": "src/knowledge_base_runtime/frontend.py",
           "symbol": "KNOWLEDGE_BASE_FRONTEND_BASES = ("
         }
       ]
@@ -528,7 +533,7 @@
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/frontend.py",
+          "file": "src/knowledge_base_runtime/frontend.py",
           "symbol": "def compose_knowledge_base_page("
         }
       ]
@@ -543,7 +548,7 @@
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/frontend.py",
+          "file": "src/knowledge_base_runtime/frontend.py",
           "symbol": "def verify_knowledge_base_frontend("
         }
       ]
@@ -558,7 +563,7 @@
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/workspace.py",
+          "file": "src/knowledge_base_runtime/workspace.py",
           "symbol": "KNOWLEDGE_BASE_WORKSPACE_CAPABILITIES = ("
         }
       ]
@@ -573,7 +578,7 @@
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/workspace.py",
+          "file": "src/knowledge_base_runtime/workspace.py",
           "symbol": "KNOWLEDGE_BASE_WORKSPACE_BOUNDARY = BoundaryDefinition("
         }
       ]
@@ -588,7 +593,7 @@
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/workspace.py",
+          "file": "src/knowledge_base_runtime/workspace.py",
           "symbol": "KNOWLEDGE_BASE_WORKSPACE_BASES = ("
         }
       ]
@@ -603,7 +608,7 @@
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/workspace.py",
+          "file": "src/knowledge_base_runtime/workspace.py",
           "symbol": "def compose_workspace_flow("
         }
       ]
@@ -618,7 +623,7 @@
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/workspace.py",
+          "file": "src/knowledge_base_runtime/workspace.py",
           "symbol": "def verify_workspace_flow("
         }
       ]
@@ -633,7 +638,7 @@
       "l2_anchor": "## 1. 能力声明（Capability Statement）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/backend.py",
+          "file": "src/knowledge_base_runtime/backend.py",
           "symbol": "KNOWLEDGE_BASE_API_CAPABILITIES = ("
         }
       ]
@@ -648,7 +653,7 @@
       "l2_anchor": "## 2. 边界定义（Boundary / 参数）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/backend.py",
+          "file": "src/knowledge_base_runtime/backend.py",
           "symbol": "KNOWLEDGE_BASE_API_BOUNDARY = BoundaryDefinition("
         }
       ]
@@ -663,7 +668,7 @@
       "l2_anchor": "## 3. 最小可行基（Minimum Viable Bases）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/backend.py",
+          "file": "src/knowledge_base_runtime/backend.py",
           "symbol": "KNOWLEDGE_BASE_API_BASES = ("
         }
       ]
@@ -678,7 +683,7 @@
       "l2_anchor": "## 4. 基组合原则（Base Combination Principles）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/backend.py",
+          "file": "src/knowledge_base_runtime/backend.py",
           "symbol": "def build_knowledge_base_router("
         }
       ]
@@ -693,7 +698,7 @@
       "l2_anchor": "## 5. 验证（Verification）",
       "impl_symbols": [
         {
-          "file": "src/knowledge_base_demo/backend.py",
+          "file": "src/knowledge_base_runtime/backend.py",
           "symbol": "def verify_knowledge_base_backend("
         }
       ]

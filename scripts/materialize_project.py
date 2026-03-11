@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -9,7 +10,13 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from project_runtime.dispatcher import materialize_project
+from generate_module_hierarchy_html import load_hierarchy, render_html
+from project_runtime import materialize_knowledge_base_project
+from workspace_governance import (
+    DEFAULT_WORKSPACE_GOVERNANCE_HTML,
+    DEFAULT_WORKSPACE_GOVERNANCE_JSON,
+    build_workspace_governance_payload,
+)
 
 
 def discover_product_spec_files() -> list[Path]:
@@ -49,6 +56,17 @@ def main() -> int:
             "->",
             project.generated_artifacts.directory,
         )
+
+    governance_payload = build_workspace_governance_payload()
+    DEFAULT_WORKSPACE_GOVERNANCE_JSON.parent.mkdir(parents=True, exist_ok=True)
+    DEFAULT_WORKSPACE_GOVERNANCE_JSON.write_text(
+        json.dumps(governance_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    graph = load_hierarchy(DEFAULT_WORKSPACE_GOVERNANCE_JSON)
+    render_html(graph, DEFAULT_WORKSPACE_GOVERNANCE_HTML, width=1680, height=1080)
+    print("[OK] governance tree ->", DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT))
+    print("[OK] governance tree ->", DEFAULT_WORKSPACE_GOVERNANCE_HTML.relative_to(REPO_ROOT))
 
     return 0
 

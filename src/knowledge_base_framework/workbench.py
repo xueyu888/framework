@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from project_runtime.knowledge_base import KnowledgeBaseProject
 
 
+# @governed_symbol id=kb.workbench.surface_contract owner=framework kind=surface_contract risk=high
 def build_workbench_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
     library_actions = ["switch_knowledge_base", "browse_documents", "open_document_detail"]
     if project.library.allow_create:
@@ -45,6 +46,7 @@ def build_workbench_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
             "conversation_sidebar",
             "chat_main",
             "citation_drawer",
+            "basketball_showcase_page",
             "knowledge_list_page",
             "knowledge_detail_page",
             "document_detail_page",

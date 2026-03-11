@@ -42,6 +42,7 @@ class HierarchyGraph:
     edges: list[HierarchyEdge]
     layout_mode: str = "global_levels"
     framework_groups: list[HierarchyFrameworkGroup] | None = None
+    storage_key_stem: str | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ def load_hierarchy(path: Path) -> HierarchyGraph:
 
     title = _expect_str(root.get("title"), "title")
     description = _expect_str(root.get("description"), "description")
+    storage_key_stem = _expect_optional_str(root.get("storage_key_stem"), "storage_key_stem")
 
     raw_level_labels = _expect_dict(root.get("level_labels"), "level_labels")
     level_labels: dict[int, str] = {}
@@ -213,6 +215,7 @@ def load_hierarchy(path: Path) -> HierarchyGraph:
         edges=edges,
         layout_mode=layout_mode,
         framework_groups=framework_groups,
+        storage_key_stem=storage_key_stem,
     )
 
 
@@ -534,6 +537,7 @@ def _build_payload(
         "level_node_counts": {str(level): level_to_node_count.get(level, 0) for level in level_values},
         "relation_counts": relation_counts,
         "layout_mode": graph.layout_mode,
+        "storage_key_stem": graph.storage_key_stem,
         "framework_groups": [
             {
                 "name": group.name,
@@ -1426,7 +1430,10 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     const graphData = __PAYLOAD_JSON__;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : null;
-    const SIDE_VISIBILITY_KEY = "archsync.frameworkTree.sideVisible";
+    const storageKeyStem = typeof graphData.storage_key_stem === "string" && graphData.storage_key_stem
+      ? graphData.storage_key_stem
+      : "frameworkTree";
+    const SIDE_VISIBILITY_KEY = `shelf.${storageKeyStem}.sideVisible`;
 
     const layoutEl = document.querySelector(".layout");
     const graphCardEl = document.querySelector(".graph-card");
@@ -2675,7 +2682,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
       const safeLine = Number.isFinite(Number(lineNumber)) ? Math.max(1, Number(lineNumber)) : 1;
       if (vscodeApi) {
         vscodeApi.postMessage({
-          type: "archSync.openSource",
+          type: "shelf.openSource",
           file: String(filePath || ""),
           line: safeLine
         });
