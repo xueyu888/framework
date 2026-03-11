@@ -62,9 +62,6 @@ function main() {
 
   const vendorRoot = path.join(resolveAppRoot(), 'vendor', 'tesseract');
   const vendorTessdata = path.join(vendorRoot, 'tessdata');
-  ensureDir(vendorTessdata);
-
-  copyFile(source.executable, path.join(vendorRoot, 'tesseract.exe'));
 
   const requiredLanguages = buildTesseractLanguages(config.productSpec)
     .split('+')
@@ -72,11 +69,22 @@ function main() {
   const extraLanguages = ['osd'];
   const languages = [...new Set([...requiredLanguages, ...extraLanguages])];
 
+  const missing = languages.filter((language) => {
+    const sourceFile = path.join(source.tessdataDir, `${language}.traineddata`);
+    return !fs.existsSync(sourceFile);
+  });
+  if (missing.length > 0) {
+    throw new Error(
+      `missing traineddata in installed Tesseract: ${missing.join(', ')} (expected under ${source.tessdataDir})`,
+    );
+  }
+
+  ensureDir(vendorTessdata);
+
+  copyFile(source.executable, path.join(vendorRoot, 'tesseract.exe'));
+
   for (const language of languages) {
     const sourceFile = path.join(source.tessdataDir, `${language}.traineddata`);
-    if (!fs.existsSync(sourceFile)) {
-      throw new Error(`missing traineddata in installed Tesseract: ${sourceFile}`);
-    }
     copyFile(sourceFile, path.join(vendorTessdata, `${language}.traineddata`));
   }
 
