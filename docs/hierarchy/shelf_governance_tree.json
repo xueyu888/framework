@@ -271,6 +271,400 @@
         "raw_node_id": "NODE-L3-REGISTRY"
       },
       {
+        "id": "workspace:shelf:standards:framework_modules",
+        "label": "Framework Modules",
+        "level": 2,
+        "description": "kind=framework_modules_root | layer=Standards",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_modules_root",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:backend",
+        "label": "backend",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=backend",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "backend"
+      },
+      {
+        "id": "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md",
+        "label": "L0-M0-文件资源与对话契约原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/backend/L0-M0-文件资源与对话契约原子模块.md | locator=L0.M0 | object_id=backend",
+        "source_file": "framework/backend/L0-M0-文件资源与对话契约原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:backend",
+        "object_id": "backend",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md",
+        "label": "L1-M0-目录预览对话编排模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/backend/L1-M0-目录预览对话编排模块.md | locator=L1.M0 | object_id=backend",
+        "source_file": "framework/backend/L1-M0-目录预览对话编排模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:backend",
+        "object_id": "backend",
+        "locator": "L1.M0"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:curtain",
+        "label": "curtain",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=curtain",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "curtain"
+      },
+      {
+        "id": "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md",
+        "label": "L0-M0-窗帘抽象结构模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/curtain/L0-M0-窗帘抽象结构模块.md | locator=L0.M0 | object_id=curtain",
+        "source_file": "framework/curtain/L0-M0-窗帘抽象结构模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:curtain",
+        "object_id": "curtain",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md",
+        "label": "L1-M0-安装与控制编排模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/curtain/L1-M0-安装与控制编排模块.md | locator=L1.M0 | object_id=curtain",
+        "source_file": "framework/curtain/L1-M0-安装与控制编排模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:curtain",
+        "object_id": "curtain",
+        "locator": "L1.M0"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:frontend",
+        "label": "frontend",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=frontend",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "frontend"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md",
+        "label": "L0-M0-承载与绑定原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L0-M0-承载与绑定原子模块.md | locator=L0.M0 | object_id=frontend",
+        "source_file": "framework/frontend/L0-M0-承载与绑定原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md",
+        "label": "L0-M1-状态与交互原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L0-M1-状态与交互原子模块.md | locator=L0.M1 | object_id=frontend",
+        "source_file": "framework/frontend/L0-M1-状态与交互原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L0.M1"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md",
+        "label": "L0-M2-视觉语义原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L0-M2-视觉语义原子模块.md | locator=L0.M2 | object_id=frontend",
+        "source_file": "framework/frontend/L0-M2-视觉语义原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L0.M2"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md",
+        "label": "L1-M0-触发与选择原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L1-M0-触发与选择原子模块.md | locator=L1.M0 | object_id=frontend",
+        "source_file": "framework/frontend/L1-M0-触发与选择原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L1.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md",
+        "label": "L1-M1-文本输入原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L1-M1-文本输入原子模块.md | locator=L1.M1 | object_id=frontend",
+        "source_file": "framework/frontend/L1-M1-文本输入原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L1.M1"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md",
+        "label": "L1-M2-展示与容器原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L1-M2-展示与容器原子模块.md | locator=L1.M2 | object_id=frontend",
+        "source_file": "framework/frontend/L1-M2-展示与容器原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L1.M2"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md",
+        "label": "L1-M3-集合与导航原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L1-M3-集合与导航原子模块.md | locator=L1.M3 | object_id=frontend",
+        "source_file": "framework/frontend/L1-M3-集合与导航原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L1.M3"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md",
+        "label": "L1-M4-标记与反馈原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L1-M4-标记与反馈原子模块.md | locator=L1.M4 | object_id=frontend",
+        "source_file": "framework/frontend/L1-M4-标记与反馈原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L1.M4"
+      },
+      {
+        "id": "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md",
+        "label": "L3-M0-页面与运行编排模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/frontend/L3-M0-页面与运行编排模块.md | locator=L3.M0 | object_id=frontend",
+        "source_file": "framework/frontend/L3-M0-页面与运行编排模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:frontend",
+        "object_id": "frontend",
+        "locator": "L3.M0"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "label": "knowledge_base",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=knowledge_base",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "knowledge_base"
+      },
+      {
+        "id": "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md",
+        "label": "L0-M0-文件库与摄取原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/knowledge_base/L0-M0-文件库与摄取原子模块.md | locator=L0.M0 | object_id=knowledge_base",
+        "source_file": "framework/knowledge_base/L0-M0-文件库与摄取原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "object_id": "knowledge_base",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md",
+        "label": "L0-M1-文档与目录原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/knowledge_base/L0-M1-文档与目录原子模块.md | locator=L0.M1 | object_id=knowledge_base",
+        "source_file": "framework/knowledge_base/L0-M1-文档与目录原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "object_id": "knowledge_base",
+        "locator": "L0.M1"
+      },
+      {
+        "id": "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md",
+        "label": "L0-M2-对话与引用原子模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/knowledge_base/L0-M2-对话与引用原子模块.md | locator=L0.M2 | object_id=knowledge_base",
+        "source_file": "framework/knowledge_base/L0-M2-对话与引用原子模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "object_id": "knowledge_base",
+        "locator": "L0.M2"
+      },
+      {
+        "id": "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md",
+        "label": "L1-M0-知识库界面骨架模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/knowledge_base/L1-M0-知识库界面骨架模块.md | locator=L1.M0 | object_id=knowledge_base",
+        "source_file": "framework/knowledge_base/L1-M0-知识库界面骨架模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "object_id": "knowledge_base",
+        "locator": "L1.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md",
+        "label": "L1-M1-知识引用上下文编排模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/knowledge_base/L1-M1-知识引用上下文编排模块.md | locator=L1.M1 | object_id=knowledge_base",
+        "source_file": "framework/knowledge_base/L1-M1-知识引用上下文编排模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "object_id": "knowledge_base",
+        "locator": "L1.M1"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:message_queue",
+        "label": "message_queue",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=message_queue",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "message_queue"
+      },
+      {
+        "id": "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md",
+        "label": "L0-M0-消息队列抽象结构模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/message_queue/L0-M0-消息队列抽象结构模块.md | locator=L0.M0 | object_id=message_queue",
+        "source_file": "framework/message_queue/L0-M0-消息队列抽象结构模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:message_queue",
+        "object_id": "message_queue",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md",
+        "label": "L1-M0-消息队列标准模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/message_queue/L1-M0-消息队列标准模块.md | locator=L1.M0 | object_id=message_queue",
+        "source_file": "framework/message_queue/L1-M0-消息队列标准模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:message_queue",
+        "object_id": "message_queue",
+        "locator": "L1.M0"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:runtime_env",
+        "label": "runtime_env",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=runtime_env",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "runtime_env"
+      },
+      {
+        "id": "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md",
+        "label": "L0-M0-运行环境识别模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/runtime_env/L0-M0-运行环境识别模块.md | locator=L0.M0 | object_id=runtime_env",
+        "source_file": "framework/runtime_env/L0-M0-运行环境识别模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:runtime_env",
+        "object_id": "runtime_env",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "workspace:shelf:standards:framework_modules:shelf",
+        "label": "shelf",
+        "level": 3,
+        "description": "kind=framework_domain | layer=Standards | object_id=shelf",
+        "source_file": "",
+        "source_line": 1,
+        "node_kind": "framework_domain",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules",
+        "object_id": "shelf"
+      },
+      {
+        "id": "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md",
+        "label": "L0-M0-置物架抽象结构模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/shelf/L0-M0-置物架抽象结构模块.md | locator=L0.M0 | object_id=shelf",
+        "source_file": "framework/shelf/L0-M0-置物架抽象结构模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:shelf",
+        "object_id": "shelf",
+        "locator": "L0.M0"
+      },
+      {
+        "id": "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md",
+        "label": "L1-M0-置物架装配编排模块",
+        "level": 4,
+        "description": "kind=framework_module_file | layer=Standards | file=framework/shelf/L1-M0-置物架装配编排模块.md | locator=L1.M0 | object_id=shelf",
+        "source_file": "framework/shelf/L1-M0-置物架装配编排模块.md",
+        "source_line": 1,
+        "node_kind": "framework_module_file",
+        "layer": "Standards",
+        "parent_node_id": "workspace:shelf:standards:framework_modules:shelf",
+        "object_id": "shelf",
+        "locator": "L1.M0"
+      },
+      {
         "id": "project:knowledge_base_basic",
         "label": "Shelf AI Knowledge Chat",
         "level": 2,
@@ -6545,6 +6939,161 @@
       {
         "from": "standards:NODE-L3-LAYER",
         "to": "standards:NODE-L3-REGISTRY",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards",
+        "to": "workspace:shelf:standards:framework_modules",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:backend",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:backend",
+        "to": "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:backend",
+        "to": "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:curtain",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:curtain",
+        "to": "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:curtain",
+        "to": "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:frontend",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:frontend",
+        "to": "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "to": "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "to": "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "to": "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "to": "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:knowledge_base",
+        "to": "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:message_queue",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:message_queue",
+        "to": "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:message_queue",
+        "to": "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:runtime_env",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:runtime_env",
+        "to": "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules",
+        "to": "workspace:shelf:standards:framework_modules:shelf",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:shelf",
+        "to": "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:standards:framework_modules:shelf",
+        "to": "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md",
         "relation": "tree_child"
       },
       {
@@ -22694,6 +23243,12 @@
         "workspace:shelf:evidence",
         "workspace:shelf:evidence:artifact:governance_tree_json"
       ],
+      "framework/backend/L0-M0-文件资源与对话契约原子模块.md": [
+        "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md"
+      ],
+      "framework/backend/L1-M0-目录预览对话编排模块.md": [
+        "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md"
+      ],
       "framework/backend/L2-M0-知识库接口框架标准模块.md": [
         "project:knowledge_base_basic:framework:module:backend.L2.M0",
         "project:knowledge_base_basic:framework:module:backend.L2.M0:rule:R1",
@@ -22702,8 +23257,38 @@
         "project:knowledge_base_basic:framework:module:backend.L2.M0:rule:R4",
         "standards:NODE-L2-BACKEND"
       ],
+      "framework/curtain/L0-M0-窗帘抽象结构模块.md": [
+        "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md"
+      ],
+      "framework/curtain/L1-M0-安装与控制编排模块.md": [
+        "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md"
+      ],
       "framework/curtain/L2-M0-窗帘框架标准模块.md": [
         "standards:NODE-L2-CURTAIN"
+      ],
+      "framework/frontend/L0-M0-承载与绑定原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md"
+      ],
+      "framework/frontend/L0-M1-状态与交互原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md"
+      ],
+      "framework/frontend/L0-M2-视觉语义原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md"
+      ],
+      "framework/frontend/L1-M0-触发与选择原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md"
+      ],
+      "framework/frontend/L1-M1-文本输入原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md"
+      ],
+      "framework/frontend/L1-M2-展示与容器原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md"
+      ],
+      "framework/frontend/L1-M3-集合与导航原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md"
+      ],
+      "framework/frontend/L1-M4-标记与反馈原子模块.md": [
+        "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md"
       ],
       "framework/frontend/L2-M0-前端框架标准模块.md": [
         "project:knowledge_base_basic:framework:module:frontend.L2.M0",
@@ -22712,6 +23297,24 @@
         "project:knowledge_base_basic:framework:module:frontend.L2.M0:rule:R3",
         "standards:NODE-L2-FRONTEND"
       ],
+      "framework/frontend/L3-M0-页面与运行编排模块.md": [
+        "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md"
+      ],
+      "framework/knowledge_base/L0-M0-文件库与摄取原子模块.md": [
+        "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md"
+      ],
+      "framework/knowledge_base/L0-M1-文档与目录原子模块.md": [
+        "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md"
+      ],
+      "framework/knowledge_base/L0-M2-对话与引用原子模块.md": [
+        "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md"
+      ],
+      "framework/knowledge_base/L1-M0-知识库界面骨架模块.md": [
+        "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md"
+      ],
+      "framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": [
+        "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md"
+      ],
       "framework/knowledge_base/L2-M0-知识库工作台场景模块.md": [
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0",
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R1",
@@ -22719,6 +23322,21 @@
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R3",
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R4",
         "standards:NODE-L2-KNOWLEDGE-BASE"
+      ],
+      "framework/message_queue/L0-M0-消息队列抽象结构模块.md": [
+        "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md"
+      ],
+      "framework/message_queue/L1-M0-消息队列标准模块.md": [
+        "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md"
+      ],
+      "framework/runtime_env/L0-M0-运行环境识别模块.md": [
+        "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md"
+      ],
+      "framework/shelf/L0-M0-置物架抽象结构模块.md": [
+        "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md"
+      ],
+      "framework/shelf/L1-M0-置物架装配编排模块.md": [
+        "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md"
       ],
       "framework/shelf/L2-M0-置物架框架标准模块.md": [
         "standards:NODE-L2-SHELF"
@@ -23029,6 +23647,37 @@
       "standards:NODE-L2-KNOWLEDGE-BASE": null,
       "standards:NODE-L3-LAYER": null,
       "standards:NODE-L3-REGISTRY": null,
+      "workspace:shelf:standards:framework_modules": "workspace:shelf:standards",
+      "workspace:shelf:standards:framework_modules:backend": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md": "workspace:shelf:standards:framework_modules:backend",
+      "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md": "workspace:shelf:standards:framework_modules:backend",
+      "workspace:shelf:standards:framework_modules:curtain": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md": "workspace:shelf:standards:framework_modules:curtain",
+      "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md": "workspace:shelf:standards:framework_modules:curtain",
+      "workspace:shelf:standards:framework_modules:frontend": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md": "workspace:shelf:standards:framework_modules:frontend",
+      "workspace:shelf:standards:framework_modules:knowledge_base": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
+      "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
+      "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
+      "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
+      "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
+      "workspace:shelf:standards:framework_modules:message_queue": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md": "workspace:shelf:standards:framework_modules:message_queue",
+      "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md": "workspace:shelf:standards:framework_modules:message_queue",
+      "workspace:shelf:standards:framework_modules:runtime_env": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": "workspace:shelf:standards:framework_modules:runtime_env",
+      "workspace:shelf:standards:framework_modules:shelf": "workspace:shelf:standards:framework_modules",
+      "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": "workspace:shelf:standards:framework_modules:shelf",
+      "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": "workspace:shelf:standards:framework_modules:shelf",
       "project:knowledge_base_basic": "workspace:shelf:projects",
       "project:knowledge_base_basic:code": "project:knowledge_base_basic",
       "project:knowledge_base_basic:code:file:projects/knowledge_base_basic/generated/framework_ir.json": "project:knowledge_base_basic:code",
@@ -23807,6 +24456,29 @@
       "standards:NODE-L2-SHELF": [],
       "standards:NODE-L3-LAYER": [],
       "standards:NODE-L3-REGISTRY": [],
+      "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md": [],
+      "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md": [],
+      "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md": [],
+      "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md": [],
+      "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md": [],
+      "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": [],
+      "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": [],
+      "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": [],
       "workspace:shelf": [
         "workspace:shelf:evidence",
         "workspace:shelf:projects"
@@ -23820,7 +24492,55 @@
       "workspace:shelf:projects": [
         "project:knowledge_base_basic"
       ],
-      "workspace:shelf:standards": []
+      "workspace:shelf:standards": [
+        "workspace:shelf:standards:framework_modules"
+      ],
+      "workspace:shelf:standards:framework_modules": [
+        "workspace:shelf:standards:framework_modules:backend",
+        "workspace:shelf:standards:framework_modules:curtain",
+        "workspace:shelf:standards:framework_modules:frontend",
+        "workspace:shelf:standards:framework_modules:knowledge_base",
+        "workspace:shelf:standards:framework_modules:message_queue",
+        "workspace:shelf:standards:framework_modules:runtime_env",
+        "workspace:shelf:standards:framework_modules:shelf"
+      ],
+      "workspace:shelf:standards:framework_modules:backend": [
+        "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md",
+        "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md"
+      ],
+      "workspace:shelf:standards:framework_modules:curtain": [
+        "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md",
+        "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md"
+      ],
+      "workspace:shelf:standards:framework_modules:frontend": [
+        "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md",
+        "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md",
+        "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md",
+        "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md",
+        "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md",
+        "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md",
+        "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md",
+        "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md",
+        "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md"
+      ],
+      "workspace:shelf:standards:framework_modules:knowledge_base": [
+        "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md",
+        "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md",
+        "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md",
+        "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md",
+        "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md"
+      ],
+      "workspace:shelf:standards:framework_modules:message_queue": [
+        "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md",
+        "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md"
+      ],
+      "workspace:shelf:standards:framework_modules:runtime_env": [
+        "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md"
+      ],
+      "workspace:shelf:standards:framework_modules:shelf": [
+        "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md",
+        "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md"
+      ]
     },
     "derived_index": {
       "project:knowledge_base_basic": [],
@@ -24721,6 +25441,29 @@
       "standards:NODE-L2-SHELF": [],
       "standards:NODE-L3-LAYER": [],
       "standards:NODE-L3-REGISTRY": [],
+      "standards:framework_module_file:framework/backend/L0-M0-文件资源与对话契约原子模块.md": [],
+      "standards:framework_module_file:framework/backend/L1-M0-目录预览对话编排模块.md": [],
+      "standards:framework_module_file:framework/curtain/L0-M0-窗帘抽象结构模块.md": [],
+      "standards:framework_module_file:framework/curtain/L1-M0-安装与控制编排模块.md": [],
+      "standards:framework_module_file:framework/frontend/L0-M0-承载与绑定原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L0-M1-状态与交互原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L0-M2-视觉语义原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M0-触发与选择原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M1-文本输入原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M2-展示与容器原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M3-集合与导航原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L1-M4-标记与反馈原子模块.md": [],
+      "standards:framework_module_file:framework/frontend/L3-M0-页面与运行编排模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L0-M0-文件库与摄取原子模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L0-M1-文档与目录原子模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md": [],
+      "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md": [],
+      "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": [],
+      "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": [],
+      "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": [],
       "workspace:shelf": [],
       "workspace:shelf:evidence": [],
       "workspace:shelf:evidence:artifact:governance_tree_html": [
@@ -24734,7 +25477,15 @@
         "workspace:shelf:standards"
       ],
       "workspace:shelf:projects": [],
-      "workspace:shelf:standards": []
+      "workspace:shelf:standards": [],
+      "workspace:shelf:standards:framework_modules": [],
+      "workspace:shelf:standards:framework_modules:backend": [],
+      "workspace:shelf:standards:framework_modules:curtain": [],
+      "workspace:shelf:standards:framework_modules:frontend": [],
+      "workspace:shelf:standards:framework_modules:knowledge_base": [],
+      "workspace:shelf:standards:framework_modules:message_queue": [],
+      "workspace:shelf:standards:framework_modules:runtime_env": [],
+      "workspace:shelf:standards:framework_modules:shelf": []
     },
     "reverse_derived_index": {
       "project:knowledge_base_basic": [
