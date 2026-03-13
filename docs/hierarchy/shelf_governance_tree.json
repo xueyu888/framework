@@ -197,6 +197,18 @@
         "raw_node_id": "NODE-L1-REDUCIBILITY"
       },
       {
+        "id": "standards:NODE-L1-CODE-GIT",
+        "label": "Git提交信息标准",
+        "level": 4,
+        "description": "kind=file | layer=Standards | file=specs/code/Git提交信息标准.md",
+        "source_file": "specs/code/Git提交信息标准.md",
+        "source_line": 1,
+        "node_kind": "file",
+        "layer": "Standards",
+        "registry_level": "L1",
+        "raw_node_id": "NODE-L1-CODE-GIT"
+      },
+      {
         "id": "standards:NODE-L1-CODE-PYTHON",
         "label": "Python实现质量标准",
         "level": 4,
@@ -207,6 +219,18 @@
         "layer": "Standards",
         "registry_level": "L1",
         "raw_node_id": "NODE-L1-CODE-PYTHON"
+      },
+      {
+        "id": "standards:NODE-L1-CODE-RELEASE",
+        "label": "发布与版本说明标准",
+        "level": 4,
+        "description": "kind=file | layer=Standards | file=specs/code/发布与版本说明标准.md",
+        "source_file": "specs/code/发布与版本说明标准.md",
+        "source_line": 1,
+        "node_kind": "file",
+        "layer": "Standards",
+        "registry_level": "L1",
+        "raw_node_id": "NODE-L1-CODE-RELEASE"
       },
       {
         "id": "standards:NODE-L2-LAYER",
@@ -7742,7 +7766,17 @@
       },
       {
         "from": "standards:NODE-L1-LAYER",
+        "to": "standards:NODE-L1-CODE-GIT",
+        "relation": "tree_child"
+      },
+      {
+        "from": "standards:NODE-L1-LAYER",
         "to": "standards:NODE-L1-CODE-PYTHON",
+        "relation": "tree_child"
+      },
+      {
+        "from": "standards:NODE-L1-LAYER",
+        "to": "standards:NODE-L1-CODE-RELEASE",
         "relation": "tree_child"
       },
       {
@@ -27539,8 +27573,14 @@
         "project:knowledge_base_basic:structure:object:knowledge_base_basic.config_effect.frontend.style_profile:role:frontend.style_profile:effect_manifest",
         "project:knowledge_base_basic:structure:object:knowledge_base_basic.config_effect.frontend.style_profile:role:frontend.style_profile:ui_spec.implementation.style_profile"
       ],
+      "specs/code/Git提交信息标准.md": [
+        "standards:NODE-L1-CODE-GIT"
+      ],
       "specs/code/Python实现质量标准.md": [
         "standards:NODE-L1-CODE-PYTHON"
+      ],
+      "specs/code/发布与版本说明标准.md": [
+        "standards:NODE-L1-CODE-RELEASE"
       ],
       "specs/可删减性标准.md": [
         "standards:NODE-L1-REDUCIBILITY"
@@ -27691,7 +27731,9 @@
       "standards:NODE-L1-LINT": null,
       "standards:NODE-L1-TRACEABILITY": null,
       "standards:NODE-L1-REDUCIBILITY": null,
+      "standards:NODE-L1-CODE-GIT": null,
       "standards:NODE-L1-CODE-PYTHON": null,
+      "standards:NODE-L1-CODE-RELEASE": null,
       "standards:NODE-L2-LAYER": null,
       "standards:NODE-L2-SHELF": null,
       "standards:NODE-L2-CURTAIN": null,
@@ -28527,7 +28569,9 @@
       "project:knowledge_base_basic:structure:object:knowledge_base_basic.config_effect.frontend.style_profile:role:frontend.style_profile:effect_manifest": [],
       "project:knowledge_base_basic:structure:object:knowledge_base_basic.config_effect.frontend.style_profile:role:frontend.style_profile:ui_spec.implementation.style_profile": [],
       "standards:NODE-L0-ROOT": [],
+      "standards:NODE-L1-CODE-GIT": [],
       "standards:NODE-L1-CODE-PYTHON": [],
+      "standards:NODE-L1-CODE-RELEASE": [],
       "standards:NODE-L1-CORE": [],
       "standards:NODE-L1-LAYER": [],
       "standards:NODE-L1-LINT": [],
@@ -29604,7 +29648,9 @@
         "project:knowledge_base_basic:structure:object:knowledge_base_basic.config_effect.frontend.style_profile"
       ],
       "standards:NODE-L0-ROOT": [],
+      "standards:NODE-L1-CODE-GIT": [],
       "standards:NODE-L1-CODE-PYTHON": [],
+      "standards:NODE-L1-CODE-RELEASE": [],
       "standards:NODE-L1-CORE": [],
       "standards:NODE-L1-LAYER": [],
       "standards:NODE-L1-LINT": [],
