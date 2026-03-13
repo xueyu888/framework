@@ -28,6 +28,7 @@
    - `uv run python scripts/materialize_project.py --project projects/desktop_screenshot_translate/product_spec.toml`
 2. 在 Windows 侧进入 `apps/desktop_screenshot_translate/electron/` 运行：
    - `npm install`
+   - 若仓库同时被 WSL 与 Windows 共用，发布脚本会自动在 Windows 下使用 `.venv-win`
 3. 若要启用真实 OCR / 翻译 provider，再补运行时环境：
    - 正式发布目标是“应用内置 OCR 运行时”，不要求终端用户手工安装 `tesseract`
    - 当前开发联调阶段若 bundling 尚未接入，可临时设置 `AITRANS_TESSERACT_PATH`
@@ -60,7 +61,7 @@ Windows 可发布安装包路径：
 
 发布时还应同步准备：
 
-- [0.1.0.md](/home/zx/shelf/projects/desktop_screenshot_translate/release-notes/0.1.0.md)
+- [0.1.1.md](/home/zx/shelf/projects/desktop_screenshot_translate/release-notes/0.1.1.md)
 - [WINDOWS-安装后回归清单.md](/home/zx/shelf/apps/desktop_screenshot_translate/WINDOWS-%E5%AE%89%E8%A3%85%E5%90%8E%E5%9B%9E%E5%BD%92%E6%B8%85%E5%8D%95.md)
 
 当前发布边界：

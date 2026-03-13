@@ -57,6 +57,7 @@ npm run release:check
 
 - 正式的 `dist:win / pack:win / release:win` 现在都会先自动执行项目物化
 - 如果你单独执行 `release:check`，它只校验当前状态，不会自动重写 `generated/*`
+- 若该仓库同时被 WSL 与 Windows 共用，发布脚本会在 Windows 下自动优先使用 `.venv-win`，避免复用 WSL 创建的 `.venv`
 
 产出可安装 exe：
 
