@@ -29,7 +29,7 @@ const FRAMEWORK_RULE_HINTS = {
   FW011: "C/B/R/V 编号格式必须合法",
   FW020: "B* 必须包含来源",
   FW021: "B* 来源表达式与引用必须合法",
-  FW022: "B* 来源必须包含 C* 与参数",
+  FW022: "B* 来源中的能力归属与参数约束必须合法",
   FW023: "B* 禁止使用“上游模块：...”，必须内联写模块引用",
   FW024: "非根层模块的 B* 必须在主句中内联写本框架上游模块引用",
   FW025: "B* 的本地内联模块引用必须指向当前框架中真实存在的更低本地层模块",
@@ -78,10 +78,60 @@ function activate(context) {
   let gitHooksPrompted = false;
   const suppressedGeneratedDirectories = new Map();
   const suppressedArtifactPaths = new Map();
+  const dirtyWatchedFiles = new Set();
   const VALIDATION_SOURCE_PRIORITY = {
     auto: 1,
     save: 2,
     manual: 3
+  };
+
+  const setStatusOk = () => {
+    status.text = "$(check) Shelf OK";
+    status.tooltip = "Shelf: no guard issues";
+    status.backgroundColor = undefined;
+    status.color = undefined;
+  };
+
+  const setStatusError = (errors) => {
+    status.text = "$(close) Shelf failed";
+    status.tooltip = buildTooltip(errors);
+    status.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+    status.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+  };
+
+  const setStatusPendingSave = () => {
+    const dirtyCount = dirtyWatchedFiles.size;
+    status.text = "$(close) Shelf pending";
+    status.tooltip = dirtyCount > 0
+      ? `Shelf: ${dirtyCount} watched file(s) changed. Save to revalidate.`
+      : "Shelf: watched files changed. Save to revalidate.";
+    status.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+    status.color = new vscode.ThemeColor("statusBarItem.warningForeground");
+  };
+
+  const refreshStatusFromCurrentState = () => {
+    if (!mappingValidationActive) {
+      if (lastRepoRoot) {
+        setStatusDisabled(status, lastRepoRoot);
+      }
+      return;
+    }
+    if (lastRunIssues.length) {
+      setStatusError(lastRunIssues);
+      return;
+    }
+    if (dirtyWatchedFiles.size) {
+      setStatusPendingSave();
+      return;
+    }
+    if (lastValidationPassed === true) {
+      setStatusOk();
+      return;
+    }
+    status.text = "$(check) Shelf idle";
+    status.tooltip = "Shelf";
+    status.backgroundColor = undefined;
+    status.color = undefined;
   };
 
   const normalizeTriggerUris = (options = {}) => {
@@ -260,7 +310,6 @@ function activate(context) {
     }
 
     const showProgressStatus = task.source === "manual";
-    const shouldSetErrorStatus = task.source === "save" || task.source === "manual";
     if (showProgressStatus) {
       status.text = "$(sync~spin) Shelf validating";
       status.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
@@ -491,19 +540,10 @@ function activate(context) {
     }
 
     if (combined.passed) {
-      status.text = "$(check) Shelf OK";
-      status.tooltip = "Shelf: no guard issues";
-      status.backgroundColor = undefined;
-      status.color = undefined;
       lastFailureSignature = "";
+      refreshStatusFromCurrentState();
     } else {
-      if (shouldSetErrorStatus) {
-        status.text = "$(error) Shelf issues";
-        status.tooltip = buildTooltip(combined.errors);
-        status.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-        status.color = new vscode.ThemeColor("statusBarItem.errorForeground");
-      }
-
+      refreshStatusFromCurrentState();
       const shouldNotify = task.notifyOnFail || config.get("notifyOnAutoFail");
       if (shouldNotify && shouldNotifyFailure(combined.errors, lastFailureSignature)) {
         lastFailureSignature = signature(combined.errors);
@@ -661,6 +701,30 @@ function activate(context) {
 
   const openGovernanceTree = async (options = { regenerateIfMissing: false }) => {
     await openTreeView("governance", options);
+  };
+
+  const clearShelfDiagnosticsForUri = (uri) => {
+    if (!uri || !uri.fsPath) {
+      return;
+    }
+    diagnostics.delete(uri);
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      return;
+    }
+    const repoRoot = folder.uri.fsPath;
+    const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, uri.fsPath));
+    if (!relPath) {
+      return;
+    }
+    lastRunIssues = lastRunIssues.filter(
+      (issue) => workspaceGuard.normalizeRelPath(issue.file || "") !== relPath
+    );
+    if (!lastRunIssues.length && dirtyWatchedFiles.size) {
+      lastValidationPassed = null;
+    }
+    refreshStatusFromCurrentState();
+    refreshSidebarHome();
   };
 
   const renderSidebarHome = () => {
@@ -1443,7 +1507,29 @@ function activate(context) {
       return;
     }
 
+    dirtyWatchedFiles.delete(doc.uri.fsPath);
     scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+  });
+
+  const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder || !event.document?.uri?.fsPath) {
+      return;
+    }
+    const relPath = workspaceGuard.normalizeRelPath(path.relative(folder.uri.fsPath, event.document.uri.fsPath));
+    if (!workspaceGuard.isWatchedPath(relPath) || isSuppressedGeneratedPath(relPath)) {
+      return;
+    }
+
+    if (event.document.isDirty) {
+      dirtyWatchedFiles.add(event.document.uri.fsPath);
+      clearShelfDiagnosticsForUri(event.document.uri);
+      return;
+    }
+
+    dirtyWatchedFiles.delete(event.document.uri.fsPath);
+    refreshStatusFromCurrentState();
+    refreshSidebarHome();
   });
 
   const createDisposable = vscode.workspace.onDidCreateFiles(async (event) => {
@@ -1540,6 +1626,7 @@ function activate(context) {
     refreshFrameworkTreeDisposable,
     openGovernanceTreeDisposable,
     refreshGovernanceTreeDisposable,
+    changeDisposable,
     saveDisposable,
     createDisposable,
     deleteDisposable,
@@ -1744,8 +1831,8 @@ function applyDiagnostics(parsed, collection, repoRoot, triggerUri) {
     const ruleCode = normalizeFrameworkRuleCode(issue.code);
     const ruleHint = frameworkRuleHint(ruleCode);
     const message = ruleCode
-      ? `[shelf ${ruleCode}] ${ruleHint} | ${issue.message}`
-      : `[shelf] ${issue.message}`;
+      ? `✖ [shelf ${ruleCode}] ${ruleHint} | ${issue.message}`
+      : `✖ [shelf] ${issue.message}`;
     const diag = new vscode.Diagnostic(
       range,
       message,

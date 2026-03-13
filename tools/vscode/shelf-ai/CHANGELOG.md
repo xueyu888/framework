@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.0.45 - 2026-03-13
+- Formalized the `B / R / C+` relation model in the repository standards and strict validation chain. Positive capabilities now map to exactly one base-level source expression, while combination principles still legitimately span multiple bases and produce multiple capabilities.
+- Rewrote the affected framework modules to follow the tightened base-source rule, then synced the lint / validation behavior so capability-to-base ownership is no longer inferred loosely from mixed dependency context.
+- Fixed Shelf AI's stale-diagnostics behavior for edited watched documents. The extension now clears outdated Shelf diagnostics while files are being edited, prefixes visible failures with a cross marker, and turns the status bar into an explicit failing state instead of leaving a misleading `Shelf OK` during auto-triggered errors.
+
 ## 0.0.44 - 2026-03-13
 - Restored the framework tree as Shelf AI's default visual entry. The sidebar and primary command now open `docs/hierarchy/shelf_framework_tree.html`, while the workspace governance tree stays available as a separate secondary view for closure tracing and guard debugging.
 - Split framework-tree and governance-tree commands, packaged settings, and generated-artifact protection. Both derived tree artifacts are now regenerated and guarded independently instead of being treated as one mixed default view.

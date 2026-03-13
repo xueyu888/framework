@@ -132,6 +132,14 @@ function main() {
     "extension.js must register a markdown completion provider"
   );
   assert(
+    /onDidChangeTextDocument\s*\(/.test(extensionSource),
+    "extension.js must clear stale shelf diagnostics when watched documents are edited"
+  );
+  assert(
+    extensionSource.includes('$(close) Shelf failed'),
+    "extension.js must expose a visible cross icon for failing Shelf status"
+  );
+  assert(
     readme.includes("Shelf: Insert Framework Module Template"),
     "README must document the framework template insert command"
   );
