@@ -5,9 +5,15 @@ from pathlib import Path
 import re
 from typing import Any, cast
 
-from project_runtime import discover_framework_driven_projects, load_registered_project
+from project_runtime import (
+    discover_framework_driven_projects,
+    load_registered_project,
+    resolve_project_template_registration,
+)
 from project_runtime.project_governance import (
+    build_object_coverage_report,
     build_project_discovery_audit,
+    build_strict_zone_report,
     render_project_discovery_audit_markdown,
 )
 from project_runtime.governance import build_governance_tree
@@ -273,6 +279,225 @@ def _project_tree_to_hierarchy_nodes(
     return nodes, edges, project_root_id
 
 
+def _build_generic_project_governance_tree(
+    product_spec_file: Path,
+    project: Any,
+) -> dict[str, Any]:
+    registration = resolve_project_template_registration(product_spec_file)
+    closure = registration.build_governance_closure(project)
+    strict_zone_report = build_strict_zone_report(closure)
+    object_coverage_report = build_object_coverage_report(closure)
+
+    root_id = f"project:{closure.project_id}"
+    framework_root_id = f"{root_id}:framework"
+    product_root_id = f"{root_id}:product_spec"
+    implementation_root_id = f"{root_id}:implementation_config"
+    structure_root_id = f"{root_id}:structure"
+    code_root_id = f"{root_id}:code"
+    evidence_root_id = f"{root_id}:evidence"
+
+    nodes: list[dict[str, Any]] = [
+        {
+            "node_id": root_id,
+            "parent": None,
+            "children": [
+                framework_root_id,
+                product_root_id,
+                implementation_root_id,
+                structure_root_id,
+                code_root_id,
+                evidence_root_id,
+            ],
+            "kind": "project_root",
+            "layer": "Project",
+            "title": getattr(project.metadata, "display_name", closure.project_id),
+            "file": closure.product_spec_file,
+            "template_id": closure.template_id,
+            "project_id": closure.project_id,
+        },
+        {
+            "node_id": framework_root_id,
+            "parent": root_id,
+            "children": [],
+            "kind": "framework_root",
+            "layer": "Framework",
+            "title": "Framework",
+            "file": closure.product_spec_file,
+        },
+        {
+            "node_id": product_root_id,
+            "parent": root_id,
+            "children": [],
+            "kind": "product_spec_root",
+            "layer": "Product Spec",
+            "title": "Product Spec",
+            "file": closure.product_spec_file,
+        },
+        {
+            "node_id": implementation_root_id,
+            "parent": root_id,
+            "children": [],
+            "kind": "implementation_root",
+            "layer": "Implementation Config",
+            "title": "Implementation Config",
+            "file": closure.implementation_config_file,
+        },
+        {
+            "node_id": structure_root_id,
+            "parent": root_id,
+            "children": [],
+            "kind": "structure_root",
+            "layer": "Structure",
+            "title": "Structure",
+            "file": closure.product_spec_file,
+        },
+        {
+            "node_id": code_root_id,
+            "parent": root_id,
+            "children": [],
+            "kind": "code_root",
+            "layer": "Code",
+            "title": "Code",
+            "file": closure.implementation_config_file,
+        },
+        {
+            "node_id": evidence_root_id,
+            "parent": root_id,
+            "children": [],
+            "kind": "evidence_root",
+            "layer": "Evidence",
+            "title": "Evidence",
+            "file": closure.implementation_config_file,
+        },
+    ]
+
+    node_index = {node["node_id"]: node for node in nodes}
+
+    def append_child(parent_id: str, node: dict[str, Any]) -> None:
+        node_index[parent_id]["children"].append(node["node_id"])
+        nodes.append(node)
+        node_index[node["node_id"]] = node
+
+    seen_framework_files: set[str] = set()
+    for source in closure.upstream_closure:
+        if source.file in seen_framework_files:
+            continue
+        seen_framework_files.add(source.file)
+        append_child(
+            framework_root_id,
+            {
+                "node_id": f"{framework_root_id}:file:{source.file}",
+                "parent": framework_root_id,
+                "children": [],
+                "kind": "framework_source",
+                "layer": "Framework",
+                "title": Path(source.file).name,
+                "file": source.file,
+                "ref_id": source.ref_id,
+            },
+        )
+
+    for section_name in (
+        "framework",
+        "input",
+        "segmentation",
+        "role_judgment",
+        "composition",
+        "ownership",
+        "output",
+        "validation",
+    ):
+        append_child(
+            product_root_id,
+            {
+                "node_id": f"{product_root_id}:section:{section_name}",
+                "parent": product_root_id,
+                "children": [],
+                "kind": "product_section",
+                "layer": "Product Spec",
+                "title": section_name,
+                "file": closure.product_spec_file,
+                "ref_id": section_name,
+            },
+        )
+
+    for section_name in ("runtime", "pipeline", "evidence", "artifacts"):
+        append_child(
+            implementation_root_id,
+            {
+                "node_id": f"{implementation_root_id}:section:{section_name}",
+                "parent": implementation_root_id,
+                "children": [],
+                "kind": "implementation_section",
+                "layer": "Implementation Config",
+                "title": section_name,
+                "file": closure.implementation_config_file,
+                "ref_id": section_name,
+            },
+        )
+
+    for structural_object in closure.structural_objects:
+        append_child(
+            structure_root_id,
+            {
+                "node_id": f"{structure_root_id}:object:{structural_object.object_id}",
+                "parent": structure_root_id,
+                "children": [],
+                "kind": "structural_object",
+                "layer": "Structure",
+                "title": structural_object.title,
+                "file": closure.product_spec_file,
+                "object_id": structural_object.object_id,
+            },
+        )
+
+    for strict_zone_entry in closure.strict_zone:
+        append_child(
+            code_root_id,
+            {
+                "node_id": f"{code_root_id}:file:{strict_zone_entry.file}",
+                "parent": code_root_id,
+                "children": [],
+                "kind": "strict_zone_file",
+                "layer": "Code",
+                "title": Path(strict_zone_entry.file).name,
+                "file": strict_zone_entry.file,
+                "object_ids": list(strict_zone_entry.object_ids),
+                "role_ids": list(strict_zone_entry.role_ids),
+                "reasons": list(strict_zone_entry.reasons),
+                "why_required": list(strict_zone_entry.why_required),
+                "minimality_status": strict_zone_entry.minimality_status,
+                "project_id": closure.project_id,
+            },
+        )
+
+    for artifact_name, artifact_path in sorted(closure.evidence_artifacts.items()):
+        append_child(
+            evidence_root_id,
+            {
+                "node_id": f"{evidence_root_id}:artifact:{artifact_name}",
+                "parent": evidence_root_id,
+                "children": [],
+                "kind": "evidence_artifact",
+                "layer": "Evidence",
+                "title": artifact_name,
+                "file": artifact_path,
+                "artifact": artifact_name,
+            },
+        )
+
+    return {
+        "tree_version": "generic-governance-tree/v1",
+        "project_id": closure.project_id,
+        "template_id": closure.template_id,
+        "root_node_id": root_id,
+        "project_discovery": closure.discovery.to_dict(),
+        "strict_zone": strict_zone_report["strict_zone"],
+        "object_coverage": object_coverage_report,
+        "nodes": nodes,
+    }
+
+
 def _build_governance_indexes(nodes: list[dict[str, Any]], project_roots: dict[str, str]) -> dict[str, Any]:
     file_index: dict[str, list[str]] = {}
     parent_index: dict[str, str | None] = {}
@@ -463,7 +688,10 @@ def build_workspace_governance_payload(
 
     for product_spec_file in requested_product_spec_files:
         project = load_registered_project(product_spec_file)
-        project_tree = build_governance_tree(project)
+        if getattr(getattr(project, "metadata", None), "template", "") == "knowledge_base_workbench":
+            project_tree = build_governance_tree(project)
+        else:
+            project_tree = _build_generic_project_governance_tree(product_spec_file, project)
         project_id = str(project_tree.get("project_id") or project.metadata.project_id)
         rel_product_spec_file = _relative(product_spec_file)
         project_trees[project_id] = project_tree

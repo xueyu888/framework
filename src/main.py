@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import sys
@@ -8,6 +9,11 @@ import sys
 import uvicorn
 
 from examples.legacy_shelf.reference_pipeline import run_reference_pipeline
+from project_runtime.document_chunking import (
+    DEFAULT_DOCUMENT_CHUNKING_PRODUCT_SPEC_FILE,
+    load_document_chunking_project,
+    run_document_chunking_file,
+)
 from project_runtime import (
     get_default_project_template_registration,
     materialize_registered_project,
@@ -18,7 +24,7 @@ SRC_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SRC_DIR.parent
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
-KNOWN_COMMANDS = {"serve", "legacy-reference-shelf", "reference-shelf"}
+KNOWN_COMMANDS = {"serve", "legacy-reference-shelf", "reference-shelf", "document-chunking-run"}
 DEFAULT_PRODUCT_SPEC_FILE = get_default_project_template_registration().default_product_spec_file
 PRODUCT_SPEC_FILE_ENV = "SHELF_PRODUCT_SPEC_FILE"
 RELOAD_DIRS = [
@@ -81,6 +87,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "reference-shelf",
         help=argparse.SUPPRESS,
     )
+    chunking_parser = subparsers.add_parser(
+        "document-chunking-run",
+        help="run the document chunking pipeline against one markdown file and print the structured result",
+    )
+    chunking_parser.add_argument(
+        "--product-spec-file",
+        default=str(DEFAULT_DOCUMENT_CHUNKING_PRODUCT_SPEC_FILE.relative_to(REPO_ROOT)),
+        help=(
+            "path to the document chunking product spec. Defaults to "
+            "projects/document_chunking_basic/product_spec.toml."
+        ),
+    )
+    chunking_parser.add_argument(
+        "--input-file",
+        help="markdown file to chunk. Defaults to the template's configured validation input.",
+    )
+    chunking_parser.add_argument(
+        "--output-file",
+        help="optional markdown file path for writing the chunked output. Defaults to the implementation config value.",
+    )
     return parser
 
 
@@ -115,6 +141,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command in {"legacy-reference-shelf", "reference-shelf"}:
         run_reference_pipeline()
+        return 0
+
+    if args.command == "document-chunking-run":
+        project = load_document_chunking_project(args.product_spec_file)
+        input_file = args.input_file or project.implementation.evidence.default_validation_input
+        result = run_document_chunking_file(
+            product_spec_file=args.product_spec_file,
+            input_file=input_file,
+            output_file=args.output_file,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
     if args.command == "serve":

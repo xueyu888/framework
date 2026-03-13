@@ -321,6 +321,45 @@ function main() {
   assert(backendResult, "backend RESULT boundary ref should resolve");
   assert(backendResult.filePath.endsWith("projects/knowledge_base_basic/product_spec.toml"));
   assert.strictEqual(targetLineText(backendResult).trim(), "[return]");
+
+  const documentChunkingL1 = loadFrameworkFile("framework/document_chunking/L1-M0-文档分块.md");
+  const documentChunkingOutputRef = locate(documentChunkingL1.text, "OUTPUT/BLOCKNUM/BLOCKCOMBINE");
+  const documentChunkingOutputResult = resolveDefinitionTarget({
+    repoRoot,
+    filePath: documentChunkingL1.filePath,
+    text: documentChunkingL1.text,
+    line: documentChunkingOutputRef.line,
+    character: documentChunkingOutputRef.character,
+  });
+  assert(documentChunkingOutputResult, "document chunking OUTPUT boundary ref should resolve");
+  assert(documentChunkingOutputResult.filePath.endsWith("projects/document_chunking_basic/product_spec.toml"));
+  assert.strictEqual(targetLineText(documentChunkingOutputResult).trim(), "[output]");
+
+  const ownershipTableL0 = loadFrameworkFile("framework/document_chunking/L0-M3-归属关系表.md");
+  const ownershipCountRef = locate(ownershipTableL0.text, "HEADER/COUNT/ROW");
+  const ownershipCountResult = resolveDefinitionTarget({
+    repoRoot,
+    filePath: ownershipTableL0.filePath,
+    text: ownershipTableL0.text,
+    line: ownershipCountRef.line,
+    character: ownershipCountRef.character + "HEADER/".length,
+  });
+  assert(ownershipCountResult, "document chunking ownership COUNT boundary ref should resolve");
+  assert(ownershipCountResult.filePath.endsWith("projects/document_chunking_basic/product_spec.toml"));
+  assert.strictEqual(targetLineText(ownershipCountResult).trim(), "[ownership]");
+
+  const outputFormatL0 = loadFrameworkFile("framework/document_chunking/L0-M4-输出格式.md");
+  const outputCountRef = locate(outputFormatL0.text, "FORMAT/FIELD/COUNT");
+  const outputCountResult = resolveDefinitionTarget({
+    repoRoot,
+    filePath: outputFormatL0.filePath,
+    text: outputFormatL0.text,
+    line: outputCountRef.line,
+    character: outputCountRef.character + "FORMAT/FIELD/".length,
+  });
+  assert(outputCountResult, "document chunking output COUNT boundary ref should resolve");
+  assert(outputCountResult.filePath.endsWith("projects/document_chunking_basic/product_spec.toml"));
+  assert.strictEqual(targetLineText(outputCountResult).trim(), "[validation]");
 }
 
 main();

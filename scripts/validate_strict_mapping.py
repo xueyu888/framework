@@ -971,6 +971,7 @@ def validate_project_governance(
             continue
 
         try:
+            registration = resolve_project_template_registration(product_spec_file)
             project = load_registered_project(product_spec_file)
         except Exception as exc:
             issues.append(
@@ -983,7 +984,94 @@ def validate_project_governance(
             )
             continue
 
-        for finding in compare_project_to_tree(project, tree_payload):
+        if all(hasattr(project, attr) for attr in ("frontend_ir", "domain_ir", "backend_ir")):
+            findings = compare_project_to_tree(project, tree_payload)
+        else:
+            closure = registration.build_governance_closure(project)
+            findings = []
+
+            if tree_payload.get("evidence_artifacts") != closure.evidence_artifacts:
+                findings.append(
+                    {
+                        "code": "GOVERNANCE_TREE_EVIDENCE_MISMATCH",
+                        "message": "governance tree evidence_artifacts does not match the current project closure",
+                        "file": rel_product_spec_file,
+                        "line": 1,
+                    }
+                )
+
+            tree_object_ids = sorted(
+                str(item.get("object_id") or "")
+                for item in tree_payload.get("structural_objects", [])
+                if isinstance(item, dict)
+            )
+            closure_object_ids = sorted(item.object_id for item in closure.structural_objects)
+            if tree_object_ids != closure_object_ids:
+                findings.append(
+                    {
+                        "code": "GOVERNANCE_TREE_OBJECT_MISMATCH",
+                        "message": "governance tree structural_objects does not match the current project closure",
+                        "file": rel_product_spec_file,
+                        "line": 1,
+                    }
+                )
+
+            tree_role_bindings = sorted(
+                (
+                    str(item.get("object_id") or ""),
+                    str(item.get("role_id") or ""),
+                    str(item.get("status") or ""),
+                )
+                for item in tree_payload.get("role_bindings", [])
+                if isinstance(item, dict)
+            )
+            closure_role_bindings = sorted(
+                (item.object_id, item.role_id, item.status)
+                for item in closure.role_bindings
+            )
+            if tree_role_bindings != closure_role_bindings:
+                findings.append(
+                    {
+                        "code": "GOVERNANCE_TREE_ROLE_BINDING_MISMATCH",
+                        "message": "governance tree role_bindings does not match the current project closure",
+                        "file": rel_product_spec_file,
+                        "line": 1,
+                    }
+                )
+
+            tree_strict_zone_files = sorted(
+                str(item.get("file") or "")
+                for item in tree_payload.get("strict_zone", [])
+                if isinstance(item, dict)
+            )
+            closure_strict_zone_files = sorted(item.file for item in closure.strict_zone)
+            if tree_strict_zone_files != closure_strict_zone_files:
+                findings.append(
+                    {
+                        "code": "GOVERNANCE_TREE_STRICT_ZONE_MISMATCH",
+                        "message": "governance tree strict_zone does not match the current project closure",
+                        "file": rel_product_spec_file,
+                        "line": 1,
+                    }
+                )
+
+            tree_candidate_ids = sorted(
+                str(item.get("candidate_id") or "")
+                for item in tree_payload.get("candidates", [])
+                if isinstance(item, dict)
+            )
+            closure_candidate_ids = sorted(item.candidate_id for item in closure.candidates)
+            if tree_candidate_ids != closure_candidate_ids:
+                findings.append(
+                    {
+                        "code": "GOVERNANCE_TREE_CANDIDATE_MISMATCH",
+                        "message": "governance tree candidates does not match the current project closure",
+                        "file": rel_product_spec_file,
+                        "line": 1,
+                    }
+                )
+
+        for finding in findings:
             issue = make_issue(
                 str(finding["message"]),
                 str(finding.get("file") or rel_product_spec_file),

@@ -183,6 +183,90 @@ const FRAMEWORK_BOUNDARY_SECTION_MAP = {
       "该边界由统一返回与多接口一致性配置共同承接。"
     ),
   },
+  document_chunking: {
+    __moduleScopes: {
+      "L0.M0": {
+        STRLEN: derivedConfigMapping(
+          "segmentation",
+          ["segmentation", "input"],
+          "该边界由分段长度约束与输入文本对象共同承接。"
+        ),
+        MATCHRULE: directConfigMapping("segmentation"),
+        MATCHRESULT: derivedConfigMapping(
+          "output",
+          ["output", "validation"],
+          "该边界由输出结构与结果校验共同承接。"
+        ),
+      },
+      "L0.M1": {
+        INDEX: derivedConfigMapping(
+          "segmentation",
+          ["segmentation", "output"],
+          "该边界由段落分段顺序与结果输出顺序共同承接。"
+        ),
+        LENGTH: directConfigMapping("segmentation"),
+        TRACE: derivedConfigMapping(
+          "output",
+          ["output", "input"],
+          "该边界由结果回溯字段与输入文档标识共同承接。"
+        ),
+        BELONG: derivedConfigMapping(
+          "ownership",
+          ["ownership", "input"],
+          "该边界由归属表结构与原文本标识策略共同承接。"
+        ),
+      },
+      "L0.M2": {
+        SUBJECT: derivedConfigMapping(
+          "composition",
+          ["composition", "role_judgment"],
+          "该边界由组合对象与角色判定条件共同承接。"
+        ),
+        CLOSURE: directConfigMapping("composition"),
+        TRIGGER: derivedConfigMapping(
+          "role_judgment",
+          ["role_judgment", "composition"],
+          "该边界由角色判定与拼接触发条件共同承接。"
+        ),
+        ACTION: directConfigMapping("composition"),
+      },
+      "L0.M3": {
+        HEADER: directConfigMapping("ownership"),
+        COUNT: derivedConfigMapping(
+          "ownership",
+          ["ownership", "validation"],
+          "该边界由归属表规模与结果校验共同承接。"
+        ),
+        ROW: directConfigMapping("ownership"),
+      },
+      "L0.M4": {
+        FORMAT: directConfigMapping("output"),
+        FIELD: directConfigMapping("output"),
+        COUNT: derivedConfigMapping(
+          "validation",
+          ["validation", "output"],
+          "该边界由输出项数量限制与输出格式共同承接。"
+        ),
+      },
+      "L1.M0": {
+        NORMDOC: directConfigMapping("input"),
+        CUTRELY: directConfigMapping("segmentation"),
+        BLOCKNUM: derivedConfigMapping(
+          "segmentation",
+          ["segmentation", "validation"],
+          "该边界由分段规模与结果校验共同承接。"
+        ),
+        ROLEJUDGE: directConfigMapping("role_judgment"),
+        ROLETYPE: directConfigMapping("role_judgment"),
+        BLOCKCOMBINE: directConfigMapping("composition"),
+        OUTPUT: derivedConfigMapping(
+          "output",
+          ["output", "ownership", "validation"],
+          "该边界由输出格式、归属结果与结果校验共同承接。"
+        ),
+      },
+    },
+  },
 };
 
 function normalizePathSlashes(value) {
@@ -590,12 +674,21 @@ function buildTomlSectionIndex(text) {
   return sections;
 }
 
-function getBoundaryConfigMapping(frameworkName, token) {
+function getBoundaryConfigMapping(frameworkName, token, moduleContext = null) {
   const mapping = FRAMEWORK_BOUNDARY_SECTION_MAP[frameworkName];
-  if (mapping && mapping[token]) {
-    return mapping[token];
+  if (mapping) {
+    if (moduleContext && mapping.__moduleScopes) {
+      const scopeKey = `${moduleContext.level}.${moduleContext.moduleId}`;
+      const scopedMapping = mapping.__moduleScopes[scopeKey];
+      if (scopedMapping && scopedMapping[token]) {
+        return scopedMapping[token];
+      }
+    }
+    if (mapping[token]) {
+      return mapping[token];
+    }
   }
-  return inferBoundaryConfigMapping(frameworkName, token);
+  return inferBoundaryConfigMapping(frameworkName, token, moduleContext);
 }
 
 function inferFrontendBoundaryConfigMapping(token) {
@@ -740,7 +833,7 @@ function inferBackendBoundaryConfigMapping(token) {
   return null;
 }
 
-function inferBoundaryConfigMapping(frameworkName, token) {
+function inferBoundaryConfigMapping(frameworkName, token, moduleContext = null) {
   if (frameworkName === "frontend") {
     return inferFrontendBoundaryConfigMapping(token);
   }
@@ -749,6 +842,11 @@ function inferBoundaryConfigMapping(frameworkName, token) {
   }
   if (frameworkName === "backend") {
     return inferBackendBoundaryConfigMapping(token);
+  }
+  if (frameworkName === "document_chunking" && moduleContext) {
+    const mapping = FRAMEWORK_BOUNDARY_SECTION_MAP.document_chunking;
+    const scopeKey = `${moduleContext.level}.${moduleContext.moduleId}`;
+    return mapping?.__moduleScopes?.[scopeKey]?.[token] || null;
   }
   return null;
 }
@@ -778,11 +876,11 @@ function inferConfiguredFrameworks(productSpecText) {
 
 function resolvePreferredProductSpecFile(repoRoot, frameworkName) {
   const preferredDefault = path.join(repoRoot, DEFAULT_PRODUCT_SPEC_FILE);
+  const candidates = discoverProductSpecFiles(repoRoot);
   if (fs.existsSync(preferredDefault) && fs.statSync(preferredDefault).isFile()) {
-    return preferredDefault;
+    candidates.unshift(preferredDefault);
   }
 
-  const candidates = discoverProductSpecFiles(repoRoot);
   let bestFile = null;
   let bestScore = -1;
   for (const filePath of candidates) {
@@ -791,6 +889,9 @@ function resolvePreferredProductSpecFile(repoRoot, frameworkName) {
       const frameworks = inferConfiguredFrameworks(fs.readFileSync(filePath, "utf8"));
       if (frameworks.has(frameworkName)) {
         score += 10;
+      }
+      if (filePath === preferredDefault) {
+        score += 1;
       }
     } catch {
       // Ignore broken product spec files here; main parser/validator handles them elsewhere.
@@ -803,8 +904,8 @@ function resolvePreferredProductSpecFile(repoRoot, frameworkName) {
   return bestFile;
 }
 
-function resolveBoundaryConfigTarget(repoRoot, frameworkName, token) {
-  const mapping = getBoundaryConfigMapping(frameworkName, token);
+function resolveBoundaryConfigTarget(repoRoot, frameworkName, token, moduleContext = null) {
+  const mapping = getBoundaryConfigMapping(frameworkName, token, moduleContext);
   if (!mapping) {
     return null;
   }
@@ -957,8 +1058,8 @@ function buildRuleHoverMarkdown(moduleInfo, rule) {
   return parts.join("\n");
 }
 
-function appendBoundaryConfigHover(parts, repoRoot, frameworkName, token) {
-  const boundaryTarget = resolveBoundaryConfigTarget(repoRoot, frameworkName, token);
+function appendBoundaryConfigHover(parts, repoRoot, frameworkName, token, moduleContext = null) {
+  const boundaryTarget = resolveBoundaryConfigTarget(repoRoot, frameworkName, token, moduleContext);
   if (!boundaryTarget) {
     return;
   }
@@ -1008,7 +1109,7 @@ function buildSymbolHoverMarkdown(moduleInfo, index, token, repoRoot) {
 
   const parts = [`**${buildModuleLabel(moduleInfo)} · \`${item.token}\`**`, item.text];
   if (item.kind === "boundary" && repoRoot && moduleInfo?.frameworkName) {
-    appendBoundaryConfigHover(parts, repoRoot, moduleInfo.frameworkName, item.token);
+    appendBoundaryConfigHover(parts, repoRoot, moduleInfo.frameworkName, item.token, moduleInfo);
   }
   return parts.join("\n");
 }
@@ -1078,7 +1179,8 @@ function resolveDefinitionTarget({ repoRoot, filePath, text, line, character }) 
     const boundaryTarget = resolveBoundaryConfigTarget(
       repoRoot,
       documentInfo.frameworkName,
-      tokenContext.token
+      tokenContext.token,
+      documentInfo
     );
     if (boundaryTarget) {
       return boundaryTarget;
@@ -1207,7 +1309,12 @@ function resolveReferenceTargets({ repoRoot, filePath, text, line, character }) 
 
   const localItem = getItemForToken(index, tokenContext.token);
   if (localItem && localItem.kind === "boundary" && documentInfo.frameworkName) {
-    const boundaryTarget = resolveBoundaryConfigTarget(repoRoot, documentInfo.frameworkName, tokenContext.token);
+    const boundaryTarget = resolveBoundaryConfigTarget(
+      repoRoot,
+      documentInfo.frameworkName,
+      tokenContext.token,
+      documentInfo
+    );
     if (boundaryTarget) {
       targets.push(boundaryTarget);
     }

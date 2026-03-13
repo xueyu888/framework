@@ -36,12 +36,16 @@ class ProjectTemplateRegistration:
 
 
 _REGISTRY: dict[str, ProjectTemplateRegistration] = {}
+_BUILTIN_TEMPLATES_LOADED = False
 
 
 def _ensure_builtin_project_templates_loaded() -> None:
-    if _REGISTRY:
+    global _BUILTIN_TEMPLATES_LOADED
+    if _BUILTIN_TEMPLATES_LOADED:
         return
     import_module("project_runtime.knowledge_base")
+    import_module("project_runtime.document_chunking")
+    _BUILTIN_TEMPLATES_LOADED = True
 
 
 def register_project_template(registration: ProjectTemplateRegistration) -> None:
