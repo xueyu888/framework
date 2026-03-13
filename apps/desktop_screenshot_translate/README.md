@@ -58,6 +58,7 @@ Windows 可发布安装包路径：
    - 如果要同时生成安装包与便携版，可直接执行 `npm run release:win`
 3. 生成的安装产物位于：
    - `apps/desktop_screenshot_translate/electron/dist/`
+   - 发布脚本会先自动清空 `dist/`，避免旧版本产物残留
 
 发布时还应同步准备：
 

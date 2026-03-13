@@ -10,6 +10,7 @@
     "vue": "^3.5.13"
   },
   "scripts": {
+    "clean:dist": "node scripts/clean-dist.js",
     "materialize:project": "node scripts/materialize-project.js",
     "doctor": "node scripts/doctor.js",
     "release:check": "node scripts/release-check.js",
@@ -19,10 +20,12 @@
     "start": "electron .",
     "dev": "npm run panel:build && electron .",
     "dev:doctor": "npm run doctor && npm run dev",
-    "pack:win": "npm run materialize:project && npm run panel:build && npm run release:check && electron-builder --win portable -c.artifactName=desktop-screenshot-translate-${version}-${arch}-portable.${ext}",
-    "dist:win": "npm run materialize:project && npm run panel:build && npm run release:check && electron-builder --win nsis",
-    "release:win": "npm run dist:win && npm run pack:win && npm run release:manifest",
-    "check": "node --check main.js && node --check preload.js && node --check lib/project-config.js && node --check lib/window-state.js && node --check lib/local-pipeline.js && node --check lib/provider-runtime.js && node --check lib/runtime-overrides.js && node --check lib/ocr-adapters.js && node --check lib/translation-adapters.js && node --check lib/windows-focus.js && node --check lib/update-runtime.js && node --check renderer/overlay/overlay.js && node --check renderer/setup/setup.js && node --check scripts/doctor.js && node --check scripts/materialize-project.js && node --check scripts/release-check.js && node --check scripts/release-manifest.js && node --check scripts/stage-tesseract.js && vite build --config vite.panel.config.mjs"
+    "pack:win:raw": "npm run materialize:project && npm run panel:build && npm run release:check && electron-builder --win portable -c.artifactName=desktop-screenshot-translate-${version}-${arch}-portable.${ext}",
+    "dist:win:raw": "npm run materialize:project && npm run panel:build && npm run release:check && electron-builder --win nsis",
+    "pack:win": "npm run clean:dist && npm run pack:win:raw",
+    "dist:win": "npm run clean:dist && npm run dist:win:raw",
+    "release:win": "npm run clean:dist && npm run dist:win:raw && npm run pack:win:raw && npm run release:manifest",
+    "check": "node --check main.js && node --check preload.js && node --check lib/project-config.js && node --check lib/window-state.js && node --check lib/local-pipeline.js && node --check lib/provider-runtime.js && node --check lib/runtime-overrides.js && node --check lib/ocr-adapters.js && node --check lib/translation-adapters.js && node --check lib/windows-focus.js && node --check lib/update-runtime.js && node --check renderer/overlay/overlay.js && node --check renderer/setup/setup.js && node --check scripts/clean-dist.js && node --check scripts/doctor.js && node --check scripts/materialize-project.js && node --check scripts/release-check.js && node --check scripts/release-manifest.js && node --check scripts/stage-tesseract.js && vite build --config vite.panel.config.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",

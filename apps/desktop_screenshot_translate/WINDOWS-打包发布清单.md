@@ -56,6 +56,8 @@ npm run release:check
 说明：
 
 - 正式的 `dist:win / pack:win / release:win` 现在都会先自动执行项目物化
+- 正式的 `dist:win / pack:win / release:win` 现在都会先自动清空 `dist/`，避免残留旧版本产物
+- `release:win` 会先清空一次，然后连续构建安装包与便携包，不会在中途再次清空
 - 如果你单独执行 `release:check`，它只校验当前状态，不会自动重写 `generated/*`
 - 若该仓库同时被 WSL 与 Windows 共用，发布脚本会在 Windows 下自动优先使用 `.venv-win`，避免复用 WSL 创建的 `.venv`
 
