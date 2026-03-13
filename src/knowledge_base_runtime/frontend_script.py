@@ -4,14 +4,16 @@ from dataclasses import dataclass
 import json
 from textwrap import dedent
 
-from project_runtime.knowledge_base import KnowledgeBaseProject
+from project_runtime.knowledge_base import KnowledgeBaseCodeModule
 
 
-def _require_script_profile(project: KnowledgeBaseProject) -> str:
+def _require_script_profile(project: KnowledgeBaseCodeModule) -> str:
     implementation = project.ui_spec.get("implementation")
     if not isinstance(implementation, dict):
         raise ValueError("ui_spec.implementation is required for frontend script selection")
     value = implementation.get("script_profile")
+    if not isinstance(value, str):
+        raise ValueError("ui_spec.implementation.script_profile must be a string")
     if value not in project.template_contract.supported_frontend_script_profiles:
         raise ValueError(f"unsupported frontend script_profile: {value}")
     return value
@@ -614,7 +616,7 @@ def _chat_script_init_section() -> str:
     )
 
 
-def build_chat_script(project: KnowledgeBaseProject) -> str:
+def build_chat_script(project: KnowledgeBaseCodeModule) -> str:
     _require_script_profile(project)
     context = ChatScriptTemplateContext(
         project_spec_json=json.dumps(project.to_spec_dict(), ensure_ascii=False),

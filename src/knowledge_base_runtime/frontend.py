@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from framework_core import Base, BoundaryDefinition, BoundaryItem, Capability, VerificationInput, VerificationResult, verify
 from knowledge_base_runtime.frontend_script import build_chat_script
 from knowledge_base_runtime.frontend_style import build_shared_style
-from project_runtime.knowledge_base import KnowledgeBaseProject, KnowledgeDocument, load_knowledge_base_project
+from project_runtime.knowledge_base import KnowledgeBaseCodeModule, KnowledgeDocument, load_knowledge_base_code_module
 
 if TYPE_CHECKING:
     from knowledge_base_runtime.backend import KnowledgeBaseDetailResponse, KnowledgeRepository
@@ -29,31 +29,33 @@ class AuxPageSpec:
     content_html: str
 
 
-def _resolve_project(project: KnowledgeBaseProject | None) -> KnowledgeBaseProject:
-    return project or load_knowledge_base_project()
+def _resolve_project(project: KnowledgeBaseCodeModule | None) -> KnowledgeBaseCodeModule:
+    return project or load_knowledge_base_code_module()
 
 
-def _require_frontend_renderer(project: KnowledgeBaseProject) -> str:
+def _require_frontend_renderer(project: KnowledgeBaseCodeModule) -> str:
     implementation = project.ui_spec.get("implementation")
     if not isinstance(implementation, dict):
         raise ValueError("ui_spec.implementation is required for frontend renderer selection")
     value = implementation.get("frontend_renderer")
+    if not isinstance(value, str):
+        raise ValueError("ui_spec.implementation.frontend_renderer must be a string")
     if value not in project.template_contract.supported_frontend_renderers:
         raise ValueError(f"unsupported frontend renderer: {value}")
     return value
 
 
-def _module_capabilities(project: KnowledgeBaseProject) -> tuple[Capability, ...]:
+def _module_capabilities(project: KnowledgeBaseCodeModule) -> tuple[Capability, ...]:
     return tuple(Capability(item.capability_id, item.statement) for item in project.frontend_ir.capabilities)
 
 
-def _module_boundary(project: KnowledgeBaseProject) -> BoundaryDefinition:
+def _module_boundary(project: KnowledgeBaseCodeModule) -> BoundaryDefinition:
     return BoundaryDefinition(
         items=tuple(BoundaryItem(item.boundary_id, item.statement) for item in project.frontend_ir.boundaries)
     )
 
 
-def _module_bases(project: KnowledgeBaseProject) -> tuple[Base, ...]:
+def _module_bases(project: KnowledgeBaseCodeModule) -> tuple[Base, ...]:
     return tuple(Base(item.base_id, item.name, item.inline_expr or item.statement) for item in project.frontend_ir.bases)
 
 
@@ -81,7 +83,7 @@ KNOWLEDGE_BASE_FRONTEND_BASES = (
 )
 
 
-def verify_knowledge_base_frontend(project: KnowledgeBaseProject | None = None) -> VerificationResult:
+def verify_knowledge_base_frontend(project: KnowledgeBaseCodeModule | None = None) -> VerificationResult:
     resolved = _resolve_project(project)
     boundary = _module_boundary(resolved)
     boundary_valid, boundary_errors = boundary.validate()
@@ -94,7 +96,7 @@ def verify_knowledge_base_frontend(project: KnowledgeBaseProject | None = None) 
                 "theme tokens and route contracts are compiled from one instance config",
             ],
             evidence={
-                "project": resolved.public_summary(),
+                "project": resolved.public_summary,
                 "capabilities": [item.to_dict() for item in _module_capabilities(resolved)],
                 "boundary": boundary.to_dict(),
                 "bases": [item.to_dict() for item in _module_bases(resolved)],
@@ -113,7 +115,7 @@ def verify_knowledge_base_frontend(project: KnowledgeBaseProject | None = None) 
     )
 
 
-def _shared_style(project: KnowledgeBaseProject) -> str:
+def _shared_style(project: KnowledgeBaseCodeModule) -> str:
     _require_frontend_renderer(project)
     return build_shared_style(project)
 
@@ -130,7 +132,7 @@ def _chip_list(items: tuple[str, ...] | list[str]) -> str:
     return "".join(_chip(item) for item in items)
 
 
-def _aux_sidebar(project: KnowledgeBaseProject, active: str) -> str:
+def _aux_sidebar(project: KnowledgeBaseCodeModule, active: str) -> str:
     ui_spec = project.ui_spec
     aux_sidebar = ui_spec["components"]["aux_sidebar"]
     knowledge_detail_href = ui_spec["pages"]["knowledge_detail"]["path"].replace(
@@ -182,7 +184,7 @@ def _render_page(title: str, style: str, body: str) -> str:
 """
 
 
-def _render_aux_page(project: KnowledgeBaseProject, *, style: str, page: AuxPageSpec) -> str:
+def _render_aux_page(project: KnowledgeBaseCodeModule, *, style: str, page: AuxPageSpec) -> str:
     header_actions = "".join(_ghost_link(item.href, item.label) for item in page.actions)
     body = f"""
     <div class="aux-shell">
@@ -206,7 +208,7 @@ def _render_aux_page(project: KnowledgeBaseProject, *, style: str, page: AuxPage
     return _render_page(page.title, style, body)
 
 
-def compose_basketball_showcase_page(project: KnowledgeBaseProject) -> str:
+def compose_basketball_showcase_page(project: KnowledgeBaseCodeModule) -> str:
     style = (
         _shared_style(project)
         + """
@@ -484,7 +486,7 @@ def compose_basketball_showcase_page(project: KnowledgeBaseProject) -> str:
     )
 
 
-def compose_knowledge_base_list_page(project: KnowledgeBaseProject, repository: "KnowledgeRepository") -> str:
+def compose_knowledge_base_list_page(project: KnowledgeBaseCodeModule, repository: "KnowledgeRepository") -> str:
     style = _shared_style(project)
     ui_spec = project.ui_spec
     page_spec = ui_spec["pages"]["knowledge_list"]
@@ -530,7 +532,7 @@ def compose_knowledge_base_list_page(project: KnowledgeBaseProject, repository: 
     )
 
 
-def compose_knowledge_base_detail_page(project: KnowledgeBaseProject, knowledge_base: "KnowledgeBaseDetailResponse") -> str:
+def compose_knowledge_base_detail_page(project: KnowledgeBaseCodeModule, knowledge_base: "KnowledgeBaseDetailResponse") -> str:
     style = _shared_style(project)
     ui_spec = project.ui_spec
     page_spec = ui_spec["pages"]["knowledge_detail"]
@@ -581,7 +583,7 @@ def compose_knowledge_base_detail_page(project: KnowledgeBaseProject, knowledge_
 
 
 def compose_document_detail_page(
-    project: KnowledgeBaseProject,
+    project: KnowledgeBaseCodeModule,
     document: KnowledgeDocument,
     active_section_id: str | None = None,
 ) -> str:
@@ -639,12 +641,12 @@ def compose_document_detail_page(
     )
 
 
-def _chat_script(project: KnowledgeBaseProject) -> str:
+def _chat_script(project: KnowledgeBaseCodeModule) -> str:
     _require_frontend_renderer(project)
     return build_chat_script(project)
 
 
-def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> str:
+def compose_knowledge_base_page(project: KnowledgeBaseCodeModule | None = None) -> str:
     resolved = _resolve_project(project)
     ui_spec = resolved.ui_spec
     sidebar_spec = ui_spec["components"]["conversation_sidebar"]

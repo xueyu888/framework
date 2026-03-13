@@ -344,6 +344,7 @@ def _artifact_contract_from_project(project: Any) -> tuple[str, ...]:
     if artifacts is None:
         return ()
     for field_name in (
+        "canonical_graph_json",
         "framework_ir_json",
         "product_spec_json",
         "implementation_bundle_py",

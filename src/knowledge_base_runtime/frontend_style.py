@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 
-from project_runtime.knowledge_base import KnowledgeBaseProject
+from project_runtime.knowledge_base import KnowledgeBaseCodeModule
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class StyleTemplateContext:
     panel_gap: str
 
     @classmethod
-    def from_project(cls, project: KnowledgeBaseProject) -> "StyleTemplateContext":
+    def from_project(cls, project: KnowledgeBaseCodeModule) -> "StyleTemplateContext":
         _require_style_profile(project)
         visual = project.ui_spec["visual"]["tokens"]
         return cls(
@@ -94,11 +94,13 @@ class StyleTemplateContext:
         }
 
 
-def _require_style_profile(project: KnowledgeBaseProject) -> str:
+def _require_style_profile(project: KnowledgeBaseCodeModule) -> str:
     implementation = project.ui_spec.get("implementation")
     if not isinstance(implementation, dict):
         raise ValueError("ui_spec.implementation is required for frontend style selection")
     value = implementation.get("style_profile")
+    if not isinstance(value, str):
+        raise ValueError("ui_spec.implementation.style_profile must be a string")
     if value not in project.template_contract.supported_frontend_style_profiles:
         raise ValueError(f"unsupported frontend style_profile: {value}")
     return value
@@ -933,5 +935,5 @@ def _style_responsive_section() -> str:
     ).strip()
 
 
-def build_shared_style(project: KnowledgeBaseProject) -> str:
+def build_shared_style(project: KnowledgeBaseCodeModule) -> str:
     return StyleTemplateContext.from_project(project).render()

@@ -11,7 +11,7 @@ import tomllib
 from typing import TYPE_CHECKING, Any, Callable, get_args, get_origin, get_type_hints
 
 from fastapi.routing import APIRoute
-from framework_ir import FrameworkModuleIR, parse_framework_module
+from framework_ir import FrameworkModule, parse_framework_module
 from project_runtime.project_config_source import (
     ProjectConfigLoadError,
     load_product_spec_document,
@@ -110,6 +110,7 @@ class SymbolDefinition:
 
 @dataclass(frozen=True)
 class GeneratedArtifactPaths:
+    canonical_graph_json: str
     framework_ir_json: str
     product_spec_json: str
     implementation_bundle_py: str
@@ -124,6 +125,7 @@ class GeneratedArtifactPaths:
 
     def to_dict(self) -> dict[str, str]:
         return {
+            "canonical_graph_json": self.canonical_graph_json,
             "framework_ir_json": self.framework_ir_json,
             "product_spec_json": self.product_spec_json,
             "implementation_bundle_py": self.implementation_bundle_py,
@@ -212,7 +214,7 @@ class GovernanceTreeBuilder:
     nodes: dict[str, GovernanceTreeNodeRecord] = field(default_factory=dict)
     source_node_ids: dict[tuple[str, str, str, str], str] = field(default_factory=dict)
     role_node_ids: dict[tuple[str, str], str] = field(default_factory=dict)
-    framework_modules: dict[str, FrameworkModuleIR] = field(default_factory=dict)
+    framework_modules: dict[str, FrameworkModule] = field(default_factory=dict)
 
     def add_node(self, node_id: str, *, parent: str | None, **payload: Any) -> GovernanceTreeNodeRecord:
         existing = self.nodes.get(node_id)
@@ -635,6 +637,7 @@ def _validated_governance_definitions_context(project: KnowledgeBaseProject) -> 
 def _expected_generated_artifact_paths(project: KnowledgeBaseProject) -> GeneratedArtifactPaths:
     if project.generated_artifacts is not None:
         return GeneratedArtifactPaths(
+            canonical_graph_json=project.generated_artifacts.canonical_graph_json,
             framework_ir_json=project.generated_artifacts.framework_ir_json,
             product_spec_json=project.generated_artifacts.product_spec_json,
             implementation_bundle_py=project.generated_artifacts.implementation_bundle_py,
@@ -648,6 +651,7 @@ def _expected_generated_artifact_paths(project: KnowledgeBaseProject) -> Generat
     generated_dir = Path(project.product_spec_file).parent / "generated"
     artifact_names = project.implementation.artifacts
     return GeneratedArtifactPaths(
+        canonical_graph_json=_relative(generated_dir / artifact_names.canonical_graph_json),
         framework_ir_json=_relative(generated_dir / artifact_names.framework_ir_json),
         product_spec_json=_relative(generated_dir / artifact_names.product_spec_json),
         implementation_bundle_py=_relative(generated_dir / artifact_names.implementation_bundle_py),
@@ -864,7 +868,7 @@ def _binding_validation_issues(
     return issues
 
 
-def _framework_rule_refs(module: FrameworkModuleIR, rule_ids: tuple[str, ...] | None = None) -> tuple[UpstreamRef, ...]:
+def _framework_rule_refs(module: FrameworkModule, rule_ids: tuple[str, ...] | None = None) -> tuple[UpstreamRef, ...]:
     allowed = set(rule_ids) if rule_ids else None
     refs: list[UpstreamRef] = []
     for rule in module.rules:
@@ -940,7 +944,7 @@ def _expected_runtime_page_routes(project: KnowledgeBaseProject) -> dict[str, An
 def _actual_runtime_page_routes(project: KnowledgeBaseProject) -> dict[str, Any]:
     from knowledge_base_runtime.app import build_knowledge_base_runtime_app
 
-    app = build_knowledge_base_runtime_app(project)
+    app = build_knowledge_base_runtime_app(project.code_module)
     expected_names = {
         "root": "home",
         "knowledge_base_page": "chat_home",
@@ -1374,7 +1378,7 @@ def _expected_api_chat_contract(project: KnowledgeBaseProject) -> dict[str, Any]
 def _route_contracts_from_router(project: KnowledgeBaseProject) -> dict[str, dict[str, Any]]:
     from knowledge_base_runtime.backend import KnowledgeRepository, build_knowledge_base_router
 
-    router = build_knowledge_base_router(project, KnowledgeRepository(project))
+    router = build_knowledge_base_router(project.code_module, KnowledgeRepository(project.code_module))
     payload: dict[str, dict[str, Any]] = {}
     for route in router.routes:
         if not isinstance(route, APIRoute):
@@ -1477,7 +1481,7 @@ def _expected_answer_behavior(project: KnowledgeBaseProject) -> dict[str, Any]:
 def _actual_answer_behavior(project: KnowledgeBaseProject) -> dict[str, Any]:
     from knowledge_base_runtime.backend import KnowledgeRepository
 
-    repository = KnowledgeRepository(project)
+    repository = KnowledgeRepository(project.code_module)
     response = repository.answer_question(
         "Explain the generated runtime and citation drawer.",
         document_id="framework-compilation-chain",
@@ -2008,6 +2012,7 @@ def _project_record_for(project: KnowledgeBaseProject) -> FrameworkDrivenProject
         artifact_contract=tuple(
             getattr(artifact_names, field_name)
             for field_name in (
+                "canonical_graph_json",
                 "framework_ir_json",
                 "product_spec_json",
                 "implementation_bundle_py",
@@ -2229,6 +2234,7 @@ def _snapshot_symbol_from_structural_object(
 def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
     context = GovernanceProjectArtifactsContext.from_project(project)
     closure = context.closure
+    generated_artifacts = _expected_generated_artifact_paths(project)
     symbols = [
         _snapshot_symbol_from_structural_object(structural_object, context.binding_index)
         for structural_object in closure.structural_objects
@@ -2238,6 +2244,8 @@ def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
         {
             "manifest_version": GOVERNANCE_MANIFEST_VERSION,
             "generator_version": GOVERNANCE_GENERATOR_VERSION,
+            "canonical_source": generated_artifacts.canonical_graph_json,
+            "derived_view_of": generated_artifacts.canonical_graph_json,
             "symbols": [item.to_dict() for item in symbols],
             "strict_zone_report": context.strict_zone_report,
             "object_coverage_report": context.object_coverage_report,
@@ -2249,6 +2257,7 @@ def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
 def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
     context = GovernanceProjectArtifactsContext.from_project(project)
     closure = context.closure
+    generated_artifacts = _expected_generated_artifact_paths(project)
     roots = GovernanceTreeRoots.for_project(project.metadata.project_id)
     builder = GovernanceTreeBuilder(
         project_id=project.metadata.project_id,
@@ -2270,6 +2279,8 @@ def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
         "project_id": project.metadata.project_id,
         "template_id": project.metadata.template,
         "generator_version": GOVERNANCE_GENERATOR_VERSION,
+        "canonical_source": generated_artifacts.canonical_graph_json,
+        "derived_view_of": generated_artifacts.canonical_graph_json,
         "root_node_id": roots.project_root_id,
         "project_discovery": closure.discovery.to_dict(),
         "upstream_closure": [item.to_dict() for item in closure.upstream_closure],
@@ -2297,7 +2308,7 @@ def digest_upstream_ref(ref: UpstreamRef) -> str:
     raise ValueError(f"unsupported governance upstream layer: {ref.layer}")
 
 
-def _framework_ref_payload(module: FrameworkModuleIR, ref: UpstreamRef) -> dict[str, Any]:
+def _framework_ref_payload(module: FrameworkModule, ref: UpstreamRef) -> dict[str, Any]:
     if ref.ref_kind == "rule":
         for rule in module.rules:
             if rule.rule_id == ref.ref_id:

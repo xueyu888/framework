@@ -7,41 +7,43 @@ import re
 from fastapi import APIRouter, HTTPException, Query, status
 from framework_core import Base, BoundaryDefinition, BoundaryItem, Capability, VerificationInput, VerificationResult, verify
 from project_runtime.knowledge_base import (
-    KnowledgeBaseProject,
+    KnowledgeBaseCodeModule,
     KnowledgeDocument,
     KnowledgeDocumentSection,
     SeedDocumentSource,
     compile_knowledge_document_source,
-    load_knowledge_base_project,
+    load_knowledge_base_code_module,
 )
 from pydantic import BaseModel, Field
 
 
-def _resolve_project(project: KnowledgeBaseProject | None) -> KnowledgeBaseProject:
-    return project or load_knowledge_base_project()
+def _resolve_project(project: KnowledgeBaseCodeModule | None) -> KnowledgeBaseCodeModule:
+    return project or load_knowledge_base_code_module()
 
 
-def _require_backend_renderer(project: KnowledgeBaseProject) -> str:
+def _require_backend_renderer(project: KnowledgeBaseCodeModule) -> str:
     implementation = project.backend_spec.get("implementation")
     if not isinstance(implementation, dict):
         raise ValueError("backend_spec.implementation is required for backend renderer selection")
     value = implementation.get("backend_renderer")
+    if not isinstance(value, str):
+        raise ValueError("backend_spec.implementation.backend_renderer must be a string")
     if value not in project.template_contract.supported_backend_renderers:
         raise ValueError(f"unsupported backend renderer: {value}")
     return value
 
 
-def _module_capabilities(project: KnowledgeBaseProject) -> tuple[Capability, ...]:
+def _module_capabilities(project: KnowledgeBaseCodeModule) -> tuple[Capability, ...]:
     return tuple(Capability(item.capability_id, item.statement) for item in project.backend_ir.capabilities)
 
 
-def _module_boundary(project: KnowledgeBaseProject) -> BoundaryDefinition:
+def _module_boundary(project: KnowledgeBaseCodeModule) -> BoundaryDefinition:
     return BoundaryDefinition(
         items=tuple(BoundaryItem(item.boundary_id, item.statement) for item in project.backend_ir.boundaries)
     )
 
 
-def _module_bases(project: KnowledgeBaseProject) -> tuple[Base, ...]:
+def _module_bases(project: KnowledgeBaseCodeModule) -> tuple[Base, ...]:
     return tuple(Base(item.base_id, item.name, item.inline_expr or item.statement) for item in project.backend_ir.bases)
 
 
@@ -171,7 +173,7 @@ def _make_document_id(value: str) -> str:
     return slug or "knowledge-document"
 
 
-def _document_detail_path(project: KnowledgeBaseProject, document_id: str, section_id: str | None = None) -> str:
+def _document_detail_path(project: KnowledgeBaseCodeModule, document_id: str, section_id: str | None = None) -> str:
     base = project.backend_spec["return_policy"]["document_detail_path"].replace("{document_id}", document_id)
     if section_id:
         return f"{base}?section={section_id}"
@@ -179,7 +181,7 @@ def _document_detail_path(project: KnowledgeBaseProject, document_id: str, secti
 
 
 class KnowledgeRepository:
-    def __init__(self, project: KnowledgeBaseProject | None = None) -> None:
+    def __init__(self, project: KnowledgeBaseCodeModule | None = None) -> None:
         self.project = _resolve_project(project)
         _require_backend_renderer(self.project)
         self.backend_spec = self.project.backend_spec
@@ -460,7 +462,7 @@ def _to_document_detail(document: KnowledgeDocument) -> KnowledgeDocumentDetailR
     )
 
 
-def verify_knowledge_base_backend(project: KnowledgeBaseProject | None = None) -> VerificationResult:
+def verify_knowledge_base_backend(project: KnowledgeBaseCodeModule | None = None) -> VerificationResult:
     resolved = _resolve_project(project)
     boundary = _module_boundary(resolved)
     boundary_valid, boundary_errors = boundary.validate()
@@ -473,7 +475,7 @@ def verify_knowledge_base_backend(project: KnowledgeBaseProject | None = None) -
                 "product spec endpoint exposes compiled product truth",
             ],
             evidence={
-                "project": resolved.public_summary(),
+                "project": resolved.public_summary,
                 "capabilities": [item.to_dict() for item in _module_capabilities(resolved)],
                 "boundary": boundary.to_dict(),
                 "bases": [item.to_dict() for item in _module_bases(resolved)],
@@ -491,7 +493,7 @@ def verify_knowledge_base_backend(project: KnowledgeBaseProject | None = None) -
 
 
 def build_knowledge_base_router(
-    project: KnowledgeBaseProject | None = None,
+    project: KnowledgeBaseCodeModule | None = None,
     repository: KnowledgeRepository | None = None,
 ) -> APIRouter:
     resolved = _resolve_project(project)

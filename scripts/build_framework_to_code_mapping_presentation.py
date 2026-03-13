@@ -15,6 +15,7 @@ from pptx.util import Inches, Pt
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT / "docs" / "presentations"
 OUTPUT_PATH = OUTPUT_DIR / "framework-to-code-mapping-cn.pptx"
+CANONICAL_GRAPH_PATH = ROOT / "projects" / "knowledge_base_basic" / "generated" / "canonical_graph.json"
 GENERATION_MANIFEST_PATH = ROOT / "projects" / "knowledge_base_basic" / "generated" / "generation_manifest.json"
 GOVERNANCE_MANIFEST_PATH = ROOT / "projects" / "knowledge_base_basic" / "generated" / "governance_manifest.json"
 
@@ -229,7 +230,7 @@ def _governed_object(payload: dict[str, Any], object_id: str) -> dict[str, Any]:
     raise ValueError(f"missing structural object: {object_id}")
 
 
-def build_cover(prs: Any, generation_manifest: dict[str, Any]) -> None:
+def build_cover(prs: Any, canonical_graph: dict[str, Any], generation_manifest: dict[str, Any]) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     set_background(slide, THEME.bg)
 
@@ -294,10 +295,10 @@ def build_cover(prs: Any, generation_manifest: dict[str, Any]) -> None:
         Inches(2.4),
         "这份 PPT 重点解释",
         [
-            "1. framework markdown 如何编成 framework_ir.json",
-            "2. product_spec / implementation_config 如何收敛成 KnowledgeBaseProject",
-            "3. contract / ui_spec / backend_spec 如何继续驱动 runtime code",
-            "4. governed_symbol + governance manifest/tree 如何把代码拉回上游",
+            "1. framework markdown 如何编成 FrameworkModule 与 FrameworkBase / Rule",
+            "2. product / implementation 如何收敛成五层 canonical graph",
+            "3. code layer export 如何继续驱动 runtime code",
+            "4. governance 派生视图如何把代码对象反查回上游",
         ],
         THEME.gold,
     )
@@ -309,14 +310,14 @@ def build_cover(prs: Any, generation_manifest: dict[str, Any]) -> None:
         Inches(5.66),
         Inches(6.9),
         Inches(0.45),
-        "阅读方法：不要先盯某个函数，看“文件链”和“对象链”更快。",
+        f"阅读方法：先看 canonical 图的 {len(canonical_graph['layers'])} 层，再去看派生视图和具体函数。",
         font_size=16,
         bold=True,
     )
-    add_footer(slide, "生成依据：projects/knowledge_base_basic/generated/* 与当前 runtime / governance 主链。")
+    add_footer(slide, "生成依据：canonical_graph.json + governance_manifest.json + generation_manifest.json。")
 
 
-def build_overall_chain_slide(prs: Any, generation_manifest: dict[str, Any]) -> None:
+def build_overall_chain_slide(prs: Any, canonical_graph: dict[str, Any], generation_manifest: dict[str, Any]) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     set_background(slide, THEME.bg)
     add_section_title(
@@ -328,11 +329,11 @@ def build_overall_chain_slide(prs: Any, generation_manifest: dict[str, Any]) -> 
 
     chain = [
         ("Framework", "共同结构语言\nframework/*.md", THEME.accent),
-        ("Product Spec", "产品真相\nproduct_spec.toml + product_spec/*.toml", THEME.accent_alt),
+        ("Product", "产品真相\nproduct_spec.toml + product_spec/*.toml", THEME.accent_alt),
         ("Implementation", "实现细化\nimplementation_config.toml", THEME.gold),
-        ("Compiled Project", "KnowledgeBaseProject\ncontract / spec / route", THEME.accent_dark),
-        ("Code", "runtime app / pages / api", THEME.ok),
-        ("Evidence", "generated/* + governance", THEME.warn),
+        ("Code", "code module export\ncontract / spec / route", THEME.accent_dark),
+        ("Runtime", "runtime app / pages / api", THEME.ok),
+        ("Evidence", "canonical graph\n+ derived views", THEME.warn),
     ]
     left = Inches(0.7)
     top = Inches(2.0)
@@ -353,9 +354,9 @@ def build_overall_chain_slide(prs: Any, generation_manifest: dict[str, Any]) -> 
         "这一层层分别做什么",
         [
             "Framework：定义能力、边界、基、规则、验证。",
-            "Product Spec：决定这个项目到底是哪一个具体产品。",
-            "Implementation Config：决定这个产品走哪条实现路径。",
-            "Compiled Project：把上游三层压成代码可以消费的稳定结构块。",
+            "Product：决定这个项目到底是哪一个具体产品。",
+            "Implementation：决定这个产品走哪条实现路径。",
+            "Code：把上游三层压成 runtime 可以消费的稳定导出面。",
         ],
         THEME.accent,
     )
@@ -367,6 +368,7 @@ def build_overall_chain_slide(prs: Any, generation_manifest: dict[str, Any]) -> 
         Inches(2.2),
         "当前可直接核对的证据",
         [
+            f"canonical layers = {len(canonical_graph['layers'])}",
             f"resolved_modules = {len(generation_manifest['framework_inputs']['resolved_modules'])}",
             f"configuration_effects = {len(generation_manifest['configuration_effects'])}",
             f"generated files = {len(generation_manifest['generated_files'])}",
@@ -374,7 +376,7 @@ def build_overall_chain_slide(prs: Any, generation_manifest: dict[str, Any]) -> 
         ],
         THEME.accent_alt,
     )
-    add_footer(slide, "关键判断：runtime 不是新真相源，而是 KnowledgeBaseProject 的消费者。")
+    add_footer(slide, "关键判断：runtime 不是新真相源，而是 Code layer export 的消费者。")
 
 
 def build_compiler_slide(prs: Any) -> None:
@@ -384,7 +386,7 @@ def build_compiler_slide(prs: Any) -> None:
         slide,
         "02 / 编译入口",
         "knowledge_base.py 是当前知识库模板的编译器，不是普通工具函数集合",
-        "它把 framework IR、产品真相和实现细化收成一个 KnowledgeBaseProject，再继续派生 contract / spec / evidence。",
+        "它把 framework、product、implementation 收成分层模块，再继续派生 code export 与 evidence。",
     )
 
     add_card(
@@ -411,7 +413,7 @@ def build_compiler_slide(prs: Any) -> None:
         "核心收敛点",
         [
             "_compile_project()",
-            "-> KnowledgeBaseProject",
+            "-> framework/product/implementation/code",
             "-> frontend_contract",
             "-> workbench_contract",
             "-> ui_spec / backend_spec",
@@ -427,6 +429,7 @@ def build_compiler_slide(prs: Any) -> None:
         "证据出口",
         [
             "materialize_knowledge_base_project()",
+            "-> canonical_graph.json",
             "-> framework_ir.json",
             "-> generation_manifest.json",
             "-> governance_manifest.json",
@@ -446,8 +449,8 @@ def build_compiler_slide(prs: Any) -> None:
         "你顺着文件看时，重点盯这几个函数",
         [
             "load_knowledge_base_project()：把配置读成显式结构块。",
-            "_compile_project()：把上游真相压成 KnowledgeBaseProject。",
-            "_build_backend_spec() / _build_ui_spec()：把项目对象继续压成运行时规格。",
+            "_compile_project()：把上游真相压成五层模块。",
+            "_build_backend_spec() / _build_ui_spec()：把 code layer export 继续压成运行时规格。",
             "materialize_knowledge_base_project()：把结果固化成 generated/*。",
         ],
         THEME.gold,
@@ -462,7 +465,7 @@ def build_effects_slide(prs: Any, generation_manifest: dict[str, Any]) -> None:
         slide,
         "03 / 配置即功能",
         "Implementation Config 不是写着好看，它必须进入下游生效位",
-        "仓库当前用 generation_manifest.configuration_effects 把这件事固化成可追踪证据。",
+        "仓库当前用 canonical graph + generation_manifest.configuration_effects 把这件事固化成可追踪证据。",
     )
 
     effects = generation_manifest["configuration_effects"]
@@ -509,6 +512,7 @@ def build_effects_slide(prs: Any, generation_manifest: dict[str, Any]) -> None:
         [
             "build_implementation_effect_manifest(project)",
             "-> generation_manifest.configuration_effects",
+            "-> canonical_graph.layers.code.export.implementation_effects",
             "-> validate_strict_mapping.py 逐条比较",
             "只在 bundle 里重复保存 config 本身，不算生效。",
         ],
@@ -516,7 +520,7 @@ def build_effects_slide(prs: Any, generation_manifest: dict[str, Any]) -> None:
     )
     add_arrow_connector(slide, Inches(4.3), Inches(3.95), Inches(4.95), Inches(3.95))
     add_arrow_connector(slide, Inches(8.1), Inches(3.95), Inches(8.65), Inches(3.95))
-    add_footer(slide, "关键例子：evidence.product_spec_endpoint -> backend_spec.transport.product_spec_endpoint -> runtime app route")
+    add_footer(slide, "关键例子：implementation_config -> code layer export -> runtime route。")
 
 
 def build_runtime_slide(prs: Any) -> None:
@@ -651,7 +655,7 @@ def build_reverse_governance_slide(prs: Any, governance_manifest: dict[str, Any]
     )
     add_arrow_connector(slide, Inches(4.35), Inches(3.7), Inches(4.75), Inches(3.7))
     add_arrow_connector(slide, Inches(7.75), Inches(3.7), Inches(8.1), Inches(3.7))
-    add_footer(slide, "关键文件：src/project_runtime/governance.py 与 projects/knowledge_base_basic/generated/governance_manifest.json")
+    add_footer(slide, "关键文件：src/project_runtime/governance.py 与 canonical_graph / governance_manifest。")
 
 
 def build_example_endpoint_slide(prs: Any) -> None:
@@ -670,7 +674,7 @@ def build_example_endpoint_slide(prs: Any) -> None:
         ("3", "knowledge_base.py", "_validate_implementation_config() 保证 endpoint stay under api_prefix"),
         ("4", "knowledge_base.py", "_build_backend_spec() 写入 backend_spec.transport.product_spec_endpoint"),
         ("5", "app.py", "@app.get(transport.product_spec_endpoint) 真正挂路由"),
-        ("6", "generation_manifest.json", "configuration_effects 记录这条 effect"),
+        ("6", "canonical_graph + generation_manifest", "code/evidence 层都记录这条 effect"),
     ]
 
     for index, (seq, label, body) in enumerate(steps):
@@ -689,7 +693,7 @@ def build_example_endpoint_slide(prs: Any) -> None:
         ["这里不是“代码自己决定路由”，而是“上游两层配置先决定，再由编译器校验并写进 runtime 可消费结构”。"],
         THEME.ok,
     )
-    add_footer(slide, "这个例子最适合顺着读：route.toml -> implementation_config.toml -> knowledge_base.py -> app.py -> generation_manifest.json")
+    add_footer(slide, "这个例子最适合顺着读：route.toml -> implementation_config.toml -> knowledge_base.py -> app.py -> canonical_graph.json")
 
 
 def build_example_answer_behavior_slide(prs: Any, governance_manifest: dict[str, Any]) -> None:
@@ -780,7 +784,7 @@ def build_reading_order_slide(prs: Any) -> None:
         [
             "product_spec / implementation_config",
             "-> knowledge_base.py",
-            "-> generation_manifest.json",
+            "-> canonical_graph.json",
             "-> frontend.py / backend.py / app.py",
             "适合回答：这个配置最后变成了什么代码？",
         ],
@@ -810,6 +814,7 @@ def build_reading_order_slide(prs: Any) -> None:
         "路径三：查配置生效",
         [
             "implementation_config field",
+            "-> canonical_graph.layers.code.export.implementation_effects",
             "-> generation_manifest.configuration_effects",
             "-> targets",
             "-> runtime 消费点",
@@ -822,6 +827,7 @@ def build_reading_order_slide(prs: Any) -> None:
 
 def build_presentation() -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    canonical_graph = _load_json(CANONICAL_GRAPH_PATH)
     generation_manifest = _load_json(GENERATION_MANIFEST_PATH)
     governance_manifest = _load_json(GOVERNANCE_MANIFEST_PATH)
 
@@ -829,8 +835,8 @@ def build_presentation() -> Path:
     prs.slide_width = THEME.width
     prs.slide_height = THEME.height
 
-    build_cover(prs, generation_manifest)
-    build_overall_chain_slide(prs, generation_manifest)
+    build_cover(prs, canonical_graph, generation_manifest)
+    build_overall_chain_slide(prs, canonical_graph, generation_manifest)
     build_compiler_slide(prs)
     build_effects_slide(prs, generation_manifest)
     build_runtime_slide(prs)

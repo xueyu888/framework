@@ -35,10 +35,11 @@ DEFAULT_IMPLEMENTATION_CONFIG = textwrap.dedent(
     [evidence]
     product_spec_endpoint = "/api/public-knowledge/product-spec"
 
-    [artifacts]
-    framework_ir_json = "framework_ir.json"
-    product_spec_json = "product_spec.json"
-    implementation_bundle_py = "implementation_bundle.py"
+[artifacts]
+canonical_graph_json = "canonical_graph.json"
+framework_ir_json = "framework_ir.json"
+product_spec_json = "product_spec.json"
+implementation_bundle_py = "implementation_bundle.py"
     generation_manifest_json = "generation_manifest.json"
     governance_manifest_json = "governance_manifest.json"
     governance_tree_json = "governance_tree.json"

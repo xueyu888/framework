@@ -145,6 +145,7 @@ class ParsedRegistry:
 
 @dataclass(frozen=True)
 class GeneratedArtifactContract:
+    canonical_graph_json: str
     framework_ir_json: str
     product_spec_json: str
     implementation_bundle_py: str
@@ -158,6 +159,7 @@ class GeneratedArtifactContract:
     def from_artifacts_table(cls, artifacts: dict[str, Any]) -> "GeneratedArtifactContract":
         names: dict[str, str] = {}
         for key in (
+            "canonical_graph_json",
             "framework_ir_json",
             "product_spec_json",
             "implementation_bundle_py",
@@ -177,6 +179,7 @@ class GeneratedArtifactContract:
 
     def file_names(self) -> tuple[str, ...]:
         return (
+            self.canonical_graph_json,
             self.framework_ir_json,
             self.product_spec_json,
             self.implementation_bundle_py,
@@ -190,6 +193,7 @@ class GeneratedArtifactContract:
     def to_generated_payload(self, *, relative_generated_dir: str) -> dict[str, str]:
         return {
             "directory": relative_generated_dir,
+            "canonical_graph_json": f"{relative_generated_dir}/{self.canonical_graph_json}",
             "framework_ir_json": f"{relative_generated_dir}/{self.framework_ir_json}",
             "product_spec_json": f"{relative_generated_dir}/{self.product_spec_json}",
             "implementation_bundle_py": f"{relative_generated_dir}/{self.implementation_bundle_py}",

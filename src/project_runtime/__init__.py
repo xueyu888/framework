@@ -1,3 +1,12 @@
+from .layered_models import (
+    CanonicalLayeredProjectGraph,
+    KnowledgeBaseCodeModule,
+    KnowledgeBaseEvidenceModule,
+    KnowledgeBaseFrameworkLayer,
+    KnowledgeBaseImplementationModule,
+    KnowledgeBaseProductModule,
+    LayeredTraceRef,
+)
 from .knowledge_base import (
     DEFAULT_KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_FILE,
     DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
@@ -11,7 +20,9 @@ from .knowledge_base import (
     build_knowledge_base_runtime_app_from_spec,
     compile_knowledge_document_source,
     load_knowledge_base_project,
+    load_knowledge_base_code_module,
     materialize_knowledge_base_project,
+    materialize_knowledge_base_code_module,
 )
 from .project_governance import (
     ProjectGovernanceClosure,
@@ -35,12 +46,19 @@ from .template_registry import (
 
 
 __all__ = [
+    "CanonicalLayeredProjectGraph",
     "DEFAULT_KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_FILE",
     "DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE",
+    "KnowledgeBaseCodeModule",
+    "KnowledgeBaseEvidenceModule",
+    "KnowledgeBaseFrameworkLayer",
     "KNOWLEDGE_BASE_IMPLEMENTATION_CONFIG_LAYOUT",
     "KNOWLEDGE_BASE_PRODUCT_SPEC_LAYOUT",
     "KNOWLEDGE_BASE_TEMPLATE_ID",
+    "KnowledgeBaseImplementationModule",
     "KnowledgeBaseProject",
+    "KnowledgeBaseProductModule",
+    "LayeredTraceRef",
     "ProjectGovernanceClosure",
     "ProjectDiscoveryAuditEntry",
     "build_object_coverage_report",
@@ -52,6 +70,7 @@ __all__ = [
     "build_implementation_effect_manifest",
     "build_knowledge_base_runtime_app_from_spec",
     "compile_knowledge_document_source",
+    "load_knowledge_base_code_module",
     "detect_project_template_id",
     "discover_framework_driven_projects",
     "get_default_project_template_registration",
@@ -59,6 +78,7 @@ __all__ = [
     "load_knowledge_base_project",
     "load_registered_project",
     "materialize_knowledge_base_project",
+    "materialize_knowledge_base_code_module",
     "materialize_registered_project",
     "register_project_template",
     "scaffold_registered_project",
