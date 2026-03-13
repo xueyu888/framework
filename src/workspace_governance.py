@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import re
@@ -71,6 +71,31 @@ class GovernanceIndexes:
 class WorkspaceCodeArea:
     relative_root: str
     label: str
+
+
+@dataclass(frozen=True)
+class WorkspaceGovernanceBuildContext:
+    workspace_root_id: str
+    projects_root_id: str
+    evidence_root_id: str
+    governance_json_rel: str
+    governance_html_rel: str
+    discovery_audit_json_rel: str
+    discovery_audit_md_rel: str
+    discovery_audit: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def build(cls) -> "WorkspaceGovernanceBuildContext":
+        return cls(
+            workspace_root_id="workspace:shelf",
+            projects_root_id="workspace:shelf:projects",
+            evidence_root_id="workspace:shelf:evidence",
+            governance_json_rel=_relative(DEFAULT_WORKSPACE_GOVERNANCE_JSON),
+            governance_html_rel=_relative(DEFAULT_WORKSPACE_GOVERNANCE_HTML),
+            discovery_audit_json_rel=_relative(DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON),
+            discovery_audit_md_rel=_relative(DEFAULT_PROJECT_DISCOVERY_AUDIT_MD),
+            discovery_audit=build_project_discovery_audit(),
+        )
 
 
 def discover_workspace_product_spec_files(projects_dir: Path | None = None) -> list[Path]:
@@ -632,36 +657,14 @@ def _build_governance_indexes(
     )
 
 
-def build_workspace_governance_payload(
-    product_spec_files: list[Path] | None = None,
-) -> dict[str, Any]:
-    workspace_root_id = "workspace:shelf"
-    standards_root_id = "workspace:shelf:standards"
-    workspace_code_root_id = "workspace:shelf:code"
-    projects_root_id = "workspace:shelf:projects"
-    evidence_root_id = "workspace:shelf:evidence"
-    governance_json_rel = _relative(DEFAULT_WORKSPACE_GOVERNANCE_JSON)
-    governance_html_rel = _relative(DEFAULT_WORKSPACE_GOVERNANCE_HTML)
-    discovery_audit_json_rel = _relative(DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON)
-    discovery_audit_md_rel = _relative(DEFAULT_PROJECT_DISCOVERY_AUDIT_MD)
-    discovery_audit = build_project_discovery_audit()
-
-    standard_result = _mapping_tree_to_hierarchy_nodes()
-    standards_root_id = standard_result.root_id
-    workspace_code_result = _workspace_code_to_hierarchy_nodes(parent_id=workspace_root_id)
-    workspace_code_root_id = workspace_code_result.root_id
-    extra_framework_result = _framework_module_docs_to_hierarchy_nodes(
-        parent_id=standards_root_id,
-        existing_source_files={
-            str((node.metadata or {}).get("source_file") or "").strip()
-            for node in standard_result.nodes
-            if str((node.metadata or {}).get("source_file") or "").strip()
-        },
-    )
-
-    nodes: list[HierarchyNode] = [
+def _workspace_top_level_nodes(
+    context: WorkspaceGovernanceBuildContext,
+    *,
+    standards_root_id: str,
+) -> list[HierarchyNode]:
+    return [
         HierarchyNode(
-            node_id=workspace_root_id,
+            node_id=context.workspace_root_id,
             label="Shelf Workspace",
             level=0,
             description="kind=workspace_root | layer=Workspace",
@@ -673,7 +676,7 @@ def build_workspace_governance_payload(
             },
         ),
         HierarchyNode(
-            node_id=projects_root_id,
+            node_id=context.projects_root_id,
             label="Projects",
             level=1,
             description="kind=projects_root | layer=Projects",
@@ -682,20 +685,20 @@ def build_workspace_governance_payload(
                 "source_line": 1,
                 "node_kind": "projects_root",
                 "layer": "Projects",
-                "parent_node_id": workspace_root_id,
+                "parent_node_id": context.workspace_root_id,
             },
         ),
         HierarchyNode(
-            node_id=evidence_root_id,
+            node_id=context.evidence_root_id,
             label="Workspace Evidence",
             level=1,
             description="kind=workspace_evidence_root | layer=Workspace Evidence",
             metadata={
-                "source_file": governance_json_rel,
+                "source_file": context.governance_json_rel,
                 "source_line": 1,
                 "node_kind": "workspace_evidence_root",
                 "layer": "Workspace Evidence",
-                "parent_node_id": workspace_root_id,
+                "parent_node_id": context.workspace_root_id,
             },
         ),
         HierarchyNode(
@@ -704,16 +707,16 @@ def build_workspace_governance_payload(
             level=2,
             description=(
                 "kind=workspace_evidence_artifact | layer=Workspace Evidence"
-                f" | file={governance_json_rel} | artifact=governance_tree_json"
+                f" | file={context.governance_json_rel} | artifact=governance_tree_json"
             ),
             metadata={
-                "source_file": governance_json_rel,
+                "source_file": context.governance_json_rel,
                 "source_line": 1,
                 "node_kind": "workspace_evidence_artifact",
                 "layer": "Workspace Evidence",
-                "parent_node_id": evidence_root_id,
+                "parent_node_id": context.evidence_root_id,
                 "artifact": "governance_tree_json",
-                "derived_from": [workspace_root_id, standards_root_id, projects_root_id],
+                "derived_from": [context.workspace_root_id, standards_root_id, context.projects_root_id],
             },
         ),
         HierarchyNode(
@@ -722,16 +725,16 @@ def build_workspace_governance_payload(
             level=2,
             description=(
                 "kind=workspace_evidence_artifact | layer=Workspace Evidence"
-                f" | file={governance_html_rel} | artifact=governance_tree_html"
+                f" | file={context.governance_html_rel} | artifact=governance_tree_html"
             ),
             metadata={
-                "source_file": governance_html_rel,
+                "source_file": context.governance_html_rel,
                 "source_line": 1,
                 "node_kind": "workspace_evidence_artifact",
                 "layer": "Workspace Evidence",
-                "parent_node_id": evidence_root_id,
+                "parent_node_id": context.evidence_root_id,
                 "artifact": "governance_tree_html",
-                "derived_from": [workspace_root_id, standards_root_id, projects_root_id],
+                "derived_from": [context.workspace_root_id, standards_root_id, context.projects_root_id],
             },
         ),
         HierarchyNode(
@@ -740,16 +743,16 @@ def build_workspace_governance_payload(
             level=2,
             description=(
                 "kind=workspace_evidence_artifact | layer=Workspace Evidence"
-                f" | file={discovery_audit_json_rel} | artifact=project_discovery_audit_json"
+                f" | file={context.discovery_audit_json_rel} | artifact=project_discovery_audit_json"
             ),
             metadata={
-                "source_file": discovery_audit_json_rel,
+                "source_file": context.discovery_audit_json_rel,
                 "source_line": 1,
                 "node_kind": "workspace_evidence_artifact",
                 "layer": "Workspace Evidence",
-                "parent_node_id": evidence_root_id,
+                "parent_node_id": context.evidence_root_id,
                 "artifact": "project_discovery_audit_json",
-                "derived_from": [workspace_root_id, projects_root_id],
+                "derived_from": [context.workspace_root_id, context.projects_root_id],
             },
         ),
         HierarchyNode(
@@ -758,41 +761,44 @@ def build_workspace_governance_payload(
             level=2,
             description=(
                 "kind=workspace_evidence_artifact | layer=Workspace Evidence"
-                f" | file={discovery_audit_md_rel} | artifact=project_discovery_audit_md"
+                f" | file={context.discovery_audit_md_rel} | artifact=project_discovery_audit_md"
             ),
             metadata={
-                "source_file": discovery_audit_md_rel,
+                "source_file": context.discovery_audit_md_rel,
                 "source_line": 1,
                 "node_kind": "workspace_evidence_artifact",
                 "layer": "Workspace Evidence",
-                "parent_node_id": evidence_root_id,
+                "parent_node_id": context.evidence_root_id,
                 "artifact": "project_discovery_audit_md",
-                "derived_from": [workspace_root_id, projects_root_id],
+                "derived_from": [context.workspace_root_id, context.projects_root_id],
             },
         ),
     ]
-    edges: list[HierarchyEdge] = [
-        HierarchyEdge(source=workspace_root_id, target=projects_root_id, relation="tree_child", metadata={}),
-        HierarchyEdge(source=workspace_root_id, target=evidence_root_id, relation="tree_child", metadata={}),
-        HierarchyEdge(source=workspace_root_id, target=standards_root_id, relation="tree_child", metadata={}),
+
+
+def _workspace_top_level_edges(
+    context: WorkspaceGovernanceBuildContext,
+    *,
+    standards_root_id: str,
+) -> list[HierarchyEdge]:
+    return [
+        HierarchyEdge(source=context.workspace_root_id, target=context.projects_root_id, relation="tree_child", metadata={}),
+        HierarchyEdge(source=context.workspace_root_id, target=context.evidence_root_id, relation="tree_child", metadata={}),
+        HierarchyEdge(source=context.workspace_root_id, target=standards_root_id, relation="tree_child", metadata={}),
     ]
 
-    nodes.extend(standard_result.nodes)
-    nodes.extend(workspace_code_result.nodes)
-    nodes.extend(extra_framework_result.nodes)
-    edges.extend(standard_result.edges)
-    edges.extend(workspace_code_result.edges)
-    edges.extend(extra_framework_result.edges)
 
-    requested_product_spec_files = (
-        [path.resolve() for path in product_spec_files]
-        if product_spec_files is not None
-        else discover_workspace_product_spec_files()
-    )
+def _collect_project_hierarchy(
+    *,
+    product_spec_files: list[Path],
+    projects_root_id: str,
+) -> tuple[dict[str, dict[str, Any]], dict[str, str], list[HierarchyNode], list[HierarchyEdge]]:
     project_trees: dict[str, dict[str, Any]] = {}
     project_roots: dict[str, str] = {}
+    nodes: list[HierarchyNode] = []
+    edges: list[HierarchyEdge] = []
 
-    for product_spec_file in requested_product_spec_files:
+    for product_spec_file in product_spec_files:
         project = load_registered_project(product_spec_file)
         project_tree = build_governance_tree(project)
         project_id = str(project_tree.get("project_id") or project.metadata.project_id)
@@ -808,9 +814,19 @@ def build_workspace_governance_payload(
         nodes.extend(project_result.nodes)
         edges.extend(project_result.edges)
 
+    return project_trees, project_roots, nodes, edges
+
+
+def _append_audit_only_project_nodes(
+    *,
+    context: WorkspaceGovernanceBuildContext,
+    project_roots: dict[str, str],
+    nodes: list[HierarchyNode],
+    edges: list[HierarchyEdge],
+) -> None:
     audited_directories = {
         str(item.get("directory") or "").strip(): item
-        for item in discovery_audit.get("entries", [])
+        for item in context.discovery_audit.get("entries", [])
         if isinstance(item, dict)
     }
     for directory, entry in sorted(audited_directories.items()):
@@ -842,12 +858,66 @@ def build_workspace_governance_payload(
                     "project_id": project_id,
                     "audit_classification": entry.get("classification"),
                     "framework_driven": entry.get("framework_driven"),
-                    "parent_node_id": projects_root_id,
+                    "parent_node_id": context.projects_root_id,
                     "derived_from": [],
                 },
             )
         )
-        edges.append(HierarchyEdge(source=projects_root_id, target=node_id, relation="tree_child", metadata={}))
+        edges.append(
+            HierarchyEdge(
+                source=context.projects_root_id,
+                target=node_id,
+                relation="tree_child",
+                metadata={},
+            )
+        )
+
+
+def build_workspace_governance_payload(
+    product_spec_files: list[Path] | None = None,
+) -> dict[str, Any]:
+    context = WorkspaceGovernanceBuildContext.build()
+
+    standard_result = _mapping_tree_to_hierarchy_nodes()
+    standards_root_id = standard_result.root_id
+    workspace_code_result = _workspace_code_to_hierarchy_nodes(parent_id=context.workspace_root_id)
+    workspace_code_root_id = workspace_code_result.root_id
+    extra_framework_result = _framework_module_docs_to_hierarchy_nodes(
+        parent_id=standards_root_id,
+        existing_source_files={
+            str((node.metadata or {}).get("source_file") or "").strip()
+            for node in standard_result.nodes
+            if str((node.metadata or {}).get("source_file") or "").strip()
+        },
+    )
+
+    nodes = _workspace_top_level_nodes(context, standards_root_id=standards_root_id)
+    edges = _workspace_top_level_edges(context, standards_root_id=standards_root_id)
+
+    nodes.extend(standard_result.nodes)
+    nodes.extend(workspace_code_result.nodes)
+    nodes.extend(extra_framework_result.nodes)
+    edges.extend(standard_result.edges)
+    edges.extend(workspace_code_result.edges)
+    edges.extend(extra_framework_result.edges)
+
+    requested_product_spec_files = (
+        [path.resolve() for path in product_spec_files]
+        if product_spec_files is not None
+        else discover_workspace_product_spec_files()
+    )
+    project_trees, project_roots, project_nodes, project_edges = _collect_project_hierarchy(
+        product_spec_files=requested_product_spec_files,
+        projects_root_id=context.projects_root_id,
+    )
+    nodes.extend(project_nodes)
+    edges.extend(project_edges)
+    _append_audit_only_project_nodes(
+        context=context,
+        project_roots=project_roots,
+        nodes=nodes,
+        edges=edges,
+    )
 
     indexes = _build_governance_indexes(nodes, project_roots)
     graph = HierarchyGraph(
@@ -870,13 +940,13 @@ def build_workspace_governance_payload(
     payload = graph.to_payload_dict()
     payload["governance"] = {
         "version": WORKSPACE_GOVERNANCE_VERSION,
-        "workspace_root_id": workspace_root_id,
+        "workspace_root_id": context.workspace_root_id,
         "standards_root_id": standards_root_id,
         "workspace_code_root_id": workspace_code_root_id,
-        "projects_root_id": projects_root_id,
+        "projects_root_id": context.projects_root_id,
         "project_roots": project_roots,
         "project_trees": project_trees,
-        "project_discovery_audit": discovery_audit,
+        "project_discovery_audit": context.discovery_audit,
         **indexes.to_payload_dict(),
     }
     return payload

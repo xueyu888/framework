@@ -246,6 +246,51 @@ class ProjectGovernanceClosure:
         }
 
 
+@dataclass
+class StrictZoneAccumulator:
+    object_ids: set[str] = field(default_factory=set)
+    role_ids: set[str] = field(default_factory=set)
+    candidate_ids: set[str] = field(default_factory=set)
+    reasons: set[str] = field(default_factory=set)
+
+    def add_binding(self, binding: ResolvedRoleBinding) -> None:
+        self.object_ids.add(binding.object_id)
+        self.role_ids.add(binding.role_id)
+        self.reasons.add(f"role:{binding.role_id}")
+        self.reasons.add(f"object:{binding.object_id}")
+
+    def add_candidate(self, candidate: StructuralCandidate) -> None:
+        self.candidate_ids.add(candidate.candidate_id)
+        if candidate.object_id:
+            self.object_ids.add(candidate.object_id)
+        self.reasons.add(f"candidate:{candidate.classification}")
+
+    def add_evidence(self, artifact_key: str) -> None:
+        self.reasons.add(f"evidence:{artifact_key}")
+
+    def to_entry(self, *, file_name: str) -> StrictZoneEntry:
+        return StrictZoneEntry(
+            file=file_name,
+            object_ids=tuple(sorted(self.object_ids)),
+            role_ids=tuple(sorted(self.role_ids)),
+            candidate_ids=tuple(sorted(self.candidate_ids)),
+            reasons=tuple(sorted(self.reasons)),
+        )
+
+
+@dataclass(frozen=True)
+class CandidateBindingIndexes:
+    file_object_index: dict[str, set[str]]
+    candidate_roles: dict[str, list[ResolvedRoleBinding]]
+
+
+@dataclass(frozen=True)
+class StrictZoneMinimalityContext:
+    role_bindings_by_file: dict[str, list[ResolvedRoleBinding]]
+    candidate_index: dict[str, StructuralCandidate]
+    evidence_by_file: dict[str, list[str]]
+
+
 DISCOVERY_CLASSIFICATIONS = {
     "recognized",
     "missing_required_files",
@@ -531,75 +576,122 @@ def resolve_role_bindings(
     return tuple(bindings)
 
 
-def classify_candidates(
-    structural_objects: tuple[StructuralObject, ...],
-    candidates: tuple[StructuralCandidate, ...],
+def _build_candidate_binding_indexes(
     role_bindings: tuple[ResolvedRoleBinding, ...],
-) -> tuple[StructuralCandidate, ...]:
-    by_candidate: dict[str, StructuralCandidate] = {item.candidate_id: item for item in candidates}
+) -> CandidateBindingIndexes:
     file_object_index: dict[str, set[str]] = {}
     candidate_roles: dict[str, list[ResolvedRoleBinding]] = {}
-
     for binding in role_bindings:
         for file_ref in binding.file_refs:
             file_object_index.setdefault(file_ref, set()).add(binding.object_id)
         for candidate_id in binding.candidate_ids:
             candidate_roles.setdefault(candidate_id, []).append(binding)
+    return CandidateBindingIndexes(
+        file_object_index=file_object_index,
+        candidate_roles=candidate_roles,
+    )
 
+
+def _classify_candidate_from_roles(
+    candidate: StructuralCandidate,
+    matched_roles: list[ResolvedRoleBinding],
+) -> StructuralCandidate:
+    primary = matched_roles[0]
+    return StructuralCandidate(
+        candidate_id=candidate.candidate_id,
+        project_id=candidate.project_id,
+        file=candidate.file,
+        locator=candidate.locator,
+        kind=candidate.kind,
+        confidence=candidate.confidence,
+        reasons=candidate.reasons,
+        classification=primary.classification,
+        object_id=primary.object_id,
+        role_ids=tuple(sorted({item.role_id for item in matched_roles})),
+    )
+
+
+def _classify_unbound_candidate(
+    candidate: StructuralCandidate,
+    related_objects: list[str],
+) -> StructuralCandidate:
+    if candidate.confidence >= 0.75 and related_objects:
+        return StructuralCandidate(
+            candidate_id=candidate.candidate_id,
+            project_id=candidate.project_id,
+            file=candidate.file,
+            locator=candidate.locator,
+            kind=candidate.kind,
+            confidence=candidate.confidence,
+            reasons=candidate.reasons,
+            classification="attached",
+            object_id=related_objects[0],
+            role_ids=(),
+        )
+    return StructuralCandidate(
+        candidate_id=candidate.candidate_id,
+        project_id=candidate.project_id,
+        file=candidate.file,
+        locator=candidate.locator,
+        kind=candidate.kind,
+        confidence=candidate.confidence,
+        reasons=candidate.reasons,
+        classification="internal",
+        object_id=None,
+        role_ids=(),
+    )
+
+
+def classify_candidates(
+    structural_objects: tuple[StructuralObject, ...],
+    candidates: tuple[StructuralCandidate, ...],
+    role_bindings: tuple[ResolvedRoleBinding, ...],
+) -> tuple[StructuralCandidate, ...]:
+    indexes = _build_candidate_binding_indexes(role_bindings)
     classified: list[StructuralCandidate] = []
     for candidate in candidates:
-        matched_roles = candidate_roles.get(candidate.candidate_id, [])
+        matched_roles = indexes.candidate_roles.get(candidate.candidate_id, [])
         if matched_roles:
-            primary = matched_roles[0]
-            classified.append(
-                StructuralCandidate(
-                    candidate_id=candidate.candidate_id,
-                    project_id=candidate.project_id,
-                    file=candidate.file,
-                    locator=candidate.locator,
-                    kind=candidate.kind,
-                    confidence=candidate.confidence,
-                    reasons=candidate.reasons,
-                    classification=primary.classification,
-                    object_id=primary.object_id,
-                    role_ids=tuple(sorted({item.role_id for item in matched_roles})),
-                )
-            )
-            continue
-
-        related_objects = sorted(file_object_index.get(candidate.file, set()))
-        if candidate.confidence >= 0.75 and related_objects:
-            classified.append(
-                StructuralCandidate(
-                    candidate_id=candidate.candidate_id,
-                    project_id=candidate.project_id,
-                    file=candidate.file,
-                    locator=candidate.locator,
-                    kind=candidate.kind,
-                    confidence=candidate.confidence,
-                    reasons=candidate.reasons,
-                    classification="attached",
-                    object_id=related_objects[0],
-                    role_ids=(),
-                )
-            )
+            classified.append(_classify_candidate_from_roles(candidate, matched_roles))
             continue
 
         classified.append(
-            StructuralCandidate(
-                candidate_id=candidate.candidate_id,
-                project_id=candidate.project_id,
-                file=candidate.file,
-                locator=candidate.locator,
-                kind=candidate.kind,
-                confidence=candidate.confidence,
-                reasons=candidate.reasons,
-                classification="internal",
-                object_id=None,
-                role_ids=(),
+            _classify_unbound_candidate(
+                candidate,
+                sorted(indexes.file_object_index.get(candidate.file, set())),
             )
         )
     return tuple(classified)
+
+
+def _strict_zone_payloads(
+    role_bindings: tuple[ResolvedRoleBinding, ...],
+    candidates: tuple[StructuralCandidate, ...],
+    evidence_artifacts: dict[str, str],
+) -> dict[str, StrictZoneAccumulator]:
+    payloads: dict[str, StrictZoneAccumulator] = {}
+
+    def ensure_file(file_name: str) -> StrictZoneAccumulator:
+        return payloads.setdefault(file_name, StrictZoneAccumulator())
+
+    candidate_lookup = {item.candidate_id: item for item in candidates}
+    for binding in role_bindings:
+        for file_name in binding.file_refs:
+            ensure_file(file_name).add_binding(binding)
+        for candidate_id in binding.candidate_ids:
+            candidate = candidate_lookup.get(candidate_id)
+            if candidate is not None:
+                ensure_file(candidate.file).candidate_ids.add(candidate.candidate_id)
+
+    for candidate in candidates:
+        if candidate.classification not in {"governed", "attached"}:
+            continue
+        ensure_file(candidate.file).add_candidate(candidate)
+
+    for artifact_key, artifact_path in evidence_artifacts.items():
+        ensure_file(artifact_path).add_evidence(artifact_key)
+
+    return payloads
 
 
 def infer_strict_zone(
@@ -608,61 +700,80 @@ def infer_strict_zone(
     candidates: tuple[StructuralCandidate, ...],
     evidence_artifacts: dict[str, str],
 ) -> tuple[StrictZoneEntry, ...]:
-    object_lookup = {item.object_id: item for item in structural_objects}
-    candidate_lookup = {item.candidate_id: item for item in candidates}
-    file_payloads: dict[str, dict[str, set[str]]] = {}
+    del structural_objects
+    payloads = _strict_zone_payloads(role_bindings, candidates, evidence_artifacts)
+    return tuple(
+        payloads[file_name].to_entry(file_name=file_name)
+        for file_name in sorted(payloads)
+    )
 
-    def ensure_file(file_name: str) -> dict[str, set[str]]:
-        return file_payloads.setdefault(
-            file_name,
-            {
-                "object_ids": set(),
-                "role_ids": set(),
-                "candidate_ids": set(),
-                "reasons": set(),
-            },
-        )
 
+def _build_strict_zone_minimality_context(
+    role_bindings: tuple[ResolvedRoleBinding, ...],
+    candidates: tuple[StructuralCandidate, ...],
+    evidence_artifacts: dict[str, str],
+) -> StrictZoneMinimalityContext:
+    role_bindings_by_file: dict[str, list[ResolvedRoleBinding]] = {}
     for binding in role_bindings:
         for file_name in binding.file_refs:
-            payload = ensure_file(file_name)
-            payload["object_ids"].add(binding.object_id)
-            payload["role_ids"].add(binding.role_id)
-            payload["reasons"].add(f"role:{binding.role_id}")
-            payload["reasons"].add(f"object:{binding.object_id}")
-        for candidate_id in binding.candidate_ids:
-            candidate = candidate_lookup.get(candidate_id)
-            if candidate is None:
-                continue
-            payload = ensure_file(candidate.file)
-            payload["candidate_ids"].add(candidate.candidate_id)
+            role_bindings_by_file.setdefault(file_name, []).append(binding)
 
-    for candidate in candidates:
-        if candidate.classification not in {"governed", "attached"}:
-            continue
-        payload = ensure_file(candidate.file)
-        payload["candidate_ids"].add(candidate.candidate_id)
-        if candidate.object_id:
-            payload["object_ids"].add(candidate.object_id)
-        payload["reasons"].add(f"candidate:{candidate.classification}")
-
+    evidence_by_file: dict[str, list[str]] = {}
     for artifact_key, artifact_path in evidence_artifacts.items():
-        payload = ensure_file(artifact_path)
-        payload["reasons"].add(f"evidence:{artifact_key}")
+        evidence_by_file.setdefault(artifact_path, []).append(artifact_key)
 
-    entries: list[StrictZoneEntry] = []
-    for file_name in sorted(file_payloads):
-        payload = file_payloads[file_name]
-        entries.append(
-            StrictZoneEntry(
-                file=file_name,
-                object_ids=tuple(sorted(payload["object_ids"])),
-                role_ids=tuple(sorted(payload["role_ids"])),
-                candidate_ids=tuple(sorted(payload["candidate_ids"])),
-                reasons=tuple(sorted(payload["reasons"])),
+    return StrictZoneMinimalityContext(
+        role_bindings_by_file=role_bindings_by_file,
+        candidate_index={item.candidate_id: item for item in candidates},
+        evidence_by_file=evidence_by_file,
+    )
+
+
+def _annotate_strict_zone_entry(
+    entry: StrictZoneEntry,
+    context: StrictZoneMinimalityContext,
+) -> StrictZoneEntry:
+    why_required: list[str] = []
+    minimality_status = "redundant"
+
+    file_bindings = context.role_bindings_by_file.get(entry.file, [])
+    if file_bindings:
+        minimality_status = "required"
+        for binding in sorted(file_bindings, key=lambda item: (item.object_id, item.role_id)):
+            why_required.append(
+                f"remove file breaks role closure {binding.object_id} -> {binding.role_id}"
             )
+
+    artifact_keys = sorted(context.evidence_by_file.get(entry.file, []))
+    if artifact_keys:
+        minimality_status = "required"
+        why_required.extend(
+            f"remove file breaks evidence artifact {artifact_key}" for artifact_key in artifact_keys
         )
-    return tuple(entries)
+
+    if not file_bindings and not artifact_keys:
+        attached_candidates = [
+            context.candidate_index[candidate_id]
+            for candidate_id in entry.candidate_ids
+            if candidate_id in context.candidate_index
+            and context.candidate_index[candidate_id].classification == "attached"
+        ]
+        if attached_candidates:
+            minimality_status = "uncertain"
+            why_required.extend(
+                f"attached candidate {candidate.locator} still rides this carrier"
+                for candidate in sorted(attached_candidates, key=lambda item: item.candidate_id)
+            )
+
+    return StrictZoneEntry(
+        file=entry.file,
+        object_ids=entry.object_ids,
+        role_ids=entry.role_ids,
+        candidate_ids=entry.candidate_ids,
+        reasons=entry.reasons,
+        why_required=tuple(sorted(set(why_required))),
+        minimality_status=minimality_status,
+    )
 
 
 def annotate_strict_zone_minimality(
@@ -671,62 +782,12 @@ def annotate_strict_zone_minimality(
     candidates: tuple[StructuralCandidate, ...],
     evidence_artifacts: dict[str, str],
 ) -> tuple[StrictZoneEntry, ...]:
-    role_bindings_by_file: dict[str, list[ResolvedRoleBinding]] = {}
-    for binding in role_bindings:
-        for file_name in binding.file_refs:
-            role_bindings_by_file.setdefault(file_name, []).append(binding)
-
-    candidate_index = {item.candidate_id: item for item in candidates}
-    evidence_by_file: dict[str, list[str]] = {}
-    for artifact_key, artifact_path in evidence_artifacts.items():
-        evidence_by_file.setdefault(artifact_path, []).append(artifact_key)
-
-    annotated: list[StrictZoneEntry] = []
-    for entry in strict_zone:
-        why_required: list[str] = []
-        minimality_status = "redundant"
-
-        file_bindings = role_bindings_by_file.get(entry.file, [])
-        if file_bindings:
-            minimality_status = "required"
-            for binding in sorted(file_bindings, key=lambda item: (item.object_id, item.role_id)):
-                why_required.append(
-                    f"remove file breaks role closure {binding.object_id} -> {binding.role_id}"
-                )
-
-        artifact_keys = sorted(evidence_by_file.get(entry.file, []))
-        if artifact_keys:
-            minimality_status = "required"
-            why_required.extend(
-                f"remove file breaks evidence artifact {artifact_key}" for artifact_key in artifact_keys
-            )
-
-        if not file_bindings and not artifact_keys:
-            attached_candidates = [
-                candidate_index[candidate_id]
-                for candidate_id in entry.candidate_ids
-                if candidate_id in candidate_index
-                and candidate_index[candidate_id].classification == "attached"
-            ]
-            if attached_candidates:
-                minimality_status = "uncertain"
-                why_required.extend(
-                    f"attached candidate {candidate.locator} still rides this carrier"
-                    for candidate in sorted(attached_candidates, key=lambda item: item.candidate_id)
-                )
-
-        annotated.append(
-            StrictZoneEntry(
-                file=entry.file,
-                object_ids=entry.object_ids,
-                role_ids=entry.role_ids,
-                candidate_ids=entry.candidate_ids,
-                reasons=entry.reasons,
-                why_required=tuple(sorted(set(why_required))),
-                minimality_status=minimality_status,
-            )
-        )
-    return tuple(annotated)
+    context = _build_strict_zone_minimality_context(
+        role_bindings,
+        candidates,
+        evidence_artifacts,
+    )
+    return tuple(_annotate_strict_zone_entry(entry, context) for entry in strict_zone)
 
 
 def build_strict_zone_report(closure: ProjectGovernanceClosure) -> dict[str, Any]:
@@ -745,20 +806,20 @@ def build_strict_zone_report(closure: ProjectGovernanceClosure) -> dict[str, Any
     }
 
 
-def build_object_coverage_report(closure: ProjectGovernanceClosure) -> dict[str, Any]:
-    binding_map: dict[tuple[str, str], ResolvedRoleBinding] = {
-        (item.object_id, item.role_id): item for item in closure.role_bindings
+def _object_coverage_candidate_counts(
+    candidates: tuple[StructuralCandidate, ...],
+) -> dict[str, int]:
+    return {
+        "governed_candidate_count": sum(1 for item in candidates if item.classification == "governed"),
+        "attached_candidate_count": sum(1 for item in candidates if item.classification == "attached"),
+        "internal_candidate_count": sum(1 for item in candidates if item.classification == "internal"),
     }
-    candidate_counts = {
-        "governed_candidate_count": sum(1 for item in closure.candidates if item.classification == "governed"),
-        "attached_candidate_count": sum(1 for item in closure.candidates if item.classification == "attached"),
-        "internal_candidate_count": sum(1 for item in closure.candidates if item.classification == "internal"),
-    }
-    entries: list[dict[str, Any]] = []
-    future_categories: set[str] = set()
-    fully_closed = 0
-    partially_closed = 0
 
+
+def _object_coverage_future_categories(
+    closure: ProjectGovernanceClosure,
+) -> set[str]:
+    future_categories: set[str] = set()
     attached_kinds = sorted({item.kind for item in closure.candidates if item.classification == "attached"})
     if "python_schema_carrier" in attached_kinds:
         future_categories.add("schema carriers that are still attached-only")
@@ -766,57 +827,79 @@ def build_object_coverage_report(closure: ProjectGovernanceClosure) -> dict[str,
         future_categories.add("compiler/evidence builders that are still attached-only")
     if any(item.kind == "implementation_effect" for item in closure.structural_objects):
         future_categories.add("implementation effect objects are field-level, not sink-level")
+    return future_categories
+
+
+def _build_object_coverage_entry(
+    structural_object: StructuralObject,
+    binding_map: dict[tuple[str, str], ResolvedRoleBinding],
+) -> tuple[dict[str, Any], bool]:
+    required_roles = [role.role_id for role in structural_object.required_roles]
+    bound_roles = [
+        role.role_id
+        for role in structural_object.required_roles
+        if binding_map.get((structural_object.object_id, role.role_id), None) is not None
+        and binding_map[(structural_object.object_id, role.role_id)].status == "satisfied"
+    ]
+    missing_roles = sorted(set(required_roles) - set(bound_roles))
+    overbound_roles = sorted(
+        binding.role_id
+        for binding in binding_map.values()
+        if binding.object_id == structural_object.object_id and binding.role_id not in required_roles
+    )
+    compare_status = (
+        "match"
+        if structural_object.actual_fingerprint == structural_object.expected_fingerprint
+        else "mismatch"
+    )
+    fully_closed = not missing_roles and compare_status == "match"
+    closure_status = "fully_closed" if fully_closed else "partially_closed"
+    return (
+        {
+            "object_id": structural_object.object_id,
+            "kind": structural_object.kind,
+            "risk_level": structural_object.risk_level,
+            "status": structural_object.status,
+            "source_categories": list(structural_object.origin_categories),
+            "sources": {
+                "framework": [item.to_dict() for item in structural_object.sources_framework],
+                "product": [item.to_dict() for item in structural_object.sources_product],
+                "implementation": [item.to_dict() for item in structural_object.sources_implementation],
+            },
+            "required_roles": required_roles,
+            "actual_roles": bound_roles,
+            "missing_roles": missing_roles,
+            "overbound_roles": overbound_roles,
+            "compare_status": compare_status,
+            "compare_coverage": {
+                "extractor": structural_object.extractor,
+                "comparator": structural_object.comparator,
+                "expected_fingerprint": structural_object.expected_fingerprint,
+                "actual_fingerprint": structural_object.actual_fingerprint,
+            },
+            "closure_status": closure_status,
+        },
+        fully_closed,
+    )
+
+
+def build_object_coverage_report(closure: ProjectGovernanceClosure) -> dict[str, Any]:
+    binding_map: dict[tuple[str, str], ResolvedRoleBinding] = {
+        (item.object_id, item.role_id): item for item in closure.role_bindings
+    }
+    candidate_counts = _object_coverage_candidate_counts(closure.candidates)
+    entries: list[dict[str, Any]] = []
+    future_categories = _object_coverage_future_categories(closure)
+    fully_closed = 0
+    partially_closed = 0
 
     for structural_object in closure.structural_objects:
-        required_roles = [role.role_id for role in structural_object.required_roles]
-        bound_roles = [
-            role.role_id
-            for role in structural_object.required_roles
-            if binding_map.get((structural_object.object_id, role.role_id), None) is not None
-            and binding_map[(structural_object.object_id, role.role_id)].status == "satisfied"
-        ]
-        missing_roles = sorted(set(required_roles) - set(bound_roles))
-        overbound_roles = sorted(
-            binding.role_id
-            for binding in closure.role_bindings
-            if binding.object_id == structural_object.object_id and binding.role_id not in required_roles
-        )
-        compare_status = (
-            "match"
-            if structural_object.actual_fingerprint == structural_object.expected_fingerprint
-            else "mismatch"
-        )
-        closure_status = "fully_closed" if not missing_roles and compare_status == "match" else "partially_closed"
-        if closure_status == "fully_closed":
+        entry, is_fully_closed = _build_object_coverage_entry(structural_object, binding_map)
+        if is_fully_closed:
             fully_closed += 1
         else:
             partially_closed += 1
-        entries.append(
-            {
-                "object_id": structural_object.object_id,
-                "kind": structural_object.kind,
-                "risk_level": structural_object.risk_level,
-                "status": structural_object.status,
-                "source_categories": list(structural_object.origin_categories),
-                "sources": {
-                    "framework": [item.to_dict() for item in structural_object.sources_framework],
-                    "product": [item.to_dict() for item in structural_object.sources_product],
-                    "implementation": [item.to_dict() for item in structural_object.sources_implementation],
-                },
-                "required_roles": required_roles,
-                "actual_roles": bound_roles,
-                "missing_roles": missing_roles,
-                "overbound_roles": overbound_roles,
-                "compare_status": compare_status,
-                "compare_coverage": {
-                    "extractor": structural_object.extractor,
-                    "comparator": structural_object.comparator,
-                    "expected_fingerprint": structural_object.expected_fingerprint,
-                    "actual_fingerprint": structural_object.actual_fingerprint,
-                },
-                "closure_status": closure_status,
-            }
-        )
+        entries.append(entry)
 
     return {
         "report_version": "object-coverage-report/v1",
