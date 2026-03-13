@@ -576,11 +576,11 @@
         "object_id": "message_queue"
       },
       {
-        "id": "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md",
-        "label": "L0-M0-消息队列抽象结构模块",
+        "id": "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md",
+        "label": "L0-M0-消息队列结构模块",
         "level": 4,
-        "description": "kind=framework_module_file | layer=Standards | file=framework/message_queue/L0-M0-消息队列抽象结构模块.md | locator=L0.M0 | object_id=message_queue",
-        "source_file": "framework/message_queue/L0-M0-消息队列抽象结构模块.md",
+        "description": "kind=framework_module_file | layer=Standards | file=framework/message_queue/L0-M0-消息队列结构模块.md | locator=L0.M0 | object_id=message_queue",
+        "source_file": "framework/message_queue/L0-M0-消息队列结构模块.md",
         "source_line": 1,
         "node_kind": "framework_module_file",
         "layer": "Standards",
@@ -589,11 +589,11 @@
         "locator": "L0.M0"
       },
       {
-        "id": "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md",
-        "label": "L1-M0-消息队列标准模块",
+        "id": "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md",
+        "label": "L1-M0-异步任务流水线模块",
         "level": 4,
-        "description": "kind=framework_module_file | layer=Standards | file=framework/message_queue/L1-M0-消息队列标准模块.md | locator=L1.M0 | object_id=message_queue",
-        "source_file": "framework/message_queue/L1-M0-消息队列标准模块.md",
+        "description": "kind=framework_module_file | layer=Standards | file=framework/message_queue/L1-M0-异步任务流水线模块.md | locator=L1.M0 | object_id=message_queue",
+        "source_file": "framework/message_queue/L1-M0-异步任务流水线模块.md",
         "source_line": 1,
         "node_kind": "framework_module_file",
         "layer": "Standards",
@@ -7063,12 +7063,12 @@
       },
       {
         "from": "workspace:shelf:standards:framework_modules:message_queue",
-        "to": "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md",
+        "to": "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md",
         "relation": "tree_child"
       },
       {
         "from": "workspace:shelf:standards:framework_modules:message_queue",
-        "to": "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md",
+        "to": "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md",
         "relation": "tree_child"
       },
       {
@@ -23323,11 +23323,11 @@
         "project:knowledge_base_basic:framework:module:knowledge_base.L2.M0:rule:R4",
         "standards:NODE-L2-KNOWLEDGE-BASE"
       ],
-      "framework/message_queue/L0-M0-消息队列抽象结构模块.md": [
-        "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md"
+      "framework/message_queue/L0-M0-消息队列结构模块.md": [
+        "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md"
       ],
-      "framework/message_queue/L1-M0-消息队列标准模块.md": [
-        "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md"
+      "framework/message_queue/L1-M0-异步任务流水线模块.md": [
+        "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md"
       ],
       "framework/runtime_env/L0-M0-运行环境识别模块.md": [
         "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md"
@@ -23671,8 +23671,8 @@
       "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
       "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": "workspace:shelf:standards:framework_modules:knowledge_base",
       "workspace:shelf:standards:framework_modules:message_queue": "workspace:shelf:standards:framework_modules",
-      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md": "workspace:shelf:standards:framework_modules:message_queue",
-      "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md": "workspace:shelf:standards:framework_modules:message_queue",
+      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md": "workspace:shelf:standards:framework_modules:message_queue",
+      "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md": "workspace:shelf:standards:framework_modules:message_queue",
       "workspace:shelf:standards:framework_modules:runtime_env": "workspace:shelf:standards:framework_modules",
       "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": "workspace:shelf:standards:framework_modules:runtime_env",
       "workspace:shelf:standards:framework_modules:shelf": "workspace:shelf:standards:framework_modules",
@@ -24474,8 +24474,8 @@
       "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md": [],
       "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md": [],
       "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": [],
-      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md": [],
-      "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md": [],
       "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": [],
       "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": [],
       "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": [],
@@ -24531,8 +24531,8 @@
         "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md"
       ],
       "workspace:shelf:standards:framework_modules:message_queue": [
-        "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md",
-        "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md"
+        "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md",
+        "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md"
       ],
       "workspace:shelf:standards:framework_modules:runtime_env": [
         "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md"
@@ -25459,8 +25459,8 @@
       "standards:framework_module_file:framework/knowledge_base/L0-M2-对话与引用原子模块.md": [],
       "standards:framework_module_file:framework/knowledge_base/L1-M0-知识库界面骨架模块.md": [],
       "standards:framework_module_file:framework/knowledge_base/L1-M1-知识引用上下文编排模块.md": [],
-      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列抽象结构模块.md": [],
-      "standards:framework_module_file:framework/message_queue/L1-M0-消息队列标准模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L0-M0-消息队列结构模块.md": [],
+      "standards:framework_module_file:framework/message_queue/L1-M0-异步任务流水线模块.md": [],
       "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": [],
       "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": [],
       "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": [],
