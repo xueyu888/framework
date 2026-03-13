@@ -1393,6 +1393,18 @@
         "object_id": "scripts"
       },
       {
+        "id": "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py",
+        "label": "build_framework_to_code_mapping_presentation.py",
+        "level": 3,
+        "description": "kind=workspace_code_file | layer=Workspace Code | file=scripts/build_framework_to_code_mapping_presentation.py | object_id=scripts",
+        "source_file": "scripts/build_framework_to_code_mapping_presentation.py",
+        "source_line": 1,
+        "node_kind": "workspace_code_file",
+        "layer": "Workspace Code",
+        "parent_node_id": "workspace:shelf:code:scripts",
+        "object_id": "scripts"
+      },
+      {
         "id": "workspace:code:file:scripts/build_shelf_ai_plugin_presentation.py",
         "label": "build_shelf_ai_plugin_presentation.py",
         "level": 3,
@@ -11302,6 +11314,11 @@
       {
         "from": "workspace:shelf:code",
         "to": "workspace:shelf:code:scripts",
+        "relation": "tree_child"
+      },
+      {
+        "from": "workspace:shelf:code:scripts",
+        "to": "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py",
         "relation": "tree_child"
       },
       {
@@ -33331,6 +33348,9 @@
       "scripts": [
         "workspace:shelf:code:scripts"
       ],
+      "scripts/build_framework_to_code_mapping_presentation.py": [
+        "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py"
+      ],
       "scripts/build_shelf_ai_plugin_presentation.py": [
         "workspace:code:file:scripts/build_shelf_ai_plugin_presentation.py"
       ],
@@ -34049,6 +34069,7 @@
       "workspace:code:file:src/visualization/viewer_backend.py": "workspace:shelf:code:src:dir:visualization",
       "workspace:code:file:src/workspace_governance.py": "workspace:shelf:code:src",
       "workspace:shelf:code:scripts": "workspace:shelf:code",
+      "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py": "workspace:shelf:code:scripts",
       "workspace:code:file:scripts/build_shelf_ai_plugin_presentation.py": "workspace:shelf:code:scripts",
       "workspace:code:file:scripts/generate_framework_tree_hierarchy.py": "workspace:shelf:code:scripts",
       "workspace:code:file:scripts/generate_governance_tree_hierarchy.py": "workspace:shelf:code:scripts",
@@ -35126,6 +35147,7 @@
       "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": [],
       "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": [],
       "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": [],
+      "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py": [],
       "workspace:code:file:scripts/build_shelf_ai_plugin_presentation.py": [],
       "workspace:code:file:scripts/generate_framework_tree_hierarchy.py": [],
       "workspace:code:file:scripts/generate_governance_tree_hierarchy.py": [],
@@ -35265,6 +35287,7 @@
         "workspace:shelf:code:tools:vscode:shelf-ai"
       ],
       "workspace:shelf:code:scripts": [
+        "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py",
         "workspace:code:file:scripts/build_shelf_ai_plugin_presentation.py",
         "workspace:code:file:scripts/generate_framework_tree_hierarchy.py",
         "workspace:code:file:scripts/generate_governance_tree_hierarchy.py",
@@ -36645,6 +36668,7 @@
       "standards:framework_module_file:framework/runtime_env/L0-M0-运行环境识别模块.md": [],
       "standards:framework_module_file:framework/shelf/L0-M0-置物架抽象结构模块.md": [],
       "standards:framework_module_file:framework/shelf/L1-M0-置物架装配编排模块.md": [],
+      "workspace:code:file:scripts/build_framework_to_code_mapping_presentation.py": [],
       "workspace:code:file:scripts/build_shelf_ai_plugin_presentation.py": [],
       "workspace:code:file:scripts/generate_framework_tree_hierarchy.py": [],
       "workspace:code:file:scripts/generate_governance_tree_hierarchy.py": [],
