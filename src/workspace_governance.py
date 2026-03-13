@@ -98,6 +98,83 @@ class WorkspaceGovernanceBuildContext:
         )
 
 
+@dataclass(frozen=True)
+class WorkspaceChangeIndexes:
+    file_index: dict[str, Any]
+    parent_index: dict[str, Any]
+    children_index: dict[str, Any]
+    derived_index: dict[str, Any]
+    reverse_derived_index: dict[str, Any]
+    project_index: dict[str, Any]
+    node_lookup: dict[str, dict[str, Any]]
+
+    @classmethod
+    def build(cls, payload: dict[str, Any]) -> "WorkspaceChangeIndexes":
+        governance = payload.get("governance")
+        if not isinstance(governance, dict):
+            raise ValueError("workspace governance payload missing governance object")
+        raw_file_index = governance.get("file_index")
+        raw_parent_index = governance.get("parent_index")
+        raw_children_index = governance.get("children_index")
+        raw_derived_index = governance.get("derived_index")
+        raw_reverse_derived_index = governance.get("reverse_derived_index")
+        raw_project_index = governance.get("project_index")
+        if not all(
+            isinstance(item, dict)
+            for item in (
+                raw_file_index,
+                raw_parent_index,
+                raw_children_index,
+                raw_derived_index,
+                raw_reverse_derived_index,
+                raw_project_index,
+            )
+        ):
+            raise ValueError("workspace governance payload indexes are incomplete")
+
+        root = payload.get("root")
+        if not isinstance(root, dict):
+            raise ValueError("workspace governance payload missing root object")
+        root_nodes = root.get("nodes")
+        if not isinstance(root_nodes, list):
+            raise ValueError("workspace governance payload root.nodes must be a list")
+        node_lookup = {
+            str(item.get("id") or ""): item
+            for item in root_nodes
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+
+        return cls(
+            file_index=cast(dict[str, Any], raw_file_index),
+            parent_index=cast(dict[str, Any], raw_parent_index),
+            children_index=cast(dict[str, Any], raw_children_index),
+            derived_index=cast(dict[str, Any], raw_derived_index),
+            reverse_derived_index=cast(dict[str, Any], raw_reverse_derived_index),
+            project_index=cast(dict[str, Any], raw_project_index),
+            node_lookup=node_lookup,
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceChangeResolution:
+    touched_nodes: set[str]
+    affected_nodes: set[str]
+    affected_projects: dict[str, str]
+    materialize_projects: dict[str, str]
+    run_standard_checks: bool
+    run_project_checks: bool
+
+    def to_payload_dict(self) -> dict[str, Any]:
+        return {
+            "touched_nodes": sorted(self.touched_nodes),
+            "affected_nodes": sorted(self.affected_nodes),
+            "affected_project_spec_files": sorted(self.affected_projects.values()),
+            "materialize_project_spec_files": sorted(self.materialize_projects.values()),
+            "run_standard_checks": self.run_standard_checks,
+            "run_project_checks": self.run_project_checks,
+        }
+
+
 def discover_workspace_product_spec_files(projects_dir: Path | None = None) -> list[Path]:
     root = projects_dir or (REPO_ROOT / "projects")
     return [
@@ -969,101 +1046,82 @@ def parse_workspace_governance_payload(path: Path) -> dict[str, Any]:
     return payload
 
 
-def resolve_workspace_change_context(
-    payload: dict[str, Any],
+def _collect_workspace_affected_nodes(
     changed_files: set[str],
-) -> dict[str, Any]:
-    governance = payload.get("governance")
-    if not isinstance(governance, dict):
-        raise ValueError("workspace governance payload missing governance object")
-    raw_file_index = governance.get("file_index")
-    raw_parent_index = governance.get("parent_index")
-    raw_children_index = governance.get("children_index")
-    raw_derived_index = governance.get("derived_index")
-    raw_reverse_derived_index = governance.get("reverse_derived_index")
-    raw_project_index = governance.get("project_index")
-    if not all(
-        isinstance(item, dict)
-        for item in (
-            raw_file_index,
-            raw_parent_index,
-            raw_children_index,
-            raw_derived_index,
-            raw_reverse_derived_index,
-            raw_project_index,
-        )
-    ):
-        raise ValueError("workspace governance payload indexes are incomplete")
-    file_index = cast(dict[str, Any], raw_file_index)
-    parent_index = cast(dict[str, Any], raw_parent_index)
-    children_index = cast(dict[str, Any], raw_children_index)
-    derived_index = cast(dict[str, Any], raw_derived_index)
-    reverse_derived_index = cast(dict[str, Any], raw_reverse_derived_index)
-    project_index = cast(dict[str, Any], raw_project_index)
-
+    indexes: WorkspaceChangeIndexes,
+) -> tuple[set[str], set[str]]:
     touched_nodes: set[str] = set()
     for rel_file in changed_files:
-        touched_nodes.update(str(node_id) for node_id in list(file_index.get(rel_file, [])))
+        touched_nodes.update(str(node_id) for node_id in list(indexes.file_index.get(rel_file, [])))
 
     affected_nodes: set[str] = set(touched_nodes)
     queue = list(touched_nodes)
     while queue:
         node_id = queue.pop()
-        parent = parent_index.get(node_id)
+        parent = indexes.parent_index.get(node_id)
         if isinstance(parent, str) and parent and parent not in affected_nodes:
             affected_nodes.add(parent)
             queue.append(parent)
-        for child_id in list(children_index.get(node_id, [])):
+        for child_id in list(indexes.children_index.get(node_id, [])):
             child = str(child_id)
             if child not in affected_nodes:
                 affected_nodes.add(child)
                 queue.append(child)
-        for upstream in list(derived_index.get(node_id, [])):
+        for upstream in list(indexes.derived_index.get(node_id, [])):
             upstream_id = str(upstream)
             if upstream_id not in affected_nodes:
                 affected_nodes.add(upstream_id)
                 queue.append(upstream_id)
-        for dependent in list(reverse_derived_index.get(node_id, [])):
+        for dependent in list(indexes.reverse_derived_index.get(node_id, [])):
             dependent_id = str(dependent)
             if dependent_id not in affected_nodes:
                 affected_nodes.add(dependent_id)
                 queue.append(dependent_id)
+    return touched_nodes, affected_nodes
 
+
+def _workspace_project_spec_file(
+    indexes: WorkspaceChangeIndexes,
+    project_id: str,
+) -> str:
+    project_entry = indexes.project_index.get(project_id)
+    if not isinstance(project_entry, dict):
+        return ""
+    return str(project_entry.get("product_spec_file") or "")
+
+
+def _resolve_workspace_affected_projects(
+    affected_nodes: set[str],
+    indexes: WorkspaceChangeIndexes,
+) -> tuple[dict[str, str], bool, bool]:
     affected_projects: dict[str, str] = {}
-    materialize_projects: dict[str, str] = {}
     run_standard_checks = False
     run_project_checks = False
 
-    root = payload.get("root")
-    if not isinstance(root, dict):
-        raise ValueError("workspace governance payload missing root object")
-    root_nodes = root.get("nodes")
-    if not isinstance(root_nodes, list):
-        raise ValueError("workspace governance payload root.nodes must be a list")
-    node_lookup = {
-        str(item.get("id") or ""): item
-        for item in root_nodes
-        if isinstance(item, dict) and isinstance(item.get("id"), str)
-    }
-
     for node_id in affected_nodes:
-        node = node_lookup.get(node_id)
+        node = indexes.node_lookup.get(node_id)
         if node is None:
             continue
         project_id = str(node.get("project_id") or "").strip()
         if project_id:
-            project_entry = project_index.get(project_id)
-            if not isinstance(project_entry, dict):
-                project_entry = {}
-            product_spec_file = str(project_entry.get("product_spec_file") or "")
+            product_spec_file = _workspace_project_spec_file(indexes, project_id)
             if product_spec_file:
                 affected_projects[project_id] = product_spec_file
                 run_project_checks = True
         if str(node.get("layer") or "") == "Standards":
             run_standard_checks = True
 
+    return affected_projects, run_standard_checks, run_project_checks
+
+
+def _resolve_workspace_materialize_projects(
+    touched_nodes: set[str],
+    indexes: WorkspaceChangeIndexes,
+) -> dict[str, str]:
+    materialize_projects: dict[str, str] = {}
+
     for node_id in touched_nodes:
-        node = node_lookup.get(node_id)
+        node = indexes.node_lookup.get(node_id)
         if node is None:
             continue
         layer = str(node.get("layer") or "").strip()
@@ -1071,22 +1129,34 @@ def resolve_workspace_change_context(
         if not project_id:
             continue
         if layer in {"Framework", "Product Spec", "Implementation Config"}:
-            project_entry = project_index.get(project_id)
-            if not isinstance(project_entry, dict):
-                project_entry = {}
-            product_spec_file = str(project_entry.get("product_spec_file") or "")
+            product_spec_file = _workspace_project_spec_file(indexes, project_id)
             if product_spec_file:
                 materialize_projects[project_id] = product_spec_file
 
-    for rel_file in changed_files:
-        if rel_file.startswith(("framework/", "specs/", "mapping/")):
-            run_standard_checks = True
+    return materialize_projects
 
-    return {
-        "touched_nodes": sorted(touched_nodes),
-        "affected_nodes": sorted(affected_nodes),
-        "affected_project_spec_files": sorted(affected_projects.values()),
-        "materialize_project_spec_files": sorted(materialize_projects.values()),
-        "run_standard_checks": run_standard_checks,
-        "run_project_checks": run_project_checks,
-    }
+
+def resolve_workspace_change_context(
+    payload: dict[str, Any],
+    changed_files: set[str],
+) -> dict[str, Any]:
+    indexes = WorkspaceChangeIndexes.build(payload)
+    touched_nodes, affected_nodes = _collect_workspace_affected_nodes(changed_files, indexes)
+    affected_projects, run_standard_checks, run_project_checks = _resolve_workspace_affected_projects(
+        affected_nodes,
+        indexes,
+    )
+    materialize_projects = _resolve_workspace_materialize_projects(touched_nodes, indexes)
+
+    if any(rel_file.startswith(("framework/", "specs/", "mapping/")) for rel_file in changed_files):
+        run_standard_checks = True
+
+    resolution = WorkspaceChangeResolution(
+        touched_nodes=touched_nodes,
+        affected_nodes=affected_nodes,
+        affected_projects=affected_projects,
+        materialize_projects=materialize_projects,
+        run_standard_checks=run_standard_checks,
+        run_project_checks=run_project_checks,
+    )
+    return resolution.to_payload_dict()
