@@ -489,6 +489,26 @@ class GovernanceTreeBuilder:
         return [self.nodes[node_id].to_dict() for node_id in sorted(self.nodes)]
 
 
+@dataclass(frozen=True)
+class GovernancePayloadIndexes:
+    object_index: dict[str, dict[str, Any]]
+    binding_index: dict[tuple[str, str], dict[str, Any]]
+    candidate_index: dict[str, dict[str, Any]]
+    strict_zone_index: dict[str, dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class GovernanceComparisonContext:
+    project: KnowledgeBaseProject
+    closure: ProjectGovernanceClosure
+    payload: dict[str, Any]
+    payload_code: str
+    tree_mode: bool
+    strict_zone_report: dict[str, Any]
+    object_coverage_report: dict[str, Any]
+    indexes: GovernancePayloadIndexes
+
+
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -2569,58 +2589,49 @@ def _strict_zone_index(
     return strict_zone_index, issues
 
 
-def _compare_payload_to_closure(
-    project: KnowledgeBaseProject,
+def _governance_payload_indexes(
     payload: dict[str, Any],
     *,
-    tree_mode: bool,
-) -> list[dict[str, Any]]:
-    binding_issues = _binding_governance_issues(project)
-    if binding_issues:
-        return binding_issues
-    try:
-        closure = build_governance_closure(project)
-    except Exception as exc:
-        return [
-            {
-                "code": "GOVERNANCE_PROJECT_INVALID",
-                "message": str(exc),
-                "file": _relative(project.product_spec_file),
-                "line": 1,
-            }
-        ]
+    code: str,
+) -> tuple[GovernancePayloadIndexes, list[dict[str, Any]]]:
     issues: list[dict[str, Any]] = []
-    payload_code = "GOVERNANCE_TREE_INVALID" if tree_mode else "GOVERNANCE_MANIFEST_INVALID"
-    strict_zone_report = build_strict_zone_report(closure)
-    object_coverage_report = build_object_coverage_report(closure)
-
-    object_index, object_issues = _manifest_object_index(payload, code=payload_code)
+    object_index, object_issues = _manifest_object_index(payload, code=code)
     issues.extend(object_issues)
-    binding_index, binding_issues = _role_binding_index(payload, code=payload_code)
+    binding_index, binding_issues = _role_binding_index(payload, code=code)
     issues.extend(binding_issues)
-    candidate_index, candidate_issues = _candidate_index(payload, code=payload_code)
+    candidate_index, candidate_issues = _candidate_index(payload, code=code)
     issues.extend(candidate_issues)
-    strict_zone_index, strict_zone_issues = _strict_zone_index(payload, code=payload_code)
+    strict_zone_index, strict_zone_issues = _strict_zone_index(payload, code=code)
     issues.extend(strict_zone_issues)
+    return (
+        GovernancePayloadIndexes(
+            object_index=object_index,
+            binding_index=binding_index,
+            candidate_index=candidate_index,
+            strict_zone_index=strict_zone_index,
+        ),
+        issues,
+    )
 
-    expected_artifacts = closure.evidence_artifacts
-    payload_artifacts = payload.get("evidence_artifacts", {})
+
+def _compare_evidence_artifacts(context: GovernanceComparisonContext) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    payload_artifacts = context.payload.get("evidence_artifacts", {})
     if not isinstance(payload_artifacts, dict):
         issues.append(
             {
-                "code": payload_code,
+                "code": context.payload_code,
                 "message": "evidence_artifacts payload must be an object",
                 "file": "",
                 "line": 1,
             }
         )
         payload_artifacts = {}
-
-    for artifact_key, rel_path in expected_artifacts.items():
+    for artifact_key, rel_path in context.closure.evidence_artifacts.items():
         if payload_artifacts.get(artifact_key) != rel_path:
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"evidence artifact path drifted for {artifact_key}",
                     "file": "",
                     "line": 1,
@@ -2629,27 +2640,39 @@ def _compare_payload_to_closure(
                     "actual": payload_artifacts.get(artifact_key),
                 }
             )
+    return issues
 
+
+def _compare_governance_reports(context: GovernanceComparisonContext) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
     for report_key, expected_report in (
-        ("strict_zone_report", strict_zone_report),
-        ("object_coverage_report", object_coverage_report),
+        ("strict_zone_report", context.strict_zone_report),
+        ("object_coverage_report", context.object_coverage_report),
     ):
-        payload_report = payload.get(report_key)
-        if _canonical_json(payload_report) != _canonical_json(expected_report):
+        if _canonical_json(context.payload.get(report_key)) != _canonical_json(expected_report):
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"{report_key} drifted from current governance closure",
                     "file": "",
                     "line": 1,
                     "report": report_key,
                 }
             )
+    return issues
 
-    for object_id in sorted(set(object_index) - {item.object_id for item in closure.structural_objects}):
+
+def _compare_structural_objects(context: GovernanceComparisonContext) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    object_index = context.indexes.object_index
+    binding_index = context.indexes.binding_index
+    closure = context.closure
+
+    expected_object_ids = {item.object_id for item in closure.structural_objects}
+    for object_id in sorted(set(object_index) - expected_object_ids):
         issues.append(
             {
-                "code": payload_code,
+                "code": context.payload_code,
                 "message": f"unknown structural object in governance payload: {object_id}",
                 "file": "",
                 "line": 1,
@@ -2662,7 +2685,7 @@ def _compare_payload_to_closure(
         if payload_object is None:
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"governance payload is missing structural object: {structural_object.object_id}",
                     "file": "",
                     "line": 1,
@@ -2674,7 +2697,7 @@ def _compare_payload_to_closure(
         if payload_object.get("expected_fingerprint") != structural_object.expected_fingerprint:
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"structural object expectation drifted: {structural_object.object_id}",
                     "file": "",
                     "line": 1,
@@ -2709,7 +2732,7 @@ def _compare_payload_to_closure(
             if binding is None:
                 issues.append(
                     {
-                        "code": payload_code,
+                        "code": context.payload_code,
                         "message": f"missing role binding entry: {structural_object.object_id} -> {role.role_id}",
                         "file": "",
                         "line": 1,
@@ -2729,13 +2752,18 @@ def _compare_payload_to_closure(
                         "role_id": role.role_id,
                     }
                 )
+    return issues
 
-    for strict_entry in closure.strict_zone:
+
+def _compare_strict_zone(context: GovernanceComparisonContext) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    strict_zone_index = context.indexes.strict_zone_index
+    for strict_entry in context.closure.strict_zone:
         payload_entry = strict_zone_index.get(strict_entry.file)
         if payload_entry is None:
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"missing strict zone entry: {strict_entry.file}",
                     "file": strict_entry.file,
                     "line": 1,
@@ -2745,7 +2773,7 @@ def _compare_payload_to_closure(
         if sorted(payload_entry.get("object_ids", [])) != list(strict_entry.object_ids):
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"strict zone object closure drifted for {strict_entry.file}",
                     "file": strict_entry.file,
                     "line": 1,
@@ -2754,7 +2782,7 @@ def _compare_payload_to_closure(
         if payload_entry.get("minimality_status") != strict_entry.minimality_status:
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"strict zone minimality drifted for {strict_entry.file}",
                     "file": strict_entry.file,
                     "line": 1,
@@ -2769,13 +2797,18 @@ def _compare_payload_to_closure(
                     "line": 1,
                 }
             )
+    return issues
 
-    for candidate in closure.candidates:
+
+def _compare_candidates(context: GovernanceComparisonContext) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    candidate_index = context.indexes.candidate_index
+    for candidate in context.closure.candidates:
         payload_candidate = candidate_index.get(candidate.candidate_id)
         if payload_candidate is None:
             issues.append(
                 {
-                    "code": payload_code,
+                    "code": context.payload_code,
                     "message": f"missing structural candidate entry: {candidate.candidate_id}",
                     "file": candidate.file,
                     "line": 1,
@@ -2819,45 +2852,91 @@ def _compare_payload_to_closure(
                     "candidate_id": candidate.candidate_id,
                 }
             )
+    return issues
 
+
+def _compare_tree_nodes(context: GovernanceComparisonContext) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    node_index, node_issues = _tree_node_index(context.payload)
+    issues.extend(node_issues)
+    project_id = context.project.metadata.project_id
+    for structural_object in context.closure.structural_objects:
+        object_node_id = f"project:{project_id}:structure:object:{structural_object.object_id}"
+        if object_node_id not in node_index:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree is missing structural object node: {structural_object.object_id}",
+                    "file": "",
+                    "line": 1,
+                    "object_id": structural_object.object_id,
+                }
+            )
+    for strict_entry in context.closure.strict_zone:
+        file_node_id = f"project:{project_id}:code:file:{strict_entry.file}"
+        if file_node_id not in node_index:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree is missing strict zone file node: {strict_entry.file}",
+                    "file": strict_entry.file,
+                    "line": 1,
+                }
+            )
+    for artifact_key in context.closure.evidence_artifacts:
+        node_id = f"project:{project_id}:evidence:artifact:{artifact_key}"
+        if node_id not in node_index:
+            issues.append(
+                {
+                    "code": "GOVERNANCE_TREE_INVALID",
+                    "message": f"governance tree is missing evidence artifact node: {artifact_key}",
+                    "file": "",
+                    "line": 1,
+                    "artifact": artifact_key,
+                }
+            )
+    return issues
+
+
+def _compare_payload_to_closure(
+    project: KnowledgeBaseProject,
+    payload: dict[str, Any],
+    *,
+    tree_mode: bool,
+) -> list[dict[str, Any]]:
+    binding_issues = _binding_governance_issues(project)
+    if binding_issues:
+        return binding_issues
+    try:
+        closure = build_governance_closure(project)
+    except Exception as exc:
+        return [
+            {
+                "code": "GOVERNANCE_PROJECT_INVALID",
+                "message": str(exc),
+                "file": _relative(project.product_spec_file),
+                "line": 1,
+            }
+        ]
+    payload_code = "GOVERNANCE_TREE_INVALID" if tree_mode else "GOVERNANCE_MANIFEST_INVALID"
+    indexes, issues = _governance_payload_indexes(payload, code=payload_code)
+    context = GovernanceComparisonContext(
+        project=project,
+        closure=closure,
+        payload=payload,
+        payload_code=payload_code,
+        tree_mode=tree_mode,
+        strict_zone_report=build_strict_zone_report(closure),
+        object_coverage_report=build_object_coverage_report(closure),
+        indexes=indexes,
+    )
+    issues.extend(_compare_evidence_artifacts(context))
+    issues.extend(_compare_governance_reports(context))
+    issues.extend(_compare_structural_objects(context))
+    issues.extend(_compare_strict_zone(context))
+    issues.extend(_compare_candidates(context))
     if tree_mode:
-        node_index, node_issues = _tree_node_index(payload)
-        issues.extend(node_issues)
-        for structural_object in closure.structural_objects:
-            object_node_id = f"project:{project.metadata.project_id}:structure:object:{structural_object.object_id}"
-            if object_node_id not in node_index:
-                issues.append(
-                    {
-                        "code": "GOVERNANCE_TREE_INVALID",
-                        "message": f"governance tree is missing structural object node: {structural_object.object_id}",
-                        "file": "",
-                        "line": 1,
-                        "object_id": structural_object.object_id,
-                    }
-                )
-        for strict_entry in closure.strict_zone:
-            file_node_id = f"project:{project.metadata.project_id}:code:file:{strict_entry.file}"
-            if file_node_id not in node_index:
-                issues.append(
-                    {
-                        "code": "GOVERNANCE_TREE_INVALID",
-                        "message": f"governance tree is missing strict zone file node: {strict_entry.file}",
-                        "file": strict_entry.file,
-                        "line": 1,
-                    }
-                )
-        for artifact_key in expected_artifacts:
-            node_id = f"project:{project.metadata.project_id}:evidence:artifact:{artifact_key}"
-            if node_id not in node_index:
-                issues.append(
-                    {
-                        "code": "GOVERNANCE_TREE_INVALID",
-                        "message": f"governance tree is missing evidence artifact node: {artifact_key}",
-                        "file": "",
-                        "line": 1,
-                        "artifact": artifact_key,
-                    }
-                )
+        issues.extend(_compare_tree_nodes(context))
     return issues
 
 

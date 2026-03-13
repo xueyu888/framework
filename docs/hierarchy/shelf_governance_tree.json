@@ -3798,6 +3798,60 @@
         "audit_classification": null
       },
       {
+        "id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "label": "class:GovernanceComparisonContext",
+        "level": 5,
+        "description": "kind=structural_candidate | layer=Code | project_id=knowledge_base_basic | file=src/project_runtime/governance.py | locator=class:GovernanceComparisonContext | object_id=kb.answer.behavior | candidate_id=knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "source_file": "src/project_runtime/governance.py",
+        "source_line": 1,
+        "node_kind": "structural_candidate",
+        "layer": "Code",
+        "project_id": "knowledge_base_basic",
+        "project_product_spec_file": "projects/knowledge_base_basic/product_spec.toml",
+        "parent_node_id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+        "derived_from": [
+          "project:knowledge_base_basic:structure:object:kb.answer.behavior"
+        ],
+        "owner": null,
+        "artifact": null,
+        "symbol_id": null,
+        "object_id": "kb.answer.behavior",
+        "role_id": null,
+        "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "symbol_kind": null,
+        "risk": null,
+        "validator": null,
+        "minimality_status": null,
+        "audit_classification": null
+      },
+      {
+        "id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
+        "label": "class:GovernancePayloadIndexes",
+        "level": 5,
+        "description": "kind=structural_candidate | layer=Code | project_id=knowledge_base_basic | file=src/project_runtime/governance.py | locator=class:GovernancePayloadIndexes | object_id=kb.answer.behavior | candidate_id=knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
+        "source_file": "src/project_runtime/governance.py",
+        "source_line": 1,
+        "node_kind": "structural_candidate",
+        "layer": "Code",
+        "project_id": "knowledge_base_basic",
+        "project_product_spec_file": "projects/knowledge_base_basic/product_spec.toml",
+        "parent_node_id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+        "derived_from": [
+          "project:knowledge_base_basic:structure:object:kb.answer.behavior"
+        ],
+        "owner": null,
+        "artifact": null,
+        "symbol_id": null,
+        "object_id": "kb.answer.behavior",
+        "role_id": null,
+        "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
+        "symbol_kind": null,
+        "risk": null,
+        "validator": null,
+        "minimality_status": null,
+        "audit_classification": null
+      },
+      {
         "id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
         "label": "class:GovernanceSnapshotSymbol",
         "level": 5,
@@ -4257,10 +4311,10 @@
         "audit_classification": null
       },
       {
-        "id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
-        "label": "function:_compare_payload_to_closure",
+        "id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
+        "label": "function:_compare_tree_nodes",
         "level": 5,
-        "description": "kind=structural_candidate | layer=Code | project_id=knowledge_base_basic | file=src/project_runtime/governance.py | locator=function:_compare_payload_to_closure | object_id=kb.answer.behavior | candidate_id=knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+        "description": "kind=structural_candidate | layer=Code | project_id=knowledge_base_basic | file=src/project_runtime/governance.py | locator=function:_compare_tree_nodes | object_id=kb.answer.behavior | candidate_id=knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
         "source_file": "src/project_runtime/governance.py",
         "source_line": 1,
         "node_kind": "structural_candidate",
@@ -4276,7 +4330,7 @@
         "symbol_id": null,
         "object_id": "kb.answer.behavior",
         "role_id": null,
-        "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+        "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
         "symbol_kind": null,
         "risk": null,
         "validator": null,
@@ -11312,6 +11366,16 @@
       },
       {
         "from": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+        "to": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "relation": "tree_child"
+      },
+      {
+        "from": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+        "to": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
+        "relation": "tree_child"
+      },
+      {
+        "from": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
         "to": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
         "relation": "tree_child"
       },
@@ -11397,7 +11461,7 @@
       },
       {
         "from": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
-        "to": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+        "to": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
         "relation": "tree_child"
       },
       {
@@ -12970,6 +13034,8 @@
             ],
             "candidate_ids": [
               "knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+              "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+              "knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
               "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
               "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
               "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -12987,7 +13053,7 @@
               "knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract",
               "knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
               "knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-              "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+              "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
               "knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
               "knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior",
               "knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract",
@@ -13562,6 +13628,8 @@
               ],
               "candidate_ids": [
                 "knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+                "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+                "knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
                 "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
                 "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
                 "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -13579,7 +13647,7 @@
                 "knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract",
                 "knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
                 "knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-                "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+                "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
                 "knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
                 "knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior",
                 "knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract",
@@ -13855,7 +13923,7 @@
             "fully_closed_object_count": 23,
             "partially_closed_object_count": 0,
             "governed_candidate_count": 24,
-            "attached_candidate_count": 93,
+            "attached_candidate_count": 95,
             "internal_candidate_count": 0,
             "uncovered_future_categories": [
               "compiler/evidence builders that are still attached-only",
@@ -21463,6 +21531,34 @@
             "role_ids": []
           },
           {
+            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+            "project_id": "knowledge_base_basic",
+            "file": "src/project_runtime/governance.py",
+            "locator": "class:GovernanceComparisonContext",
+            "kind": "python_schema_carrier",
+            "confidence": 0.96,
+            "reasons": [
+              "class carries request/response/spec schema surface"
+            ],
+            "classification": "attached",
+            "object_id": "kb.answer.behavior",
+            "role_ids": []
+          },
+          {
+            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
+            "project_id": "knowledge_base_basic",
+            "file": "src/project_runtime/governance.py",
+            "locator": "class:GovernancePayloadIndexes",
+            "kind": "python_schema_carrier",
+            "confidence": 0.96,
+            "reasons": [
+              "class carries request/response/spec schema surface"
+            ],
+            "classification": "attached",
+            "object_id": "kb.answer.behavior",
+            "role_ids": []
+          },
+          {
             "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
             "project_id": "knowledge_base_basic",
             "file": "src/project_runtime/governance.py",
@@ -21718,10 +21814,10 @@
             "role_ids": []
           },
           {
-            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
             "project_id": "knowledge_base_basic",
             "file": "src/project_runtime/governance.py",
-            "locator": "function:_compare_payload_to_closure",
+            "locator": "function:_compare_tree_nodes",
             "kind": "python_evidence_builder",
             "confidence": 0.84,
             "reasons": [
@@ -23953,6 +24049,8 @@
             "parent": "project:knowledge_base_basic:code",
             "children": [
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+              "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+              "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -23970,7 +24068,7 @@
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-              "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+              "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior",
               "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract",
@@ -24100,6 +24198,52 @@
             "file": "src/project_runtime/governance.py",
             "locator": "class:GeneratedArtifactPaths",
             "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+            "candidate_kind": "python_schema_carrier",
+            "confidence": 0.96,
+            "classification": "attached",
+            "object_id": "kb.answer.behavior",
+            "role_ids": [],
+            "reasons": [
+              "class carries request/response/spec schema surface"
+            ],
+            "derived_from": [
+              "project:knowledge_base_basic:structure:object:kb.answer.behavior"
+            ],
+            "project_id": "knowledge_base_basic"
+          },
+          {
+            "node_id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+            "parent": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+            "children": [],
+            "kind": "structural_candidate",
+            "layer": "Code",
+            "title": "class:GovernanceComparisonContext",
+            "file": "src/project_runtime/governance.py",
+            "locator": "class:GovernanceComparisonContext",
+            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+            "candidate_kind": "python_schema_carrier",
+            "confidence": 0.96,
+            "classification": "attached",
+            "object_id": "kb.answer.behavior",
+            "role_ids": [],
+            "reasons": [
+              "class carries request/response/spec schema surface"
+            ],
+            "derived_from": [
+              "project:knowledge_base_basic:structure:object:kb.answer.behavior"
+            ],
+            "project_id": "knowledge_base_basic"
+          },
+          {
+            "node_id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
+            "parent": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+            "children": [],
+            "kind": "structural_candidate",
+            "layer": "Code",
+            "title": "class:GovernancePayloadIndexes",
+            "file": "src/project_runtime/governance.py",
+            "locator": "class:GovernancePayloadIndexes",
+            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
             "candidate_kind": "python_schema_carrier",
             "confidence": 0.96,
             "classification": "attached",
@@ -24522,15 +24666,15 @@
             "project_id": "knowledge_base_basic"
           },
           {
-            "node_id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+            "node_id": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
             "parent": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
             "children": [],
             "kind": "structural_candidate",
             "layer": "Code",
-            "title": "function:_compare_payload_to_closure",
+            "title": "function:_compare_tree_nodes",
             "file": "src/project_runtime/governance.py",
-            "locator": "function:_compare_payload_to_closure",
-            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+            "locator": "function:_compare_tree_nodes",
+            "candidate_id": "knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
             "candidate_kind": "python_evidence_builder",
             "confidence": 0.84,
             "classification": "attached",
@@ -31869,6 +32013,8 @@
       "src/project_runtime/governance.py": [
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -31886,7 +32032,7 @@
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract",
@@ -32421,6 +32567,8 @@
       "project:knowledge_base_basic:code:file:src/knowledge_base_runtime/backend.py:candidate:knowledge_base_basic:src/knowledge_base_runtime/backend.py:function:list_tags": "project:knowledge_base_basic:code:file:src/knowledge_base_runtime/backend.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py": "project:knowledge_base_basic:code",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
@@ -32438,7 +32586,7 @@
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
-      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract": "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
@@ -32759,6 +32907,8 @@
       "project:knowledge_base_basic:code:file:src/knowledge_base_runtime/backend.py:candidate:knowledge_base_basic:src/knowledge_base_runtime/backend.py:function:list_tags": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py": [
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -32776,7 +32926,7 @@
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract",
@@ -32799,6 +32949,8 @@
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:validate_tree_closure"
       ],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths": [],
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext": [],
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord": [],
@@ -32816,7 +32968,7 @@
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json": [],
-      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure": [],
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior": [],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract": [],
@@ -33824,6 +33976,12 @@
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths": [
         "project:knowledge_base_basic:structure:object:kb.answer.behavior"
       ],
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext": [
+        "project:knowledge_base_basic:structure:object:kb.answer.behavior"
+      ],
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes": [
+        "project:knowledge_base_basic:structure:object:kb.answer.behavior"
+      ],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol": [
         "project:knowledge_base_basic:structure:object:kb.answer.behavior"
       ],
@@ -33875,7 +34033,7 @@
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json": [
         "project:knowledge_base_basic:structure:object:kb.answer.behavior"
       ],
-      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure": [
+      "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes": [
         "project:knowledge_base_basic:structure:object:kb.answer.behavior"
       ],
       "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles": [
@@ -35059,6 +35217,8 @@
         "project:knowledge_base_basic:code:file:src/knowledge_base_runtime/backend.py:candidate:knowledge_base_basic:src/knowledge_base_runtime/backend.py:class:RankedSection",
         "project:knowledge_base_basic:code:file:src/knowledge_base_runtime/backend.py:candidate:knowledge_base_basic:src/knowledge_base_runtime/backend.py:function:_to_document_detail",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -35068,7 +35228,7 @@
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:UpstreamRef",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+        "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_generated_artifact_paths",
         "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_project_record_for",
@@ -35744,6 +35904,8 @@
           "project:knowledge_base_basic:code:file:src/knowledge_base_runtime/backend.py:candidate:knowledge_base_basic:src/knowledge_base_runtime/backend.py:function:list_tags",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GeneratedArtifactPaths",
+          "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceComparisonContext",
+          "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernancePayloadIndexes",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceSnapshotSymbol",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeBuilder",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:class:GovernanceTreeNodeRecord",
@@ -35761,7 +35923,7 @@
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_actual_workbench_surface_contract",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_build_governance_snapshot",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_canonical_json",
-          "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_payload_to_closure",
+          "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_compare_tree_nodes",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_effect_sink_roles",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_answer_behavior",
           "project:knowledge_base_basic:code:file:src/project_runtime/governance.py:candidate:knowledge_base_basic:src/project_runtime/governance.py:function:_expected_api_chat_contract",
