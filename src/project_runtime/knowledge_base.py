@@ -730,6 +730,79 @@ class GeneratedArtifactPayloads:
 
 
 @dataclass(frozen=True)
+class GovernanceArtifactPayloads:
+    closure: Any
+    manifest_payload: dict[str, Any]
+    tree_payload: dict[str, Any]
+    strict_zone_report_payload: dict[str, Any]
+    object_coverage_report_payload: dict[str, Any]
+
+    @classmethod
+    def from_project(cls, project: "KnowledgeBaseProject") -> "GovernanceArtifactPayloads":
+        closure = build_governance_closure(project)
+        return cls(
+            closure=closure,
+            manifest_payload=build_governance_manifest(project),
+            tree_payload=build_governance_tree(project),
+            strict_zone_report_payload=build_strict_zone_report(closure),
+            object_coverage_report_payload=build_object_coverage_report(closure),
+        )
+
+    def governance_manifest_text(self) -> str:
+        return json.dumps(self.manifest_payload, ensure_ascii=False, indent=2)
+
+    def governance_tree_text(self) -> str:
+        return json.dumps(self.tree_payload, ensure_ascii=False, indent=2)
+
+    def strict_zone_report_text(self) -> str:
+        return json.dumps(self.strict_zone_report_payload, ensure_ascii=False, indent=2)
+
+    def object_coverage_report_text(self) -> str:
+        return json.dumps(self.object_coverage_report_payload, ensure_ascii=False, indent=2)
+
+
+@dataclass(frozen=True)
+class GeneratedArtifactBuildContext:
+    product_spec: dict[str, Any]
+    runtime_bundle: dict[str, Any]
+    configuration_effect_payload: dict[str, dict[str, Any]]
+    framework_ir_text: str
+    product_spec_text: str
+    implementation_bundle_text: str
+    governance: GovernanceArtifactPayloads
+
+    @classmethod
+    def from_project(cls, project: "KnowledgeBaseProject") -> "GeneratedArtifactBuildContext":
+        product_spec = project.to_product_spec_dict()
+        runtime_bundle = project.to_runtime_bundle_dict()
+        return cls(
+            product_spec=product_spec,
+            runtime_bundle=runtime_bundle,
+            configuration_effect_payload=_implementation_effect_payload(project),
+            framework_ir_text=_build_framework_ir_text(project),
+            product_spec_text=json.dumps(product_spec, ensure_ascii=False, indent=2),
+            implementation_bundle_text=_build_implementation_bundle_text(
+                project,
+                product_spec=product_spec,
+                runtime_bundle=runtime_bundle,
+            ),
+            governance=GovernanceArtifactPayloads.from_project(project),
+        )
+
+    def to_artifact_payloads(self) -> GeneratedArtifactPayloads:
+        return GeneratedArtifactPayloads(
+            framework_ir_json=self.framework_ir_text,
+            product_spec_json=self.product_spec_text,
+            implementation_bundle_py=self.implementation_bundle_text,
+            generation_manifest_json="",
+            governance_manifest_json=self.governance.governance_manifest_text(),
+            governance_tree_json=self.governance.governance_tree_text(),
+            strict_zone_report_json=self.governance.strict_zone_report_text(),
+            object_coverage_report_json=self.governance.object_coverage_report_text(),
+        )
+
+
+@dataclass(frozen=True)
 class ImplementationEffectEntry:
     value: Any
     relation: str
@@ -916,6 +989,21 @@ class KnowledgeBaseProject:
             },
             "generated_artifacts": self.generated_artifacts.to_dict() if self.generated_artifacts else None,
         }
+
+
+@dataclass(frozen=True)
+class UiSpecPaths:
+    knowledge_base_detail_path: str
+    document_detail_path: str
+    basketball_showcase_path: str
+
+    @classmethod
+    def from_project(cls, project: KnowledgeBaseProject) -> "UiSpecPaths":
+        return cls(
+            knowledge_base_detail_path=f"{project.route.knowledge_detail}/{{knowledge_base_id}}",
+            document_detail_path=f"{project.route.document_detail_prefix}/{{document_id}}",
+            basketball_showcase_path=project.route.basketball_showcase,
+        )
 
 
 def _effective_generated_artifacts(project: KnowledgeBaseProject) -> GeneratedArtifactPaths:
@@ -1463,34 +1551,194 @@ def _derive_copy(
     }
 
 
+def _ui_derived_from(project: KnowledgeBaseProject) -> dict[str, Any]:
+    return {
+        "framework_modules": {
+            "frontend": project.frontend_ir.module_id,
+            "domain": project.domain_ir.module_id,
+        },
+        "boundary_sections": {
+            "SURFACE": "surface",
+            "VISUAL": "visual",
+            "ROUTE": "route",
+            "A11Y": "a11y",
+            "LIBRARY": "library",
+            "PREVIEW": "preview",
+            "CHAT": "chat",
+            "CONTEXT": "context",
+            "RETURN": "return",
+        },
+        "rule_drivers": {
+            "frontend": [item.rule_id for item in project.frontend_ir.rules],
+            "domain": [item.rule_id for item in project.domain_ir.rules],
+        },
+    }
+
+
+def _ui_pages(
+    project: KnowledgeBaseProject,
+    paths: UiSpecPaths,
+    contract: KnowledgeBaseTemplateContract,
+) -> dict[str, Any]:
+    return {
+        "chat_home": {
+            "path": project.route.workbench,
+            "title": project.metadata.display_name,
+            "slots": list(contract.chat_home_slots),
+            "entry_state": "welcome_prompts",
+        },
+        "basketball_showcase": {
+            "path": paths.basketball_showcase_path,
+            "title": project.showcase_page.title,
+            "kicker": project.showcase_page.kicker,
+            "headline": project.showcase_page.headline,
+            "intro": project.showcase_page.intro,
+            "back_to_chat_label": project.showcase_page.back_to_chat_label,
+            "browse_knowledge_label": project.showcase_page.browse_knowledge_label,
+            "slots": ["aux_sidebar", "page_header", "showcase_stage"],
+        },
+        "knowledge_list": {
+            "path": project.route.knowledge_list,
+            "title": project.surface.copy.library_title,
+            "subtitle": "聊天是主入口，知识库页用于切换上下文和确认可用来源。",
+            "primary_action_label": "返回聊天",
+            "rationale_title": "为什么这页是二级入口",
+            "rationale_copy": (
+                "主界面保持 ChatGPT 风格：左侧历史会话，中央聊天区，底部输入框。"
+                "知识库管理和文档浏览退到二级页面，只在需要验证来源时展开。"
+            ),
+            "chat_action_label": "用此知识库开始聊天",
+            "detail_action_label": "查看知识库详情",
+            "slots": ["aux_sidebar", "page_header", "knowledge_cards"],
+        },
+        "knowledge_detail": {
+            "path": paths.knowledge_base_detail_path,
+            "chat_action_label": "用此知识库开始聊天",
+            "overview_title": "知识库概况",
+            "return_chat_with_document_label": "回到聊天并聚焦此文档",
+            "document_detail_action_label": "查看文档详情",
+            "slots": ["aux_sidebar", "page_header", "document_cards"],
+        },
+        "document_detail": {
+            "path": paths.document_detail_path,
+            "title": "文档详情",
+            "subtitle": "从引用抽屉进入完整文档上下文，再返回聊天继续提问。",
+            "return_chat_label": "返回聊天",
+            "return_knowledge_detail_label": "返回知识库详情",
+            "slots": ["aux_sidebar", "page_header", "document_sections"],
+        },
+    }
+
+
+def _ui_components(
+    project: KnowledgeBaseProject,
+    contract: KnowledgeBaseTemplateContract,
+) -> dict[str, Any]:
+    return {
+        "conversation_sidebar": {
+            "title": "历史会话",
+            "actions": ["start_new_chat", "select_session", "open_knowledge_switch"],
+            "new_chat_label": "新建聊天",
+            "browse_knowledge_label": "浏览知识库与文档",
+            "basketball_showcase_label": project.showcase_page.title,
+            "knowledge_entry_label": f"知识库 · {project.library.knowledge_base_name}",
+        },
+        "aux_sidebar": {
+            "nav": {
+                "chat": "返回聊天",
+                "basketball_showcase": project.showcase_page.title,
+                "knowledge_list": "知识库列表",
+                "knowledge_detail": "当前知识库详情",
+            },
+            "note": "辅助页面负责知识库浏览、来源验证与文档追溯，不抢占聊天主舞台。",
+        },
+        "chat_header": {
+            "title_source": "conversation.title",
+            "subtitle_template": "知识库 · {knowledge_base_name}",
+            "knowledge_badge_template": "基于：{knowledge_base_name}",
+            "knowledge_entry_link_label": "知识库入口",
+            "showcase_link_label": project.showcase_page.title,
+        },
+        "message_stream": {
+            "max_width": project.visual_tokens["message_width"],
+            "roles": ["user", "assistant"],
+            "role_labels": {"user": "You", "assistant": "Assistant"},
+            "assistant_actions": ["copy_answer"],
+            "copy_action_label": "复制回答",
+            "copy_failure_message": "复制失败，请手动复制。",
+            "loading_label": "正在检索知识库并整理回答…",
+            "summary_template": "参考了 {count} 个来源",
+            "citation_style": project.chat.citation_style,
+        },
+        "chat_composer": {
+            "placeholder": project.chat.placeholder,
+            "submit_label": "发送",
+            "context_template": "当前上下文：{context_label}",
+            "citation_hint": "引用默认轻量展示，点击后打开来源抽屉",
+            "mode_label": "知识问答",
+            "knowledge_link_label": "查看知识库",
+            "showcase_link_label": project.showcase_page.title,
+        },
+        "citation_drawer": {
+            "title": project.copy["preview_title"],
+            "close_aria_label": "Close citation drawer",
+            "tab_variant": "numbered",
+            "sections": list(contract.drawer_sections),
+            "section_label": "章节",
+            "snippet_title": "命中片段",
+            "source_context_title": "来源上下文",
+            "empty_context_text": "暂无来源上下文。",
+            "load_failure_text": "无法加载来源片段。",
+            "document_link_label": "打开文档详情",
+            "return_targets": list(project.return_config.targets),
+        },
+        "knowledge_switch_dialog": {
+            "title": "切换知识库",
+            "description": "默认保持 ChatGPT 风格聊天界面，知识库切换只在需要时展开。",
+            "close_aria_label": "Close knowledge dialog",
+            "select_action_label": "使用此知识库",
+            "detail_action_label": "查看详情",
+            "card_actions": ["select", "open_knowledge_detail"],
+        },
+    }
+
+
+def _ui_conversation(project: KnowledgeBaseProject) -> dict[str, Any]:
+    return {
+        "default_title": "新建聊天",
+        "relative_groups": {
+            "today": "今天",
+            "last_7_days": "7 天内",
+            "last_30_days": "30 天内",
+            "older": "更早",
+        },
+        "welcome_kicker": project.surface.copy.chat_title,
+        "welcome_title": "今天想了解什么？",
+        "welcome_copy": project.chat.welcome,
+        "welcome_prompts": list(project.chat.welcome_prompts),
+        "current_knowledge_base_template": "当前知识库：{knowledge_base_name}",
+    }
+
+
+def _ui_citation(
+    project: KnowledgeBaseProject,
+    paths: UiSpecPaths,
+    contract: KnowledgeBaseTemplateContract,
+) -> dict[str, Any]:
+    return {
+        "style": project.chat.citation_style,
+        "summary_variant": project.return_config.citation_card_variant,
+        "drawer_sections": list(contract.drawer_sections),
+        "document_detail_path": paths.document_detail_path,
+    }
+
+
 # @governed_symbol id=kb.ui.surface_spec owner=framework kind=ui_surface risk=high
 def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     contract = project.template_contract
-    knowledge_base_detail_path = f"{project.route.knowledge_detail}/{{knowledge_base_id}}"
-    document_detail_path = f"{project.route.document_detail_prefix}/{{document_id}}"
-    basketball_showcase_path = project.route.basketball_showcase
+    paths = UiSpecPaths.from_project(project)
     return {
-        "derived_from": {
-            "framework_modules": {
-                "frontend": project.frontend_ir.module_id,
-                "domain": project.domain_ir.module_id,
-            },
-            "boundary_sections": {
-                "SURFACE": "surface",
-                "VISUAL": "visual",
-                "ROUTE": "route",
-                "A11Y": "a11y",
-                "LIBRARY": "library",
-                "PREVIEW": "preview",
-                "CHAT": "chat",
-                "CONTEXT": "context",
-                "RETURN": "return",
-            },
-            "rule_drivers": {
-                "frontend": [item.rule_id for item in project.frontend_ir.rules],
-                "domain": [item.rule_id for item in project.domain_ir.rules],
-            },
-        },
+        "derived_from": _ui_derived_from(project),
         "implementation": {
             "frontend_renderer": project.implementation.frontend.renderer,
             "style_profile": project.implementation.frontend.style_profile,
@@ -1509,165 +1757,61 @@ def _build_ui_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
             "theme": project.visual.to_dict(),
             "tokens": project.visual_tokens,
         },
-        "pages": {
-            "chat_home": {
-                "path": project.route.workbench,
-                "title": project.metadata.display_name,
-                "slots": list(contract.chat_home_slots),
-                "entry_state": "welcome_prompts",
-            },
-            "basketball_showcase": {
-                "path": basketball_showcase_path,
-                "title": project.showcase_page.title,
-                "kicker": project.showcase_page.kicker,
-                "headline": project.showcase_page.headline,
-                "intro": project.showcase_page.intro,
-                "back_to_chat_label": project.showcase_page.back_to_chat_label,
-                "browse_knowledge_label": project.showcase_page.browse_knowledge_label,
-                "slots": ["aux_sidebar", "page_header", "showcase_stage"],
-            },
-            "knowledge_list": {
-                "path": project.route.knowledge_list,
-                "title": project.surface.copy.library_title,
-                "subtitle": "聊天是主入口，知识库页用于切换上下文和确认可用来源。",
-                "primary_action_label": "返回聊天",
-                "rationale_title": "为什么这页是二级入口",
-                "rationale_copy": (
-                    "主界面保持 ChatGPT 风格：左侧历史会话，中央聊天区，底部输入框。"
-                    "知识库管理和文档浏览退到二级页面，只在需要验证来源时展开。"
-                ),
-                "chat_action_label": "用此知识库开始聊天",
-                "detail_action_label": "查看知识库详情",
-                "slots": ["aux_sidebar", "page_header", "knowledge_cards"],
-            },
-            "knowledge_detail": {
-                "path": knowledge_base_detail_path,
-                "chat_action_label": "用此知识库开始聊天",
-                "overview_title": "知识库概况",
-                "return_chat_with_document_label": "回到聊天并聚焦此文档",
-                "document_detail_action_label": "查看文档详情",
-                "slots": ["aux_sidebar", "page_header", "document_cards"],
-            },
-            "document_detail": {
-                "path": document_detail_path,
-                "title": "文档详情",
-                "subtitle": "从引用抽屉进入完整文档上下文，再返回聊天继续提问。",
-                "return_chat_label": "返回聊天",
-                "return_knowledge_detail_label": "返回知识库详情",
-                "slots": ["aux_sidebar", "page_header", "document_sections"],
-            },
+        "pages": _ui_pages(project, paths, contract),
+        "components": _ui_components(project, contract),
+        "conversation": _ui_conversation(project),
+        "citation": _ui_citation(project, paths, contract),
+    }
+
+def _backend_derived_from(project: KnowledgeBaseProject) -> dict[str, Any]:
+    return {
+        "framework_modules": {
+            "domain": project.domain_ir.module_id,
+            "backend": project.backend_ir.module_id,
         },
-        "components": {
-            "conversation_sidebar": {
-                "title": "历史会话",
-                "actions": ["start_new_chat", "select_session", "open_knowledge_switch"],
-                "new_chat_label": "新建聊天",
-                "browse_knowledge_label": "浏览知识库与文档",
-                "basketball_showcase_label": project.showcase_page.title,
-                "knowledge_entry_label": f"知识库 · {project.library.knowledge_base_name}",
-            },
-            "aux_sidebar": {
-                "nav": {
-                    "chat": "返回聊天",
-                    "basketball_showcase": project.showcase_page.title,
-                    "knowledge_list": "知识库列表",
-                    "knowledge_detail": "当前知识库详情",
-                },
-                "note": "辅助页面负责知识库浏览、来源验证与文档追溯，不抢占聊天主舞台。",
-            },
-            "chat_header": {
-                "title_source": "conversation.title",
-                "subtitle_template": "知识库 · {knowledge_base_name}",
-                "knowledge_badge_template": "基于：{knowledge_base_name}",
-                "knowledge_entry_link_label": "知识库入口",
-                "showcase_link_label": project.showcase_page.title,
-            },
-            "message_stream": {
-                "max_width": project.visual_tokens["message_width"],
-                "roles": ["user", "assistant"],
-                "role_labels": {"user": "You", "assistant": "Assistant"},
-                "assistant_actions": ["copy_answer"],
-                "copy_action_label": "复制回答",
-                "copy_failure_message": "复制失败，请手动复制。",
-                "loading_label": "正在检索知识库并整理回答…",
-                "summary_template": "参考了 {count} 个来源",
-                "citation_style": project.chat.citation_style,
-            },
-            "chat_composer": {
-                "placeholder": project.chat.placeholder,
-                "submit_label": "发送",
-                "context_template": "当前上下文：{context_label}",
-                "citation_hint": "引用默认轻量展示，点击后打开来源抽屉",
-                "mode_label": "知识问答",
-                "knowledge_link_label": "查看知识库",
-                "showcase_link_label": project.showcase_page.title,
-            },
-            "citation_drawer": {
-                "title": project.copy["preview_title"],
-                "close_aria_label": "Close citation drawer",
-                "tab_variant": "numbered",
-                "sections": list(contract.drawer_sections),
-                "section_label": "章节",
-                "snippet_title": "命中片段",
-                "source_context_title": "来源上下文",
-                "empty_context_text": "暂无来源上下文。",
-                "load_failure_text": "无法加载来源片段。",
-                "document_link_label": "打开文档详情",
-                "return_targets": list(project.return_config.targets),
-            },
-            "knowledge_switch_dialog": {
-                "title": "切换知识库",
-                "description": "默认保持 ChatGPT 风格聊天界面，知识库切换只在需要时展开。",
-                "close_aria_label": "Close knowledge dialog",
-                "select_action_label": "使用此知识库",
-                "detail_action_label": "查看详情",
-                "card_actions": ["select", "open_knowledge_detail"],
-            },
+        "boundary_sections": {
+            "LIBRARY": "library",
+            "PREVIEW": "preview",
+            "CHAT": "chat",
+            "CONTEXT": "context",
+            "RETURN": "return",
         },
-        "conversation": {
-            "default_title": "新建聊天",
-            "relative_groups": {
-                "today": "今天",
-                "last_7_days": "7 天内",
-                "last_30_days": "30 天内",
-                "older": "更早",
-            },
-            "welcome_kicker": project.surface.copy.chat_title,
-            "welcome_title": "今天想了解什么？",
-            "welcome_copy": project.chat.welcome,
-            "welcome_prompts": list(project.chat.welcome_prompts),
-            "current_knowledge_base_template": "当前知识库：{knowledge_base_name}",
+        "rule_drivers": {
+            "domain": [item.rule_id for item in project.domain_ir.rules],
+            "backend": [item.rule_id for item in project.backend_ir.rules],
         },
-        "citation": {
-            "style": project.chat.citation_style,
-            "summary_variant": project.return_config.citation_card_variant,
-            "drawer_sections": list(contract.drawer_sections),
-            "document_detail_path": document_detail_path,
-        },
+    }
+
+
+def _backend_answer_policy(project: KnowledgeBaseProject) -> dict[str, Any]:
+    return {
+        "citation_style": project.chat.citation_style,
+        "no_match_text": (
+            "当前知识库里没有找到足够相关的证据。你可以换一种问法，或者先浏览知识库与文档详情页确认可用来源。"
+        ),
+        "lead_template": "根据当前知识库，最相关的证据来自《{document_title}》的“{section_title}”。[{citation_index}]",
+        "lead_snippet_template": "该片段指出：{snippet}",
+        "followup_template": "补充来源还包括《{document_title}》的“{section_title}”。[{citation_index}] {snippet}",
+        "closing_text": "点击文中引用可打开来源抽屉，并继续进入文档详情页查看完整上下文。",
+    }
+
+
+def _backend_return_policy(project: KnowledgeBaseProject, paths: UiSpecPaths) -> dict[str, Any]:
+    return {
+        "targets": list(project.return_config.targets),
+        "anchor_restore": project.return_config.anchor_restore,
+        "chat_path": project.route.workbench,
+        "knowledge_base_detail_path": paths.knowledge_base_detail_path,
+        "document_detail_path": paths.document_detail_path,
     }
 
 
 # @governed_symbol id=kb.backend.surface_spec owner=implementation_config kind=backend_surface risk=high
 def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
     contract = project.template_contract
+    paths = UiSpecPaths.from_project(project)
     return {
-        "derived_from": {
-            "framework_modules": {
-                "domain": project.domain_ir.module_id,
-                "backend": project.backend_ir.module_id,
-            },
-            "boundary_sections": {
-                "LIBRARY": "library",
-                "PREVIEW": "preview",
-                "CHAT": "chat",
-                "CONTEXT": "context",
-                "RETURN": "return",
-            },
-            "rule_drivers": {
-                "domain": [item.rule_id for item in project.domain_ir.rules],
-                "backend": [item.rule_id for item in project.backend_ir.rules],
-            },
-        },
+        "derived_from": _backend_derived_from(project),
         "implementation": {
             "backend_renderer": project.implementation.backend.renderer,
         },
@@ -1693,27 +1837,12 @@ def _build_backend_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
             "selection_mode": project.context.selection_mode,
         },
         "interaction_flow": list(contract.workbench_flow_dicts()),
-        "answer_policy": {
-            "citation_style": project.chat.citation_style,
-            "no_match_text": (
-                "当前知识库里没有找到足够相关的证据。你可以换一种问法，或者先浏览知识库与文档详情页确认可用来源。"
-            ),
-            "lead_template": "根据当前知识库，最相关的证据来自《{document_title}》的“{section_title}”。[{citation_index}]",
-            "lead_snippet_template": "该片段指出：{snippet}",
-            "followup_template": "补充来源还包括《{document_title}》的“{section_title}”。[{citation_index}] {snippet}",
-            "closing_text": "点击文中引用可打开来源抽屉，并继续进入文档详情页查看完整上下文。",
-        },
+        "answer_policy": _backend_answer_policy(project),
         "interaction_copy": {
             "loading_text": "正在检索知识库并整理回答…",
             "error_text": "回答生成失败。你可以重新提问，或稍后再试。",
         },
-        "return_policy": {
-            "targets": list(project.return_config.targets),
-            "anchor_restore": project.return_config.anchor_restore,
-            "chat_path": project.route.workbench,
-            "knowledge_base_detail_path": f"{project.route.knowledge_detail}/{{knowledge_base_id}}",
-            "document_detail_path": f"{project.route.document_detail_prefix}/{{document_id}}",
-        },
+        "return_policy": _backend_return_policy(project, paths),
         "write_policy": {
             "allow_create": project.library.allow_create,
             "allow_delete": project.library.allow_delete,
@@ -1937,60 +2066,25 @@ def _build_generation_manifest_payload(
     }
 
 
+def _implementation_effect_payload(project: KnowledgeBaseProject) -> dict[str, dict[str, Any]]:
+    return {
+        field_path: effect_entry.to_dict()
+        for field_path, effect_entry in build_implementation_effect_manifest(project).items()
+    }
+
+
 def _build_generated_artifact_payloads(project: KnowledgeBaseProject) -> GeneratedArtifactPayloads:
     generated_artifacts = project.generated_artifacts
     if generated_artifacts is None:
         raise ValueError("generated_artifacts must be populated before payload generation")
 
-    product_spec = project.to_product_spec_dict()
-    runtime_bundle = project.to_runtime_bundle_dict()
-    configuration_effects = build_implementation_effect_manifest(project)
-    configuration_effect_payload = {
-        field_path: effect_entry.to_dict()
-        for field_path, effect_entry in configuration_effects.items()
-    }
-    framework_ir_text = _build_framework_ir_text(project)
-    product_spec_text = json.dumps(product_spec, ensure_ascii=False, indent=2)
-    implementation_bundle_text = _build_implementation_bundle_text(
-        project,
-        product_spec=product_spec,
-        runtime_bundle=runtime_bundle,
-    )
-    governance_manifest_text = json.dumps(
-        build_governance_manifest(project),
-        ensure_ascii=False,
-        indent=2,
-    )
-    governance_tree_text = json.dumps(
-        build_governance_tree(project),
-        ensure_ascii=False,
-        indent=2,
-    )
-    strict_zone_report_text = json.dumps(
-        build_strict_zone_report(build_governance_closure(project)),
-        ensure_ascii=False,
-        indent=2,
-    )
-    object_coverage_report_text = json.dumps(
-        build_object_coverage_report(build_governance_closure(project)),
-        ensure_ascii=False,
-        indent=2,
-    )
-    artifact_payloads = GeneratedArtifactPayloads(
-        framework_ir_json=framework_ir_text,
-        product_spec_json=product_spec_text,
-        implementation_bundle_py=implementation_bundle_text,
-        generation_manifest_json="",
-        governance_manifest_json=governance_manifest_text,
-        governance_tree_json=governance_tree_text,
-        strict_zone_report_json=strict_zone_report_text,
-        object_coverage_report_json=object_coverage_report_text,
-    )
+    context = GeneratedArtifactBuildContext.from_project(project)
+    artifact_payloads = context.to_artifact_payloads()
     generation_manifest_text = json.dumps(
         _build_generation_manifest_payload(
             project,
             generated_artifacts=generated_artifacts,
-            configuration_effect_payload=configuration_effect_payload,
+            configuration_effect_payload=context.configuration_effect_payload,
             artifact_payloads=artifact_payloads,
         ),
         ensure_ascii=False,

@@ -194,6 +194,45 @@ class ProjectionValidationArtifacts:
 
 
 @dataclass(frozen=True)
+class ProjectionValidationReportContext:
+    scenarios: list[ProjectionScenario]
+    rows: list[ProjectionValidationRow]
+    reason_counter: dict[str, int]
+    mapping_default: MappingCheckResult
+    mapping_changes: MappingCheckResult
+    summary: ProjectionValidationSummary
+    default_state: ProjectionDashboardDefaultState
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        scenarios: list[ProjectionScenario],
+        selected_scenario: ProjectionScenario,
+        mapping_default: MappingCheckResult,
+        mapping_changes: MappingCheckResult,
+        ratio_threshold: float,
+        default_state: ProjectionDashboardDefaultState,
+    ) -> "ProjectionValidationReportContext":
+        rows = list(selected_scenario.rows)
+        reason_counter = dict(selected_scenario.reason_counter)
+        return cls(
+            scenarios=scenarios,
+            rows=rows,
+            reason_counter=reason_counter,
+            mapping_default=mapping_default,
+            mapping_changes=mapping_changes,
+            summary=_build_summary(
+                rows=rows,
+                mapping_default=mapping_default,
+                mapping_changes=mapping_changes,
+                ratio_threshold=ratio_threshold,
+            ),
+            default_state=default_state,
+        )
+
+
+@dataclass(frozen=True)
 class ProjectionDashboardTemplateContext:
     payload_json: str
 
@@ -272,6 +311,29 @@ def _scenario_id(x_cells: int, y_cells: int, layers: int, allow_empty_layer: boo
     return f"x{x_cells}_y{y_cells}_l{layers}_e{1 if allow_empty_layer else 0}"
 
 
+def _parse_mapping_check_payload(stdout: str, stderr: str) -> dict[str, Any]:
+    if stdout.strip():
+        try:
+            return json.loads(stdout)
+        except json.JSONDecodeError:
+            for line in reversed([item.strip() for item in stdout.splitlines() if item.strip()]):
+                if not line.startswith("{"):
+                    continue
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+            return {"passed": False, "errors": [{"message": stdout.strip()}]}
+    return {
+        "passed": False,
+        "errors": [
+            {
+                "message": stderr.strip() or "mapping validation produced no output",
+            }
+        ],
+    }
+
+
 def _run_mapping_check(check_changes: bool) -> MappingCheckResult:
     cmd = [sys.executable, str(REPO_ROOT / "scripts/validate_strict_mapping.py")]
     if check_changes:
@@ -286,21 +348,7 @@ def _run_mapping_check(check_changes: bool) -> MappingCheckResult:
         check=False,
     )
 
-    payload: dict[str, Any]
-    if result.stdout.strip():
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            payload = {"passed": False, "errors": [{"message": result.stdout.strip()}]}
-    else:
-        payload = {
-            "passed": False,
-            "errors": [
-                {
-                    "message": result.stderr.strip() or "mapping validation produced no output",
-                }
-            ],
-        }
+    payload = _parse_mapping_check_payload(result.stdout, result.stderr)
 
     errors = payload.get("errors", [])
     first_error = ""
@@ -595,54 +643,49 @@ def _write_group_summary_csv(rows: list[ProjectionValidationRow], output_path: P
             )
 
 
-def _write_markdown_summary(
-    summary: ProjectionValidationSummary,
-    mapping_default: MappingCheckResult,
-    mapping_changes: MappingCheckResult,
-    output_path: Path,
-) -> None:
+def _write_markdown_summary(report: ProjectionValidationReportContext, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "# Shelf Projection Validation Summary",
         "",
         "Metric rule:",
-        f"- pass if `projection_ratio > {summary.ratio_threshold:.6f}` and boundary/combination/structural checks all pass.",
+        f"- pass if `projection_ratio > {report.summary.ratio_threshold:.6f}` and boundary/combination/structural checks all pass.",
         "",
         "## Validation Checks",
         "",
         "| Check | Passed | Error Count | First Error |",
         "|---|---:|---:|---|",
         (
-            f"| strict_mapping | {mapping_default.passed} | {mapping_default.error_count} | "
-            f"{mapping_default.first_error or '-'} |"
+            f"| strict_mapping | {report.mapping_default.passed} | {report.mapping_default.error_count} | "
+            f"{report.mapping_default.first_error or '-'} |"
         ),
         (
-            f"| strict_mapping_change_propagation | {mapping_changes.passed} | {mapping_changes.error_count} | "
-            f"{mapping_changes.first_error or '-'} |"
+            f"| strict_mapping_change_propagation | {report.mapping_changes.passed} | {report.mapping_changes.error_count} | "
+            f"{report.mapping_changes.first_error or '-'} |"
         ),
         "",
         "## Stats",
         "",
         "| Metric | Value |",
         "|---|---:|",
-        f"| generated_at_utc | {summary.generated_at_utc} |",
-        f"| total_types | {summary.total_types} |",
-        f"| structural_valid_types | {summary.structural_valid_types} |",
-        f"| projection_improved_types | {summary.projection_improved_types} |",
-        f"| passed_types | {summary.passed_types} |",
-        f"| failed_types | {summary.failed_types} |",
-        f"| avg_ratio | {summary.avg_ratio:.6f} |",
-        f"| min_ratio | {summary.min_ratio:.6f} |",
-        f"| max_ratio | {summary.max_ratio:.6f} |",
+        f"| generated_at_utc | {report.summary.generated_at_utc} |",
+        f"| total_types | {report.summary.total_types} |",
+        f"| structural_valid_types | {report.summary.structural_valid_types} |",
+        f"| projection_improved_types | {report.summary.projection_improved_types} |",
+        f"| passed_types | {report.summary.passed_types} |",
+        f"| failed_types | {report.summary.failed_types} |",
+        f"| avg_ratio | {report.summary.avg_ratio:.6f} |",
+        f"| min_ratio | {report.summary.min_ratio:.6f} |",
+        f"| max_ratio | {report.summary.max_ratio:.6f} |",
         "",
     ]
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_json_summary(summary: ProjectionValidationSummary, output_path: Path) -> None:
+def _write_json_summary(report: ProjectionValidationReportContext, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps(summary.to_dict(), ensure_ascii=False, indent=2),
+        json.dumps(report.summary.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -1539,17 +1582,13 @@ def _dashboard_script_block() -> str:
     ).strip()
 
 
-def _write_dashboard(
-    scenarios: list[ProjectionScenario],
-    default_state: ProjectionDashboardDefaultState,
-    output_path: Path,
-) -> None:
+def _write_dashboard(report: ProjectionValidationReportContext, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     context = ProjectionDashboardTemplateContext(
         payload_json=json.dumps(
             {
-                "scenarios": [scenario.to_dict() for scenario in scenarios],
-                "default": default_state.to_dict(),
+                "scenarios": [scenario.to_dict() for scenario in report.scenarios],
+                "default": report.default_state.to_dict(),
             },
             ensure_ascii=False,
         )
@@ -1557,10 +1596,10 @@ def _write_dashboard(
     output_path.write_text(context.render(), encoding="utf-8")
 
 
-def _write_scenarios_json(scenarios: list[ProjectionScenario], output_path: Path) -> None:
+def _write_scenarios_json(report: ProjectionValidationReportContext, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps({"scenarios": [scenario.to_dict() for scenario in scenarios]}, ensure_ascii=False, indent=2),
+        json.dumps({"scenarios": [scenario.to_dict() for scenario in report.scenarios]}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -1623,30 +1662,12 @@ def main() -> None:
     if selected_scenario is None:
         raise ValueError(f"default scenario missing: {selected_scenario_id}")
 
-    rows = list(selected_scenario.rows)
-    reason_counter = dict(selected_scenario.reason_counter)
-    summary = _build_summary(
-        rows=rows,
+    report = ProjectionValidationReportContext.build(
+        scenarios=scenarios,
+        selected_scenario=selected_scenario,
         mapping_default=mapping_default,
         mapping_changes=mapping_changes,
         ratio_threshold=args.ratio_threshold,
-    )
-
-    output_dir = Path(args.output_dir)
-    artifacts = ProjectionValidationArtifacts(
-        row_csv=output_dir / "shelf_projection_validation_table.csv",
-        group_csv=output_dir / "shelf_projection_group_summary.csv",
-        summary_markdown=output_dir / "shelf_projection_validation_summary.md",
-        dashboard_html=output_dir / "shelf_projection_validation_dashboard.html",
-        summary_json=output_dir / "shelf_projection_validation_summary.json",
-        scenarios_json=output_dir / "shelf_projection_validation_scenarios.json",
-    )
-
-    _write_rows_csv(rows, artifacts.row_csv)
-    _write_group_summary_csv(rows, artifacts.group_csv)
-    _write_markdown_summary(summary, mapping_default, mapping_changes, artifacts.summary_markdown)
-    _write_dashboard(
-        scenarios=scenarios,
         default_state=ProjectionDashboardDefaultState(
             x_cells=args.x_cells,
             y_cells=args.y_cells,
@@ -1659,18 +1680,32 @@ def main() -> None:
             require_ratio_threshold=True,
             require_r6_weighted_gt_footprint=True,
         ),
-        output_path=artifacts.dashboard_html,
     )
-    _write_json_summary(summary, artifacts.summary_json)
-    _write_scenarios_json(scenarios, artifacts.scenarios_json)
+
+    output_dir = Path(args.output_dir)
+    artifacts = ProjectionValidationArtifacts(
+        row_csv=output_dir / "shelf_projection_validation_table.csv",
+        group_csv=output_dir / "shelf_projection_group_summary.csv",
+        summary_markdown=output_dir / "shelf_projection_validation_summary.md",
+        dashboard_html=output_dir / "shelf_projection_validation_dashboard.html",
+        summary_json=output_dir / "shelf_projection_validation_summary.json",
+        scenarios_json=output_dir / "shelf_projection_validation_scenarios.json",
+    )
+
+    _write_rows_csv(report.rows, artifacts.row_csv)
+    _write_group_summary_csv(report.rows, artifacts.group_csv)
+    _write_markdown_summary(report, artifacts.summary_markdown)
+    _write_dashboard(report, artifacts.dashboard_html)
+    _write_json_summary(report, artifacts.summary_json)
+    _write_scenarios_json(report, artifacts.scenarios_json)
 
     print(
         json.dumps(
             {
-                "summary": summary.to_dict(),
+                "summary": report.summary.to_dict(),
                 "scenario_count": len(scenarios),
                 "default_scenario_id": selected_scenario_id,
-                "default_failure_reason_count": len(reason_counter),
+                "default_failure_reason_count": len(report.reason_counter),
                 "artifacts": artifacts.to_dict(),
             },
             ensure_ascii=False,

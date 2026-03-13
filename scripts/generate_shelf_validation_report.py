@@ -106,6 +106,66 @@ class ShelfValidationArtifacts:
         }
 
 
+@dataclass(frozen=True)
+class ShelfValidationDashboardData:
+    valid_count: int
+    invalid_count: int
+    efficiencies_passed: list[float]
+    efficiencies_failed: list[float]
+    reason_labels: list[str]
+    reason_values: list[int]
+    table_rows: list[ShelfValidationRow]
+
+
+@dataclass(frozen=True)
+class ShelfValidationReportContext:
+    rows: list[ShelfValidationRow]
+    reason_counter: dict[str, int]
+    mapping_default: MappingCheckResult
+    mapping_changes: MappingCheckResult
+    summary: ShelfValidationSummary
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        rows: list[ShelfValidationRow],
+        reason_counter: dict[str, int],
+        mapping_default: MappingCheckResult,
+        mapping_changes: MappingCheckResult,
+    ) -> "ShelfValidationReportContext":
+        return cls(
+            rows=rows,
+            reason_counter=reason_counter,
+            mapping_default=mapping_default,
+            mapping_changes=mapping_changes,
+            summary=_build_summary(rows, mapping_default, mapping_changes),
+        )
+
+
+def _parse_mapping_check_payload(stdout: str, stderr: str) -> dict[str, Any]:
+    if stdout.strip():
+        try:
+            return json.loads(stdout)
+        except json.JSONDecodeError:
+            for line in reversed([item.strip() for item in stdout.splitlines() if item.strip()]):
+                if not line.startswith("{"):
+                    continue
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+            return {"passed": False, "errors": [{"message": stdout.strip()}]}
+    return {
+        "passed": False,
+        "errors": [
+            {
+                "message": stderr.strip() or "mapping validation produced no output",
+            }
+        ],
+    }
+
+
 def _run_mapping_check(check_changes: bool) -> MappingCheckResult:
     cmd = [sys.executable, str(REPO_ROOT / "scripts/validate_strict_mapping.py")]
     if check_changes:
@@ -120,21 +180,7 @@ def _run_mapping_check(check_changes: bool) -> MappingCheckResult:
         check=False,
     )
 
-    payload: dict[str, Any]
-    if result.stdout.strip():
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            payload = {"passed": False, "errors": [{"message": result.stdout.strip()}]}
-    else:
-        payload = {
-            "passed": False,
-            "errors": [
-                {
-                    "message": result.stderr.strip() or "mapping validation produced no output",
-                }
-            ],
-        }
+    payload = _parse_mapping_check_payload(result.stdout, result.stderr)
 
     errors = payload.get("errors", [])
     first_error = ""
@@ -267,12 +313,7 @@ def _write_csv(rows: list[ShelfValidationRow], output_path: Path) -> None:
             writer.writerow(row.to_csv_row())
 
 
-def _write_markdown_summary(
-    summary: ShelfValidationSummary,
-    mapping_default: MappingCheckResult,
-    mapping_changes: MappingCheckResult,
-    output_path: Path,
-) -> None:
+def _write_markdown_summary(report: ShelfValidationReportContext, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "# Shelf Validation Summary",
@@ -282,57 +323,149 @@ def _write_markdown_summary(
         "| Check | Passed | Error Count | First Error |",
         "|---|---:|---:|---|",
         (
-            f"| strict_mapping | {mapping_default.passed} | {mapping_default.error_count} | "
-            f"{mapping_default.first_error or '-'} |"
+            f"| strict_mapping | {report.mapping_default.passed} | {report.mapping_default.error_count} | "
+            f"{report.mapping_default.first_error or '-'} |"
         ),
         (
-            f"| strict_mapping_change_propagation | {mapping_changes.passed} | {mapping_changes.error_count} | "
-            f"{mapping_changes.first_error or '-'} |"
+            f"| strict_mapping_change_propagation | {report.mapping_changes.passed} | {report.mapping_changes.error_count} | "
+            f"{report.mapping_changes.first_error or '-'} |"
         ),
         "",
         "## Shelf Type Verification Stats",
         "",
         "| Metric | Value |",
         "|---|---:|",
-        f"| generated_at_utc | {summary.generated_at_utc} |",
-        f"| total_types | {summary.total_types} |",
-        f"| structural_valid_types | {summary.structural_valid_types} |",
-        f"| structural_invalid_types | {summary.structural_invalid_types} |",
-        f"| verification_passed_types | {summary.verification_passed_types} |",
-        f"| verification_failed_types | {summary.verification_failed_types} |",
-        f"| avg_target_efficiency | {summary.avg_target_efficiency:.6f} |",
-        f"| min_target_efficiency | {summary.min_target_efficiency:.6f} |",
-        f"| max_target_efficiency | {summary.max_target_efficiency:.6f} |",
+        f"| generated_at_utc | {report.summary.generated_at_utc} |",
+        f"| total_types | {report.summary.total_types} |",
+        f"| structural_valid_types | {report.summary.structural_valid_types} |",
+        f"| structural_invalid_types | {report.summary.structural_invalid_types} |",
+        f"| verification_passed_types | {report.summary.verification_passed_types} |",
+        f"| verification_failed_types | {report.summary.verification_failed_types} |",
+        f"| avg_target_efficiency | {report.summary.avg_target_efficiency:.6f} |",
+        f"| min_target_efficiency | {report.summary.min_target_efficiency:.6f} |",
+        f"| max_target_efficiency | {report.summary.max_target_efficiency:.6f} |",
         "",
     ]
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_dashboard(
+def _build_dashboard_data(
     rows: list[ShelfValidationRow],
     summary: ShelfValidationSummary,
     reason_counter: dict[str, int],
+) -> ShelfValidationDashboardData:
+    reason_items = sorted(reason_counter.items(), key=lambda item: item[1], reverse=True)
+    top_reasons = reason_items[:8]
+    return ShelfValidationDashboardData(
+        valid_count=summary.verification_passed_types,
+        invalid_count=summary.verification_failed_types,
+        efficiencies_passed=[row.target_efficiency for row in rows if row.verification_passed],
+        efficiencies_failed=[row.target_efficiency for row in rows if not row.verification_passed],
+        reason_labels=[item[0] for item in top_reasons] or ["no failure reason"],
+        reason_values=[item[1] for item in top_reasons] or [0],
+        table_rows=sorted(
+            rows,
+            key=lambda item: (item.verification_passed, -item.target_efficiency),
+        )[:20],
+    )
+
+
+def _add_dashboard_result_counts(fig: Any, data: ShelfValidationDashboardData) -> None:
+    import plotly.graph_objects as go
+
+    fig.add_trace(
+        go.Bar(
+            x=["passed", "failed"],
+            y=[data.valid_count, data.invalid_count],
+            marker_color=["#2c7a7b", "#c53030"],
+            name="verification",
+            showlegend=False,
+        ),
+        row=1,
+        col=1,
+    )
+
+
+def _add_dashboard_efficiency_histograms(fig: Any, data: ShelfValidationDashboardData) -> None:
+    import plotly.graph_objects as go
+
+    fig.add_trace(
+        go.Histogram(
+            x=data.efficiencies_passed,
+            name="passed",
+            marker_color="#2f855a",
+            opacity=0.75,
+            nbinsx=20,
+        ),
+        row=1,
+        col=2,
+    )
+    fig.add_trace(
+        go.Histogram(
+            x=data.efficiencies_failed,
+            name="failed",
+            marker_color="#c53030",
+            opacity=0.75,
+            nbinsx=20,
+        ),
+        row=1,
+        col=2,
+    )
+
+
+def _add_dashboard_failure_reasons(fig: Any, data: ShelfValidationDashboardData) -> None:
+    import plotly.graph_objects as go
+
+    fig.add_trace(
+        go.Bar(
+            x=data.reason_values,
+            y=data.reason_labels,
+            orientation="h",
+            marker_color="#3182ce",
+            name="failure reasons",
+            showlegend=False,
+        ),
+        row=2,
+        col=1,
+    )
+
+
+def _add_dashboard_table(fig: Any, data: ShelfValidationDashboardData) -> None:
+    import plotly.graph_objects as go
+
+    fig.add_trace(
+        go.Table(
+            header={
+                "values": ["index", "verification_passed", "target_efficiency", "panel_count", "canonical_key"],
+                "fill_color": "#e2e8f0",
+                "align": "left",
+            },
+            cells={
+                "values": [
+                    [item.index for item in data.table_rows],
+                    [item.verification_passed for item in data.table_rows],
+                    [item.target_efficiency for item in data.table_rows],
+                    [item.panel_count for item in data.table_rows],
+                    [item.canonical_key for item in data.table_rows],
+                ],
+                "fill_color": "#f8fafc",
+                "align": "left",
+            },
+        ),
+        row=2,
+        col=2,
+    )
+
+
+def _write_dashboard(
+    report: ShelfValidationReportContext,
     output_path: Path,
 ) -> None:
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    valid_count = summary.verification_passed_types
-    invalid_count = summary.verification_failed_types
-    efficiencies_passed = [row.target_efficiency for row in rows if row.verification_passed]
-    efficiencies_failed = [row.target_efficiency for row in rows if not row.verification_passed]
-
-    reason_items = sorted(reason_counter.items(), key=lambda item: item[1], reverse=True)
-    top_reasons = reason_items[:8]
-    reason_labels = [item[0] for item in top_reasons] or ["no failure reason"]
-    reason_values = [item[1] for item in top_reasons] or [0]
-
-    table_rows = sorted(
-        rows,
-        key=lambda item: (item.verification_passed, -item.target_efficiency),
-    )[:20]
+    data = _build_dashboard_data(report.rows, report.summary, report.reason_counter)
 
     fig = make_subplots(
         rows=2,
@@ -351,82 +484,16 @@ def _write_dashboard(
         horizontal_spacing=0.08,
     )
 
-    fig.add_trace(
-        go.Bar(
-            x=["passed", "failed"],
-            y=[valid_count, invalid_count],
-            marker_color=["#2c7a7b", "#c53030"],
-            name="verification",
-            showlegend=False,
-        ),
-        row=1,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Histogram(
-            x=efficiencies_passed,
-            name="passed",
-            marker_color="#2f855a",
-            opacity=0.75,
-            nbinsx=20,
-        ),
-        row=1,
-        col=2,
-    )
-    fig.add_trace(
-        go.Histogram(
-            x=efficiencies_failed,
-            name="failed",
-            marker_color="#c53030",
-            opacity=0.75,
-            nbinsx=20,
-        ),
-        row=1,
-        col=2,
-    )
-
-    fig.add_trace(
-        go.Bar(
-            x=reason_values,
-            y=reason_labels,
-            orientation="h",
-            marker_color="#3182ce",
-            name="failure reasons",
-            showlegend=False,
-        ),
-        row=2,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Table(
-            header={
-                "values": ["index", "verification_passed", "target_efficiency", "panel_count", "canonical_key"],
-                "fill_color": "#e2e8f0",
-                "align": "left",
-            },
-            cells={
-                "values": [
-                    [item.index for item in table_rows],
-                    [item.verification_passed for item in table_rows],
-                    [item.target_efficiency for item in table_rows],
-                    [item.panel_count for item in table_rows],
-                    [item.canonical_key for item in table_rows],
-                ],
-                "fill_color": "#f8fafc",
-                "align": "left",
-            },
-        ),
-        row=2,
-        col=2,
-    )
+    _add_dashboard_result_counts(fig, data)
+    _add_dashboard_efficiency_histograms(fig, data)
+    _add_dashboard_failure_reasons(fig, data)
+    _add_dashboard_table(fig, data)
 
     fig.update_layout(
         title=(
             "Shelf Validation Dashboard | "
-            f"types={summary.total_types}, passed={summary.verification_passed_types}, "
-            f"failed={summary.verification_failed_types}"
+            f"types={report.summary.total_types}, passed={report.summary.verification_passed_types}, "
+            f"failed={report.summary.verification_failed_types}"
         ),
         barmode="overlay",
         height=980,
@@ -438,10 +505,10 @@ def _write_dashboard(
     fig.write_html(str(output_path), include_plotlyjs=True, full_html=True)
 
 
-def _write_json_summary(summary: ShelfValidationSummary, output_path: Path) -> None:
+def _write_json_summary(report: ShelfValidationReportContext, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps(summary.to_dict(), ensure_ascii=False, indent=2),
+        json.dumps(report.summary.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -478,7 +545,12 @@ def main() -> None:
         allow_empty_layer=args.allow_empty_layer,
         max_type_count=args.max_type_count,
     )
-    summary = _build_summary(rows, mapping_default, mapping_changes)
+    report = ShelfValidationReportContext.build(
+        rows=rows,
+        reason_counter=reason_counter,
+        mapping_default=mapping_default,
+        mapping_changes=mapping_changes,
+    )
 
     output_dir = Path(args.output_dir)
     artifacts = ShelfValidationArtifacts(
@@ -489,14 +561,14 @@ def main() -> None:
     )
 
     _write_csv(rows, artifacts.csv)
-    _write_markdown_summary(summary, mapping_default, mapping_changes, artifacts.markdown)
-    _write_dashboard(rows, summary, reason_counter, artifacts.dashboard_html)
-    _write_json_summary(summary, artifacts.summary_json)
+    _write_markdown_summary(report, artifacts.markdown)
+    _write_dashboard(report, artifacts.dashboard_html)
+    _write_json_summary(report, artifacts.summary_json)
 
     print(
         json.dumps(
             {
-                "summary": summary.to_dict(),
+                "summary": report.summary.to_dict(),
                 "artifacts": artifacts.to_dict(),
             },
             ensure_ascii=False,

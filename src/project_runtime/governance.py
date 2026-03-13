@@ -20,9 +20,11 @@ from project_runtime.project_governance import (
     FrameworkDrivenProjectRecord,
     ProjectGovernanceClosure,
     RequiredRole,
+    ResolvedRoleBinding,
     SourceRef,
     StructuralObject,
     StructuralCandidate,
+    StrictZoneEntry,
     annotate_strict_zone_minimality,
     build_object_coverage_report,
     build_project_discovery_audit,
@@ -509,6 +511,64 @@ class GovernanceComparisonContext:
     indexes: GovernancePayloadIndexes
 
 
+@dataclass(frozen=True)
+class GovernanceProjectArtifactsContext:
+    project: KnowledgeBaseProject
+    closure: ProjectGovernanceClosure
+    strict_zone_report: dict[str, Any]
+    object_coverage_report: dict[str, Any]
+    binding_index: dict[str, list[GovernedBinding]]
+
+    @classmethod
+    def from_project(cls, project: KnowledgeBaseProject) -> "GovernanceProjectArtifactsContext":
+        closure = build_governance_closure(project)
+        return cls(
+            project=project,
+            closure=closure,
+            strict_zone_report=build_strict_zone_report(closure),
+            object_coverage_report=build_object_coverage_report(closure),
+            binding_index=_binding_index_for_project(project),
+        )
+
+
+@dataclass(frozen=True)
+class GovernanceDefinitionsContext:
+    project: KnowledgeBaseProject
+    definitions: tuple[SymbolDefinition, ...]
+    bindings_by_symbol: dict[str, list[GovernedBinding]]
+    unbound_high_risk: tuple[dict[str, Any], ...]
+
+    def sorted_bindings_for(self, symbol_id: str) -> tuple[GovernedBinding, ...]:
+        return tuple(
+            sorted(
+                self.bindings_by_symbol.get(symbol_id, []),
+                key=lambda item: (item.file, item.line, item.locator),
+            )
+        )
+
+    def missing_bindings_for(self, definition: SymbolDefinition) -> tuple[str, ...]:
+        return tuple(
+            f"{rel_file} -> {locator}"
+            for rel_file, locator in definition.required_bindings
+            if not _binding_exists(self.bindings_by_symbol, definition.symbol_id, rel_file, locator)
+        )
+
+
+@dataclass(frozen=True)
+class GovernanceStructuralContext:
+    structural_objects: tuple[StructuralObject, ...]
+    expected_artifacts: dict[str, str]
+    discovery: FrameworkDrivenProjectRecord
+    upstream_closure: tuple[SourceRef, ...]
+
+
+@dataclass(frozen=True)
+class GovernanceResolutionContext:
+    role_bindings: tuple[ResolvedRoleBinding, ...]
+    candidates: tuple[StructuralCandidate, ...]
+    strict_zone: tuple[StrictZoneEntry, ...]
+
+
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -525,6 +585,51 @@ def _relative(path: Path | str) -> str:
         except ValueError:
             return str(candidate)
     return candidate.as_posix()
+
+
+def _build_governance_definitions_context(project: KnowledgeBaseProject) -> GovernanceDefinitionsContext:
+    return GovernanceDefinitionsContext(
+        project=project,
+        definitions=tuple(_definitions(project)),
+        bindings_by_symbol=collect_governed_bindings(governed_files_for_project(project)),
+        unbound_high_risk=tuple(find_unbound_high_risk_structures()),
+    )
+
+
+def _raise_binding_validation_issues(binding_issues: list[dict[str, Any]]) -> None:
+    if not binding_issues:
+        return
+    details = "; ".join(
+        f"{item['file']}:{item['line']} {item['code']} {item['message']}" for item in binding_issues
+    )
+    raise ValueError(f"invalid governed bindings: {details}")
+
+
+def _raise_unbound_high_risk_issues(unbound_high_risk: tuple[dict[str, Any], ...]) -> None:
+    if not unbound_high_risk:
+        return
+    details = "; ".join(f"{item['file']}:{item['line']} -> {item['locator']}" for item in unbound_high_risk)
+    raise ValueError(f"missing governed_symbol binding for high-risk structures: {details}")
+
+
+def _raise_missing_required_bindings(
+    definition: SymbolDefinition,
+    missing_bindings: tuple[str, ...],
+) -> None:
+    if not missing_bindings:
+        return
+    raise ValueError(
+        f"missing governed_symbol binding(s) for {definition.symbol_id}: {', '.join(missing_bindings)}"
+    )
+
+
+def _validated_governance_definitions_context(project: KnowledgeBaseProject) -> GovernanceDefinitionsContext:
+    context = _build_governance_definitions_context(project)
+    _raise_binding_validation_issues(_binding_validation_issues(context.bindings_by_symbol, context.definitions))
+    _raise_unbound_high_risk_issues(context.unbound_high_risk)
+    for definition in context.definitions:
+        _raise_missing_required_bindings(definition, context.missing_bindings_for(definition))
+    return context
 
 
 def _expected_generated_artifact_paths(project: KnowledgeBaseProject) -> GeneratedArtifactPaths:
@@ -1916,46 +2021,59 @@ def _project_record_for(project: KnowledgeBaseProject) -> FrameworkDrivenProject
     )
 
 
-def build_governance_closure(project: KnowledgeBaseProject) -> ProjectGovernanceClosure:
+def _implementation_effect_objects(project: KnowledgeBaseProject) -> tuple[StructuralObject, ...]:
     from project_runtime.knowledge_base import build_implementation_effect_manifest
 
-    definitions = _definitions(project)
-    bindings_by_symbol = collect_governed_bindings(governed_files_for_project(project))
-    binding_issues = _binding_validation_issues(bindings_by_symbol, definitions)
-    if binding_issues:
-        details = "; ".join(
-            f"{item['file']}:{item['line']} {item['code']} {item['message']}" for item in binding_issues
-        )
-        raise ValueError(f"invalid governed bindings: {details}")
-    unbound = find_unbound_high_risk_structures()
-    if unbound:
-        details = "; ".join(f"{item['file']}:{item['line']} -> {item['locator']}" for item in unbound)
-        raise ValueError(f"missing governed_symbol binding for high-risk structures: {details}")
+    return tuple(
+        _config_effect_object(project, field_path, effect_entry)
+        for field_path, effect_entry in sorted(build_implementation_effect_manifest(project).items())
+    )
 
-    for definition in definitions:
-        missing_bindings = [
-            f"{rel_file} -> {locator}"
-            for rel_file, locator in definition.required_bindings
-            if not _binding_exists(bindings_by_symbol, definition.symbol_id, rel_file, locator)
+
+def _upstream_closure_from_structural_objects(
+    structural_objects: tuple[StructuralObject, ...],
+) -> tuple[SourceRef, ...]:
+    upstream_index: dict[tuple[str, str, str, str], SourceRef] = {}
+    for structural_object in structural_objects:
+        for source in structural_object.all_sources():
+            upstream_index[source.key()] = source
+    return tuple(
+        sorted(upstream_index.values(), key=lambda item: (item.layer, item.file, item.ref_kind, item.ref_id))
+    )
+
+
+def _build_governance_structural_context(
+    project: KnowledgeBaseProject,
+    definitions_context: GovernanceDefinitionsContext,
+) -> GovernanceStructuralContext:
+    structural_objects = tuple(
+        [
+            *(
+                _structural_object_from_definition(project, definition)
+                for definition in definitions_context.definitions
+            ),
+            *_implementation_effect_objects(project),
         ]
-        if missing_bindings:
-            raise ValueError(
-                f"missing governed_symbol binding(s) for {definition.symbol_id}: {', '.join(missing_bindings)}"
-            )
+    )
+    return GovernanceStructuralContext(
+        structural_objects=tuple(sorted(structural_objects, key=lambda item: item.object_id)),
+        expected_artifacts=_expected_generated_artifact_paths(project).to_dict(),
+        discovery=_project_record_for(project),
+        upstream_closure=_upstream_closure_from_structural_objects(structural_objects),
+    )
 
-    structural_objects: list[StructuralObject] = [
-        _structural_object_from_definition(project, definition)
-        for definition in definitions
-    ]
-    for field_path, effect_entry in sorted(build_implementation_effect_manifest(project).items()):
-        structural_objects.append(_config_effect_object(project, field_path, effect_entry))
 
-    expected_artifacts = _expected_generated_artifact_paths(project).to_dict()
+def _resolve_governance_candidates(
+    project: KnowledgeBaseProject,
+    structural_context: GovernanceStructuralContext,
+) -> GovernanceResolutionContext:
+    structural_objects = structural_context.structural_objects
+    expected_artifacts = structural_context.expected_artifacts
     raw_candidates = scan_python_structural_candidates(project_id=project.metadata.project_id)
-    seed_bindings = resolve_role_bindings(tuple(structural_objects), raw_candidates)
-    seed_candidates = classify_candidates(tuple(structural_objects), raw_candidates, seed_bindings)
+    seed_bindings = resolve_role_bindings(structural_objects, raw_candidates)
+    seed_candidates = classify_candidates(structural_objects, raw_candidates, seed_bindings)
     seed_strict_zone = infer_strict_zone(
-        tuple(structural_objects),
+        structural_objects,
         seed_bindings,
         seed_candidates,
         expected_artifacts,
@@ -1965,109 +2083,61 @@ def build_governance_closure(project: KnowledgeBaseProject) -> ProjectGovernance
     project_candidates = tuple(
         candidate
         for candidate in raw_candidates
-        if candidate.file in strict_files and (candidate.confidence >= 0.75 or candidate.candidate_id in seed_candidate_ids)
+        if candidate.file in strict_files
+        and (candidate.confidence >= 0.75 or candidate.candidate_id in seed_candidate_ids)
     )
-    role_bindings = resolve_role_bindings(tuple(structural_objects), project_candidates)
-    candidates = classify_candidates(tuple(structural_objects), project_candidates, role_bindings)
-    strict_zone = infer_strict_zone(
-        tuple(structural_objects),
-        role_bindings,
-        candidates,
-        expected_artifacts,
+    role_bindings = tuple(resolve_role_bindings(structural_objects, project_candidates))
+    candidates = tuple(classify_candidates(structural_objects, project_candidates, role_bindings))
+    strict_zone = tuple(
+        annotate_strict_zone_minimality(
+            infer_strict_zone(
+                structural_objects,
+                role_bindings,
+                candidates,
+                expected_artifacts,
+            ),
+            role_bindings,
+            candidates,
+            expected_artifacts,
+        )
     )
-    strict_zone = annotate_strict_zone_minimality(
-        strict_zone,
-        role_bindings,
-        candidates,
-        expected_artifacts,
+    return GovernanceResolutionContext(
+        role_bindings=tuple(sorted(role_bindings, key=lambda item: (item.object_id, item.role_id))),
+        candidates=tuple(sorted(candidates, key=lambda item: (item.file, item.locator, item.kind))),
+        strict_zone=tuple(sorted(strict_zone, key=lambda item: item.file)),
     )
-    record = _project_record_for(project)
 
-    upstream_index: dict[tuple[str, str, str, str], SourceRef] = {}
-    for structural_object in structural_objects:
-        for source in structural_object.all_sources():
-            upstream_index[source.key()] = source
+
+def build_governance_closure(project: KnowledgeBaseProject) -> ProjectGovernanceClosure:
+    definitions_context = _validated_governance_definitions_context(project)
+    structural_context = _build_governance_structural_context(project, definitions_context)
+    resolution_context = _resolve_governance_candidates(project, structural_context)
     return ProjectGovernanceClosure(
         project_id=project.metadata.project_id,
         template_id=project.metadata.template,
         product_spec_file=_relative(project.product_spec_file),
         implementation_config_file=_relative(project.implementation_config_file),
-        discovery=record,
-        structural_objects=tuple(sorted(structural_objects, key=lambda item: item.object_id)),
-        candidates=tuple(sorted(candidates, key=lambda item: (item.file, item.locator, item.kind))),
-        role_bindings=tuple(sorted(role_bindings, key=lambda item: (item.object_id, item.role_id))),
-        strict_zone=tuple(sorted(strict_zone, key=lambda item: item.file)),
-        upstream_closure=tuple(
-            sorted(upstream_index.values(), key=lambda item: (item.layer, item.file, item.ref_kind, item.ref_id))
-        ),
-        evidence_artifacts=expected_artifacts,
+        discovery=structural_context.discovery,
+        structural_objects=structural_context.structural_objects,
+        candidates=resolution_context.candidates,
+        role_bindings=resolution_context.role_bindings,
+        strict_zone=resolution_context.strict_zone,
+        upstream_closure=structural_context.upstream_closure,
+        evidence_artifacts=structural_context.expected_artifacts,
     )
 
 
 def _build_governance_snapshot(project: KnowledgeBaseProject) -> dict[str, Any]:
-    definitions = _definitions(project)
-    bindings_by_symbol = collect_governed_bindings(governed_files_for_project(project))
-    binding_issues = _binding_validation_issues(bindings_by_symbol, definitions)
-    if binding_issues:
-        details = "; ".join(
-            f"{item['file']}:{item['line']} {item['code']} {item['message']}" for item in binding_issues
-        )
-        raise ValueError(f"invalid governed bindings: {details}")
-    unbound = find_unbound_high_risk_structures()
-    if unbound:
-        details = "; ".join(f"{item['file']}:{item['line']} -> {item['locator']}" for item in unbound)
-        raise ValueError(f"missing governed_symbol binding for high-risk structures: {details}")
+    context = _validated_governance_definitions_context(project)
     upstream_closure: dict[tuple[str, str, str, str], str] = {}
-    symbols: list[GovernanceSnapshotSymbol] = []
-    for definition in definitions:
-        bindings = sorted(
-            bindings_by_symbol.get(definition.symbol_id, []),
-            key=lambda item: (item.file, item.line, item.locator),
-        )
-        missing_bindings = [
-            f"{rel_file} -> {locator}"
-            for rel_file, locator in definition.required_bindings
-            if not _binding_exists(bindings_by_symbol, definition.symbol_id, rel_file, locator)
-        ]
-        if missing_bindings:
-            raise ValueError(
-                f"missing governed_symbol binding(s) for {definition.symbol_id}: {', '.join(missing_bindings)}"
-            )
-        expected_evidence = definition.expected_builder(project)
-        upstream_refs = definition.upstream_ref_builder(project)
-        for ref in upstream_refs:
-            upstream_closure[ref.key()] = digest_upstream_ref(ref)
-        symbols.append(
-            GovernanceSnapshotSymbol(
-                symbol_id=definition.symbol_id,
-                owner=definition.owner,
-                kind=definition.kind,
-                risk=definition.risk,
-                bindings=tuple(item.to_manifest_dict() for item in bindings),
-                upstream_refs=tuple(
-                    ref.to_manifest_dict(digest=upstream_closure[ref.key()])
-                    for ref in upstream_refs
-                ),
-                extractor=definition.extractor,
-                comparator=definition.comparator,
-                fingerprint=_fingerprint(expected_evidence),
-                evidence=expected_evidence,
-            )
-        )
-    closure_items = [
-        {
-            "layer": layer,
-            "file": file_name,
-            "ref_kind": ref_kind,
-            "ref_id": ref_id,
-            "digest": digest,
-        }
-        for (layer, file_name, ref_kind, ref_id), digest in sorted(upstream_closure.items())
+    symbols = [
+        _snapshot_symbol_from_definition(project, context, definition, upstream_closure)
+        for definition in context.definitions
     ]
     return {
-        "definitions": definitions,
+        "definitions": list(context.definitions),
         "symbols": [item.to_dict() for item in symbols],
-        "upstream_closure": closure_items,
+        "upstream_closure": _upstream_closure_items(upstream_closure),
     }
 
 
@@ -2085,51 +2155,100 @@ def _binding_index_for_project(project: KnowledgeBaseProject) -> dict[str, list[
     return collect_governed_bindings(governed_files_for_project(project))
 
 
-def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
-    closure = build_governance_closure(project)
-    strict_zone_report = build_strict_zone_report(closure)
-    object_coverage_report = build_object_coverage_report(closure)
-    binding_index = _binding_index_for_project(project)
-    symbols: list[GovernanceSnapshotSymbol] = []
-    for structural_object in closure.structural_objects:
-        bindings = [
-            item.to_manifest_dict()
-            for item in sorted(
-                binding_index.get(structural_object.object_id, []),
-                key=lambda entry: (entry.file, entry.line, entry.locator),
-            )
-        ]
-        symbols.append(
-            GovernanceSnapshotSymbol(
-                symbol_id=structural_object.object_id,
-                owner=_object_owner(structural_object),
-                kind=structural_object.kind,
-                risk=structural_object.risk_level,
-                bindings=tuple(bindings),
-                upstream_refs=(),
-                extractor=structural_object.extractor,
-                comparator=structural_object.comparator,
-                fingerprint=structural_object.expected_fingerprint,
-                evidence=structural_object.expected_evidence,
-            )
+def _manifest_binding_entries(bindings: tuple[GovernedBinding, ...]) -> tuple[dict[str, Any], ...]:
+    return tuple(item.to_manifest_dict() for item in bindings)
+
+
+def _upstream_closure_items(
+    upstream_closure: dict[tuple[str, str, str, str], str],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "layer": layer,
+            "file": file_name,
+            "ref_kind": ref_kind,
+            "ref_id": ref_id,
+            "digest": digest,
+        }
+        for (layer, file_name, ref_kind, ref_id), digest in sorted(upstream_closure.items())
+    ]
+
+
+def _snapshot_symbol_from_definition(
+    project: KnowledgeBaseProject,
+    context: GovernanceDefinitionsContext,
+    definition: SymbolDefinition,
+    upstream_closure: dict[tuple[str, str, str, str], str],
+) -> GovernanceSnapshotSymbol:
+    bindings = context.sorted_bindings_for(definition.symbol_id)
+    expected_evidence = definition.expected_builder(project)
+    upstream_refs = definition.upstream_ref_builder(project)
+    for ref in upstream_refs:
+        upstream_closure[ref.key()] = digest_upstream_ref(ref)
+    return GovernanceSnapshotSymbol(
+        symbol_id=definition.symbol_id,
+        owner=definition.owner,
+        kind=definition.kind,
+        risk=definition.risk,
+        bindings=_manifest_binding_entries(bindings),
+        upstream_refs=tuple(
+            ref.to_manifest_dict(digest=upstream_closure[ref.key()])
+            for ref in upstream_refs
+        ),
+        extractor=definition.extractor,
+        comparator=definition.comparator,
+        fingerprint=_fingerprint(expected_evidence),
+        evidence=expected_evidence,
+    )
+
+
+def _snapshot_symbol_from_structural_object(
+    structural_object: StructuralObject,
+    binding_index: dict[str, list[GovernedBinding]],
+) -> GovernanceSnapshotSymbol:
+    bindings = tuple(
+        sorted(
+            binding_index.get(structural_object.object_id, []),
+            key=lambda entry: (entry.file, entry.line, entry.locator),
         )
+    )
+    return GovernanceSnapshotSymbol(
+        symbol_id=structural_object.object_id,
+        owner=_object_owner(structural_object),
+        kind=structural_object.kind,
+        risk=structural_object.risk_level,
+        bindings=_manifest_binding_entries(bindings),
+        upstream_refs=(),
+        extractor=structural_object.extractor,
+        comparator=structural_object.comparator,
+        fingerprint=structural_object.expected_fingerprint,
+        evidence=structural_object.expected_evidence,
+    )
+
+
+def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
+    context = GovernanceProjectArtifactsContext.from_project(project)
+    closure = context.closure
+    symbols = [
+        _snapshot_symbol_from_structural_object(structural_object, context.binding_index)
+        for structural_object in closure.structural_objects
+    ]
     payload = closure.to_manifest_dict()
     payload.update(
         {
             "manifest_version": GOVERNANCE_MANIFEST_VERSION,
             "generator_version": GOVERNANCE_GENERATOR_VERSION,
             "symbols": [item.to_dict() for item in symbols],
-            "strict_zone_report": strict_zone_report,
-            "object_coverage_report": object_coverage_report,
+            "strict_zone_report": context.strict_zone_report,
+            "object_coverage_report": context.object_coverage_report,
         }
     )
     return payload
 
 
 def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
-    closure = build_governance_closure(project)
-    strict_zone_report = build_strict_zone_report(closure)
-    object_coverage_report = build_object_coverage_report(closure)
+    context = GovernanceProjectArtifactsContext.from_project(project)
+    closure = context.closure
     roots = GovernanceTreeRoots.for_project(project.metadata.project_id)
     builder = GovernanceTreeBuilder(
         project_id=project.metadata.project_id,
@@ -2155,8 +2274,8 @@ def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
         "project_discovery": closure.discovery.to_dict(),
         "upstream_closure": [item.to_dict() for item in closure.upstream_closure],
         "strict_zone": [item.to_dict() for item in closure.strict_zone],
-        "strict_zone_report": strict_zone_report,
-        "object_coverage_report": object_coverage_report,
+        "strict_zone_report": context.strict_zone_report,
+        "object_coverage_report": context.object_coverage_report,
         "evidence_artifacts": dict(closure.evidence_artifacts),
         "structural_objects": [item.to_manifest_dict() for item in closure.structural_objects],
         "role_bindings": [item.to_dict() for item in closure.role_bindings],
@@ -2438,13 +2557,11 @@ def validate_tree_closure(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _binding_governance_issues(project: KnowledgeBaseProject) -> list[dict[str, Any]]:
-    definitions = _definitions(project)
-    binding_index = collect_governed_bindings(governed_files_for_project(project))
-    issues = list(_binding_validation_issues(binding_index, definitions))
-    for definition in definitions:
-        for rel_file, locator in definition.required_bindings:
-            if _binding_exists(binding_index, definition.symbol_id, rel_file, locator):
-                continue
+    context = _build_governance_definitions_context(project)
+    issues = list(_binding_validation_issues(context.bindings_by_symbol, context.definitions))
+    for definition in context.definitions:
+        for missing_binding in context.missing_bindings_for(definition):
+            rel_file, _separator, locator = missing_binding.partition(" -> ")
             issues.append(
                 {
                     "code": "MISSING_BINDING",
@@ -2454,7 +2571,7 @@ def _binding_governance_issues(project: KnowledgeBaseProject) -> list[dict[str, 
                     "symbol_id": definition.symbol_id,
                 }
             )
-    for item in find_unbound_high_risk_structures():
+    for item in context.unbound_high_risk:
         issues.append(
             {
                 "code": "MISSING_BINDING",
@@ -2908,7 +3025,7 @@ def _compare_payload_to_closure(
     if binding_issues:
         return binding_issues
     try:
-        closure = build_governance_closure(project)
+        project_context = GovernanceProjectArtifactsContext.from_project(project)
     except Exception as exc:
         return [
             {
@@ -2922,12 +3039,12 @@ def _compare_payload_to_closure(
     indexes, issues = _governance_payload_indexes(payload, code=payload_code)
     context = GovernanceComparisonContext(
         project=project,
-        closure=closure,
+        closure=project_context.closure,
         payload=payload,
         payload_code=payload_code,
         tree_mode=tree_mode,
-        strict_zone_report=build_strict_zone_report(closure),
-        object_coverage_report=build_object_coverage_report(closure),
+        strict_zone_report=project_context.strict_zone_report,
+        object_coverage_report=project_context.object_coverage_report,
         indexes=indexes,
     )
     issues.extend(_compare_evidence_artifacts(context))
