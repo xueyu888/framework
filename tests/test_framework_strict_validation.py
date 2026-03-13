@@ -60,6 +60,76 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                 issues, _ = validate_strict_mapping.validate_framework_layers()
             return issues
 
+    def test_capability_must_not_map_to_multiple_base_sources(self) -> None:
+        issues = self.run_framework_validation(
+            {
+                "demo/L0-M0-能力归属模块.md": build_framework_doc(
+                    "能力归属模块:CapabilityOwnershipModule",
+                    [
+                        "- `C1` 承载能力：定义稳定承载结构。",
+                        "- `C2` 治理能力：定义治理闭环。",
+                        "- `C4` 非能力项：不负责实例参数。",
+                    ],
+                    [
+                        "- `P1` 参数一：承载边界。来源：`C1`。",
+                        "- `P2` 参数二：治理边界。来源：`C2`。",
+                    ],
+                    [
+                        "- `B1` 承载结构基：由承载骨架组成。来源：`C1 + P1`。",
+                        "- `B2` 治理结构基：由治理节点组成。来源：`C1 + C2 + P2`。",
+                    ],
+                    [
+                        "- `R1` 承载组合",
+                        "  - `R1.1` 参与基：`B1`。",
+                        "  - `R1.2` 组合方式：固定承载骨架。",
+                        "  - `R1.3` 输出能力：`C1`。",
+                        "  - `R1.4` 边界绑定：`P1`。",
+                        "- `R2` 治理组合",
+                        "  - `R2.1` 参与基：`B2`。",
+                        "  - `R2.2` 组合方式：挂接治理节点。",
+                        "  - `R2.3` 输出能力：`C2`。",
+                        "  - `R2.4` 边界绑定：`P2`。",
+                    ],
+                    [
+                        "- `V1` 能力归属必须唯一。",
+                    ],
+                )
+            }
+        )
+        self.assertTrue(any(issue["code"] == "FW075" for issue in issues))
+
+    def test_support_only_base_may_omit_capability_token(self) -> None:
+        issues = self.run_framework_validation(
+            {
+                "demo/L0-M0-支撑模块.md": build_framework_doc(
+                    "支撑模块:SupportOnlyBaseModule",
+                    [
+                        "- `C1` 承载能力：定义稳定承载结构。",
+                        "- `C4` 非能力项：不负责实例参数。",
+                    ],
+                    [
+                        "- `P1` 参数一：承载边界。来源：`C1`。",
+                        "- `P2` 参数二：支撑边界。来源：`C1`。",
+                    ],
+                    [
+                        "- `B1` 承载结构基：由承载骨架组成。来源：`C1 + P1`。",
+                        "- `B2` 支撑结构基：由辅助连接点组成。来源：`P2`。",
+                    ],
+                    [
+                        "- `R1` 支撑组合",
+                        "  - `R1.1` 参与基：`B1 + B2`。",
+                        "  - `R1.2` 组合方式：用支撑结构稳定承载骨架。",
+                        "  - `R1.3` 输出能力：`C1`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
+                    ],
+                    [
+                        "- `V1` 支撑结构必须参与组合。",
+                    ],
+                )
+            }
+        )
+        self.assertFalse(any(issue["code"] in {"FW022", "FW070", "FW075"} for issue in issues))
+
     def test_non_l0_base_requires_inline_adjacent_module_refs(self) -> None:
         issues = self.run_framework_validation(
             {
@@ -83,7 +153,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：固定根层结构与接口边界。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 根层结构必须可独立成立。",
@@ -109,7 +179,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：按相邻层规则收敛结构。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 上层结构必须可回溯到下层输入。",
@@ -142,7 +212,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：固定根层结构与接口边界。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 根层结构必须可独立成立。",
@@ -168,7 +238,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：按相邻层规则收敛结构。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 上层结构必须可回溯到下层输入。",
@@ -201,7 +271,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：固定根层结构与接口边界。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 根层结构必须可独立成立。",
@@ -227,7 +297,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：固定辅助结构与接口边界。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 辅助结构必须可独立成立。",
@@ -260,7 +330,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：固定运行壳和挂载入口。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 运行壳必须独立成立。",
@@ -286,7 +356,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：用运行底座承接基础组件。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 组件必须可由底座承接。",
@@ -312,7 +382,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：由前端基础组件承接文件目录结构。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 文件目录结构必须可回溯到前端基础组件。",
@@ -345,7 +415,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：由前端基础组件承接文件目录结构。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 文件目录结构必须可回溯到前端基础组件。",
@@ -378,7 +448,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：固定运行壳和挂载入口。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 运行壳必须独立成立。",
@@ -404,7 +474,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：用运行底座承接基础组件。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 组件必须可由底座承接。",
@@ -430,7 +500,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：由前端基础组件承接文件目录结构。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 文件目录结构必须可回溯到前端基础组件。",
@@ -456,7 +526,7 @@ class FrameworkStrictValidationTest(unittest.TestCase):
                         "  - `R1.1` 参与基：`B1`。",
                         "  - `R1.2` 组合方式：用前端基础组件承接骨架结构。",
                         "  - `R1.3` 输出能力：`C1 + C2`。",
-                        "  - `R1.4` 边界绑定：`P1/P2`。",
+                        "  - `R1.4` 边界绑定：`P1 + P2`。",
                     ],
                     [
                         "- `V1` 骨架结构必须可回溯到下层输入。",

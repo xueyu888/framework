@@ -11,8 +11,21 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from generate_module_hierarchy_html import load_hierarchy, render_html
+from generate_framework_tree_hierarchy import (
+    DEFAULT_FRAMEWORK_DIR,
+    DEFAULT_OUTPUT_HTML as DEFAULT_FRAMEWORK_TREE_HTML,
+    DEFAULT_OUTPUT_JSON as DEFAULT_FRAMEWORK_TREE_JSON,
+    build_payload_from_framework,
+    render_html as render_framework_tree_html,
+)
 from project_runtime import discover_framework_driven_projects, materialize_registered_project
+from project_runtime.project_governance import (
+    build_project_discovery_audit,
+    render_project_discovery_audit_markdown,
+)
 from workspace_governance import (
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON,
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_MD,
     DEFAULT_WORKSPACE_GOVERNANCE_HTML,
     DEFAULT_WORKSPACE_GOVERNANCE_JSON,
     build_workspace_governance_payload,
@@ -60,16 +73,45 @@ def main() -> int:
             project.generated_artifacts.directory,
         )
 
+    framework_payload, framework_warnings = build_payload_from_framework(DEFAULT_FRAMEWORK_DIR)
+    DEFAULT_FRAMEWORK_TREE_JSON.parent.mkdir(parents=True, exist_ok=True)
+    DEFAULT_FRAMEWORK_TREE_JSON.write_text(
+        json.dumps(framework_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    render_framework_tree_html(
+        DEFAULT_FRAMEWORK_TREE_JSON,
+        DEFAULT_FRAMEWORK_TREE_HTML,
+        width=1680,
+        height=1180,
+    )
+    for warning in framework_warnings:
+        print("[WARN] framework tree ->", warning)
+    print("[OK] framework tree ->", DEFAULT_FRAMEWORK_TREE_JSON.relative_to(REPO_ROOT))
+    print("[OK] framework tree ->", DEFAULT_FRAMEWORK_TREE_HTML.relative_to(REPO_ROOT))
+
     governance_payload = build_workspace_governance_payload()
+    discovery_audit_payload = build_project_discovery_audit()
     DEFAULT_WORKSPACE_GOVERNANCE_JSON.parent.mkdir(parents=True, exist_ok=True)
     DEFAULT_WORKSPACE_GOVERNANCE_JSON.write_text(
         json.dumps(governance_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON.write_text(
+        json.dumps(discovery_audit_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_MD.parent.mkdir(parents=True, exist_ok=True)
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_MD.write_text(
+        render_project_discovery_audit_markdown(discovery_audit_payload),
         encoding="utf-8",
     )
     graph = load_hierarchy(DEFAULT_WORKSPACE_GOVERNANCE_JSON)
     render_html(graph, DEFAULT_WORKSPACE_GOVERNANCE_HTML, width=1680, height=1080)
     print("[OK] governance tree ->", DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT))
     print("[OK] governance tree ->", DEFAULT_WORKSPACE_GOVERNANCE_HTML.relative_to(REPO_ROOT))
+    print("[OK] project discovery audit ->", DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON.relative_to(REPO_ROOT))
+    print("[OK] project discovery audit ->", DEFAULT_PROJECT_DISCOVERY_AUDIT_MD.relative_to(REPO_ROOT))
 
     return 0
 

@@ -18,6 +18,10 @@ from project_runtime.project_governance import (
     SourceRef,
     StructuralObject,
     StructuralCandidate,
+    annotate_strict_zone_minimality,
+    build_object_coverage_report,
+    build_project_discovery_audit,
+    build_strict_zone_report,
     classify_candidates,
     discover_framework_driven_projects,
     fingerprint,
@@ -124,6 +128,8 @@ def _expected_generated_artifact_paths(project: KnowledgeBaseProject) -> dict[st
             "generation_manifest_json": project.generated_artifacts.generation_manifest_json,
             "governance_manifest_json": project.generated_artifacts.governance_manifest_json,
             "governance_tree_json": project.generated_artifacts.governance_tree_json,
+            "strict_zone_report_json": project.generated_artifacts.strict_zone_report_json,
+            "object_coverage_report_json": project.generated_artifacts.object_coverage_report_json,
         }
 
     generated_dir = Path(project.product_spec_file).parent / "generated"
@@ -135,6 +141,8 @@ def _expected_generated_artifact_paths(project: KnowledgeBaseProject) -> dict[st
         "generation_manifest_json": _relative(generated_dir / artifact_names.generation_manifest_json),
         "governance_manifest_json": _relative(generated_dir / artifact_names.governance_manifest_json),
         "governance_tree_json": _relative(generated_dir / artifact_names.governance_tree_json),
+        "strict_zone_report_json": _relative(generated_dir / artifact_names.strict_zone_report_json),
+        "object_coverage_report_json": _relative(generated_dir / artifact_names.object_coverage_report_json),
     }
 
 
@@ -429,24 +437,7 @@ def _actual_runtime_page_routes(project: KnowledgeBaseProject) -> dict[str, Any]
 
 
 def _expected_frontend_surface_contract(project: KnowledgeBaseProject) -> dict[str, Any]:
-    interaction_actions = [
-        "start_new_chat",
-        "select_session",
-        "open_knowledge_switch",
-        "search_documents",
-        "select_document",
-        "submit_chat",
-        "open_citation_drawer",
-        "browse_knowledge_bases",
-        "open_basketball_showcase",
-        "open_knowledge_base_detail",
-        "open_document_detail",
-        "return_from_citation",
-    ]
-    if project.library.allow_create:
-        interaction_actions.append("create_document")
-    if project.library.allow_delete:
-        interaction_actions.append("delete_document")
+    contract = project.template_contract
     return {
         "module_id": project.frontend_ir.module_id,
         "shell": project.surface.shell,
@@ -456,21 +447,14 @@ def _expected_frontend_surface_contract(project: KnowledgeBaseProject) -> dict[s
             "preview_mode": project.surface.preview_mode,
             "density": project.surface.density,
         },
-        "surface_regions": [
-            "conversation_sidebar",
-            "chat_main",
-            "citation_drawer",
-            "knowledge_pages",
-        ],
-        "interaction_actions": interaction_actions,
-        "state_channels": [
-            {"state_id": "current_conversation", "sticky": True},
-            {"state_id": "current_knowledge_base", "sticky": True},
-            {"state_id": "current_document", "sticky": project.context.sticky_document},
-            {"state_id": "current_section", "sticky": True},
-            {"state_id": "citation_drawer_state", "sticky": True},
-            {"state_id": "streaming_reply", "sticky": False},
-        ],
+        "surface_regions": list(contract.required_surface_region_ids),
+        "interaction_actions": list(
+            contract.frontend_interaction_action_ids(
+                allow_create=project.library.allow_create,
+                allow_delete=project.library.allow_delete,
+            )
+        ),
+        "state_channels": list(contract.resolve_state_channels(sticky_document=project.context.sticky_document)),
         "route_contract": project.route.to_dict(),
         "a11y": project.a11y.to_dict(),
         "component_variants": {
@@ -506,29 +490,22 @@ def _actual_frontend_surface_contract(project: KnowledgeBaseProject) -> dict[str
 
 
 def _expected_workbench_surface_contract(project: KnowledgeBaseProject) -> dict[str, Any]:
-    library_actions = ["switch_knowledge_base", "browse_documents", "open_document_detail"]
-    if project.library.allow_create:
-        library_actions.append("create_document")
-    if project.library.allow_delete:
-        library_actions.append("delete_document")
+    contract = project.template_contract
     return {
         "module_id": project.domain_ir.module_id,
         "layout_variant": project.surface.layout_variant,
-        "regions": [
-            "conversation_sidebar",
-            "chat_main",
-            "citation_drawer",
-            "basketball_showcase_page",
-            "knowledge_list_page",
-            "knowledge_detail_page",
-            "document_detail_page",
-        ],
+        "regions": list(contract.workbench_region_ids),
         "surface": {
             "sidebar_width": project.surface.sidebar_width,
             "preview_mode": project.surface.preview_mode,
             "density": project.surface.density,
         },
-        "library_actions": library_actions,
+        "library_actions": list(
+            contract.workbench_library_actions(
+                allow_create=project.library.allow_create,
+                allow_delete=project.library.allow_delete,
+            )
+        ),
         "preview": {
             "anchor_mode": project.preview.anchor_mode,
             "show_toc": project.preview.show_toc,
@@ -548,30 +525,9 @@ def _expected_workbench_surface_contract(project: KnowledgeBaseProject) -> dict[
             "anchor_restore": project.return_config.anchor_restore,
             "citation_card_variant": project.return_config.citation_card_variant,
         },
-        "flow": [
-            {
-                "stage_id": "knowledge_base_select",
-                "depends_on": [],
-                "produces": ["knowledge_base_id"],
-            },
-            {
-                "stage_id": "conversation",
-                "depends_on": ["knowledge_base_id"],
-                "produces": ["conversation_id", "answer", "citations"],
-            },
-            {
-                "stage_id": "citation_review",
-                "depends_on": ["conversation_id", "citations"],
-                "produces": ["document_id", "section_id", "drawer_state"],
-            },
-            {
-                "stage_id": "document_detail",
-                "depends_on": ["document_id", "section_id"],
-                "produces": ["document_page", "return_path"],
-            },
-        ],
+        "flow": list(contract.workbench_flow_dicts()),
         "citation_return_contract": {
-            "query_keys": ["document", "section", "citation"],
+            "query_keys": list(contract.workbench_citation_query_keys),
             "targets": list(project.return_config.targets),
             "anchor_restore": project.return_config.anchor_restore,
         },
@@ -614,6 +570,7 @@ def _actual_workbench_surface_contract(project: KnowledgeBaseProject) -> dict[st
 
 
 def _expected_ui_surface_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
+    contract = project.template_contract
     return {
         "derived_from": {
             "framework_modules": {
@@ -639,22 +596,15 @@ def _expected_ui_surface_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
         "shell": {
             "id": project.surface.shell,
             "layout_variant": project.surface.layout_variant,
-            "regions": ["conversation_sidebar", "chat_main", "citation_drawer"],
-            "secondary_pages": ["basketball_showcase", "knowledge_list", "knowledge_detail", "document_detail"],
+            "regions": list(contract.shell_regions),
+            "secondary_pages": list(contract.secondary_pages),
             "preview_mode": project.surface.preview_mode,
             "density": project.surface.density,
         },
         "pages": {
             "chat_home": {
                 "path": project.route.workbench,
-                "slots": [
-                    "conversation_sidebar",
-                    "chat_header",
-                    "message_stream",
-                    "chat_composer",
-                    "citation_drawer",
-                    "knowledge_switch_dialog",
-                ],
+                "slots": list(contract.chat_home_slots),
             },
             "basketball_showcase": {
                 "path": project.route.basketball_showcase,
@@ -678,7 +628,7 @@ def _expected_ui_surface_spec(project: KnowledgeBaseProject) -> dict[str, Any]:
         "citation": {
             "style": project.chat.citation_style,
             "summary_variant": project.return_config.citation_card_variant,
-            "drawer_sections": ["snippet", "source_context"],
+            "drawer_sections": list(contract.drawer_sections),
             "document_detail_path": _document_detail_path(project),
         },
     }
@@ -1009,7 +959,11 @@ def _actual_answer_behavior(project: KnowledgeBaseProject) -> dict[str, Any]:
         section_id="generated-runtime",
     )
     citations = list(response.citations)
-    citation_style = "inline_refs" if citations and "[1]" in response.answer else "missing_inline_refs"
+    citation_style = (
+        project.template_contract.required_chat_citation_style
+        if citations and "[1]" in response.answer
+        else f"missing_{project.template_contract.required_chat_citation_style}"
+    )
     return_path_prefix = project.route.workbench
     document_path_prefix = project.route.document_detail_prefix
     if citations and not all(item.return_path.startswith(f"{return_path_prefix}?") for item in citations):
@@ -1335,6 +1289,13 @@ def _structural_object_from_definition(
 
     expected_evidence = definition.expected_builder(project)
     actual_evidence = definition.actual_extractor(project)
+    origin_categories: list[str] = ["legacy-migrated"]
+    if framework_sources:
+        origin_categories.append("framework-derived")
+    if product_sources:
+        origin_categories.append("product-instantiated")
+    if implementation_sources:
+        origin_categories.append("implementation-refined")
     return StructuralObject(
         object_id=definition.symbol_id,
         project_id=project.metadata.project_id,
@@ -1354,6 +1315,7 @@ def _structural_object_from_definition(
         actual_fingerprint=_fingerprint(actual_evidence),
         comparator=definition.comparator,
         extractor=definition.extractor,
+        origin_categories=tuple(sorted(set(origin_categories))),
     )
 
 
@@ -1487,6 +1449,7 @@ def _config_effect_object(
         actual_fingerprint=_fingerprint(actual_evidence),
         comparator="implementation_effect_exact.v1",
         extractor="implementation.effect.v1",
+        origin_categories=("implementation-refined", "evidence-only"),
     )
 
 
@@ -1526,6 +1489,8 @@ def _project_record_for(project: KnowledgeBaseProject) -> Any:
                 "generation_manifest_json",
                 "governance_manifest_json",
                 "governance_tree_json",
+                "strict_zone_report_json",
+                "object_coverage_report_json",
             )
         ),
     }
@@ -1585,6 +1550,12 @@ def build_governance_closure(project: KnowledgeBaseProject) -> ProjectGovernance
     candidates = classify_candidates(tuple(structural_objects), project_candidates, role_bindings)
     strict_zone = infer_strict_zone(
         tuple(structural_objects),
+        role_bindings,
+        candidates,
+        _expected_generated_artifact_paths(project),
+    )
+    strict_zone = annotate_strict_zone_minimality(
+        strict_zone,
         role_bindings,
         candidates,
         _expected_generated_artifact_paths(project),
@@ -1703,6 +1674,8 @@ def _binding_index_for_project(project: KnowledgeBaseProject) -> dict[str, list[
 
 def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
     closure = build_governance_closure(project)
+    strict_zone_report = build_strict_zone_report(closure)
+    object_coverage_report = build_object_coverage_report(closure)
     binding_index = _binding_index_for_project(project)
     symbols = []
     for structural_object in closure.structural_objects:
@@ -1734,6 +1707,8 @@ def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
             "manifest_version": GOVERNANCE_MANIFEST_VERSION,
             "generator_version": GOVERNANCE_GENERATOR_VERSION,
             "symbols": symbols,
+            "strict_zone_report": strict_zone_report,
+            "object_coverage_report": object_coverage_report,
         }
     )
     return payload
@@ -1741,6 +1716,8 @@ def build_governance_manifest(project: KnowledgeBaseProject) -> dict[str, Any]:
 
 def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
     closure = build_governance_closure(project)
+    strict_zone_report = build_strict_zone_report(closure)
+    object_coverage_report = build_object_coverage_report(closure)
     project_root_id = f"project:{project.metadata.project_id}"
     framework_root_id = f"{project_root_id}:framework"
     product_root_id = f"{project_root_id}:product_spec"
@@ -1898,6 +1875,7 @@ def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
             cardinality=structural_object.cardinality,
             comparator=structural_object.comparator,
             extractor=structural_object.extractor,
+            origin_categories=list(structural_object.origin_categories),
             expected_evidence=structural_object.expected_evidence,
             expected_fingerprint=structural_object.expected_fingerprint,
             actual_evidence=structural_object.actual_evidence,
@@ -1948,6 +1926,8 @@ def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
             object_ids=list(strict_entry.object_ids),
             role_ids=list(strict_entry.role_ids),
             reasons=list(strict_entry.reasons),
+            why_required=list(strict_entry.why_required),
+            minimality_status=strict_entry.minimality_status,
             derived_from=derived_from,
             project_id=project.metadata.project_id,
         )
@@ -2019,6 +1999,8 @@ def build_governance_tree(project: KnowledgeBaseProject) -> dict[str, Any]:
         "project_discovery": closure.discovery.to_dict(),
         "upstream_closure": [item.to_dict() for item in closure.upstream_closure],
         "strict_zone": [item.to_dict() for item in closure.strict_zone],
+        "strict_zone_report": strict_zone_report,
+        "object_coverage_report": object_coverage_report,
         "evidence_artifacts": dict(closure.evidence_artifacts),
         "structural_objects": [item.to_manifest_dict() for item in closure.structural_objects],
         "role_bindings": [item.to_dict() for item in closure.role_bindings],
@@ -2074,8 +2056,12 @@ def parse_governance_manifest(path: Path) -> dict[str, Any]:
         raise ValueError("governance manifest missing role_bindings list")
     if not isinstance(payload.get("strict_zone"), list):
         raise ValueError("governance manifest missing strict_zone list")
+    if not isinstance(payload.get("strict_zone_report"), dict):
+        raise ValueError("governance manifest missing strict_zone_report object")
     if not isinstance(payload.get("candidates"), list):
         raise ValueError("governance manifest missing candidates list")
+    if not isinstance(payload.get("object_coverage_report"), dict):
+        raise ValueError("governance manifest missing object_coverage_report object")
     return payload
 
 
@@ -2095,12 +2081,16 @@ def parse_governance_tree(path: Path) -> dict[str, Any]:
         raise ValueError("governance tree missing project_discovery object")
     if not isinstance(payload.get("strict_zone"), list):
         raise ValueError("governance tree missing strict_zone list")
+    if not isinstance(payload.get("strict_zone_report"), dict):
+        raise ValueError("governance tree missing strict_zone_report object")
     if not isinstance(payload.get("structural_objects"), list):
         raise ValueError("governance tree missing structural_objects list")
     if not isinstance(payload.get("role_bindings"), list):
         raise ValueError("governance tree missing role_bindings list")
     if not isinstance(payload.get("candidates"), list):
         raise ValueError("governance tree missing candidates list")
+    if not isinstance(payload.get("object_coverage_report"), dict):
+        raise ValueError("governance tree missing object_coverage_report object")
     if not isinstance(payload.get("evidence_artifacts"), dict):
         raise ValueError("governance tree missing evidence_artifacts object")
     return payload
@@ -2465,6 +2455,8 @@ def _compare_payload_to_closure(
         ]
     issues: list[dict[str, Any]] = []
     payload_code = "GOVERNANCE_TREE_INVALID" if tree_mode else "GOVERNANCE_MANIFEST_INVALID"
+    strict_zone_report = build_strict_zone_report(closure)
+    object_coverage_report = build_object_coverage_report(closure)
 
     object_index, object_issues = _manifest_object_index(payload, code=payload_code)
     issues.extend(object_issues)
@@ -2499,6 +2491,22 @@ def _compare_payload_to_closure(
                     "artifact": artifact_key,
                     "expected": rel_path,
                     "actual": payload_artifacts.get(artifact_key),
+                }
+            )
+
+    for report_key, expected_report in (
+        ("strict_zone_report", strict_zone_report),
+        ("object_coverage_report", object_coverage_report),
+    ):
+        payload_report = payload.get(report_key)
+        if _canonical_json(payload_report) != _canonical_json(expected_report):
+            issues.append(
+                {
+                    "code": payload_code,
+                    "message": f"{report_key} drifted from current governance closure",
+                    "file": "",
+                    "line": 1,
+                    "report": report_key,
                 }
             )
 
@@ -2539,9 +2547,14 @@ def _compare_payload_to_closure(
                 }
             )
         if structural_object.actual_fingerprint != structural_object.expected_fingerprint:
+            mismatch_code = (
+                "DEAD_CONFIG_EFFECT"
+                if structural_object.kind == "implementation_effect"
+                else "EXPECTATION_MISMATCH"
+            )
             issues.append(
                 {
-                    "code": "EXPECTATION_MISMATCH",
+                    "code": mismatch_code,
                     "message": f"structural object no longer matches derived expectation: {structural_object.object_id}",
                     "file": next(
                         (role.file_hints[0] for role in structural_object.required_roles if role.file_hints),
@@ -2602,6 +2615,24 @@ def _compare_payload_to_closure(
                     "line": 1,
                 }
             )
+        if payload_entry.get("minimality_status") != strict_entry.minimality_status:
+            issues.append(
+                {
+                    "code": payload_code,
+                    "message": f"strict zone minimality drifted for {strict_entry.file}",
+                    "file": strict_entry.file,
+                    "line": 1,
+                }
+            )
+        if strict_entry.minimality_status == "redundant":
+            issues.append(
+                {
+                    "code": "STRICT_ZONE_REDUNDANT",
+                    "message": f"strict zone contains redundant carrier: {strict_entry.file}",
+                    "file": strict_entry.file,
+                    "line": 1,
+                }
+            )
 
     for candidate in closure.candidates:
         payload_candidate = candidate_index.get(candidate.candidate_id)
@@ -2637,6 +2668,19 @@ def _compare_payload_to_closure(
                     "candidate_id": candidate.candidate_id,
                     "expected": candidate.classification,
                     "actual": payload_candidate.get("classification"),
+                }
+            )
+        if (
+            candidate.classification == "internal"
+            and candidate.kind in {"python_route_handler", "python_route_builder", "python_behavior_orchestrator"}
+        ):
+            issues.append(
+                {
+                    "code": "MISSING_BINDING",
+                    "message": f"high-risk structural candidate is not governed or attached: {candidate.candidate_id}",
+                    "file": candidate.file,
+                    "line": 1,
+                    "candidate_id": candidate.candidate_id,
                 }
             )
 

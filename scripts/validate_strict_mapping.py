@@ -18,8 +18,17 @@ try:
 except ModuleNotFoundError:
     _hierarchy_module = import_module("generate_module_hierarchy_html")
 
+try:
+    _framework_tree_module = import_module("scripts.generate_framework_tree_hierarchy")
+except ModuleNotFoundError:
+    _framework_tree_module = import_module("generate_framework_tree_hierarchy")
+
 load_hierarchy_graph = _hierarchy_module.load_hierarchy
 render_hierarchy_html = _hierarchy_module.render_html
+build_framework_tree_payload = _framework_tree_module.build_payload_from_framework
+DEFAULT_FRAMEWORK_TREE_HTML = _framework_tree_module.DEFAULT_OUTPUT_HTML
+DEFAULT_FRAMEWORK_TREE_JSON = _framework_tree_module.DEFAULT_OUTPUT_JSON
+render_framework_tree_html = _framework_tree_module.render_html
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
@@ -33,6 +42,11 @@ from project_runtime import (
     materialize_registered_project,
     resolve_project_template_registration,
 )
+from project_runtime.repository_policy import load_repository_validation_policy
+from project_runtime.project_governance import (
+    build_project_discovery_audit,
+    render_project_discovery_audit_markdown,
+)
 from project_runtime.governance import (
     compare_project_to_tree,
     parse_governance_tree,
@@ -40,6 +54,8 @@ from project_runtime.governance import (
 )
 from standards_tree import build_standards_tree, level_files_from_tree
 from workspace_governance import (
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON,
+    DEFAULT_PROJECT_DISCOVERY_AUDIT_MD,
     DEFAULT_WORKSPACE_GOVERNANCE_HTML,
     DEFAULT_WORKSPACE_GOVERNANCE_JSON,
     build_workspace_governance_payload,
@@ -54,21 +70,11 @@ CORE_L1_STANDARD_FILE = "specs/框架设计核心标准.md"
 COMPATIBILITY_FACADE_FILE = "src/shelf_framework.py"
 SHELF_DOMAIN_FILE = "src/shelf_domain.py"
 
-DEFAULT_LEVEL_ORDER = ("L0", "L1", "L2", "L3")
-VALID_NODE_KINDS = {"layer", "file"}
-LEVEL_ALLOWED_PREFIXES: dict[str, tuple[str, ...]] = {
-    "L0": ("specs/",),
-    "L1": ("specs/",),
-    "L2": ("framework/",),
-    "L3": ("mapping/",),
-}
-REQUIRED_L1_ANCHORS_PER_L2 = (
-    "## 1. 能力声明（Capability Statement）",
-    "## 2. 边界定义（Boundary）",
-    "## 3. 最小可行基（Bases）",
-    "## 4. 组合原则（Combination Principles）",
-    "## 5. 验证（Verification）",
-)
+VALIDATION_POLICY = load_repository_validation_policy()
+DEFAULT_LEVEL_ORDER = VALIDATION_POLICY.default_level_order
+VALID_NODE_KINDS = VALIDATION_POLICY.valid_node_kinds
+LEVEL_ALLOWED_PREFIXES: dict[str, tuple[str, ...]] = VALIDATION_POLICY.level_allowed_prefixes
+REQUIRED_L1_ANCHORS_PER_L2 = VALIDATION_POLICY.required_l1_anchors_per_l2
 ASSIGN_CALL_PATTERN = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\(\s*$"
 )
@@ -106,16 +112,10 @@ FRAMEWORK_RULE_TOP_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(R\d+)`\s*(.*)$")
 FRAMEWORK_RULE_CHILD_LINE_PATTERN = re.compile(r"^\s*[-*]\s*`(R\d+\.\d+)`\s*(.*)$")
 FRAMEWORK_BACKTICK_CONTENT_PATTERN = re.compile(r"`([^`]+)`")
 FRAMEWORK_SYMBOL_TOKEN_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
-REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS = (
-    "## 1. 能力声明",
-    "## 2. 边界定义",
-    "## 3. 最小可行基",
-    "## 4. 基组合原则",
-    "## 5. 验证",
-)
-PROJECT_ALLOWED_TOP_LEVEL_DIRS = {"assets", "generated"}
-PROJECT_ALLOWED_ROOT_FILES = {"product_spec.toml", "implementation_config.toml"}
-PROJECT_ALLOWED_DOC_SUFFIXES = {".md"}
+REQUIRED_FRAMEWORK_DIRECTIVE_SECTIONS = VALIDATION_POLICY.required_framework_directive_sections
+PROJECT_ALLOWED_TOP_LEVEL_DIRS = VALIDATION_POLICY.allowed_project_top_level_dirs
+PROJECT_ALLOWED_ROOT_FILES = VALIDATION_POLICY.allowed_project_root_files
+PROJECT_ALLOWED_DOC_SUFFIXES = VALIDATION_POLICY.allowed_project_doc_suffixes
 
 Issue = dict[str, Any]
 
@@ -278,6 +278,8 @@ def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
         "generation_manifest_json",
         "governance_manifest_json",
         "governance_tree_json",
+        "strict_zone_report_json",
+        "object_coverage_report_json",
     ):
         value = artifacts.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -290,6 +292,13 @@ def expected_generated_files_for(product_spec_file: Path) -> tuple[str, ...]:
 
 def _read_file_bytes(path: Path) -> bytes:
     return path.read_bytes()
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path.name} must decode into an object")
+    return payload
 
 
 def _load_toml_text_and_data(path: Path) -> tuple[str, dict[str, Any]]:
@@ -347,6 +356,8 @@ def _derived_generated_artifacts_payload(
         "generation_manifest_json": rel_path("generation_manifest_json"),
         "governance_manifest_json": rel_path("governance_manifest_json"),
         "governance_tree_json": rel_path("governance_tree_json"),
+        "strict_zone_report_json": rel_path("strict_zone_report_json"),
+        "object_coverage_report_json": rel_path("object_coverage_report_json"),
     }
 
 
@@ -693,6 +704,79 @@ def validate_project_generation_discipline(
     return issues
 
 
+def _iter_repository_portability_scan_files(repo_root: Path = REPO_ROOT) -> tuple[Path, ...]:
+    policy = VALIDATION_POLICY.portability
+    files: list[Path] = []
+    excluded_roots = tuple((repo_root / item).resolve() for item in policy.excluded_roots)
+    for root_entry in policy.text_scan_roots:
+        target = (repo_root / root_entry).resolve()
+        if not target.exists():
+            continue
+        if target.is_file():
+            if target.suffix.lower() in policy.text_scan_extensions:
+                files.append(target)
+            continue
+        for path in sorted(target.rglob("*")):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() not in policy.text_scan_extensions:
+                continue
+            resolved = path.resolve()
+            if any(resolved.is_relative_to(excluded) for excluded in excluded_roots):
+                continue
+            files.append(resolved)
+    return tuple(dict.fromkeys(files))
+
+
+def validate_repository_portability(repo_root: Path = REPO_ROOT) -> list[Issue]:
+    issues: list[Issue] = []
+    repo_root = repo_root.resolve()
+    policy = VALIDATION_POLICY
+    absolute_prefixes = {repo_root.as_posix()}
+    raw_repo_root = str(repo_root)
+    if raw_repo_root != repo_root.as_posix():
+        absolute_prefixes.add(raw_repo_root)
+
+    for file_path in _iter_repository_portability_scan_files(repo_root):
+        rel_file = file_path.relative_to(repo_root).as_posix()
+        text = read_text(file_path)
+        for prefix in sorted(absolute_prefixes):
+            if prefix in text:
+                issues.append(
+                    make_issue(
+                        "repository documents and templates must not embed machine-local absolute repository paths",
+                        rel_file,
+                        find_line(text, prefix),
+                        code="REPOSITORY_PORTABILITY_ABSOLUTE_PATH",
+                    )
+                )
+                break
+
+    expected_repo_fragment = f"github.com/{policy.public_repo_slug}/"
+    for issue_template_file in policy.portability.issue_template_files:
+        file_path = (repo_root / issue_template_file).resolve()
+        if not file_path.exists():
+            continue
+        text = read_text(file_path)
+        for idx, line in enumerate(text.splitlines(), start=1):
+            stripped = line.strip()
+            if not stripped.startswith("url:"):
+                continue
+            url = stripped.split(":", 1)[1].strip()
+            if "github.com/" not in url:
+                continue
+            if expected_repo_fragment not in url:
+                issues.append(
+                    make_issue(
+                        f"issue template links must point at the canonical public repo {policy.public_repo_slug}",
+                        issue_template_file,
+                        idx,
+                        code="ISSUE_TEMPLATE_REPO_URL_STALE",
+                    )
+                )
+    return issues
+
+
 def validate_implementation_config_effects(
     product_spec_files: list[Path] | None = None,
 ) -> list[Issue]:
@@ -985,6 +1069,8 @@ def validate_workspace_governance_artifacts() -> list[Issue]:
     issues: list[Issue] = []
     rel_json = DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix()
     rel_html = DEFAULT_WORKSPACE_GOVERNANCE_HTML.relative_to(REPO_ROOT).as_posix()
+    rel_audit_json = DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON.relative_to(REPO_ROOT).as_posix()
+    rel_audit_md = DEFAULT_PROJECT_DISCOVERY_AUDIT_MD.relative_to(REPO_ROOT).as_posix()
 
     if not DEFAULT_WORKSPACE_GOVERNANCE_JSON.exists():
         issues.append(
@@ -1008,6 +1094,28 @@ def validate_workspace_governance_artifacts() -> list[Issue]:
         )
         return issues
 
+    if not DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON.exists():
+        issues.append(
+            make_issue(
+                "missing project discovery audit JSON; run `uv run python scripts/materialize_project.py`",
+                rel_audit_json,
+                1,
+                code="PROJECT_DISCOVERY_AUDIT_MISSING",
+            )
+        )
+        return issues
+
+    if not DEFAULT_PROJECT_DISCOVERY_AUDIT_MD.exists():
+        issues.append(
+            make_issue(
+                "missing project discovery audit Markdown; run `uv run python scripts/materialize_project.py`",
+                rel_audit_md,
+                1,
+                code="PROJECT_DISCOVERY_AUDIT_MISSING",
+            )
+        )
+        return issues
+
     try:
         parse_workspace_governance_payload(DEFAULT_WORKSPACE_GOVERNANCE_JSON)
     except Exception as exc:
@@ -1022,11 +1130,39 @@ def validate_workspace_governance_artifacts() -> list[Issue]:
         return issues
 
     try:
+        audit_payload = _read_json(DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON)
+        if audit_payload.get("audit_version") != "project-discovery-audit/v1":
+            raise ValueError(f"unsupported audit version: {audit_payload.get('audit_version')}")
+        if not isinstance(audit_payload.get("entries"), list):
+            raise ValueError("project discovery audit missing entries list")
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"invalid project discovery audit JSON: {exc}",
+                rel_audit_json,
+                1,
+                code="PROJECT_DISCOVERY_AUDIT_INVALID",
+            )
+        )
+        return issues
+
+    try:
         fresh_payload = build_workspace_governance_payload()
+        fresh_audit_payload = build_project_discovery_audit()
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
             temp_json = Path(temp_dir) / "shelf_governance_tree.json"
             temp_html = Path(temp_dir) / "shelf_governance_tree.html"
+            temp_audit_json = Path(temp_dir) / "project_discovery_audit.json"
+            temp_audit_md = Path(temp_dir) / "project_discovery_audit.md"
             temp_json.write_text(json.dumps(fresh_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            temp_audit_json.write_text(
+                json.dumps(fresh_audit_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            temp_audit_md.write_text(
+                render_project_discovery_audit_markdown(fresh_audit_payload),
+                encoding="utf-8",
+            )
             graph = load_hierarchy_graph(temp_json)
             render_hierarchy_html(graph, temp_html, width=1680, height=1080)
             if _read_file_bytes(DEFAULT_WORKSPACE_GOVERNANCE_JSON) != _read_file_bytes(temp_json):
@@ -1047,6 +1183,24 @@ def validate_workspace_governance_artifacts() -> list[Issue]:
                         code="WORKSPACE_GOVERNANCE_OUT_OF_SYNC",
                     )
                 )
+            if _read_file_bytes(DEFAULT_PROJECT_DISCOVERY_AUDIT_JSON) != _read_file_bytes(temp_audit_json):
+                issues.append(
+                    make_issue(
+                        "project discovery audit JSON is stale or manually edited; re-materialize the workspace tree",
+                        rel_audit_json,
+                        1,
+                        code="PROJECT_DISCOVERY_AUDIT_OUT_OF_SYNC",
+                    )
+                )
+            if _read_file_bytes(DEFAULT_PROJECT_DISCOVERY_AUDIT_MD) != _read_file_bytes(temp_audit_md):
+                issues.append(
+                    make_issue(
+                        "project discovery audit Markdown is stale or manually edited; re-materialize the workspace tree",
+                        rel_audit_md,
+                        1,
+                        code="PROJECT_DISCOVERY_AUDIT_OUT_OF_SYNC",
+                    )
+                )
     except Exception as exc:
         issues.append(
             make_issue(
@@ -1054,6 +1208,84 @@ def validate_workspace_governance_artifacts() -> list[Issue]:
                 rel_json,
                 1,
                 code="WORKSPACE_GOVERNANCE_BUILD_FAILED",
+            )
+        )
+
+    return issues
+
+
+def validate_framework_tree_artifacts() -> list[Issue]:
+    issues: list[Issue] = []
+    rel_json = DEFAULT_FRAMEWORK_TREE_JSON.relative_to(REPO_ROOT).as_posix()
+    rel_html = DEFAULT_FRAMEWORK_TREE_HTML.relative_to(REPO_ROOT).as_posix()
+
+    if not DEFAULT_FRAMEWORK_TREE_JSON.exists():
+        issues.append(
+            make_issue(
+                "missing framework tree JSON; run `uv run python scripts/materialize_project.py`",
+                rel_json,
+                1,
+                code="WORKSPACE_FRAMEWORK_TREE_MISSING",
+            )
+        )
+        return issues
+
+    if not DEFAULT_FRAMEWORK_TREE_HTML.exists():
+        issues.append(
+            make_issue(
+                "missing framework tree HTML; run `uv run python scripts/materialize_project.py`",
+                rel_html,
+                1,
+                code="WORKSPACE_FRAMEWORK_TREE_MISSING",
+            )
+        )
+        return issues
+
+    try:
+        load_hierarchy_graph(DEFAULT_FRAMEWORK_TREE_JSON)
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"invalid framework tree JSON: {exc}",
+                rel_json,
+                1,
+                code="WORKSPACE_FRAMEWORK_TREE_INVALID",
+            )
+        )
+        return issues
+
+    try:
+        fresh_payload, _ = build_framework_tree_payload(FRAMEWORK_DIR)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+            temp_json = Path(temp_dir) / "shelf_framework_tree.json"
+            temp_html = Path(temp_dir) / "shelf_framework_tree.html"
+            temp_json.write_text(json.dumps(fresh_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            render_framework_tree_html(temp_json, temp_html, 1680, 1180)
+            if _read_file_bytes(DEFAULT_FRAMEWORK_TREE_JSON) != _read_file_bytes(temp_json):
+                issues.append(
+                    make_issue(
+                        "framework tree JSON is stale or manually edited; re-materialize the workspace tree",
+                        rel_json,
+                        1,
+                        code="WORKSPACE_FRAMEWORK_TREE_OUT_OF_SYNC",
+                    )
+                )
+            if _read_file_bytes(DEFAULT_FRAMEWORK_TREE_HTML) != _read_file_bytes(temp_html):
+                issues.append(
+                    make_issue(
+                        "framework tree HTML is stale or manually edited; re-materialize the workspace tree",
+                        rel_html,
+                        1,
+                        code="WORKSPACE_FRAMEWORK_TREE_OUT_OF_SYNC",
+                    )
+                )
+    except Exception as exc:
+        issues.append(
+            make_issue(
+                f"failed to rebuild framework tree: {exc}",
+                rel_json,
+                1,
+                code="WORKSPACE_FRAMEWORK_TREE_BUILD_FAILED",
             )
         )
 
@@ -1679,15 +1911,28 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         )
                     )
 
-            has_capability_ref = any(re.fullmatch(r"C\d+", token) for token in source_tokens)
-            has_boundary_ref = any(not re.fullmatch(r"C\d+", token) for token in source_tokens)
-            if not has_capability_ref or not has_boundary_ref:
+            capability_refs = {
+                token for token in source_tokens if re.fullmatch(r"C\d+", token) is not None
+            }
+            invalid_capability_refs = capability_refs - positive_capability_ids
+            if invalid_capability_refs:
                 issues.append(
                     make_issue(
                         (
-                            f"{base_id} source must include at least one capability id (C*) "
-                            "and one boundary/parameter identifier"
+                            f"{base_id} source may only reference positive capabilities; "
+                            f"found invalid capability ids: {', '.join(sorted(invalid_capability_refs))}"
                         ),
+                        rel_file,
+                        base_line_num,
+                        code="FW022",
+                    )
+                )
+
+            has_boundary_ref = any(not re.fullmatch(r"C\d+", token) for token in source_tokens)
+            if not has_boundary_ref:
+                issues.append(
+                    make_issue(
+                        f"{base_id} source must include at least one boundary/parameter identifier",
                         rel_file,
                         base_line_num,
                         code="FW022",
@@ -1886,8 +2131,8 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
             for child_line, content in child_items:
                 if "输出能力" not in content:
                     continue
-                capability_refs = re.findall(r"C\d+", content)
-                if not capability_refs:
+                output_capability_refs = re.findall(r"C\d+", content)
+                if not output_capability_refs:
                     issues.append(
                         make_issue(
                             f"{parent_rule} output capability must reference at least one C*",
@@ -1897,7 +2142,7 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         )
                     )
                     continue
-                for cap_id in capability_refs:
+                for cap_id in output_capability_refs:
                     if cap_id in capability_ids:
                         continue
                     issues.append(
@@ -1916,9 +2161,9 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                     capability_source_bases.setdefault(capability_id, set()).add(base_ref_id)
 
         capability_output_rules: dict[str, set[str]] = {cap_id: set() for cap_id in positive_capability_ids}
-        for parent_rule, output_capability_refs in rule_output_capabilities.items():
+        for parent_rule, parent_rule_output_capabilities in rule_output_capabilities.items():
             for capability_id in positive_capability_ids:
-                if capability_id in output_capability_refs:
+                if capability_id in parent_rule_output_capabilities:
                     capability_output_rules.setdefault(capability_id, set()).add(parent_rule)
 
         for capability_id in sorted(positive_capability_ids):
@@ -1935,6 +2180,18 @@ def validate_framework_layers() -> tuple[list[Issue], set[str]]:
                         rel_file,
                         capability_line_num,
                         code="FW070",
+                    )
+                )
+            elif len(supporting_bases) > 1:
+                issues.append(
+                    make_issue(
+                        (
+                            f"{capability_id} must map to exactly one B* source expression; "
+                            f"found multiple bases: {', '.join(sorted(supporting_bases))}"
+                        ),
+                        rel_file,
+                        capability_line_num,
+                        code="FW075",
                     )
                 )
             if not output_rules:
@@ -2770,14 +3027,16 @@ def validate_change_propagation(change_context: dict[str, Any], changed_files: s
     affected_nodes = list(change_context.get("affected_nodes", []))
 
     governed_prefixes = ("framework/", "specs/", "mapping/", "projects/", "src/")
-    ignored_governance_artifacts = {
+    ignored_tree_artifacts = {
+        DEFAULT_FRAMEWORK_TREE_JSON.relative_to(REPO_ROOT).as_posix(),
+        DEFAULT_FRAMEWORK_TREE_HTML.relative_to(REPO_ROOT).as_posix(),
         DEFAULT_WORKSPACE_GOVERNANCE_JSON.relative_to(REPO_ROOT).as_posix(),
         DEFAULT_WORKSPACE_GOVERNANCE_HTML.relative_to(REPO_ROOT).as_posix(),
     }
     governed_changed_files = sorted(
         path
         for path in changed_files
-        if path.startswith(governed_prefixes) and path not in ignored_governance_artifacts
+        if path.startswith(governed_prefixes) and path not in ignored_tree_artifacts
     )
     if governed_changed_files and not touched_nodes:
         issues.append(
@@ -2887,6 +3146,9 @@ def main() -> int:
             )
 
     if not issues:
+        issues.extend(validate_repository_portability())
+
+    if not issues:
         issues.extend(validate_project_generation_discipline(scoped_project_spec_files))
 
     if not issues:
@@ -2896,6 +3158,7 @@ def main() -> int:
         issues.extend(validate_project_governance(scoped_project_spec_files))
 
     if not issues:
+        issues.extend(validate_framework_tree_artifacts())
         issues.extend(validate_workspace_governance_artifacts())
 
     if args.check_changes and change_context is not None:

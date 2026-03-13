@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.0.46 - 2026-03-13
+- Fixed the long-lived validation deadlock path in Shelf AI. Validation commands now run with timeout protection, and a manual `Shelf: Validate Mapping Now` request can restart a stale in-flight validation instead of leaving the extension apparently unresponsive until `Reload Window`.
+- Changed boundary-to-product-spec navigation to prefer materialized governance manifests when available. This removes the hardcoded knowledge-base bias and lets custom frameworks such as `document_chunking` resolve to the correct `projects/*/product_spec.toml` section after project materialization.
+- Added regression coverage for both fixes: plugin-side runtime tests now guard command-timeout / stale-restart behavior, and framework-navigation tests now cover a custom framework that resolves boundary navigation through generated governance metadata.
+
+## 0.0.45 - 2026-03-13
+- Formalized the `B / R / C+` relation model in the repository standards and strict validation chain. Positive capabilities now map to exactly one base-level source expression, while combination principles still legitimately span multiple bases and produce multiple capabilities.
+- Rewrote the affected framework modules to follow the tightened base-source rule, then synced the lint / validation behavior so capability-to-base ownership is no longer inferred loosely from mixed dependency context.
+- Fixed Shelf AI's stale-diagnostics behavior for edited watched documents. The extension now clears outdated Shelf diagnostics while files are being edited, prefixes visible failures with a cross marker, and turns the status bar into an explicit failing state instead of leaving a misleading `Shelf OK` during auto-triggered errors.
+
+## 0.0.44 - 2026-03-13
+- Restored the framework tree as Shelf AI's default visual entry. The sidebar and primary command now open `docs/hierarchy/shelf_framework_tree.html`, while the workspace governance tree stays available as a separate secondary view for closure tracing and guard debugging.
+- Split framework-tree and governance-tree commands, packaged settings, and generated-artifact protection. Both derived tree artifacts are now regenerated and guarded independently instead of being treated as one mixed default view.
+- Fixed the framework-tree canvas viewport model so left-drag now pans a real workspace surface instead of a content-stretched pseudo-viewport. The generated graph keeps extra workspace padding, recenters after fit/reset, and behaves closer to Visio-style canvas navigation.
+- Registered repository-level code governance more explicitly by adding a Chinese-first Git commit-message standard alongside the existing release-note standard under `specs/code/`.
+
+## 0.0.43 - 2026-03-11
+- Clarified the current governance-tree scope in the packaged Shelf AI docs: the mainline now explicitly means the path that carries `Framework -> Product Spec -> Implementation Config -> Code -> Evidence` convergence plus the reverse-check chain back to upstream structure.
+- Documented the current coverage boundary more precisely: Shelf AI strongly governs the structural mainline carriers, while lower-level rendering and presentation details remain only partially governed instead of being overstated as fully closed.
+- Synced this release with the repository-side second-round audit so packaged guidance, GitHub release notes, and the current governance posture no longer drift apart.
+
 ## 0.0.40 - 2026-03-10
 - Switched Shelf AI from a framework-tree-only view to a workspace governance-tree flow. The extension now reads the workspace governance tree, opens the governance-tree view directly, and surfaces the recent touched / affected node closure inside the sidebar.
 - Moved strict validation to the same workspace-governance source used by the extension. Validation now resolves affected projects and checks through governance-tree closure instead of relying on framework-tree-only path heuristics.

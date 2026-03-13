@@ -1,4 +1,3 @@
-const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const vscode = require("vscode");
@@ -6,9 +5,14 @@ const frameworkNavigation = require("./framework_navigation");
 const frameworkCompletion = require("./framework_completion");
 const governanceTree = require("./governance_tree");
 const workspaceGuard = require("./guarding");
+const validationRuntime = require("./validation_runtime");
 
 const STANDARDS_TREE_FILE = path.join("specs", "规范总纲与树形结构.md");
 const REGISTRY_FILE = path.join("mapping", "mapping_registry.json");
+const DEFAULT_FRAMEWORK_TREE_JSON = path.join("docs", "hierarchy", "shelf_framework_tree.json");
+const DEFAULT_FRAMEWORK_TREE_HTML = path.join("docs", "hierarchy", "shelf_framework_tree.html");
+const DEFAULT_FRAMEWORK_TREE_GENERATE_COMMAND =
+  "uv run python scripts/generate_framework_tree_hierarchy.py --output-json docs/hierarchy/shelf_framework_tree.json --output-html docs/hierarchy/shelf_framework_tree.html";
 const DEFAULT_GOVERNANCE_TREE_JSON = path.join("docs", "hierarchy", "shelf_governance_tree.json");
 const DEFAULT_GOVERNANCE_TREE_HTML = path.join("docs", "hierarchy", "shelf_governance_tree.html");
 const SIDEBAR_VIEW_ID = "shelf.sidebarHome";
@@ -18,6 +22,7 @@ const DEFAULT_MATERIALIZE_COMMAND = "uv run python scripts/materialize_project.p
 const DEFAULT_TYPE_CHECK_COMMAND = "uv run mypy";
 const DEFAULT_INSTALL_GIT_HOOKS_COMMAND = "bash scripts/install_git_hooks.sh";
 const GENERATED_EVENT_SUPPRESSION_MS = 2500;
+const MANUAL_STALE_VALIDATION_RESTART_MS = 15 * 1000;
 const FRAMEWORK_RULE_HINTS = {
   FW002: "@framework 必须无参数",
   FW003: "标题必须为 中文名:EnglishName",
@@ -25,7 +30,7 @@ const FRAMEWORK_RULE_HINTS = {
   FW011: "C/B/R/V 编号格式必须合法",
   FW020: "B* 必须包含来源",
   FW021: "B* 来源表达式与引用必须合法",
-  FW022: "B* 来源必须包含 C* 与参数",
+  FW022: "B* 来源中的能力归属与参数约束必须合法",
   FW023: "B* 禁止使用“上游模块：...”，必须内联写模块引用",
   FW024: "非根层模块的 B* 必须在主句中内联写本框架上游模块引用",
   FW025: "B* 的本地内联模块引用必须指向当前框架中真实存在的更低本地层模块",
@@ -61,8 +66,8 @@ function activate(context) {
   let lastRunIssues = [];
   let lastRepoRoot = "";
   let mappingValidationActive = true;
-  let frameworkTreePanel = null;
-  let frameworkTreeRepoRoot = "";
+  let treePanel = null;
+  let treePanelRepoRoot = "";
   let frameworkSidebarView = null;
   let lastValidationAt = "";
   let lastValidationMode = "change";
@@ -74,10 +79,61 @@ function activate(context) {
   let gitHooksPrompted = false;
   const suppressedGeneratedDirectories = new Map();
   const suppressedArtifactPaths = new Map();
+  const dirtyWatchedFiles = new Set();
+  const activeValidationCommand = validationRuntime.createActiveCommandTracker();
   const VALIDATION_SOURCE_PRIORITY = {
     auto: 1,
     save: 2,
     manual: 3
+  };
+
+  const setStatusOk = () => {
+    status.text = "$(check) Shelf OK";
+    status.tooltip = "Shelf: no guard issues";
+    status.backgroundColor = undefined;
+    status.color = undefined;
+  };
+
+  const setStatusError = (errors) => {
+    status.text = "$(close) Shelf failed";
+    status.tooltip = buildTooltip(errors);
+    status.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+    status.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+  };
+
+  const setStatusPendingSave = () => {
+    const dirtyCount = dirtyWatchedFiles.size;
+    status.text = "$(close) Shelf pending";
+    status.tooltip = dirtyCount > 0
+      ? `Shelf: ${dirtyCount} watched file(s) changed. Save to revalidate.`
+      : "Shelf: watched files changed. Save to revalidate.";
+    status.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+    status.color = new vscode.ThemeColor("statusBarItem.warningForeground");
+  };
+
+  const refreshStatusFromCurrentState = () => {
+    if (!mappingValidationActive) {
+      if (lastRepoRoot) {
+        setStatusDisabled(status, lastRepoRoot);
+      }
+      return;
+    }
+    if (lastRunIssues.length) {
+      setStatusError(lastRunIssues);
+      return;
+    }
+    if (dirtyWatchedFiles.size) {
+      setStatusPendingSave();
+      return;
+    }
+    if (lastValidationPassed === true) {
+      setStatusOk();
+      return;
+    }
+    status.text = "$(check) Shelf idle";
+    status.tooltip = "Shelf";
+    status.backgroundColor = undefined;
+    status.color = undefined;
   };
 
   const normalizeTriggerUris = (options = {}) => {
@@ -179,10 +235,34 @@ function activate(context) {
 
   const runParsedCommand = async (label, command, repoRoot, parseFn) => {
     output.appendLine(`[${label}] ${command}`);
-    const execResult = await execCommand(command, repoRoot);
+    const execResult = await validationRuntime.execCommand(command, repoRoot, {
+      onSpawn: (child) => activeValidationCommand.trackChild(label, child),
+      onExit: (child) => activeValidationCommand.clearChild(child),
+    });
     output.appendLine(execResult.stdout || "");
     output.appendLine(execResult.stderr || "");
+    if (execResult.timedOut) {
+      return parseStageFailure(
+        `SHELF_${String(label).replace(/[^A-Za-z0-9]+/g, "_").toUpperCase()}_TIMEOUT`,
+        `Shelf ${label} command timed out after ${Math.round(execResult.timeoutMs / 1000)}s.`,
+        execResult.stdout,
+        execResult.stderr,
+        execResult.code
+      );
+    }
     return parseFn(execResult.stdout, execResult.stderr, execResult.code);
+  };
+
+  const requestManualValidation = () => {
+    if (running) {
+      const restarted = activeValidationCommand.restartIfStale(MANUAL_STALE_VALIDATION_RESTART_MS);
+      if (restarted.restarted) {
+        output.appendLine(
+          `[validate] restarted stale ${restarted.label} command after ${Math.round(restarted.elapsedMs / 1000)}s`
+        );
+      }
+    }
+    scheduleValidation({ mode: "full", triggerUris: [], notifyOnFail: true, source: "manual" });
   };
 
   const refreshGitHookStatus = async ({ promptIfMissing = false } = {}) => {
@@ -256,7 +336,6 @@ function activate(context) {
     }
 
     const showProgressStatus = task.source === "manual";
-    const shouldSetErrorStatus = task.source === "save" || task.source === "manual";
     if (showProgressStatus) {
       status.text = "$(sync~spin) Shelf validating";
       status.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
@@ -269,29 +348,30 @@ function activate(context) {
       .map((uri) => workspaceGuard.normalizeRelPath(path.relative(repoRoot, uri.fsPath)))
       .filter(Boolean)
       .filter((relPath) => !isSuppressedGeneratedPath(relPath));
-    const governanceJsonPath = resolveGovernanceTreeJsonPath(
-      repoRoot,
-      config.get("governanceTreeJsonPath") || config.get("frameworkTreeJsonPath")
-    );
-    const governanceGenerateCommand = String(
-      config.get("governanceTreeGenerateCommand")
-      || config.get("frameworkTreeGenerateCommand")
-      || DEFAULT_GOVERNANCE_TREE_GENERATE_COMMAND
-    );
-    if (!fs.existsSync(governanceJsonPath)) {
-      await generateFrameworkTree(repoRoot, governanceGenerateCommand, output);
+    const governanceTreeSettings = getGovernanceTreeSettings(repoRoot, config);
+    const frameworkTreeSettings = getFrameworkTreeSettings(repoRoot, config);
+    if (!fs.existsSync(governanceTreeSettings.jsonPath)) {
+      await generateTreeArtifacts(
+        repoRoot,
+        governanceTreeSettings.generateCommand,
+        output,
+        "governance-tree"
+      );
     }
 
     const combinedIssues = [];
     let governancePayload = null;
     let changePlan = workspaceGuard.classifyWorkspaceChanges(repoRoot, relPaths);
     try {
-      governancePayload = governanceTree.readGovernanceTree(repoRoot, path.relative(repoRoot, governanceJsonPath));
+      governancePayload = governanceTree.readGovernanceTree(
+        repoRoot,
+        path.relative(repoRoot, governanceTreeSettings.jsonPath)
+      );
       changePlan = governanceTree.classifyWorkspaceChanges(repoRoot, relPaths, governancePayload);
     } catch (error) {
       combinedIssues.push(normalizeIssue({
         message: `Shelf could not load governance tree: ${String(error)}`,
-        file: path.relative(repoRoot, governanceJsonPath),
+        file: path.relative(repoRoot, governanceTreeSettings.jsonPath),
         line: 1,
         column: 1,
         code: "SHELF_GOVERNANCE_TREE",
@@ -324,6 +404,8 @@ function activate(context) {
     if (config.get("protectGeneratedFiles") && changePlan.protectedGeneratedPaths.length) {
       const guardMode = config.get("guardMode") === "strict" ? "strict" : "normal";
       const protectedWorkspaceArtifacts = changePlan.protectedWorkspaceArtifacts || [];
+      const protectedGovernanceArtifacts = changePlan.protectedGovernanceArtifacts || [];
+      const protectedFrameworkArtifacts = changePlan.protectedFrameworkArtifacts || [];
       if (guardMode === "strict") {
         if (changePlan.protectedProjectSpecs.length) {
           const restoreCommand = buildMaterializeCommand(
@@ -351,10 +433,10 @@ function activate(context) {
             combinedIssues.push(...restoreResult.errors);
           }
         }
-        if (protectedWorkspaceArtifacts.length) {
+        if (protectedGovernanceArtifacts.length) {
           const restoreResult = await runParsedCommand(
             "governance-tree",
-            governanceGenerateCommand,
+            governanceTreeSettings.generateCommand,
             repoRoot,
             (stdout, stderr, code) => parseStageFailure(
               "SHELF_GOVERNANCE_TREE_PROTECT",
@@ -367,7 +449,26 @@ function activate(context) {
           if (!restoreResult.passed) {
             combinedIssues.push(...restoreResult.errors);
           } else {
-            suppressArtifactEvents(protectedWorkspaceArtifacts);
+            suppressArtifactEvents(protectedGovernanceArtifacts);
+          }
+        }
+        if (protectedFrameworkArtifacts.length) {
+          const restoreResult = await runParsedCommand(
+            "framework-tree",
+            frameworkTreeSettings.generateCommand,
+            repoRoot,
+            (stdout, stderr, code) => parseStageFailure(
+              "SHELF_FRAMEWORK_TREE_PROTECT",
+              "Workspace framework tree artifacts were edited directly and Shelf could not restore them.",
+              stdout,
+              stderr,
+              code
+            )
+          );
+          if (!restoreResult.passed) {
+            combinedIssues.push(...restoreResult.errors);
+          } else {
+            suppressArtifactEvents(protectedFrameworkArtifacts);
           }
         }
         const unresolvedProtectedPaths = changePlan.protectedGeneratedPaths.filter(
@@ -385,15 +486,22 @@ function activate(context) {
         }
       } else {
         for (const relPath of changePlan.protectedGeneratedPaths) {
-          const isWorkspaceArtifact = protectedWorkspaceArtifacts.includes(relPath);
+          const isGovernanceArtifact = workspaceGuard.isWorkspaceGovernanceArtifact(relPath);
+          const isFrameworkArtifact = workspaceGuard.isWorkspaceFrameworkArtifact(relPath);
           combinedIssues.push(normalizeIssue({
-            message: isWorkspaceArtifact
+            message: isGovernanceArtifact
               ? "Workspace governance tree artifacts are derived evidence. Refresh the governance tree instead of editing them directly."
-              : "Direct edits under projects/*/generated/* are forbidden. Change framework/product spec/implementation config and re-materialize instead.",
+              : (
+                isFrameworkArtifact
+                  ? "Workspace framework tree artifacts are derived evidence. Refresh the framework tree instead of editing them directly."
+                  : "Direct edits under projects/*/generated/* are forbidden. Change framework/product spec/implementation config and re-materialize instead."
+              ),
             file: relPath,
             line: 1,
             column: 1,
-            code: isWorkspaceArtifact ? "SHELF_GOVERNANCE_TREE_EDIT" : "SHELF_GENERATED_EDIT",
+            code: isGovernanceArtifact
+              ? "SHELF_GOVERNANCE_TREE_EDIT"
+              : (isFrameworkArtifact ? "SHELF_FRAMEWORK_TREE_EDIT" : "SHELF_GENERATED_EDIT"),
           }));
         }
       }
@@ -458,19 +566,10 @@ function activate(context) {
     }
 
     if (combined.passed) {
-      status.text = "$(check) Shelf OK";
-      status.tooltip = "Shelf: no guard issues";
-      status.backgroundColor = undefined;
-      status.color = undefined;
       lastFailureSignature = "";
+      refreshStatusFromCurrentState();
     } else {
-      if (shouldSetErrorStatus) {
-        status.text = "$(error) Shelf issues";
-        status.tooltip = buildTooltip(combined.errors);
-        status.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-        status.color = new vscode.ThemeColor("statusBarItem.errorForeground");
-      }
-
+      refreshStatusFromCurrentState();
       const shouldNotify = task.notifyOnFail || config.get("notifyOnAutoFail");
       if (shouldNotify && shouldNotifyFailure(combined.errors, lastFailureSignature)) {
         lastFailureSignature = signature(combined.errors);
@@ -539,38 +638,43 @@ function activate(context) {
     editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
   };
 
-  const ensureFrameworkTreePanel = () => {
-    if (!frameworkTreePanel) {
-      frameworkTreePanel = vscode.window.createWebviewPanel(
-        "shelfFrameworkTree",
-        "Shelf · Governance Tree",
+  const treeTitleForKind = (kind) => kind === "governance"
+    ? "Shelf · Governance Tree"
+    : "Shelf · Framework Tree";
+
+  const ensureTreePanel = (kind) => {
+    if (!treePanel) {
+      treePanel = vscode.window.createWebviewPanel(
+        "shelfTreeView",
+        treeTitleForKind(kind),
         vscode.ViewColumn.Active,
         {
           enableScripts: true,
           retainContextWhenHidden: true
         }
       );
-      frameworkTreePanel.onDidDispose(() => {
-        frameworkTreePanel = null;
-        frameworkTreeRepoRoot = "";
+      treePanel.onDidDispose(() => {
+        treePanel = null;
+        treePanelRepoRoot = "";
       });
-      frameworkTreePanel.webview.onDidReceiveMessage(async (message) => {
+      treePanel.webview.onDidReceiveMessage(async (message) => {
         if (!message || message.type !== "shelf.openSource") {
           return;
         }
         await openFrameworkTreeSource(
-          frameworkTreeRepoRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+          treePanelRepoRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
           String(message.file || ""),
           Number(message.line || 1)
         );
       });
     } else {
-      frameworkTreePanel.reveal(vscode.ViewColumn.Active, true);
+      treePanel.reveal(vscode.ViewColumn.Active, true);
     }
-    return frameworkTreePanel;
+    treePanel.title = treeTitleForKind(kind);
+    return treePanel;
   };
 
-  const openFrameworkTree = async (options = { regenerateIfMissing: false }) => {
+  const openTreeView = async (kind, options = { regenerateIfMissing: false }) => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
       vscode.window.showWarningMessage("Shelf: no workspace is open.");
@@ -578,53 +682,101 @@ function activate(context) {
     }
 
     const repoRoot = folder.uri.fsPath;
-    frameworkTreeRepoRoot = repoRoot;
+    treePanelRepoRoot = repoRoot;
     const config = vscode.workspace.getConfiguration("shelf");
-    const htmlPath = resolveGovernanceTreeHtmlPath(
-      repoRoot,
-      config.get("governanceTreeHtmlPath") || config.get("frameworkTreeHtmlPath")
-    );
+    const treeSettings = getTreeSettings(repoRoot, config, kind);
+    const treeLabel = kind === "governance" ? "governance tree" : "framework tree";
+    const refreshCommandLabel = kind === "governance"
+      ? "Shelf: Refresh Governance Tree"
+      : "Shelf: Refresh Framework Tree";
 
-    if (options.regenerateIfMissing && !fs.existsSync(htmlPath)) {
-      const generateCommand = config.get("governanceTreeGenerateCommand")
-        || config.get("frameworkTreeGenerateCommand")
-        || DEFAULT_GOVERNANCE_TREE_GENERATE_COMMAND;
-      await generateFrameworkTree(repoRoot, String(generateCommand), output);
+    if (options.regenerateIfMissing && !fs.existsSync(treeSettings.htmlPath)) {
+      await generateTreeArtifacts(repoRoot, treeSettings.generateCommand, output, treeLabel);
     }
 
-    const panel = ensureFrameworkTreePanel();
-    panel.webview.html = buildFrameworkTreeFallbackHtml(
-      `Loading ${toWorkspaceRelative(htmlPath, repoRoot)} ...`
+    const panel = ensureTreePanel(kind);
+    panel.webview.html = buildTreeFallbackHtml(
+      `Loading ${toWorkspaceRelative(treeSettings.htmlPath, repoRoot)} ...`,
+      refreshCommandLabel,
+      treeTitleForKind(kind)
     );
 
-    if (!fs.existsSync(htmlPath)) {
-      panel.webview.html = buildFrameworkTreeFallbackHtml(
-        `Governance tree HTML not found: ${toWorkspaceRelative(htmlPath, repoRoot)}`
+    if (!fs.existsSync(treeSettings.htmlPath)) {
+      panel.webview.html = buildTreeFallbackHtml(
+        `${kind === "governance" ? "Governance" : "Framework"} tree HTML not found: ${toWorkspaceRelative(treeSettings.htmlPath, repoRoot)}`,
+        refreshCommandLabel,
+        treeTitleForKind(kind)
       );
       return;
     }
 
     try {
-      panel.webview.html = fs.readFileSync(htmlPath, "utf8");
+      panel.webview.html = fs.readFileSync(treeSettings.htmlPath, "utf8");
     } catch (error) {
-      panel.webview.html = buildFrameworkTreeFallbackHtml(
-        `Failed to read governance tree HTML: ${String(error)}`
+      panel.webview.html = buildTreeFallbackHtml(
+        `Failed to read ${treeLabel} HTML: ${String(error)}`,
+        refreshCommandLabel,
+        treeTitleForKind(kind)
       );
     }
+  };
+
+  const openFrameworkTree = async (options = { regenerateIfMissing: false }) => {
+    await openTreeView("framework", options);
+  };
+
+  const openGovernanceTree = async (options = { regenerateIfMissing: false }) => {
+    await openTreeView("governance", options);
+  };
+
+  const clearShelfDiagnosticsForUri = (uri) => {
+    if (!uri || !uri.fsPath) {
+      return;
+    }
+    diagnostics.delete(uri);
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      return;
+    }
+    const repoRoot = folder.uri.fsPath;
+    const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, uri.fsPath));
+    if (!relPath) {
+      return;
+    }
+    lastRunIssues = lastRunIssues.filter(
+      (issue) => workspaceGuard.normalizeRelPath(issue.file || "") !== relPath
+    );
+    if (!lastRunIssues.length && dirtyWatchedFiles.size) {
+      lastValidationPassed = null;
+    }
+    refreshStatusFromCurrentState();
+    refreshSidebarHome();
   };
 
   const renderSidebarHome = () => {
     const defaultActionItems = [
       {
         action: "openTree",
-        label: "打开治理树",
-        description: "直接查看统一治理树，并保留节点跳转能力。",
+        label: "打开框架树",
+        description: "默认查看框架文档树，不把代码节点混进主视图。",
         tone: "primary"
       },
       {
         action: "refreshTree",
+        label: "刷新框架树产物",
+        description: "重新生成 docs/hierarchy 下的框架树 HTML。",
+        tone: "ghost"
+      },
+      {
+        action: "openGovernanceTree",
+        label: "打开治理树",
+        description: "需要排障或看受影响闭包时，再打开工作区治理树。",
+        tone: "ghost"
+      },
+      {
+        action: "refreshGovernanceTree",
         label: "刷新治理树产物",
-        description: "重新生成 docs/hierarchy 下的治理树 HTML。",
+        description: "重新生成工作区治理树 HTML / JSON。",
         tone: "ghost"
       },
       {
@@ -653,8 +805,8 @@ function activate(context) {
         workspace: "No workspace",
         heroTone: "unknown",
         heroStatus: "等待工作区",
-        heroSummary: "打开仓库后，这里会显示治理树、严格校验和问题跳转入口。",
-        treePath: DEFAULT_GOVERNANCE_TREE_HTML,
+        heroSummary: "打开仓库后，这里会优先显示框架树入口，同时保留治理树守卫和问题跳转。",
+        treePath: DEFAULT_FRAMEWORK_TREE_HTML,
         mappingStatus: "Unavailable",
         issueSummary: "No workspace",
         treeStatus: "Unknown",
@@ -667,6 +819,12 @@ function activate(context) {
             value: "未知",
             tone: "unknown",
             note: STANDARDS_TREE_FILE
+          },
+          {
+            label: "框架树产物",
+            value: "未知",
+            tone: "unknown",
+            note: DEFAULT_FRAMEWORK_TREE_HTML
           },
           {
             label: "治理树产物",
@@ -713,13 +871,14 @@ function activate(context) {
 
     const repoRoot = folder.uri.fsPath;
     const config = vscode.workspace.getConfiguration("shelf");
-    const treePath = resolveGovernanceTreeHtmlPath(
-      repoRoot,
-      config.get("governanceTreeHtmlPath") || config.get("frameworkTreeHtmlPath")
-    );
+    const frameworkTreeSettings = getFrameworkTreeSettings(repoRoot, config);
+    const governanceTreeSettings = getGovernanceTreeSettings(repoRoot, config);
+    const frameworkTreePath = frameworkTreeSettings.htmlPath;
+    const governanceTreePath = governanceTreeSettings.htmlPath;
     const standardsExists = hasStandardsTree(repoRoot);
     const validationEnabled = standardsExists && mappingValidationActive;
-    const treeExists = fs.existsSync(treePath);
+    const frameworkTreeExists = fs.existsSync(frameworkTreePath);
+    const governanceTreeExists = fs.existsSync(governanceTreePath);
     const guardMode = config.get("guardMode") === "strict" ? "strict" : "normal";
     const issueCount = lastRunIssues.length;
     const issueSummary = validationEnabled
@@ -775,19 +934,19 @@ function activate(context) {
     if (!standardsExists) {
       heroTone = "error";
       heroStatus = "严格守卫未启用";
-      heroSummary = `当前工作区缺少 ${STANDARDS_TREE_FILE}，Shelf 会自动停用严格映射校验。`;
+      heroSummary = `当前工作区缺少 ${STANDARDS_TREE_FILE}，Shelf 会停用治理树守卫，但仍可打开框架树。`;
       calloutTone = "error";
       calloutTitle = "先补齐规范入口";
-      calloutBody = "没有规范总纲时，侧边栏仍可作为树图入口，但严格映射问题不会自动汇总。";
+      calloutBody = "没有规范总纲时，侧边栏仍可作为框架树入口，但严格映射问题不会自动汇总。";
       calloutAction = {
         action: "openStandards",
         label: "打开规范总纲路径"
       };
-    } else if (!treeExists) {
-      heroStatus = "树图产物缺失";
-      heroSummary = "侧边栏已经可用，但治理树 HTML 还没准备好，下一步应该生成并打开树图。";
-      calloutTitle = "生成并打开治理树";
-      calloutBody = `目标产物位于 ${toWorkspaceRelative(treePath, repoRoot)}。使用 Shelf 可以直接生成并打开。`;
+    } else if (!frameworkTreeExists) {
+      heroStatus = "框架树产物缺失";
+      heroSummary = "侧边栏已经可用，但默认框架树 HTML 还没准备好，下一步应该先生成框架树。";
+      calloutTitle = "生成并打开框架树";
+      calloutBody = `目标产物位于 ${toWorkspaceRelative(frameworkTreePath, repoRoot)}。使用 Shelf 可以直接生成并打开。`;
       calloutAction = {
         action: "openTree",
         label: "生成树图并打开"
@@ -806,13 +965,13 @@ function activate(context) {
     } else if (lastValidationPassed === true) {
       heroTone = "ok";
       heroStatus = "工作区状态正常";
-      heroSummary = "树图产物和严格映射校验都已接通，侧边栏现在就是你的快速入口。";
+      heroSummary = "框架树入口和治理树守卫都已接通，侧边栏现在就是你的快速入口。";
       calloutTone = "ok";
-      calloutTitle = "继续查看治理树";
-      calloutBody = "可以直接打开统一治理树检查结构，或在改动后随时手动刷新与复核。";
+      calloutTitle = "继续查看框架树";
+      calloutBody = "一般先打开框架文档树；只有需要追踪代码影响闭包时，再切到治理树。";
       calloutAction = {
         action: "openTree",
-        label: "打开治理树"
+        label: "打开框架树"
       };
     }
 
@@ -834,12 +993,20 @@ function activate(context) {
         note: STANDARDS_TREE_FILE
       },
       {
+        label: "框架树产物",
+        value: frameworkTreeExists ? "就绪" : "缺失",
+        tone: frameworkTreeExists ? "ok" : "error",
+        note: frameworkTreeExists
+          ? toWorkspaceRelative(frameworkTreePath, repoRoot)
+          : `等待生成 ${toWorkspaceRelative(frameworkTreePath, repoRoot)}`
+      },
+      {
         label: "治理树产物",
-        value: treeExists ? "就绪" : "缺失",
-        tone: treeExists ? "ok" : "error",
-        note: treeExists
-          ? toWorkspaceRelative(treePath, repoRoot)
-          : `等待生成 ${toWorkspaceRelative(treePath, repoRoot)}`
+        value: governanceTreeExists ? "就绪" : "缺失",
+        tone: governanceTreeExists ? "ok" : "error",
+        note: governanceTreeExists
+          ? toWorkspaceRelative(governanceTreePath, repoRoot)
+          : `等待生成 ${toWorkspaceRelative(governanceTreePath, repoRoot)}`
       },
       {
         label: "守卫模式",
@@ -909,10 +1076,10 @@ function activate(context) {
       heroTone,
       heroStatus,
       heroSummary,
-      treePath: toWorkspaceRelative(treePath, repoRoot),
+      treePath: toWorkspaceRelative(frameworkTreePath, repoRoot),
       mappingStatus: validationEnabled ? "Enabled" : "Disabled",
       issueSummary,
-      treeStatus: treeExists ? "Ready" : "Missing",
+      treeStatus: frameworkTreeExists ? "Ready" : "Missing",
       standardsStatus: standardsExists ? "Ready" : "Missing",
       lastValidation,
       actionItems,
@@ -968,8 +1135,16 @@ function activate(context) {
           await vscode.commands.executeCommand("shelf.refreshFrameworkTree");
           return;
         }
+        if (message.type === "shelf.sidebar.openGovernanceTree") {
+          await openGovernanceTree({ regenerateIfMissing: true });
+          return;
+        }
+        if (message.type === "shelf.sidebar.refreshGovernanceTree") {
+          await vscode.commands.executeCommand("shelf.refreshGovernanceTree");
+          return;
+        }
         if (message.type === "shelf.sidebar.validate") {
-          scheduleValidation({ mode: "full", triggerUris: [], notifyOnFail: true, source: "manual" });
+          requestManualValidation();
           return;
         }
         if (message.type === "shelf.sidebar.showIssues") {
@@ -1155,7 +1330,7 @@ function activate(context) {
   );
 
   const validateNowDisposable = vscode.commands.registerCommand("shelf.validateNow", async () => {
-    scheduleValidation({ mode: "full", triggerUris: [], notifyOnFail: true, source: "manual" });
+    requestManualValidation();
   });
 
   const installGitHooksDisposable = vscode.commands.registerCommand("shelf.installGitHooks", async () => {
@@ -1281,13 +1456,51 @@ function activate(context) {
 
     const repoRoot = folder.uri.fsPath;
     const config = vscode.workspace.getConfiguration("shelf");
-    const generateCommand = String(
-      config.get("governanceTreeGenerateCommand")
-      || config.get("frameworkTreeGenerateCommand")
-      || DEFAULT_GOVERNANCE_TREE_GENERATE_COMMAND
-    );
+    const frameworkTreeSettings = getFrameworkTreeSettings(repoRoot, config);
 
-    const ok = await generateFrameworkTree(repoRoot, generateCommand, output);
+    const ok = await generateTreeArtifacts(
+      repoRoot,
+      frameworkTreeSettings.generateCommand,
+      output,
+      "framework-tree"
+    );
+    if (!ok) {
+      await vscode.window.showErrorMessage("Shelf: failed to refresh framework tree.", "Open Log").then((action) => {
+        if (action === "Open Log") {
+          output.show(true);
+        }
+      });
+      return;
+    }
+
+    suppressArtifactEvents([
+      path.relative(repoRoot, frameworkTreeSettings.jsonPath),
+      path.relative(repoRoot, frameworkTreeSettings.htmlPath),
+    ]);
+    await openFrameworkTree({ regenerateIfMissing: false });
+  });
+
+  const openGovernanceTreeDisposable = vscode.commands.registerCommand("shelf.openGovernanceTree", async () => {
+    await openGovernanceTree({ regenerateIfMissing: true });
+  });
+
+  const refreshGovernanceTreeDisposable = vscode.commands.registerCommand("shelf.refreshGovernanceTree", async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      vscode.window.showWarningMessage("Shelf: no workspace is open.");
+      return;
+    }
+
+    const repoRoot = folder.uri.fsPath;
+    const config = vscode.workspace.getConfiguration("shelf");
+    const governanceTreeSettings = getGovernanceTreeSettings(repoRoot, config);
+
+    const ok = await generateTreeArtifacts(
+      repoRoot,
+      governanceTreeSettings.generateCommand,
+      output,
+      "governance-tree"
+    );
     if (!ok) {
       await vscode.window.showErrorMessage("Shelf: failed to refresh governance tree.", "Open Log").then((action) => {
         if (action === "Open Log") {
@@ -1298,10 +1511,10 @@ function activate(context) {
     }
 
     suppressArtifactEvents([
-      path.relative(repoRoot, resolveGovernanceTreeJsonPath(repoRoot, config.get("governanceTreeJsonPath") || config.get("frameworkTreeJsonPath"))),
-      path.relative(repoRoot, resolveGovernanceTreeHtmlPath(repoRoot, config.get("governanceTreeHtmlPath") || config.get("frameworkTreeHtmlPath"))),
+      path.relative(repoRoot, governanceTreeSettings.jsonPath),
+      path.relative(repoRoot, governanceTreeSettings.htmlPath),
     ]);
-    await openFrameworkTree({ regenerateIfMissing: false });
+    await openGovernanceTree({ regenerateIfMissing: false });
   });
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (doc) => {
@@ -1320,7 +1533,29 @@ function activate(context) {
       return;
     }
 
+    dirtyWatchedFiles.delete(doc.uri.fsPath);
     scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+  });
+
+  const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder || !event.document?.uri?.fsPath) {
+      return;
+    }
+    const relPath = workspaceGuard.normalizeRelPath(path.relative(folder.uri.fsPath, event.document.uri.fsPath));
+    if (!workspaceGuard.isWatchedPath(relPath) || isSuppressedGeneratedPath(relPath)) {
+      return;
+    }
+
+    if (event.document.isDirty) {
+      dirtyWatchedFiles.add(event.document.uri.fsPath);
+      clearShelfDiagnosticsForUri(event.document.uri);
+      return;
+    }
+
+    dirtyWatchedFiles.delete(event.document.uri.fsPath);
+    refreshStatusFromCurrentState();
+    refreshSidebarHome();
   });
 
   const createDisposable = vscode.workspace.onDidCreateFiles(async (event) => {
@@ -1415,6 +1650,9 @@ function activate(context) {
     showIssuesDisposable,
     openFrameworkTreeDisposable,
     refreshFrameworkTreeDisposable,
+    openGovernanceTreeDisposable,
+    refreshGovernanceTreeDisposable,
+    changeDisposable,
     saveDisposable,
     createDisposable,
     deleteDisposable,
@@ -1429,24 +1667,14 @@ function activate(context) {
 
 function deactivate() {}
 
-function execCommand(command, cwd) {
-  return new Promise((resolve) => {
-    cp.exec(command, { cwd, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      resolve({
-        code: error ? error.code ?? 1 : 0,
-        stdout: stdout || "",
-        stderr: stderr || ""
-      });
-    });
-  });
-}
+const execCommand = validationRuntime.execCommand;
 
-async function generateFrameworkTree(repoRoot, command, output) {
-  output.appendLine(`[framework-tree] ${command}`);
+async function generateTreeArtifacts(repoRoot, command, output, label) {
+  output.appendLine(`[${label}] ${command}`);
   const result = await execCommand(command, repoRoot);
   output.appendLine(result.stdout || "");
   output.appendLine(result.stderr || "");
-  output.appendLine(`[framework-tree] exit=${result.code}`);
+  output.appendLine(`[${label}] exit=${result.code}`);
   return result.code === 0;
 }
 
@@ -1619,8 +1847,8 @@ function applyDiagnostics(parsed, collection, repoRoot, triggerUri) {
     const ruleCode = normalizeFrameworkRuleCode(issue.code);
     const ruleHint = frameworkRuleHint(ruleCode);
     const message = ruleCode
-      ? `[shelf ${ruleCode}] ${ruleHint} | ${issue.message}`
-      : `[shelf] ${issue.message}`;
+      ? `✖ [shelf ${ruleCode}] ${ruleHint} | ${issue.message}`
+      : `✖ [shelf] ${issue.message}`;
     const diag = new vscode.Diagnostic(
       range,
       message,
@@ -1674,9 +1902,9 @@ function resolveIssueFile(file, repoRoot) {
   return path.join(repoRoot, file);
 }
 
-function resolveGovernanceTreeHtmlPath(repoRoot, configuredPath) {
+function resolveTreePath(repoRoot, configuredPath, defaultRelativePath) {
   if (typeof configuredPath !== "string" || !configuredPath.trim()) {
-    return path.join(repoRoot, DEFAULT_GOVERNANCE_TREE_HTML);
+    return path.join(repoRoot, defaultRelativePath);
   }
   if (path.isAbsolute(configuredPath)) {
     return configuredPath;
@@ -1684,14 +1912,26 @@ function resolveGovernanceTreeHtmlPath(repoRoot, configuredPath) {
   return path.join(repoRoot, configuredPath);
 }
 
-function resolveGovernanceTreeJsonPath(repoRoot, configuredPath) {
-  if (typeof configuredPath !== "string" || !configuredPath.trim()) {
-    return path.join(repoRoot, DEFAULT_GOVERNANCE_TREE_JSON);
-  }
-  if (path.isAbsolute(configuredPath)) {
-    return configuredPath;
-  }
-  return path.join(repoRoot, configuredPath);
+function getFrameworkTreeSettings(repoRoot, config) {
+  return {
+    jsonPath: resolveTreePath(repoRoot, config.get("frameworkTreeJsonPath"), DEFAULT_FRAMEWORK_TREE_JSON),
+    htmlPath: resolveTreePath(repoRoot, config.get("frameworkTreeHtmlPath"), DEFAULT_FRAMEWORK_TREE_HTML),
+    generateCommand: String(config.get("frameworkTreeGenerateCommand") || DEFAULT_FRAMEWORK_TREE_GENERATE_COMMAND),
+  };
+}
+
+function getGovernanceTreeSettings(repoRoot, config) {
+  return {
+    jsonPath: resolveTreePath(repoRoot, config.get("governanceTreeJsonPath"), DEFAULT_GOVERNANCE_TREE_JSON),
+    htmlPath: resolveTreePath(repoRoot, config.get("governanceTreeHtmlPath"), DEFAULT_GOVERNANCE_TREE_HTML),
+    generateCommand: String(config.get("governanceTreeGenerateCommand") || DEFAULT_GOVERNANCE_TREE_GENERATE_COMMAND),
+  };
+}
+
+function getTreeSettings(repoRoot, config, kind) {
+  return kind === "governance"
+    ? getGovernanceTreeSettings(repoRoot, config)
+    : getFrameworkTreeSettings(repoRoot, config);
 }
 
 function toWorkspaceRelative(filePath, repoRoot) {
@@ -1699,18 +1939,20 @@ function toWorkspaceRelative(filePath, repoRoot) {
   return rel.startsWith("..") ? filePath : rel;
 }
 
-function buildFrameworkTreeFallbackHtml(message) {
+function buildTreeFallbackHtml(message, refreshCommandLabel, title) {
   const escaped = String(message)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+  const commandLabel = escapeHtml(refreshCommandLabel || "Shelf: Refresh Framework Tree");
+  const pageTitle = escapeHtml(title || "Shelf · Framework Tree");
 
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Shelf · Governance Tree</title>
+  <title>${pageTitle}</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -1793,7 +2035,7 @@ function buildFrameworkTreeFallbackHtml(message) {
   <div class="card">
     <h1>Shelf</h1>
     <p class="message">${escaped}</p>
-    <p class="next-step">使用 <code>Shelf: Refresh Governance Tree</code> 重新生成树图。</p>
+    <p class="next-step">使用 <code>${commandLabel}</code> 重新生成树图。</p>
   </div>
 </body>
 </html>`;
@@ -1838,7 +2080,7 @@ function buildSidebarHomeHtml(model) {
     : null;
   const summaryTiles = [
     { label: "规范总纲", value: standardsStatus },
-    { label: "治理树", value: treeStatus },
+    { label: "框架树", value: treeStatus },
     { label: "严格校验", value: mappingStatus },
     { label: "问题", value: issueSummary }
   ];

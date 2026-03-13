@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
+from scripts.generate_framework_tree_hierarchy import DEFAULT_OUTPUT_JSON as DEFAULT_FRAMEWORK_TREE_JSON
 from workspace_governance import (
     DEFAULT_WORKSPACE_GOVERNANCE_JSON,
     build_workspace_governance_payload,
@@ -23,6 +24,7 @@ class WorkspaceGovernanceTest(unittest.TestCase):
         self.assertIn("project:knowledge_base_basic", node_ids)
         self.assertIn("project:knowledge_base_basic:structure:object:kb.answer.behavior", node_ids)
         self.assertIn("knowledge_base_basic", governance["project_trees"])
+        self.assertIn("project_discovery_audit", governance)
 
     def test_resolve_workspace_change_context_maps_framework_change_to_project(self) -> None:
         payload = build_workspace_governance_payload()
@@ -55,16 +57,19 @@ class WorkspaceGovernanceTest(unittest.TestCase):
         self.assertIn("root", payload)
         self.assertIn("governance", payload)
 
+    def test_framework_tree_artifact_exists(self) -> None:
+        self.assertTrue(DEFAULT_FRAMEWORK_TREE_JSON.exists())
+
     def test_workspace_governance_artifacts_are_nodes_in_the_tree(self) -> None:
         payload = build_workspace_governance_payload()
 
         context = resolve_workspace_change_context(
             payload,
-            {"docs/hierarchy/shelf_governance_tree.json"},
+            {"docs/hierarchy/project_discovery_audit.json"},
         )
 
         self.assertIn(
-            "workspace:shelf:evidence:artifact:governance_tree_json",
+            "workspace:shelf:evidence:artifact:project_discovery_audit_json",
             context["touched_nodes"],
         )
         self.assertTrue(context["affected_nodes"])

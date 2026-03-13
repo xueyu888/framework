@@ -40,6 +40,8 @@ DEFAULT_IMPLEMENTATION_CONFIG = textwrap.dedent(
     generation_manifest_json = "generation_manifest.json"
     governance_manifest_json = "governance_manifest.json"
     governance_tree_json = "governance_tree.json"
+    strict_zone_report_json = "strict_zone_report.json"
+    object_coverage_report_json = "object_coverage_report.json"
     """
 ).strip()
 
@@ -64,11 +66,13 @@ class ProjectRuntimeTest(unittest.TestCase):
 
         self.assertEqual(project.metadata.project_id, "knowledge_base_basic")
         self.assertEqual(project.metadata.template, "knowledge_base_workbench")
+        self.assertEqual(project.template_contract.template_id, project.metadata.template)
         self.assertEqual(project.route.workbench, "/knowledge-base")
         self.assertEqual(project.route.basketball_showcase, "/knowledge-base/cxk-basketball")
         self.assertEqual(project.route.knowledge_list, "/knowledge-bases")
         self.assertEqual(project.route.api_prefix, "/api/knowledge")
         self.assertEqual(project.surface.layout_variant, "chatgpt_knowledge_client")
+        self.assertIn(project.implementation.frontend.renderer, project.template_contract.supported_frontend_renderers)
         self.assertEqual(project.visual.brand, "Shelf")
         self.assertEqual(len(project.documents), 3)
         self.assertTrue(project.features.upload)
