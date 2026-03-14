@@ -3,10 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from project_runtime.knowledge_base import KnowledgeBaseProject
+    from project_runtime.knowledge_base import KnowledgeBaseCompilationState
 
 
-def build_workbench_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
+def build_workbench_contract(
+    project: "KnowledgeBaseCompilationState",
+    backend_spec: dict[str, Any],
+) -> dict[str, Any]:
     contract = project.template_contract
     library_actions = list(
         contract.workbench_library_actions(
@@ -14,7 +17,7 @@ def build_workbench_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
             allow_delete=project.library.allow_delete,
         )
     )
-    flow = project.backend_spec.get("interaction_flow", list(contract.workbench_flow_dicts()))
+    flow = backend_spec.get("interaction_flow", list(contract.workbench_flow_dicts()))
 
     return {
         "module_id": project.domain_ir.module_id,

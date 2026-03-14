@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from project_runtime.knowledge_base import KnowledgeBaseProject
+    from project_runtime.knowledge_base import KnowledgeBaseRuntimeBundle
 
 from rule_validation_models import RuleValidationOutcome, RuleValidationSummary
 
@@ -24,7 +24,7 @@ def _outcome(
     )
 
 
-def validate_workbench_rules(project: "KnowledgeBaseProject") -> tuple[RuleValidationOutcome, ...]:
+def validate_workbench_rules(project: "KnowledgeBaseRuntimeBundle") -> tuple[RuleValidationOutcome, ...]:
     contract_spec = project.template_contract
     contract = project.workbench_contract
     ui_spec = project.ui_spec

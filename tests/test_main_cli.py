@@ -13,7 +13,7 @@ class MainCliTest(unittest.TestCase):
         self.assertEqual(shelf_main._normalize_argv(["--reload"]), ["serve", "--reload"])
 
     @mock.patch("main.uvicorn.run")
-    @mock.patch("main.materialize_knowledge_base_project")
+    @mock.patch("main.materialize_knowledge_base_runtime_bundle")
     def test_serve_reload_materializes_project(self, materialize_project: mock.Mock, uvicorn_run: mock.Mock) -> None:
         result = shelf_main.main(
             [

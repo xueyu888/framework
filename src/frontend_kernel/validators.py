@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from project_runtime.knowledge_base import KnowledgeBaseProject
+    from project_runtime.knowledge_base import KnowledgeBaseRuntimeBundle
 
 from rule_validation_models import RuleValidationOutcome, RuleValidationSummary
 
@@ -24,7 +24,7 @@ def _outcome(
     )
 
 
-def validate_frontend_rules(project: "KnowledgeBaseProject") -> tuple[RuleValidationOutcome, ...]:
+def validate_frontend_rules(project: "KnowledgeBaseRuntimeBundle") -> tuple[RuleValidationOutcome, ...]:
     contract_spec = project.template_contract
     contract = project.frontend_contract
     ui_spec = project.ui_spec
@@ -71,9 +71,9 @@ def validate_frontend_rules(project: "KnowledgeBaseProject") -> tuple[RuleValida
     r3_reasons: list[str] = []
     if project.metadata.runtime_scene != contract_spec.template_id:
         r3_reasons.append(f"frontend extend slot must target {contract_spec.template_id}")
-    if contract["extend_slots"][0]["module_id"] != project.domain_ir.module_id:
+    if contract["extend_slots"][0]["module_id"] != project.root_module_ids["knowledge_base"]:
         r3_reasons.append("domain workbench slot must point to the selected domain framework module")
-    if contract["extend_slots"][1]["module_id"] != project.backend_ir.module_id:
+    if contract["extend_slots"][1]["module_id"] != project.root_module_ids["backend"]:
         r3_reasons.append("backend contract slot must point to the selected backend framework module")
 
     r4_reasons: list[str] = []

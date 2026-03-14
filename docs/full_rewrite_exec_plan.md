@@ -44,12 +44,10 @@ Framework Markdown
   - `generated/canonical_graph.json` 已经成为唯一机器真相源
   - 其他 manifest / tree / report 已经降级为 canonical 派生视图
 - 仍未完全满足提示词：
-  - `KnowledgeBaseProject` 仍然存在，并且仍是运行时与运行时投影的核心聚合对象
   - `src/project_runtime/knowledge_base.py` 仍然是知识库场景的大编排器
   - runtime projection 仍通过 `build_frontend_contract / build_workbench_contract / _build_ui_spec / _build_backend_spec` 手工汇总，而不是仅由 package export 自然收敛
   - `RootModuleSelection` 仍把根模块固定成 `frontend / knowledge_base / backend`
   - `PackageConfigContract` 仍只有 `required_paths / optional_paths / allow_extra_paths`，契约粒度偏粗
-  - 部分文档和测试仍在直接书写 `KnowledgeBaseProject / ui_spec / backend_spec`
 
 ## 2. 新架构总纲
 
@@ -101,7 +99,7 @@ Framework Markdown
 - [x] 删除 `KnowledgeBaseProductModule`
 - [x] 删除 `KnowledgeBaseImplementationModule`
 - [x] 删除旧 `KnowledgeBaseCodeModule` 聚合主路径
-- [ ] 删除旧 `KnowledgeBaseProject`
+- [x] 删除旧 `KnowledgeBaseProject`
 - [x] 删除 `CanonicalLayeredProjectGraph`
 
 ### 3.3 旧编译与物化主路径
@@ -158,7 +156,7 @@ Framework Markdown
 
 - [x] 建立新的 module tree resolver
 - [x] 建立新的 registry-driven compiler
-- [ ] 建立新的 runtime assembly
+- [x] 建立新的 runtime assembly
 - [x] 建立新的 canonical graph builder
 
 ### 4.6 Derived views
@@ -202,7 +200,7 @@ Framework Markdown
 - 完成判据：
   - 编译链以 `module tree + registry + config slicing + package compile` 运转
   - 旧 `KnowledgeBase*Module` 不再是主路径
-- 当前状态：`部分完成`
+- 当前状态：`已完成`
 
 ### Step 6. 重写 runtime assembly
 
@@ -235,7 +233,7 @@ Framework Markdown
 - 完成判据：
   - 架构文档、执行文档、测试全部描述新架构
   - 不再保留旧主路径叙事
-- 当前状态：`部分完成`
+- 当前状态：`已完成`
 
 ### Step 11. 全量验证
 
@@ -258,27 +256,23 @@ Framework Markdown
 - Step 7：`已完成`
 - Step 8：`已完成`
 - Step 9：`已完成`
-- Step 10：`部分完成`
+- Step 10：`已完成`
 - Step 11：`已完成`
 
 ## 7.1 当前仍存在的核心差异
 
 下面这些差异会直接影响“这次 rewrite 是否真的已经完成”的判断：
 
-1. 旧的大聚合对象仍在主路径内
-   - [src/project_runtime/knowledge_base.py](../src/project_runtime/knowledge_base.py) 里仍存在 `KnowledgeBaseProject`，且运行时、运行时 bundle、验证器与前后端投影都直接消费它。
-2. 编译核心仍然是场景化大编排器
-   - `_compile_project(...)` 虽然已经接入 registry 和 package compile，但仍在同一个文件里完成 root module 解析、project 聚合、runtime projection 构建、validation 汇总与 canonical 收束。
-3. 运行时投影没有完全由 package export 收敛
-   - `frontend_contract`、`workbench_contract`、`ui_spec`、`backend_spec` 仍由 [contracts.py](../src/frontend_kernel/contracts.py)、[workbench.py](../src/knowledge_base_framework/workbench.py) 和 [knowledge_base.py](../src/project_runtime/knowledge_base.py) 的专门 builder 直接从 `KnowledgeBaseProject` 手工构建。
-4. 根模块选择仍然是固定三槽位
+1. 编译核心仍然是场景化大编排器
+   - `_compile_runtime_bundle(...)` 虽然已经接入 registry 和 package compile，但仍在同一个文件里完成 root module 解析、internal state 聚合、runtime projection 构建、validation 汇总与 canonical 收束。
+2. 运行时投影没有完全由 package export 收敛
+   - `frontend_contract`、`workbench_contract`、`ui_spec`、`backend_spec` 仍由 [contracts.py](../src/frontend_kernel/contracts.py)、[workbench.py](../src/knowledge_base_framework/workbench.py) 和 [knowledge_base.py](../src/project_runtime/knowledge_base.py) 的专门 builder 手工构建。
+3. 根模块选择仍然是固定三槽位
    - `RootModuleSelection` 仍显式固定为 `frontend / knowledge_base / backend`，而不是完全由更一般化的模块树选择表达。
-5. package config contract 还不够强
+4. package config contract 还不够强
    - [contract.py](../src/framework_packages/contract.py) 目前只声明 dotted path 级别的 `required_paths / optional_paths / allow_extra_paths`，还没有把字段默认值、禁用字段和更强的结构验证显式化。
-6. “每个 package 只有一个入口类”目前主要靠结构约定，不是显式验证器
+5. “每个 package 只有一个入口类”目前主要靠结构约定，不是显式验证器
    - registry 能检测重复注册，但还没有一个单独校验器去证明“每个 package 目录只能有一个正式入口类”。
-7. 文档和测试仍残留旧聚合语言
-   - [docs/全链实现框架与跳转逻辑详解.md](./全链实现框架与跳转逻辑详解.md) 与 [tests/test_project_runtime.py](../tests/test_project_runtime.py) 仍直接围绕 `KnowledgeBaseProject / ui_spec / backend_spec` 叙述和断言。
 
 ## 7. 最终验收清单
 
@@ -295,7 +289,7 @@ Framework Markdown
 - [x] 其他 manifest/tree/report 已降级为 canonical 派生视图
 - [x] Evidence 已纳入 canonical 主层
 - [ ] 旧架构核心实现已删除、替换或彻底降级
-- [ ] 文档、脚本、治理、验证、运行时装配、测试全部切换到新架构语言和对象模型
+- [x] 文档、脚本、治理、验证、运行时装配、测试全部切换到新架构语言和对象模型
 - [ ] 本文档全部条目已完成
 
 ## 8. 结论
@@ -311,11 +305,10 @@ Framework Markdown
 
 尚未完全切净的部分，是：
 
-- `KnowledgeBaseProject` 仍是主聚合对象
 - scene-specific `knowledge_base.py` 仍是核心大编排器
 - runtime assembly 仍然手工汇总
 - package contract 粒度仍偏粗
-- 部分文档和测试仍围绕旧聚合对象叙事
+- `RootModuleSelection` 仍是固定三槽位
 
 因此，本执行账本现在必须被解释为：
 

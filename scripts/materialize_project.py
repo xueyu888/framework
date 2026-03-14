@@ -21,7 +21,7 @@ from generate_module_hierarchy_html import load_hierarchy, render_html
 from project_runtime import (
     build_project_discovery_audit,
     discover_framework_driven_projects,
-    materialize_knowledge_base_project,
+    materialize_knowledge_base_runtime_bundle,
     render_project_discovery_audit_markdown,
 )
 from workspace_governance import (
@@ -59,7 +59,7 @@ def main() -> int:
         return 1
 
     for project_file in project_files:
-        project = materialize_knowledge_base_project(project_file)
+        project = materialize_knowledge_base_runtime_bundle(project_file)
         assert project.generated_artifacts is not None
         print("[OK] materialized", project.metadata.project_id, "->", project.generated_artifacts.directory)
 

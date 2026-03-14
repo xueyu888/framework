@@ -18,7 +18,7 @@ from framework_packages import load_builtin_package_registry
 from project_runtime import (
     build_project_discovery_audit,
     discover_framework_driven_projects,
-    materialize_knowledge_base_project,
+    materialize_knowledge_base_runtime_bundle,
     render_project_discovery_audit_markdown,
 )
 from workspace_governance import (
@@ -64,7 +64,7 @@ def validate_project_materialization() -> list[str]:
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_output = Path(temp_dir) / "generated"
-                materialize_knowledge_base_project(project_file, output_dir=temp_output)
+                materialize_knowledge_base_runtime_bundle(project_file, output_dir=temp_output)
                 for file_name in record.artifact_contract.values():
                     repo_file = generated_dir / file_name
                     temp_file = temp_output / file_name

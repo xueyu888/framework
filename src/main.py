@@ -7,7 +7,7 @@ import sys
 
 import uvicorn
 
-from project_runtime import DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE, materialize_knowledge_base_project
+from project_runtime import DEFAULT_KNOWLEDGE_BASE_PROJECT_FILE, materialize_knowledge_base_runtime_bundle
 from project_runtime.app_factory import PROJECT_FILE_ENV, build_project_app
 
 
@@ -59,7 +59,7 @@ def _serve_project(project_file: str | Path, *, host: str, port: int, reload: bo
     os.environ[PROJECT_FILE_ENV] = str(resolved_project_file)
 
     if reload:
-        materialize_knowledge_base_project(resolved_project_file)
+        materialize_knowledge_base_runtime_bundle(resolved_project_file)
         uvicorn.run(
             "project_runtime.app_factory:app",
             host=host,

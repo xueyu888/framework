@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from project_runtime.knowledge_base import KnowledgeBaseProject
+    from project_runtime.knowledge_base import KnowledgeBaseCompilationState
 
 
-def build_frontend_contract(project: "KnowledgeBaseProject") -> dict[str, Any]:
+def build_frontend_contract(project: "KnowledgeBaseCompilationState") -> dict[str, Any]:
     contract = project.template_contract
     interaction_actions = list(
         contract.frontend_interaction_actions(
