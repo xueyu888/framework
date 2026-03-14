@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 
-from knowledge_base_runtime.projection import KnowledgeBaseRuntimeProjection
+from knowledge_base_runtime.runtime_exports import resolve_frontend_app_spec
+from project_runtime import ProjectRuntimeAssembly
+from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 
 
 @dataclass(frozen=True)
@@ -29,9 +31,9 @@ class StyleTemplateContext:
     panel_gap: str
 
     @classmethod
-    def from_project(cls, project: KnowledgeBaseRuntimeProjection) -> "StyleTemplateContext":
+    def from_project(cls, project: ProjectRuntimeAssembly) -> "StyleTemplateContext":
         _require_style_profile(project)
-        visual = project.ui_spec["visual"]["tokens"]
+        visual = resolve_frontend_app_spec(project)["ui"]["visual"]["tokens"]
         return cls(
             bg=visual["bg"],
             panel=visual["panel"],
@@ -94,14 +96,14 @@ class StyleTemplateContext:
         }
 
 
-def _require_style_profile(project: KnowledgeBaseRuntimeProjection) -> str:
-    implementation = project.ui_spec.get("implementation")
+def _require_style_profile(project: ProjectRuntimeAssembly) -> str:
+    implementation = resolve_frontend_app_spec(project)["ui"].get("implementation")
     if not isinstance(implementation, dict):
-        raise ValueError("ui_spec.implementation is required for frontend style selection")
+        raise ValueError("frontend_app_spec.ui.implementation is required for frontend style selection")
     value = implementation.get("style_profile")
     if not isinstance(value, str):
-        raise ValueError("ui_spec.implementation.style_profile must be a string")
-    if value not in project.template_contract.supported_frontend_style_profiles:
+        raise ValueError("frontend_app_spec.ui.implementation.style_profile must be a string")
+    if value not in load_knowledge_base_template_contract().supported_frontend_style_profiles:
         raise ValueError(f"unsupported frontend style_profile: {value}")
     return value
 
@@ -935,5 +937,5 @@ def _style_responsive_section() -> str:
     ).strip()
 
 
-def build_shared_style(project: KnowledgeBaseRuntimeProjection) -> str:
+def build_shared_style(project: ProjectRuntimeAssembly) -> str:
     return StyleTemplateContext.from_project(project).render()

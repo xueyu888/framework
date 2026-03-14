@@ -6,7 +6,7 @@
 - Treats the repository mainline as:
   `Framework Markdown -> Package Registry -> Project Config -> Code -> Evidence`.
 - Treats `projects/*/generated/canonical_graph.json` as the only machine truth.
-- Treats `generation_manifest.json` / `governance_manifest.json` / `governance_tree.json` / reports as canonical-derived views.
+- Treats `generation_manifest.json` / `derived_governance_manifest.json` / `derived_governance_tree.json` / reports as canonical-derived views.
 - Supports framework-markdown navigation for `B/C/R/V`, boundaries, module refs, and rule refs.
 - Maps framework boundaries back to `projects/*/project.toml` sections such as `[truth.chat]` and `[truth.surface]`.
 - Auto-materializes affected projects when `framework/*.md` or `projects/*/project.toml` changes.
@@ -84,4 +84,4 @@ The extension no longer treats the removed dual-track config files as live autho
 Public release notes live at:
 
 - `tools/vscode/shelf-ai/CHANGELOG.md`
-- `tools/vscode/shelf-ai/release-notes/0.1.1.md`
+- `tools/vscode/shelf-ai/release-notes/0.1.2.md`

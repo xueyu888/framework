@@ -7,7 +7,7 @@ import sys
 
 import uvicorn
 
-from project_runtime import DEFAULT_PROJECT_FILE, materialize_project_runtime_bundle
+from project_runtime import DEFAULT_PROJECT_FILE, materialize_project_runtime
 from project_runtime.app_factory import PROJECT_FILE_ENV, build_project_app
 
 
@@ -36,10 +36,10 @@ def _normalize_argv(argv: list[str]) -> list[str]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Shelf repository entrypoint. Default behavior materializes the configured project and serves it."
+        description="Shelf repository entrypoint. Default behavior loads the configured project runtime and serves it."
     )
     subparsers = parser.add_subparsers(dest="command")
-    serve_parser = subparsers.add_parser("serve", help="materialize the selected project and start the demo server")
+    serve_parser = subparsers.add_parser("serve", help="load the selected project runtime and start the demo server")
     serve_parser.add_argument(
         "--project-file",
         default=str(DEFAULT_PROJECT_FILE.relative_to(REPO_ROOT)),
@@ -47,7 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--host", default=DEFAULT_HOST, help=f"bind host (default: {DEFAULT_HOST})")
     serve_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"bind port (default: {DEFAULT_PORT})")
-    serve_parser.add_argument("--reload", action="store_true", help="enable uvicorn reload mode")
+    serve_parser.add_argument("--reload", action="store_true", help="enable uvicorn reload mode and pre-materialize generated artifacts")
     return parser
 
 
@@ -58,7 +58,7 @@ def _serve_project(project_file: str | Path, *, host: str, port: int, reload: bo
     os.environ[PROJECT_FILE_ENV] = str(resolved_project_file)
 
     if reload:
-        materialize_project_runtime_bundle(resolved_project_file)
+        materialize_project_runtime(resolved_project_file)
         uvicorn.run(
             "project_runtime.app_factory:app",
             host=host,

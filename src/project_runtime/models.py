@@ -295,10 +295,10 @@ class EvidenceRefinementConfig:
 @dataclass(frozen=True)
 class ArtifactConfig:
     canonical_graph_json: str
-    runtime_bundle_py: str
+    runtime_snapshot_py: str
     generation_manifest_json: str
-    governance_manifest_json: str
-    governance_tree_json: str
+    derived_governance_manifest_json: str
+    derived_governance_tree_json: str
     strict_zone_report_json: str
     object_coverage_report_json: str
 
@@ -308,10 +308,10 @@ class ArtifactConfig:
     def file_names(self) -> tuple[str, ...]:
         return (
             self.canonical_graph_json,
-            self.runtime_bundle_py,
+            self.runtime_snapshot_py,
             self.generation_manifest_json,
-            self.governance_manifest_json,
-            self.governance_tree_json,
+            self.derived_governance_manifest_json,
+            self.derived_governance_tree_json,
             self.strict_zone_report_json,
             self.object_coverage_report_json,
         )
@@ -428,10 +428,10 @@ class KnowledgeDocument:
 class GeneratedArtifactPaths:
     directory: str
     canonical_graph_json: str
-    runtime_bundle_py: str
+    runtime_snapshot_py: str
     generation_manifest_json: str
-    governance_manifest_json: str
-    governance_tree_json: str
+    derived_governance_manifest_json: str
+    derived_governance_tree_json: str
     strict_zone_report_json: str
     object_coverage_report_json: str
 
@@ -449,10 +449,10 @@ class GeneratedArtifactPaths:
         return cls(
             directory=path_renderer(directory),
             canonical_graph_json=path_renderer(directory / artifact_names.canonical_graph_json),
-            runtime_bundle_py=path_renderer(directory / artifact_names.runtime_bundle_py),
+            runtime_snapshot_py=path_renderer(directory / artifact_names.runtime_snapshot_py),
             generation_manifest_json=path_renderer(directory / artifact_names.generation_manifest_json),
-            governance_manifest_json=path_renderer(directory / artifact_names.governance_manifest_json),
-            governance_tree_json=path_renderer(directory / artifact_names.governance_tree_json),
+            derived_governance_manifest_json=path_renderer(directory / artifact_names.derived_governance_manifest_json),
+            derived_governance_tree_json=path_renderer(directory / artifact_names.derived_governance_tree_json),
             strict_zone_report_json=path_renderer(directory / artifact_names.strict_zone_report_json),
             object_coverage_report_json=path_renderer(directory / artifact_names.object_coverage_report_json),
         )
@@ -461,10 +461,10 @@ class GeneratedArtifactPaths:
 @dataclass(frozen=True)
 class GeneratedArtifactOutputPaths:
     canonical_graph_json: Path
-    runtime_bundle_py: Path
+    runtime_snapshot_py: Path
     generation_manifest_json: Path
-    governance_manifest_json: Path
-    governance_tree_json: Path
+    derived_governance_manifest_json: Path
+    derived_governance_tree_json: Path
     strict_zone_report_json: Path
     object_coverage_report_json: Path
 
@@ -472,10 +472,10 @@ class GeneratedArtifactOutputPaths:
     def from_artifact_config(cls, artifact_names: ArtifactConfig, *, output_dir: Path) -> "GeneratedArtifactOutputPaths":
         return cls(
             canonical_graph_json=output_dir / artifact_names.canonical_graph_json,
-            runtime_bundle_py=output_dir / artifact_names.runtime_bundle_py,
+            runtime_snapshot_py=output_dir / artifact_names.runtime_snapshot_py,
             generation_manifest_json=output_dir / artifact_names.generation_manifest_json,
-            governance_manifest_json=output_dir / artifact_names.governance_manifest_json,
-            governance_tree_json=output_dir / artifact_names.governance_tree_json,
+            derived_governance_manifest_json=output_dir / artifact_names.derived_governance_manifest_json,
+            derived_governance_tree_json=output_dir / artifact_names.derived_governance_tree_json,
             strict_zone_report_json=output_dir / artifact_names.strict_zone_report_json,
             object_coverage_report_json=output_dir / artifact_names.object_coverage_report_json,
         )
@@ -724,7 +724,7 @@ class ProjectRuntimeAssembly:
     def require_runtime_export(self, export_key: str) -> Any:
         return self.runtime_projection.require_export(export_key)
 
-    def to_runtime_bundle_dict(self) -> dict[str, Any]:
+    def to_runtime_snapshot_dict(self) -> dict[str, Any]:
         return {
             "project_file": self.project_file,
             "project": self.metadata.to_dict(),
@@ -740,4 +740,4 @@ class ProjectRuntimeAssembly:
         }
 
     def to_spec_dict(self) -> dict[str, Any]:
-        return self.to_runtime_bundle_dict()
+        return self.to_runtime_snapshot_dict()

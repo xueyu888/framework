@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from knowledge_base_runtime.projection import KnowledgeBaseRuntimeProjection, resolve_knowledge_base_projection
+from knowledge_base_runtime.runtime_exports import (
+    resolve_backend_service_spec,
+    resolve_knowledge_base_domain_spec,
+)
+from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 
 if TYPE_CHECKING:
     from project_runtime import ProjectRuntimeAssembly
@@ -27,46 +31,47 @@ def _outcome(
 
 
 def validate_workbench_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleValidationOutcome, ...]:
-    projection: KnowledgeBaseRuntimeProjection = resolve_knowledge_base_projection(project)
-    contract_spec = projection.template_contract
-    contract = projection.workbench_contract
-    ui_spec = projection.ui_spec
-    backend_spec = projection.backend_spec
-    region_ids = tuple(contract["regions"])
-    flow = contract["flow"]
-    documents = contract["documents"]
-    citation_return = contract["citation_return_contract"]
-    knowledge_bases = contract["knowledge_bases"]
+    contract_spec = load_knowledge_base_template_contract()
+    frontend_spec = project.require_runtime_export("frontend_app_spec")
+    domain_spec = resolve_knowledge_base_domain_spec(project)
+    service_spec = resolve_backend_service_spec(project)
+    workbench = domain_spec["workbench"]
+    frontend_ui = frontend_spec["ui"]
+    region_ids = tuple(workbench["regions"])
+    flow = workbench["flow"]
+    documents = workbench["documents"]
+    citation_return = workbench["citation_return"]
+    knowledge_bases = workbench["knowledge_bases"]
 
     r1_reasons: list[str] = []
     for region in contract_spec.workbench_region_ids:
         if region not in region_ids:
             r1_reasons.append(f"missing workbench region: {region}")
-    if contract["layout_variant"] != ui_spec.get("shell", {}).get("layout_variant"):
-        r1_reasons.append("workbench layout_variant must match ui_spec.shell.layout_variant")
-    if contract["surface"]["preview_mode"] != ui_spec.get("shell", {}).get("preview_mode"):
-        r1_reasons.append("surface.preview_mode must match ui_spec.shell.preview_mode")
-    if projection.library.default_focus != contract_spec.required_library_default_focus:
+    if workbench["layout_variant"] != frontend_ui.get("shell", {}).get("layout_variant"):
+        r1_reasons.append("workbench layout_variant must match frontend_app_spec.ui.shell.layout_variant")
+    if workbench["surface"]["preview_mode"] != frontend_ui.get("shell", {}).get("preview_mode"):
+        r1_reasons.append("surface.preview_mode must match frontend_app_spec.ui.shell.preview_mode")
+    if project.library.default_focus != contract_spec.required_library_default_focus:
         r1_reasons.append(f"library.default_focus must stay {contract_spec.required_library_default_focus}")
-    if projection.preview.anchor_mode != contract_spec.required_preview_anchor_mode:
+    if project.preview.anchor_mode != contract_spec.required_preview_anchor_mode:
         r1_reasons.append(f"preview.anchor_mode must stay {contract_spec.required_preview_anchor_mode}")
-    library_actions = contract["library"].get("actions", [])
+    library_actions = workbench["library"].get("actions", [])
     for action_id in contract_spec.workbench_base_library_actions:
         if action_id not in library_actions:
             r1_reasons.append(f"missing library action: {action_id}")
-    if projection.library.allow_create and contract_spec.workbench_optional_create_action_id not in library_actions:
+    if project.library.allow_create and contract_spec.workbench_optional_create_action_id not in library_actions:
         r1_reasons.append(f"missing library action: {contract_spec.workbench_optional_create_action_id}")
-    if projection.library.allow_delete and contract_spec.workbench_optional_delete_action_id not in library_actions:
+    if project.library.allow_delete and contract_spec.workbench_optional_delete_action_id not in library_actions:
         r1_reasons.append(f"missing library action: {contract_spec.workbench_optional_delete_action_id}")
 
     r2_reasons: list[str] = []
-    if not projection.chat.enabled:
+    if not project.chat.enabled:
         r2_reasons.append("chat must stay enabled")
-    if projection.chat.mode != contract_spec.required_chat_mode:
+    if project.chat.mode != contract_spec.required_chat_mode:
         r2_reasons.append(f"chat.mode must stay {contract_spec.required_chat_mode}")
-    if projection.chat.citation_style != backend_spec.get("answer_policy", {}).get("citation_style"):
-        r2_reasons.append("chat.citation_style must match backend_spec.answer_policy.citation_style")
-    if projection.context.max_citations <= 0:
+    if project.chat.citation_style != service_spec.get("answer_policy", {}).get("citation_style"):
+        r2_reasons.append("chat.citation_style must match backend_service_spec.answer_policy.citation_style")
+    if project.context.max_citations <= 0:
         r2_reasons.append("context.max_citations must be positive")
     missing_return_targets = contract_spec.required_return_target_set() - set(citation_return["targets"])
     for target in sorted(missing_return_targets):
@@ -83,17 +88,17 @@ def validate_workbench_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleVal
         r3_reasons.append("every document must expose at least summary plus one anchored section")
     if len(knowledge_bases) != 1:
         r3_reasons.append("current project instance must expose exactly one selected knowledge base")
-    if flow != backend_spec.get("interaction_flow", flow):
-        r3_reasons.append("workbench flow must match backend_spec.interaction_flow")
+    if flow != service_spec.get("interaction_flow", flow):
+        r3_reasons.append("workbench flow must match backend_service_spec.interaction_flow")
 
     r4_reasons: list[str] = []
-    if not all((projection.library.enabled, projection.preview.enabled, projection.chat.enabled)):
+    if not all((project.library.enabled, project.preview.enabled, project.chat.enabled)):
         r4_reasons.append("library, preview, and chat must stay enabled together")
-    if not projection.chat.citations_enabled:
+    if not project.chat.citations_enabled:
         r4_reasons.append("citation cannot be removed from the workbench chain")
-    if not projection.return_config.enabled:
+    if not project.return_config.enabled:
         r4_reasons.append("return_to_anchor cannot be removed from the workbench chain")
-    if projection.return_config.citation_card_variant not in contract_spec.supported_citation_card_variants:
+    if project.return_config.citation_card_variant not in contract_spec.supported_citation_card_variants:
         r4_reasons.append("return.citation_card_variant must stay within supported framework set")
 
     return (
@@ -104,8 +109,8 @@ def validate_workbench_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleVal
             r1_reasons,
             {
                 "regions": region_ids,
-                "library": projection.library.to_dict(),
-                "preview": projection.preview.to_dict(),
+                "library": project.library.to_dict(),
+                "preview": project.preview.to_dict(),
             },
         ),
         _outcome(
@@ -114,9 +119,9 @@ def validate_workbench_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleVal
             not r2_reasons,
             r2_reasons,
             {
-                "chat": projection.chat.to_dict(),
-                "context": projection.context.to_dict(),
-                "citation_return_contract": citation_return,
+                "chat": project.chat.to_dict(),
+                "context": project.context.to_dict(),
+                "citation_return": citation_return,
             },
         ),
         _outcome(
@@ -136,8 +141,8 @@ def validate_workbench_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleVal
             not r4_reasons,
             r4_reasons,
             {
-                "features": projection.features.to_dict(),
-                "return": projection.return_config.to_dict(),
+                "features": project.features.to_dict(),
+                "return": project.return_config.to_dict(),
             },
         ),
     )

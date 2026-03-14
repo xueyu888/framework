@@ -70,20 +70,20 @@ def compile_project(project_file: str | Path) -> tuple[ProjectCompilationState, 
     return state, assembly
 
 
-def compile_project_runtime_bundle(
+def compile_project_runtime(
     project_file: str | Path = DEFAULT_PROJECT_FILE,
 ) -> tuple[ProjectCompilationState, ProjectRuntimeAssembly]:
     return compile_project(project_file)
 
 
-def load_project_runtime_bundle(
+def load_project_runtime(
     project_file: str | Path = DEFAULT_PROJECT_FILE,
 ) -> ProjectRuntimeAssembly:
     _, assembly = compile_project(project_file)
     return assembly
 
 
-def materialize_project_runtime_bundle(
+def materialize_project_runtime(
     project_file: str | Path = DEFAULT_PROJECT_FILE,
     output_dir: str | Path | None = None,
 ) -> ProjectRuntimeAssembly:
@@ -112,19 +112,19 @@ def materialize_project_runtime_bundle(
     )
     assembly = replace(assembly, derived_views=derived_view_payloads.generation_manifest["derived_views"])
     assembly = replace(assembly, canonical_graph=build_canonical_graph(state, assembly))
-    runtime_bundle_text = build_runtime_bundle_text(assembly, assembly.canonical_graph)
+    runtime_snapshot_text = build_runtime_snapshot_text(assembly, assembly.canonical_graph)
 
     output_paths.canonical_graph_json.write_text(json.dumps(assembly.canonical_graph, ensure_ascii=False, indent=2), encoding="utf-8")
-    output_paths.runtime_bundle_py.write_text(runtime_bundle_text, encoding="utf-8")
+    output_paths.runtime_snapshot_py.write_text(runtime_snapshot_text, encoding="utf-8")
     output_paths.generation_manifest_json.write_text(
         json.dumps(derived_view_payloads.generation_manifest, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    output_paths.governance_manifest_json.write_text(
+    output_paths.derived_governance_manifest_json.write_text(
         json.dumps(derived_view_payloads.governance_manifest, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    output_paths.governance_tree_json.write_text(
+    output_paths.derived_governance_tree_json.write_text(
         json.dumps(derived_view_payloads.governance_tree, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -139,10 +139,10 @@ def materialize_project_runtime_bundle(
     return assembly
 
 
-def build_project_runtime_app_from_project_file(
+def build_project_app_from_project_file(
     project_file: str | Path = DEFAULT_PROJECT_FILE,
 ) -> Any:
-    assembly = materialize_project_runtime_bundle(project_file)
+    assembly = load_project_runtime(project_file)
     entrypoints = assembly.runtime_projection.app_entrypoints
     if len(entrypoints) != 1:
         raise ValueError(f"runtime projection must expose exactly one app entrypoint, found {len(entrypoints)}")
@@ -208,6 +208,7 @@ def compile_package_results(
             package_id=entry.module_id(),
         )
         child_exports: dict[str, dict[str, Any]] = {}
+        child_runtime_exports: dict[str, dict[str, Any]] = {}
         for slot in child_slots[module_id]:
             child_payload = project_owned_config_payload(
                 available_payload,
@@ -215,11 +216,13 @@ def compile_package_results(
             )
             child_result = compile_module(slot.child_module_id, child_payload)
             child_exports[slot.child_module_id] = child_result.export
+            child_runtime_exports[slot.child_module_id] = dict(child_result.runtime_exports)
         result = entry.compile(
             PackageCompileInput(
                 framework_module=module,
                 config_slice=own_config_slice,
                 child_exports=child_exports,
+                child_runtime_exports=child_runtime_exports,
                 selected_roots=selected_roots,
             )
         )
@@ -296,8 +299,8 @@ def raise_on_validation_failures(reports: ValidationReports) -> None:
         raise ValueError("framework rule validation failed: " + " | ".join(errors))
 
 
-def build_runtime_bundle_text(project: ProjectRuntimeAssembly, canonical_graph: dict[str, Any]) -> str:
-    runtime_bundle = project.to_runtime_bundle_dict()
+def build_runtime_snapshot_text(project: ProjectRuntimeAssembly, canonical_graph: dict[str, Any]) -> str:
+    runtime_snapshot = project.to_runtime_snapshot_dict()
     return "\n".join(
         [
             "from __future__ import annotations",
@@ -308,12 +311,11 @@ def build_runtime_bundle_text(project: ProjectRuntimeAssembly, canonical_graph: 
             "import json",
             "",
             f"CANONICAL_GRAPH = json.loads(r'''{json.dumps(canonical_graph, ensure_ascii=False)}''')",
-            f"RUNTIME_BUNDLE = json.loads(r'''{json.dumps(runtime_bundle, ensure_ascii=False)}''')",
-            "PROJECT_CONFIG = RUNTIME_BUNDLE['project_config']",
+            f"RUNTIME_SNAPSHOT = json.loads(r'''{json.dumps(runtime_snapshot, ensure_ascii=False)}''')",
+            "PROJECT_CONFIG = RUNTIME_SNAPSHOT['project_config']",
             "",
         ]
     )
-
 
 def build_canonical_graph(
     state: ProjectCompilationState,
@@ -384,7 +386,10 @@ def _validate_module_tree(modules: tuple[FrameworkModule, ...]) -> None:
 
 
 def _document_digests(project: ProjectRuntimeAssembly) -> dict[str, str]:
-    raw_documents = project.runtime_projection.export_values.get("documents")
+    domain_spec = project.runtime_projection.export_values.get("knowledge_base_domain_spec")
+    if not isinstance(domain_spec, dict):
+        return {}
+    raw_documents = domain_spec.get("documents")
     if not isinstance(raw_documents, list):
         return {}
     digests: dict[str, str] = {}

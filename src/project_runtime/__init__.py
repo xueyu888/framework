@@ -35,13 +35,14 @@ _EXPORTS = {
     "UnifiedProjectConfig": ("project_runtime.models", "UnifiedProjectConfig"),
     "VisualConfig": ("project_runtime.models", "VisualConfig"),
     "build_project_discovery_audit": ("project_runtime.project_governance", "build_project_discovery_audit"),
-    "build_project_runtime_app_from_project_file": ("project_runtime.pipeline", "build_project_runtime_app_from_project_file"),
+    "build_project_runtime_app": ("project_runtime.runtime_app", "build_project_runtime_app"),
+    "build_project_app_from_project_file": ("project_runtime.pipeline", "build_project_app_from_project_file"),
     "compile_knowledge_document_source": ("project_runtime.documents", "compile_knowledge_document_source"),
-    "compile_project_runtime_bundle": ("project_runtime.pipeline", "compile_project_runtime_bundle"),
+    "compile_project_runtime": ("project_runtime.pipeline", "compile_project_runtime"),
     "discover_project_entry_files": ("project_runtime.project_governance", "discover_project_entry_files"),
     "discover_framework_driven_projects": ("project_runtime.project_governance", "discover_framework_driven_projects"),
-    "load_project_runtime_bundle": ("project_runtime.pipeline", "load_project_runtime_bundle"),
-    "materialize_project_runtime_bundle": ("project_runtime.pipeline", "materialize_project_runtime_bundle"),
+    "load_project_runtime": ("project_runtime.pipeline", "load_project_runtime"),
+    "materialize_project_runtime": ("project_runtime.pipeline", "materialize_project_runtime"),
     "render_project_discovery_audit_markdown": ("project_runtime.project_governance", "render_project_discovery_audit_markdown"),
 }
 

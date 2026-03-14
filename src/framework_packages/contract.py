@@ -91,6 +91,7 @@ class PackageCompileInput:
     framework_module: FrameworkModule
     config_slice: dict[str, Any]
     child_exports: dict[str, dict[str, Any]]
+    child_runtime_exports: dict[str, dict[str, Any]]
     selected_roots: tuple[PackageSelectedRoot, ...] = ()
 
     def root_module_id(self, role: str) -> str:

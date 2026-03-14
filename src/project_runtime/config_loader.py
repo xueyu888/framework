@@ -296,10 +296,16 @@ def load_project_config(project_file: Path) -> UnifiedProjectConfig:
             ),
             artifacts=ArtifactConfig(
                 canonical_graph_json=require_string(artifacts_table, "canonical_graph_json"),
-                runtime_bundle_py=require_string(artifacts_table, "runtime_bundle_py"),
+                runtime_snapshot_py=require_string(artifacts_table, "runtime_snapshot_py"),
                 generation_manifest_json=require_string(artifacts_table, "generation_manifest_json"),
-                governance_manifest_json=require_string(artifacts_table, "governance_manifest_json"),
-                governance_tree_json=require_string(artifacts_table, "governance_tree_json"),
+                derived_governance_manifest_json=require_string(
+                    artifacts_table,
+                    "derived_governance_manifest_json",
+                ),
+                derived_governance_tree_json=require_string(
+                    artifacts_table,
+                    "derived_governance_tree_json",
+                ),
                 strict_zone_report_json=require_string(artifacts_table, "strict_zone_report_json"),
                 object_coverage_report_json=require_string(artifacts_table, "object_coverage_report_json"),
             ),

@@ -145,7 +145,6 @@ class StyleProfileContract:
 
 @dataclass(frozen=True)
 class KnowledgeBaseTemplateContract:
-    template_id: str
     required_surface_shell: str
     required_layout_variant: str
     required_preview_mode: str
@@ -390,7 +389,6 @@ def load_knowledge_base_template_contract() -> KnowledgeBaseTemplateContract:
     if not isinstance(data, dict):
         raise ValueError("knowledge-base contract must decode into an object")
 
-    template_table = _require_table(data, "template")
     product_table = _require_table(data, "product")
     product_surface = _require_table(product_table, "surface")
     product_library = _require_table(product_table, "library")
@@ -404,7 +402,6 @@ def load_knowledge_base_template_contract() -> KnowledgeBaseTemplateContract:
     workbench_table = _require_table(data, "workbench")
 
     return KnowledgeBaseTemplateContract(
-        template_id=_require_string(template_table, "id"),
         required_surface_shell=_require_string(product_surface, "shell"),
         required_layout_variant=_require_string(product_surface, "layout_variant"),
         required_preview_mode=_require_string(product_surface, "preview_mode"),

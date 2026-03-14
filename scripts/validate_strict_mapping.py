@@ -19,7 +19,7 @@ from project_runtime import (
     build_project_discovery_audit,
     discover_project_entry_files,
     discover_framework_driven_projects,
-    materialize_project_runtime_bundle,
+    materialize_project_runtime,
     render_project_discovery_audit_markdown,
 )
 from workspace_governance import (
@@ -65,7 +65,7 @@ def validate_project_materialization() -> list[str]:
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_output = Path(temp_dir) / "generated"
-                materialize_project_runtime_bundle(project_file, output_dir=temp_output)
+                materialize_project_runtime(project_file, output_dir=temp_output)
                 for file_name in record.artifact_contract.values():
                     repo_file = generated_dir / file_name
                     temp_file = temp_output / file_name

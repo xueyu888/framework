@@ -11,7 +11,9 @@ framework/*.md
       -> package entry classes
         -> projects/<project_id>/project.toml
           -> config slicing + package compile
-            -> runtime assembly
+            -> child runtime fragments
+              -> root runtime exports
+                -> runtime assembly
               -> generated/canonical_graph.json
                 -> derived governance / tree / report views
 ```
@@ -64,7 +66,7 @@ uv run python src/main.py
 - 编译器：
   - [src/project_runtime/pipeline.py](./src/project_runtime/pipeline.py)
 - 运行时：
-  - [src/knowledge_base_runtime/app.py](./src/knowledge_base_runtime/app.py)
+  - [src/project_runtime/runtime_app.py](./src/project_runtime/runtime_app.py)
 - 派生治理：
   - [src/project_runtime/governance.py](./src/project_runtime/governance.py)
 - 物化与校验：

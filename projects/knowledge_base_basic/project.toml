@@ -8,10 +8,10 @@
 
 [project]
 project_id = "knowledge_base_basic"
-runtime_scene = "knowledge_base_workbench"
+runtime_scene = "package_export_runtime"
 display_name = "Shelf AI Knowledge Chat"
 description = "A ChatGPT-style knowledge chat client compiled through framework packages and one unified project config."
-version = "0.4.0"
+version = "0.4.1"
 
 [selection]
 preset = "document_chat_workbench"
@@ -206,10 +206,10 @@ project_config_endpoint = "/api/knowledge/project-config"
 
 [refinement.artifacts]
 canonical_graph_json = "canonical_graph.json"
-runtime_bundle_py = "runtime_bundle.py"
+runtime_snapshot_py = "runtime_snapshot.py"
 generation_manifest_json = "generation_manifest.json"
-governance_manifest_json = "governance_manifest.json"
-governance_tree_json = "governance_tree.json"
+derived_governance_manifest_json = "derived_governance_manifest.json"
+derived_governance_tree_json = "derived_governance_tree.json"
 strict_zone_report_json = "strict_zone_report.json"
 object_coverage_report_json = "object_coverage_report.json"
 

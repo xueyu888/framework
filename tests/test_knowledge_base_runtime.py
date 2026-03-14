@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from knowledge_base_runtime.app import build_knowledge_base_runtime_app
+from project_runtime.runtime_app import build_project_runtime_app
 
 
 class KnowledgeBaseRuntimeTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = TestClient(build_knowledge_base_runtime_app())
+        self.client = TestClient(build_project_runtime_app())
 
     def test_root_and_project_config_endpoint_exist(self) -> None:
         response = self.client.get("/")
@@ -36,6 +37,18 @@ class KnowledgeBaseRuntimeTest(unittest.TestCase):
         self.assertEqual(knowledge_bases.status_code, 200)
         payload = knowledge_bases.json()
         self.assertEqual(payload[0]["knowledge_base_id"], "research-and-standards")
+
+    @mock.patch("project_runtime.runtime_app.load_project_runtime")
+    def test_runtime_app_builds_from_loaded_assembly_without_materialization_side_effect(self, load_project_runtime: mock.Mock) -> None:
+        from project_runtime import load_project_runtime as load_runtime
+
+        assembly = load_runtime()
+        load_project_runtime.return_value = assembly
+
+        app = build_project_runtime_app()
+
+        self.assertEqual(app.title, assembly.metadata.display_name)
+        load_project_runtime.assert_called_once_with()
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@
         "id": "project:knowledge_base_basic",
         "label": "knowledge_base_basic",
         "level": 2,
-        "description": "runtime_scene=knowledge_base_workbench | project_file=projects/knowledge_base_basic/project.toml",
+        "description": "runtime_scene=package_export_runtime | project_file=projects/knowledge_base_basic/project.toml",
         "order": 1,
         "source_file": "projects/knowledge_base_basic/project.toml",
         "node_kind": "project"
@@ -47,10 +47,10 @@
       },
       {
         "id": "project:knowledge_base_basic:governance_tree",
-        "label": "governance_tree.json",
+        "label": "derived_governance_tree.json",
         "level": 3,
-        "description": "derived view | file=projects/knowledge_base_basic/generated/governance_tree.json",
-        "source_file": "projects/knowledge_base_basic/generated/governance_tree.json",
+        "description": "derived view | file=projects/knowledge_base_basic/generated/derived_governance_tree.json",
+        "source_file": "projects/knowledge_base_basic/generated/derived_governance_tree.json",
         "node_kind": "derived_view"
       },
       {

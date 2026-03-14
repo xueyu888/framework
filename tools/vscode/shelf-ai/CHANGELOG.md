@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 - 2026-03-14
+
+- Synced the extension with the final export-driven runtime rewrite so its navigation and governance assumptions match the shipped repository mainline.
+- Updated release-facing documentation to use the renamed canonical-derived governance artifacts instead of the retired `governance_manifest.json` / `governance_tree.json` labels.
+- Repackaged and reinstalled the VSIX against the current workspace so the publishable asset matches the validated repository state.
+
 ## 0.1.1 - 2026-03-14
 
 - Fixed Shelf validation defaults to use the supported `validate_strict_mapping.py` commands instead of passing the removed `--json` flag.

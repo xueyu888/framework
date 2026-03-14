@@ -3,37 +3,48 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import re
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from knowledge_base_runtime.projection import KnowledgeBaseRuntimeProjection, resolve_knowledge_base_projection
+from knowledge_base_runtime.runtime_exports import (
+    resolve_backend_service_spec,
+    resolve_knowledge_base_domain_spec,
+    resolve_runtime_documents,
+)
 from project_runtime import (
     KnowledgeDocument,
     KnowledgeDocumentSection,
     ProjectRuntimeAssembly,
     SeedDocumentSource,
     compile_knowledge_document_source,
-    load_project_runtime_bundle,
+    load_project_runtime,
 )
+from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 from pydantic import BaseModel, Field
 
 
 def _resolve_project(
-    project: ProjectRuntimeAssembly | KnowledgeBaseRuntimeProjection | None,
-) -> KnowledgeBaseRuntimeProjection:
-    if isinstance(project, KnowledgeBaseRuntimeProjection):
-        return project
-    assembly = project or load_project_runtime_bundle()
-    return resolve_knowledge_base_projection(assembly)
+    project: ProjectRuntimeAssembly | None,
+) -> ProjectRuntimeAssembly:
+    return project or load_project_runtime()
 
 
-def _require_backend_renderer(project: KnowledgeBaseRuntimeProjection) -> str:
-    implementation = project.backend_spec.get("implementation")
+def _service_spec(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    return resolve_backend_service_spec(project)
+
+
+def _domain_spec(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    return resolve_knowledge_base_domain_spec(project)
+
+
+def _require_backend_renderer(project: ProjectRuntimeAssembly) -> str:
+    implementation = _service_spec(project).get("implementation")
     if not isinstance(implementation, dict):
-        raise ValueError("backend_spec.implementation is required for backend renderer selection")
+        raise ValueError("backend_service_spec.implementation is required for backend renderer selection")
     value = implementation.get("backend_renderer")
     if not isinstance(value, str):
-        raise ValueError("backend_spec.implementation.backend_renderer must be a string")
-    if value not in project.template_contract.supported_backend_renderers:
+        raise ValueError("backend_service_spec.implementation.backend_renderer must be a string")
+    if value not in load_knowledge_base_template_contract().supported_backend_renderers:
         raise ValueError(f"unsupported backend renderer: {value}")
     return value
 
@@ -140,8 +151,8 @@ def _make_document_id(value: str) -> str:
     return slug or "knowledge-document"
 
 
-def _document_detail_path(project: KnowledgeBaseRuntimeProjection, document_id: str, section_id: str | None = None) -> str:
-    base = project.backend_spec["return_policy"]["document_detail_path"].replace("{document_id}", document_id)
+def _document_detail_path(project: ProjectRuntimeAssembly, document_id: str, section_id: str | None = None) -> str:
+    base = _service_spec(project)["return_policy"]["document_detail_path"].replace("{document_id}", document_id)
     if section_id:
         return f"{base}?section={section_id}"
     return base
@@ -150,13 +161,15 @@ def _document_detail_path(project: KnowledgeBaseRuntimeProjection, document_id: 
 class KnowledgeRepository:
     def __init__(
         self,
-        project: ProjectRuntimeAssembly | KnowledgeBaseRuntimeProjection | None = None,
+        project: ProjectRuntimeAssembly | None = None,
     ) -> None:
         self.project = _resolve_project(project)
         _require_backend_renderer(self.project)
-        self.backend_spec = self.project.backend_spec
-        self._documents = {item.document_id: item for item in self.project.documents}
-        self._document_order = [item.document_id for item in self.project.documents]
+        self.service_spec = _service_spec(self.project)
+        self.domain_spec = _domain_spec(self.project)
+        documents = resolve_runtime_documents(self.project)
+        self._documents = {item.document_id: item for item in documents}
+        self._document_order = [item.document_id for item in documents]
 
     def list_knowledge_bases(self) -> list[KnowledgeBaseSummaryResponse]:
         latest = max((item.updated_at for item in self._documents.values()), default=date.today().isoformat())
@@ -249,7 +262,7 @@ class KnowledgeRepository:
         document_id: str | None = None,
         section_id: str | None = None,
     ) -> KnowledgeChatTurnResponse:
-        retrieval = self.backend_spec["retrieval"]
+        retrieval = self.service_spec["retrieval"]
         ranked = self._rank_sections(message, document_id=document_id, section_id=section_id)
         citations = self._build_citations(
             ranked[: retrieval["max_citations"]],
@@ -272,9 +285,9 @@ class KnowledgeRepository:
         document_id: str | None = None,
         section_id: str | None = None,
     ) -> list[RankedSection]:
-        retrieval = self.backend_spec["retrieval"]
+        retrieval = self.service_spec["retrieval"]
         strategy = retrieval["strategy"]
-        if strategy == self.project.template_contract.required_chat_mode:
+        if strategy == "retrieval_stub":
             return self._rank_sections_stub(message, document_id=document_id, section_id=section_id)
         raise ValueError(f"unsupported backend retrieval strategy: {strategy}")
 
@@ -284,7 +297,7 @@ class KnowledgeRepository:
         document_id: str | None = None,
         section_id: str | None = None,
     ) -> list[RankedSection]:
-        retrieval = self.backend_spec["retrieval"]
+        retrieval = self.service_spec["retrieval"]
         query_tokens = {
             token for token in message.lower().split() if len(token) >= retrieval["query_token_min_length"]
         }
@@ -321,7 +334,7 @@ class KnowledgeRepository:
                 section_title=item.section.title,
                 snippet=item.section.plain_text[:220],
                 return_path=(
-                    f"{self.backend_spec['return_policy']['chat_path']}?document={item.document.document_id}"
+                    f"{self.service_spec['return_policy']['chat_path']}?document={item.document.document_id}"
                     f"&section={item.section.section_id}&citation={index}"
                 ),
                 document_path=_document_detail_path(
@@ -340,7 +353,7 @@ class KnowledgeRepository:
         fallback_document_id: str | None,
         fallback_section_id: str | None,
     ) -> AnswerDraft:
-        answer_policy = self.backend_spec["answer_policy"]
+        answer_policy = self.service_spec["answer_policy"]
         if not citations:
             return AnswerDraft(
                 answer=answer_policy["no_match_text"],
@@ -392,7 +405,7 @@ class KnowledgeRepository:
         document_id: str | None,
         section_id: str | None,
     ) -> int:
-        retrieval = self.backend_spec["retrieval"]
+        retrieval = self.service_spec["retrieval"]
         score = 0
         if section_id and document.document_id == document_id and section.section_id == section_id:
             score += retrieval["focus_section_bonus"]
@@ -432,7 +445,7 @@ def _to_document_detail(document: KnowledgeDocument) -> KnowledgeDocumentDetailR
 
 
 def build_knowledge_base_router(
-    project: ProjectRuntimeAssembly | KnowledgeBaseRuntimeProjection | None = None,
+    project: ProjectRuntimeAssembly | None = None,
     repository: KnowledgeRepository | None = None,
 ) -> APIRouter:
     resolved = _resolve_project(project)

@@ -6,7 +6,7 @@
 ## knowledge_base_basic
 
 - project_file: `projects/knowledge_base_basic/project.toml`
-- runtime_scene: `knowledge_base_workbench`
+- runtime_scene: `package_export_runtime`
 - generated_dir: `projects/knowledge_base_basic/generated`
 - canonical_graph: `projects/knowledge_base_basic/generated/canonical_graph.json`
 - classification: `framework-package-project`

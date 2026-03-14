@@ -62,6 +62,7 @@ class StaticFrameworkPackage:
                 "verification_count": len(framework_module.verifications),
             },
             "child_export_module_ids": sorted(payload.child_exports),
+            "child_runtime_export_module_ids": sorted(payload.child_runtime_exports),
             "config_paths": sorted(payload.config_slice),
         }
         return PackageCompileResult(

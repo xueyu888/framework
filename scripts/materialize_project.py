@@ -22,7 +22,7 @@ from project_runtime import (
     build_project_discovery_audit,
     discover_framework_driven_projects,
     discover_project_entry_files,
-    materialize_project_runtime_bundle,
+    materialize_project_runtime,
     render_project_discovery_audit_markdown,
 )
 from workspace_governance import (
@@ -60,7 +60,7 @@ def main() -> int:
         return 1
 
     for project_file in project_files:
-        project = materialize_project_runtime_bundle(project_file)
+        project = materialize_project_runtime(project_file)
         assert project.generated_artifacts is not None
         print("[OK] materialized", project.metadata.project_id, "->", project.generated_artifacts.directory)
 

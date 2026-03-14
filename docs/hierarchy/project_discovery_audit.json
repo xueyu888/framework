@@ -12,7 +12,7 @@
         "derived artifacts point back to canonical graph"
       ],
       "project_file": "projects/knowledge_base_basic/project.toml",
-      "runtime_scene": "knowledge_base_workbench",
+      "runtime_scene": "package_export_runtime",
       "root_modules": {
         "frontend": "framework/frontend/L2-M0-前端框架标准模块.md",
         "knowledge_base": "framework/knowledge_base/L2-M0-知识库工作台场景模块.md",

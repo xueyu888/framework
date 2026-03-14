@@ -37,9 +37,10 @@ Framework Markdown
   - `src/project_runtime/config_loader.py`
   - `src/project_runtime/module_tree.py`
   - `src/project_runtime/package_config.py`
-  - `src/project_runtime/export_builders.py`
+  - `src/framework_packages/modules/runtime_support.py`
   - `src/project_runtime/pipeline.py`
-  - 用 module tree、字段级 config slicing 与 package exports 编译 runtime
+  - `src/project_runtime/runtime_app.py`
+  - 用 module tree、字段级 config slicing、child runtime fragments 与 root runtime exports 编译 runtime
 - Evidence
   - `projects/<project_id>/generated/canonical_graph.json`
   - 以及所有 derived views
@@ -68,5 +69,4 @@ Framework Markdown
 默认运行入口：
 
 - [src/main.py](../src/main.py)
-- [src/project_runtime/app_factory.py](../src/project_runtime/app_factory.py)
-- [src/knowledge_base_runtime/app.py](../src/knowledge_base_runtime/app.py)
+- [src/project_runtime/runtime_app.py](../src/project_runtime/runtime_app.py)

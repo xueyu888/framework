@@ -6,6 +6,28 @@
 
 ## 已完成任务
 
+- [x] 残差 0：补齐 runtime export-driven 主链并收掉旧入口
+  - [x] `PackageCompileInput` 新增 `child_runtime_exports`，child runtime fragments 真正向上游传递
+  - [x] 删除 `src/project_runtime/export_builders.py` 主装配角色，改为 child fragment -> root export 组合
+  - [x] 删除 `src/knowledge_base_runtime/projection.py` 的知识库专属大聚合主路径
+  - [x] 删除 `src/knowledge_base_runtime/app.py` 的知识库专属正式入口
+  - [x] 新增 [src/project_runtime/runtime_app.py](../src/project_runtime/runtime_app.py) 作为 export-driven 通用入口
+
+- [x] 残差 0.1：去掉 `knowledge_base_workbench` 对 runtime 主链的控制
+  - [x] `project.toml` 中 `runtime_scene` 降级为普通元数据值
+  - [x] `knowledge_base_contract.toml` 不再声明模板 id
+  - [x] frontend / workbench validators 不再用场景名做主链约束
+
+- [x] 残差 0.2：清理旧命名派生产物
+  - [x] `runtime_bundle.py` 更名为 `runtime_snapshot.py`
+  - [x] `governance_manifest.json` 更名为 `derived_governance_manifest.json`
+  - [x] `governance_tree.json` 更名为 `derived_governance_tree.json`
+
+- [x] 残差 0.3：同步 README / docs / tests 到 export-driven 主链
+  - [x] README 切到通用 runtime 入口
+  - [x] 运行时说明文档改写为 child fragment -> root export -> runtime assembly
+  - [x] 测试改为围绕 `frontend_app_spec / knowledge_base_domain_spec / backend_service_spec` 验收
+
 - [x] 残差 1：把 config slicing 改成按模块树逐层分发
   - [x] root package 先拿到 subtree-owned config slice
   - [x] child package 只从 parent-owned sub-slice 继续切片

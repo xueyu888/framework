@@ -59,7 +59,7 @@ def build_workspace_governance_payload() -> dict[str, Any]:
         edges.append(HierarchyEdge(projects_id, project_node_id, "tree_child", {}))
 
         canonical_path = REPO_ROOT / project.canonical_graph_path
-        governance_file = project.artifact_contract.get("governance_tree_json")
+        governance_file = project.artifact_contract.get("derived_governance_tree_json")
         governance_path = REPO_ROOT / project.generated_dir / governance_file if governance_file else None
         nodes.append(
             HierarchyNode(
@@ -75,7 +75,7 @@ def build_workspace_governance_payload() -> dict[str, Any]:
             nodes.append(
                 HierarchyNode(
                     f"{project_node_id}:governance_tree",
-                    "governance_tree.json",
+                    "derived_governance_tree.json",
                     3,
                     f"derived view | file={_relative(governance_path)}",
                     metadata={"source_file": _relative(governance_path), "node_kind": "derived_view"},
