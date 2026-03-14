@@ -4,7 +4,10 @@ from framework_packages.contract import (
     RuntimeAppEntrypoint,
     RuntimeValidationHook,
 )
-from framework_packages.modules.runtime_support import assemble_knowledge_base_domain_spec
+from framework_packages.modules.runtime_support import (
+    assemble_knowledge_base_domain_spec,
+    assemble_runtime_documents,
+)
 from framework_packages.static import StaticFrameworkPackage
 
 
@@ -24,7 +27,10 @@ class KnowledgeBaseL2M0Package(StaticFrameworkPackage):
             config_slice=base.config_slice,
             export=base.export,
             evidence=base.evidence,
-            runtime_exports={"knowledge_base_domain_spec": assemble_knowledge_base_domain_spec(payload)},
+            runtime_exports={
+                "knowledge_base_domain_spec": assemble_knowledge_base_domain_spec(payload),
+                "runtime_documents": assemble_runtime_documents(payload),
+            },
             runtime_entrypoints=(
                 RuntimeAppEntrypoint(
                     entrypoint_id="project_runtime_app",

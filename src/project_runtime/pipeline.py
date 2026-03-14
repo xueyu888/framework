@@ -267,6 +267,12 @@ def assemble_runtime_projection(package_results: dict[str, PackageCompileResult]
                 raise ValueError(f"runtime validation scope declared more than once: {hook.scope}")
             validation_scopes.add(hook.scope)
             validation_hooks.append(hook)
+    runtime_blueprint = _assemble_runtime_blueprint(export_index)
+    if runtime_blueprint is not None:
+        export_index["runtime_blueprint"] = {
+            "provider_module_id": "runtime_projection",
+            "value": runtime_blueprint,
+        }
     return RuntimeProjection(
         package_exports=package_exports,
         export_index=export_index,
@@ -386,14 +392,11 @@ def _validate_module_tree(modules: tuple[FrameworkModule, ...]) -> None:
 
 
 def _document_digests(project: ProjectRuntimeAssembly) -> dict[str, str]:
-    domain_spec = project.runtime_projection.export_values.get("knowledge_base_domain_spec")
-    if not isinstance(domain_spec, dict):
-        return {}
-    raw_documents = domain_spec.get("documents")
-    if not isinstance(raw_documents, list):
+    runtime_documents = project.runtime_projection.export_values.get("runtime_documents")
+    if not isinstance(runtime_documents, list):
         return {}
     digests: dict[str, str] = {}
-    for item in raw_documents:
+    for item in runtime_documents:
         if not isinstance(item, dict):
             continue
         document_id = item.get("document_id")
@@ -401,6 +404,28 @@ def _document_digests(project: ProjectRuntimeAssembly) -> dict[str, str]:
         if isinstance(document_id, str) and isinstance(body_markdown, str):
             digests[document_id] = sha256_text(body_markdown)
     return digests
+
+
+def _assemble_runtime_blueprint(export_index: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    page_blueprint = _dict_export_value(export_index, "runtime_page_blueprint")
+    api_blueprint = _dict_export_value(export_index, "runtime_api_blueprint")
+    if page_blueprint is None and api_blueprint is None:
+        return None
+    if page_blueprint is None or api_blueprint is None:
+        raise ValueError("runtime_blueprint requires both runtime_page_blueprint and runtime_api_blueprint exports")
+    if "runtime_blueprint" in export_index:
+        raise ValueError("runtime_blueprint must not be declared directly; derive it from page/api blueprint exports")
+    return {**api_blueprint, **page_blueprint}
+
+
+def _dict_export_value(export_index: dict[str, dict[str, Any]], export_key: str) -> dict[str, Any] | None:
+    binding = export_index.get(export_key)
+    if binding is None:
+        return None
+    value = binding.get("value")
+    if not isinstance(value, dict):
+        raise ValueError(f"runtime export must be a dict: {export_key}")
+    return dict(value)
 
 
 def _load_callable(path: str) -> Callable[..., Any]:

@@ -3,7 +3,7 @@ from framework_packages.contract import (
     PackageCompileResult,
     RuntimeValidationHook,
 )
-from framework_packages.modules.runtime_support import assemble_frontend_app_spec
+from framework_packages.modules.runtime_support import assemble_frontend_app_spec, assemble_runtime_page_blueprint
 from framework_packages.static import StaticFrameworkPackage
 
 
@@ -13,6 +13,7 @@ class FrontendL2M0Package(StaticFrameworkPackage):
 
     def compile(self, payload: PackageCompileInput) -> PackageCompileResult:
         base = super().compile(payload)
+        frontend_spec = assemble_frontend_app_spec(payload)
         return PackageCompileResult(
             framework_file=base.framework_file,
             module_id=base.module_id,
@@ -23,7 +24,10 @@ class FrontendL2M0Package(StaticFrameworkPackage):
             config_slice=base.config_slice,
             export=base.export,
             evidence=base.evidence,
-            runtime_exports={"frontend_app_spec": assemble_frontend_app_spec(payload)},
+            runtime_exports={
+                "frontend_app_spec": frontend_spec,
+                "runtime_page_blueprint": assemble_runtime_page_blueprint(frontend_spec),
+            },
             runtime_validation_hooks=(
                 RuntimeValidationHook(
                     scope="frontend",

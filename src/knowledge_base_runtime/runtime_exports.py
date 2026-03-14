@@ -5,6 +5,10 @@ from typing import Any
 from project_runtime import KnowledgeDocument, ProjectRuntimeAssembly
 
 
+def resolve_runtime_blueprint(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    return _require_dict_export(project, "runtime_blueprint")
+
+
 def resolve_frontend_app_spec(project: ProjectRuntimeAssembly) -> dict[str, Any]:
     return _require_dict_export(project, "frontend_app_spec")
 
@@ -18,17 +22,19 @@ def resolve_backend_service_spec(project: ProjectRuntimeAssembly) -> dict[str, A
 
 
 def resolve_runtime_documents(project: ProjectRuntimeAssembly) -> tuple[KnowledgeDocument, ...]:
-    domain_spec = resolve_knowledge_base_domain_spec(project)
-    raw_documents = domain_spec.get("documents")
+    value = project.require_runtime_export("runtime_documents")
+    if not isinstance(value, list):
+        raise ValueError("runtime blueprint requires runtime_documents export")
+    raw_documents = value
     if not isinstance(raw_documents, list):
-        raise ValueError("knowledge base runtime requires knowledge_base_domain_spec.documents")
+        raise ValueError("runtime blueprint requires runtime_documents export")
     documents = tuple(
         KnowledgeDocument.from_dict(item)
         for item in raw_documents
         if isinstance(item, dict)
     )
     if not documents:
-        raise ValueError("knowledge base runtime requires at least one compiled document")
+        raise ValueError("runtime blueprint requires at least one compiled document")
     return documents
 
 
@@ -62,6 +68,7 @@ def project_runtime_public_summary(project: ProjectRuntimeAssembly) -> dict[str,
     frontend_spec = resolve_frontend_app_spec(project)
     service_spec = resolve_backend_service_spec(project)
     documents = resolve_runtime_documents(project)
+    blueprint = resolve_runtime_blueprint(project)
     ui = frontend_spec.get("ui", {})
     return {
         "project_file": project.project_file,
@@ -77,6 +84,14 @@ def project_runtime_public_summary(project: ProjectRuntimeAssembly) -> dict[str,
             "page_ids": list(ui.get("pages", {}).keys()) if isinstance(ui.get("pages"), dict) else [],
             "component_ids": list(ui.get("components", {}).keys()) if isinstance(ui.get("components"), dict) else [],
         },
+        "runtime_summary": {
+            "landing_path": blueprint.get("landing_path"),
+            "page_route_ids": [
+                item.get("route_id")
+                for item in blueprint.get("page_routes", [])
+                if isinstance(item, dict)
+            ],
+        },
         "backend_summary": {
             "retrieval": service_spec.get("retrieval", {}),
             "answer_policy": {
@@ -91,5 +106,5 @@ def project_runtime_public_summary(project: ProjectRuntimeAssembly) -> dict[str,
 def _require_dict_export(project: ProjectRuntimeAssembly, export_key: str) -> dict[str, Any]:
     value = project.require_runtime_export(export_key)
     if not isinstance(value, dict):
-        raise ValueError(f"knowledge base runtime requires dict export: {export_key}")
+        raise ValueError(f"runtime export must be a dict: {export_key}")
     return dict(value)

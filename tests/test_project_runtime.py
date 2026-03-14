@@ -6,9 +6,8 @@ import unittest
 from pathlib import Path
 
 from knowledge_base_runtime.runtime_exports import (
-    resolve_backend_service_spec,
-    resolve_frontend_app_spec,
-    resolve_knowledge_base_domain_spec,
+    resolve_runtime_blueprint,
+    resolve_runtime_documents,
 )
 from project_runtime import (
     DEFAULT_PROJECT_FILE,
@@ -29,15 +28,15 @@ class ProjectRuntimeTest(unittest.TestCase):
         self.assertEqual(project.root_module_ids["backend"], "backend.L2.M0")
         self.assertGreaterEqual(len(project.package_compile_order), 3)
         self.assertIn("frontend.L2.M0", project.package_compile_order)
-        frontend_spec = resolve_frontend_app_spec(project)
-        backend_service = resolve_backend_service_spec(project)
-        knowledge_domain = resolve_knowledge_base_domain_spec(project)
-        self.assertEqual(backend_service["transport"]["project_config_endpoint"], "/api/knowledge/project-config")
-        self.assertEqual(frontend_spec["ui"]["implementation"]["frontend_renderer"], "knowledge_chat_client_v1")
-        self.assertEqual(knowledge_domain["workbench"]["library"]["knowledge_base_id"], "research-and-standards")
-        self.assertIn("frontend_app_spec", project.runtime_exports)
-        self.assertIn("knowledge_base_domain_spec", project.runtime_exports)
-        self.assertIn("backend_service_spec", project.runtime_exports)
+        runtime_blueprint = resolve_runtime_blueprint(project)
+        runtime_documents = resolve_runtime_documents(project)
+        self.assertEqual(runtime_blueprint["transport"]["project_config_endpoint"], "/api/knowledge/project-config")
+        self.assertEqual(runtime_blueprint["landing_path"], "/knowledge-base")
+        self.assertEqual(runtime_blueprint["page_routes"][0]["route_id"], "chat_home")
+        self.assertEqual(runtime_blueprint["api_router_factory"], "knowledge_base_runtime.backend:build_knowledge_base_router")
+        self.assertGreaterEqual(len(runtime_documents), 1)
+        self.assertIn("runtime_blueprint", project.runtime_exports)
+        self.assertIn("runtime_documents", project.runtime_exports)
         self.assertEqual(project.to_runtime_snapshot_dict()["project_config"]["project"]["project_id"], "knowledge_base_basic")
 
     def test_materialize_writes_canonical_and_derived_views(self) -> None:

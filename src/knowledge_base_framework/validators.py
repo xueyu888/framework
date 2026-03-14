@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 from knowledge_base_runtime.runtime_exports import (
     resolve_backend_service_spec,
     resolve_knowledge_base_domain_spec,
 )
-from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 
 if TYPE_CHECKING:
     from project_runtime import ProjectRuntimeAssembly
@@ -31,7 +31,7 @@ def _outcome(
 
 
 def validate_workbench_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleValidationOutcome, ...]:
-    contract_spec = load_knowledge_base_template_contract()
+    contract_spec = load_knowledge_base_runtime_profile()
     frontend_spec = project.require_runtime_export("frontend_app_spec")
     domain_spec = resolve_knowledge_base_domain_spec(project)
     service_spec = resolve_backend_service_spec(project)

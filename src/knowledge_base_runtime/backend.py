@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 from knowledge_base_runtime.runtime_exports import (
     resolve_backend_service_spec,
     resolve_knowledge_base_domain_spec,
@@ -19,7 +20,6 @@ from project_runtime import (
     compile_knowledge_document_source,
     load_project_runtime,
 )
-from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 from pydantic import BaseModel, Field
 
 
@@ -44,7 +44,7 @@ def _require_backend_renderer(project: ProjectRuntimeAssembly) -> str:
     value = implementation.get("backend_renderer")
     if not isinstance(value, str):
         raise ValueError("backend_service_spec.implementation.backend_renderer must be a string")
-    if value not in load_knowledge_base_template_contract().supported_backend_renderers:
+    if value not in load_knowledge_base_runtime_profile().supported_backend_renderers:
         raise ValueError(f"unsupported backend renderer: {value}")
     return value
 
@@ -425,6 +425,10 @@ def _to_document_summary(document: KnowledgeDocument) -> KnowledgeDocumentSummar
         updated_at=document.updated_at,
         section_count=len(document.sections),
     )
+
+
+def build_runtime_repository(project: ProjectRuntimeAssembly | None = None) -> KnowledgeRepository:
+    return KnowledgeRepository(project)
 
 
 def _to_document_detail(document: KnowledgeDocument) -> KnowledgeDocumentDetailResponse:

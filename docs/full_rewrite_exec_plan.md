@@ -15,7 +15,7 @@
 
 - [x] 残差 0.1：去掉 `knowledge_base_workbench` 对 runtime 主链的控制
   - [x] `project.toml` 中 `runtime_scene` 降级为普通元数据值
-  - [x] `knowledge_base_contract.toml` 不再声明模板 id
+  - [x] 删除 `knowledge_base_contract.toml` 并把稳定 runtime profile 内联到 package code
   - [x] frontend / workbench validators 不再用场景名做主链约束
 
 - [x] 残差 0.2：清理旧命名派生产物
@@ -26,7 +26,7 @@
 - [x] 残差 0.3：同步 README / docs / tests 到 export-driven 主链
   - [x] README 切到通用 runtime 入口
   - [x] 运行时说明文档改写为 child fragment -> root export -> runtime assembly
-  - [x] 测试改为围绕 `frontend_app_spec / knowledge_base_domain_spec / backend_service_spec` 验收
+  - [x] 测试改为围绕 `runtime_blueprint / runtime_documents / runtime entrypoint` 验收
 
 - [x] 残差 1：把 config slicing 改成按模块树逐层分发
   - [x] root package 先拿到 subtree-owned config slice

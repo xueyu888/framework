@@ -1,97 +1,157 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
+from typing import Any, Callable
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from knowledge_base_runtime.backend import KnowledgeRepository, build_knowledge_base_router
-from knowledge_base_runtime.frontend import (
-    compose_basketball_showcase_page,
-    compose_document_detail_page,
-    compose_knowledge_base_detail_page,
-    compose_knowledge_base_list_page,
-    compose_knowledge_base_page,
-)
-from knowledge_base_runtime.runtime_exports import (
-    project_runtime_public_summary,
-    resolve_backend_service_spec,
-)
 from project_runtime import ProjectRuntimeAssembly
 from project_runtime.pipeline import load_project_runtime
 
 
 @dataclass(frozen=True)
-class BackendTransportContract:
+class RuntimeRouteSpec:
+    route_id: str
+    path: str
+    handler_factory_path: str
+    response_class: str | None = None
+
+
+@dataclass(frozen=True)
+class RuntimeBlueprint:
     mode: str
     project_config_endpoint: str
-
-
-def _require_backend_transport(project: ProjectRuntimeAssembly) -> BackendTransportContract:
-    service_spec = resolve_backend_service_spec(project)
-    transport = service_spec.get("transport")
-    if not isinstance(transport, dict):
-        raise ValueError("backend_service_spec.transport is required for runtime app construction")
-    mode = transport.get("mode")
-    if not isinstance(mode, str):
-        raise ValueError("backend_service_spec.transport.mode must be a string")
-    project_config_endpoint = transport.get("project_config_endpoint")
-    if not isinstance(project_config_endpoint, str) or not project_config_endpoint.startswith(project.route.api_prefix):
-        raise ValueError("backend_service_spec.transport.project_config_endpoint must stay under route.api_prefix")
-    return BackendTransportContract(mode=mode, project_config_endpoint=project_config_endpoint)
+    landing_path: str
+    summary_factory_path: str
+    repository_factory_path: str | None
+    api_router_factory_path: str | None
+    page_routes: tuple[RuntimeRouteSpec, ...]
 
 
 def build_project_runtime_app(project: ProjectRuntimeAssembly | None = None) -> FastAPI:
     assembly = project or load_project_runtime()
-    transport = _require_backend_transport(assembly)
-    repository = KnowledgeRepository(assembly)
+    blueprint = _load_runtime_blueprint(assembly)
     app = FastAPI(
         title=assembly.metadata.display_name,
         summary=assembly.metadata.description,
         version=assembly.metadata.version,
     )
-    app.include_router(build_knowledge_base_router(assembly, repository))
+    repository = None
+    if blueprint.repository_factory_path is not None:
+        repository_factory = _load_callable(blueprint.repository_factory_path)
+        repository = repository_factory(assembly)
+    if blueprint.api_router_factory_path is not None:
+        router_factory = _load_callable(blueprint.api_router_factory_path)
+        app.include_router(router_factory(assembly, repository))
+    summary_factory = _load_callable(blueprint.summary_factory_path)
 
     @app.get(assembly.route.home, include_in_schema=False)
     def root() -> dict[str, object]:
         return {
-            "project": project_runtime_public_summary(assembly),
-            "frontend": assembly.route.workbench,
-            "project_config": transport.project_config_endpoint,
+            "project": summary_factory(assembly),
+            "frontend": blueprint.landing_path,
+            "project_config": blueprint.project_config_endpoint,
         }
 
-    @app.get(assembly.route.workbench, response_class=HTMLResponse, include_in_schema=False)
-    def knowledge_base_page() -> str:
-        return compose_knowledge_base_page(assembly)
+    for route_spec in blueprint.page_routes:
+        handler_factory = _load_callable(route_spec.handler_factory_path)
+        handler = handler_factory(assembly, repository)
+        route_kwargs: dict[str, Any] = {
+            "endpoint": handler,
+            "methods": ["GET"],
+            "include_in_schema": False,
+        }
+        response_class = _resolve_response_class(route_spec.response_class)
+        if response_class is not None:
+            route_kwargs["response_class"] = response_class
+        app.add_api_route(route_spec.path, **route_kwargs)
 
-    @app.get(assembly.route.basketball_showcase, response_class=HTMLResponse, include_in_schema=False)
-    def basketball_showcase_page() -> str:
-        return compose_basketball_showcase_page(assembly)
-
-    @app.get(assembly.route.knowledge_list, response_class=HTMLResponse, include_in_schema=False)
-    def knowledge_base_list_page() -> str:
-        return compose_knowledge_base_list_page(assembly, repository)
-
-    @app.get(f"{assembly.route.knowledge_detail}/{{knowledge_base_id}}", response_class=HTMLResponse, include_in_schema=False)
-    def knowledge_base_detail_page(knowledge_base_id: str) -> str:
-        knowledge_base = repository.get_knowledge_base(knowledge_base_id)
-        if knowledge_base is None:
-            raise HTTPException(status_code=404, detail="Knowledge base not found")
-        return compose_knowledge_base_detail_page(assembly, knowledge_base)
-
-    @app.get(
-        f"{assembly.route.document_detail_prefix}/{{document_id}}",
-        response_class=HTMLResponse,
-        include_in_schema=False,
-    )
-    def document_detail_page(document_id: str, section: str | None = None) -> str:
-        document = repository.get_document(document_id)
-        if document is None:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return compose_document_detail_page(assembly, document, active_section_id=section)
-
-    @app.get(transport.project_config_endpoint)
+    @app.get(blueprint.project_config_endpoint)
     def project_config() -> dict[str, object]:
         return assembly.project_config_view
 
     return app
+
+
+def _load_runtime_blueprint(project: ProjectRuntimeAssembly) -> RuntimeBlueprint:
+    value = project.require_runtime_export("runtime_blueprint")
+    if not isinstance(value, dict):
+        raise ValueError("runtime_blueprint export is required for runtime app construction")
+    transport = value.get("transport")
+    if not isinstance(transport, dict):
+        raise ValueError("runtime_blueprint.transport is required for runtime app construction")
+    mode = transport.get("mode")
+    if not isinstance(mode, str):
+        raise ValueError("runtime_blueprint.transport.mode must be a string")
+    project_config_endpoint = transport.get("project_config_endpoint")
+    if not isinstance(project_config_endpoint, str) or not project_config_endpoint.startswith(project.route.api_prefix):
+        raise ValueError("runtime_blueprint.transport.project_config_endpoint must stay under route.api_prefix")
+    landing_path = value.get("landing_path")
+    if not isinstance(landing_path, str) or not landing_path.startswith("/"):
+        raise ValueError("runtime_blueprint.landing_path must be a routable path")
+    summary_factory_path = value.get("summary_factory")
+    if not isinstance(summary_factory_path, str):
+        raise ValueError("runtime_blueprint.summary_factory must be a callable path")
+    repository_factory_path = value.get("repository_factory")
+    if repository_factory_path is not None and not isinstance(repository_factory_path, str):
+        raise ValueError("runtime_blueprint.repository_factory must be a callable path when provided")
+    api_router_factory_path = value.get("api_router_factory")
+    if api_router_factory_path is not None and not isinstance(api_router_factory_path, str):
+        raise ValueError("runtime_blueprint.api_router_factory must be a callable path when provided")
+    raw_page_routes = value.get("page_routes")
+    if not isinstance(raw_page_routes, list) or not raw_page_routes:
+        raise ValueError("runtime_blueprint.page_routes must be a non-empty list")
+    page_routes: list[RuntimeRouteSpec] = []
+    for item in raw_page_routes:
+        if not isinstance(item, dict):
+            raise ValueError("runtime_blueprint.page_routes entries must be objects")
+        route_id = item.get("route_id")
+        path = item.get("path")
+        handler_factory = item.get("handler_factory")
+        response_class = item.get("response_class")
+        if not isinstance(route_id, str) or not route_id:
+            raise ValueError("runtime_blueprint.page_routes.route_id must be a string")
+        if not isinstance(path, str) or not path.startswith("/"):
+            raise ValueError("runtime_blueprint.page_routes.path must be a routable path")
+        if not isinstance(handler_factory, str):
+            raise ValueError("runtime_blueprint.page_routes.handler_factory must be a callable path")
+        if response_class is not None and not isinstance(response_class, str):
+            raise ValueError("runtime_blueprint.page_routes.response_class must be a string when provided")
+        page_routes.append(
+            RuntimeRouteSpec(
+                route_id=route_id,
+                path=path,
+                handler_factory_path=handler_factory,
+                response_class=response_class,
+            )
+        )
+    return RuntimeBlueprint(
+        mode=mode,
+        project_config_endpoint=project_config_endpoint,
+        landing_path=landing_path,
+        summary_factory_path=summary_factory_path,
+        repository_factory_path=repository_factory_path,
+        api_router_factory_path=api_router_factory_path,
+        page_routes=tuple(page_routes),
+    )
+
+
+def _resolve_response_class(response_class: str | None) -> type[Any] | None:
+    if response_class is None:
+        return None
+    if response_class == "html":
+        return HTMLResponse
+    raise ValueError(f"unsupported runtime response class: {response_class}")
+
+
+def _load_callable(path: str) -> Callable[..., Any]:
+    module_name, _, attr_name = path.partition(":")
+    if not module_name or not attr_name:
+        raise ValueError(f"invalid callable path: {path}")
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    if not callable(value):
+        raise TypeError(f"resolved object is not callable: {path}")
+    return value

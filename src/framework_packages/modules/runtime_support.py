@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from framework_packages.contract import PackageCompileInput
+from knowledge_base_runtime.runtime_profile import KnowledgeBaseRuntimeProfile, load_knowledge_base_runtime_profile
 from project_runtime.documents import export_documents
-from project_runtime.knowledge_base_contract import KnowledgeBaseTemplateContract, load_knowledge_base_template_contract
 from project_runtime.models import RouteConfig, SeedDocumentSource, UiSpecPaths
 
 
 def compose_frontend_action_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     route = _route(payload)
     copy_titles = {
         "chat_title": _config_value(payload, "truth.surface.copy.chat_title"),
@@ -46,7 +46,7 @@ def compose_frontend_action_fragment(payload: PackageCompileInput) -> dict[str, 
 
 
 def compose_frontend_surface_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     surface = _surface(payload)
     visual = _visual(payload)
     visual_tokens = _visual_tokens(
@@ -104,7 +104,7 @@ def compose_frontend_surface_fragment(payload: PackageCompileInput) -> dict[str,
 
 
 def compose_frontend_navigation_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     surface = {
         "copy": {
             "hero_title": _config_value(payload, "truth.surface.copy.hero_title"),
@@ -195,7 +195,7 @@ def compose_frontend_conversation_fragment(payload: PackageCompileInput) -> dict
 
 
 def compose_frontend_feedback_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     citation_style = _config_value(payload, "truth.chat.citation_style")
     bubble_variant = _config_value(payload, "truth.chat.bubble_variant")
     composer_variant = _config_value(payload, "truth.chat.composer_variant")
@@ -290,8 +290,52 @@ def assemble_frontend_app_spec(payload: PackageCompileInput) -> dict[str, Any]:
     }
 
 
+def assemble_runtime_page_blueprint(frontend_spec: dict[str, Any]) -> dict[str, Any]:
+    ui = frontend_spec.get("ui")
+    if not isinstance(ui, dict):
+        raise ValueError("frontend_app_spec.ui must be a dict")
+    pages = ui.get("pages")
+    if not isinstance(pages, dict):
+        raise ValueError("frontend_app_spec.ui.pages must be a dict")
+    return {
+        "landing_path": _require_page_path(pages, "chat_home"),
+        "page_routes": [
+            {
+                "route_id": "chat_home",
+                "path": _require_page_path(pages, "chat_home"),
+                "response_class": "html",
+                "handler_factory": "knowledge_base_runtime.frontend:build_knowledge_base_page_handler",
+            },
+            {
+                "route_id": "basketball_showcase",
+                "path": _require_page_path(pages, "basketball_showcase"),
+                "response_class": "html",
+                "handler_factory": "knowledge_base_runtime.frontend:build_basketball_showcase_page_handler",
+            },
+            {
+                "route_id": "knowledge_list",
+                "path": _require_page_path(pages, "knowledge_list"),
+                "response_class": "html",
+                "handler_factory": "knowledge_base_runtime.frontend:build_knowledge_base_list_page_handler",
+            },
+            {
+                "route_id": "knowledge_detail",
+                "path": _require_page_path(pages, "knowledge_detail"),
+                "response_class": "html",
+                "handler_factory": "knowledge_base_runtime.frontend:build_knowledge_base_detail_page_handler",
+            },
+            {
+                "route_id": "document_detail",
+                "path": _require_page_path(pages, "document_detail"),
+                "response_class": "html",
+                "handler_factory": "knowledge_base_runtime.frontend:build_document_detail_page_handler",
+            },
+        ],
+    }
+
+
 def compose_knowledge_base_surface_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     surface = _workbench_surface(payload)
     library = _library(payload)
     preview = _preview(payload)
@@ -336,7 +380,7 @@ def compose_knowledge_base_surface_fragment(payload: PackageCompileInput) -> dic
 
 
 def compose_knowledge_base_context_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     documents = tuple(
         SeedDocumentSource.from_dict(item)
         for item in _config_value(payload, "truth.documents")
@@ -388,8 +432,16 @@ def assemble_knowledge_base_domain_spec(payload: PackageCompileInput) -> dict[st
     }
 
 
+def assemble_runtime_documents(payload: PackageCompileInput) -> list[dict[str, Any]]:
+    context_fragment = _require_child_runtime_export(payload, "knowledge_base.L1.M1", "knowledge_base_context_fragment")
+    documents = context_fragment.get("documents")
+    if not isinstance(documents, list):
+        raise ValueError("knowledge_base_context_fragment.documents must be a list")
+    return [dict(item) for item in documents if isinstance(item, dict)]
+
+
 def compose_backend_service_fragment(payload: PackageCompileInput) -> dict[str, Any]:
-    contract = load_knowledge_base_template_contract()
+    contract = load_knowledge_base_runtime_profile()
     selection = _selection_payload(payload)
     roots = _selected_roots(payload)
     route = _route(payload)
@@ -472,6 +524,27 @@ def assemble_backend_service_spec(payload: PackageCompileInput) -> dict[str, Any
     spec["rule_ids"] = [item.rule_id for item in payload.framework_module.rules]
     spec["derived_from"]["child_runtime_modules"] = sorted(payload.child_runtime_exports)
     return spec
+
+
+def assemble_runtime_api_blueprint(service_spec: dict[str, Any]) -> dict[str, Any]:
+    transport = service_spec.get("transport")
+    if not isinstance(transport, dict):
+        raise ValueError("backend_service_spec.transport must be a dict")
+    mode = transport.get("mode")
+    project_config_endpoint = transport.get("project_config_endpoint")
+    if not isinstance(mode, str):
+        raise ValueError("backend_service_spec.transport.mode must be a string")
+    if not isinstance(project_config_endpoint, str):
+        raise ValueError("backend_service_spec.transport.project_config_endpoint must be a string")
+    return {
+        "transport": {
+            "mode": mode,
+            "project_config_endpoint": project_config_endpoint,
+        },
+        "summary_factory": "knowledge_base_runtime.runtime_exports:project_runtime_public_summary",
+        "repository_factory": "knowledge_base_runtime.backend:build_runtime_repository",
+        "api_router_factory": "knowledge_base_runtime.backend:build_knowledge_base_router",
+    }
 
 
 def _require_child_runtime_export(
@@ -696,7 +769,7 @@ def _evidence_refinement(payload: PackageCompileInput) -> dict[str, Any]:
 
 def _visual_tokens(
     *,
-    contract: KnowledgeBaseTemplateContract,
+    contract: KnowledgeBaseRuntimeProfile,
     surface: dict[str, Any],
     visual: dict[str, Any],
     preview_variant: str,
@@ -721,8 +794,8 @@ def _ui_pages(
     route: RouteConfig,
     showcase_page: dict[str, Any],
     paths: UiSpecPaths,
-    contract: KnowledgeBaseTemplateContract,
-) -> dict[str, Any]:
+    contract: KnowledgeBaseRuntimeProfile,
+    ) -> dict[str, Any]:
     return {
         "chat_home": {
             "path": route.workbench,
@@ -771,3 +844,13 @@ def _ui_pages(
             "slots": ["aux_sidebar", "page_header", "document_sections"],
         },
     }
+
+
+def _require_page_path(pages: dict[str, Any], page_id: str) -> str:
+    value = pages.get(page_id)
+    if not isinstance(value, dict):
+        raise ValueError(f"frontend_app_spec.ui.pages.{page_id} must be a dict")
+    path = value.get("path")
+    if not isinstance(path, str) or not path.startswith("/"):
+        raise ValueError(f"frontend_app_spec.ui.pages.{page_id}.path must be a routable string")
+    return path

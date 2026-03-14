@@ -47,7 +47,7 @@
 ## 5. Canonical 与派生视图
 
 - `projects/*/generated/canonical_graph.json` 是唯一机器真相源。
-- `generation_manifest.json`、`governance_manifest.json`、`governance_tree.json`、`strict_zone_report.json`、`object_coverage_report.json` 必须明确是 canonical 派生视图。
+- `generation_manifest.json`、`derived_governance_manifest.json`、`derived_governance_tree.json`、`strict_zone_report.json`、`object_coverage_report.json` 必须明确是 canonical 派生视图。
 - 直接编辑 `projects/*/generated/*` 必须被视为违规。
 
 ## 6. 自动检查必须覆盖的内容

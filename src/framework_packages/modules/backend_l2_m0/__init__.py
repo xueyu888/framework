@@ -1,5 +1,5 @@
 from framework_packages.contract import PackageCompileInput, PackageCompileResult
-from framework_packages.modules.runtime_support import assemble_backend_service_spec
+from framework_packages.modules.runtime_support import assemble_backend_service_spec, assemble_runtime_api_blueprint
 from framework_packages.static import StaticFrameworkPackage
 
 
@@ -9,6 +9,7 @@ class BackendL2M0Package(StaticFrameworkPackage):
 
     def compile(self, payload: PackageCompileInput) -> PackageCompileResult:
         base = super().compile(payload)
+        service_spec = assemble_backend_service_spec(payload)
         return PackageCompileResult(
             framework_file=base.framework_file,
             module_id=base.module_id,
@@ -19,7 +20,10 @@ class BackendL2M0Package(StaticFrameworkPackage):
             config_slice=base.config_slice,
             export=base.export,
             evidence=base.evidence,
-            runtime_exports={"backend_service_spec": assemble_backend_service_spec(payload)},
+            runtime_exports={
+                "backend_service_spec": service_spec,
+                "runtime_api_blueprint": assemble_runtime_api_blueprint(service_spec),
+            },
         )
 
 

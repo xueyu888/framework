@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from textwrap import dedent
 
 from knowledge_base_runtime.runtime_exports import resolve_frontend_app_spec
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 from project_runtime import ProjectRuntimeAssembly
-from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ def _require_style_profile(project: ProjectRuntimeAssembly) -> str:
     value = implementation.get("style_profile")
     if not isinstance(value, str):
         raise ValueError("frontend_app_spec.ui.implementation.style_profile must be a string")
-    if value not in load_knowledge_base_template_contract().supported_frontend_style_profiles:
+    if value not in load_knowledge_base_runtime_profile().supported_frontend_style_profiles:
         raise ValueError(f"unsupported frontend style_profile: {value}")
     return value
 

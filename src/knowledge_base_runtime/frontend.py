@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from html import escape
 from typing import TYPE_CHECKING, Any
 
+from fastapi import HTTPException
 from knowledge_base_runtime.frontend_script import build_chat_script
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 from knowledge_base_runtime.frontend_style import build_shared_style
 from knowledge_base_runtime.runtime_exports import resolve_frontend_app_spec
 from project_runtime import (
@@ -12,7 +14,6 @@ from project_runtime import (
     ProjectRuntimeAssembly,
     load_project_runtime,
 )
-from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 
 if TYPE_CHECKING:
     from knowledge_base_runtime.backend import KnowledgeBaseDetailResponse, KnowledgeRepository
@@ -65,7 +66,7 @@ def _require_frontend_renderer(project: ProjectRuntimeAssembly) -> str:
     value = implementation.get("frontend_renderer")
     if not isinstance(value, str):
         raise ValueError("frontend_app_spec.ui.implementation.frontend_renderer must be a string")
-    if value not in load_knowledge_base_template_contract().supported_frontend_renderers:
+    if value not in load_knowledge_base_runtime_profile().supported_frontend_renderers:
         raise ValueError(f"unsupported frontend renderer: {value}")
     return value
 
@@ -730,3 +731,76 @@ def compose_knowledge_base_page(
     {_chat_script(resolved)}
     """
     return _render_page(resolved.metadata.display_name, style, body)
+
+
+def build_knowledge_base_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    def handler() -> str:
+        return compose_knowledge_base_page(project)
+
+    return handler
+
+
+def build_basketball_showcase_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    def handler() -> str:
+        return compose_basketball_showcase_page(project)
+
+    return handler
+
+
+def build_knowledge_base_list_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    resolved_repository = _require_repository(project, repository)
+
+    def handler() -> str:
+        return compose_knowledge_base_list_page(project, resolved_repository)
+
+    return handler
+
+
+def build_knowledge_base_detail_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    resolved_repository = _require_repository(project, repository)
+
+    def handler(knowledge_base_id: str) -> str:
+        knowledge_base = resolved_repository.get_knowledge_base(knowledge_base_id)
+        if knowledge_base is None:
+            raise HTTPException(status_code=404, detail="Knowledge base not found")
+        return compose_knowledge_base_detail_page(project, knowledge_base)
+
+    return handler
+
+
+def build_document_detail_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    resolved_repository = _require_repository(project, repository)
+
+    def handler(document_id: str, section: str | None = None) -> str:
+        document = resolved_repository.get_document(document_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return compose_document_detail_page(project, document, active_section_id=section)
+
+    return handler
+
+
+def _require_repository(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None,
+) -> "KnowledgeRepository":
+    if repository is not None:
+        return repository
+    from knowledge_base_runtime.backend import KnowledgeRepository
+
+    return KnowledgeRepository(project)

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 from textwrap import dedent
 
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 from knowledge_base_runtime.runtime_exports import (
     project_runtime_routes,
     resolve_backend_service_spec,
@@ -11,7 +12,6 @@ from knowledge_base_runtime.runtime_exports import (
     resolve_knowledge_base_domain_spec,
 )
 from project_runtime import ProjectRuntimeAssembly
-from project_runtime.knowledge_base_contract import load_knowledge_base_template_contract
 
 
 def _require_script_profile(project: ProjectRuntimeAssembly) -> str:
@@ -21,7 +21,7 @@ def _require_script_profile(project: ProjectRuntimeAssembly) -> str:
     value = implementation.get("script_profile")
     if not isinstance(value, str):
         raise ValueError("frontend_app_spec.ui.implementation.script_profile must be a string")
-    if value not in load_knowledge_base_template_contract().supported_frontend_script_profiles:
+    if value not in load_knowledge_base_runtime_profile().supported_frontend_script_profiles:
         raise ValueError(f"unsupported frontend script_profile: {value}")
     return value
 
