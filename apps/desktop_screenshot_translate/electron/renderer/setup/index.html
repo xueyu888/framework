@@ -7,8 +7,8 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #e9f7f2;
-        --card: rgba(255, 255, 255, 0.9);
+        --bg: #edf5f2;
+        --card: rgba(255, 255, 255, 0.94);
         --ink: #15332c;
         --muted: #5f7f75;
         --line: rgba(17, 79, 65, 0.14);
@@ -24,32 +24,32 @@
         margin: 0;
         font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         background:
-          radial-gradient(circle at top right, rgba(15, 118, 110, 0.18), transparent 30%),
-          linear-gradient(180deg, #f4fbf8 0%, var(--bg) 100%);
+          radial-gradient(circle at top right, rgba(15, 118, 110, 0.14), transparent 32%),
+          linear-gradient(180deg, #f7fbf8 0%, var(--bg) 100%);
         color: var(--ink);
       }
 
       .shell {
         min-height: 100vh;
-        padding: 24px;
+        padding: 22px;
       }
 
       .hero,
       .card {
         border: 1px solid var(--line);
-        border-radius: 24px;
+        border-radius: 22px;
         background: var(--card);
-        box-shadow: 0 24px 80px rgba(17, 79, 65, 0.12);
+        box-shadow: 0 20px 54px rgba(17, 79, 65, 0.1);
       }
 
       .hero {
-        padding: 24px;
-        margin-bottom: 16px;
+        padding: 22px;
+        margin-bottom: 14px;
       }
 
       .eyebrow {
         font-size: 12px;
-        letter-spacing: 0.18em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
         color: var(--accent);
         margin-bottom: 10px;
@@ -68,8 +68,8 @@
       }
 
       .card {
-        padding: 18px 20px;
-        margin-bottom: 14px;
+        padding: 16px 18px;
+        margin-bottom: 12px;
       }
 
       .title {
@@ -103,18 +103,6 @@
       .status[data-tone="error"] {
         background: rgba(220, 38, 38, 0.12);
         color: #991b1b;
-      }
-
-      .path {
-        margin-top: 10px;
-        padding: 12px 14px;
-        border-radius: 16px;
-        background: rgba(15, 118, 110, 0.08);
-        border: 1px solid rgba(15, 118, 110, 0.12);
-        font-family: Consolas, "SFMono-Regular", monospace;
-        font-size: 12px;
-        line-height: 1.55;
-        word-break: break-all;
       }
 
       ul {
@@ -153,12 +141,16 @@
 
       .footer {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
         margin-top: 16px;
       }
 
-      .footer button {
-        min-width: 140px;
+      .footer-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
       }
 
       .form-grid {
@@ -198,8 +190,59 @@
         line-height: 1.65;
       }
 
-      .capability-summary {
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.08);
+        color: var(--accent-strong);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .advanced {
+        border: 1px solid rgba(15, 118, 110, 0.12);
+        border-radius: 18px;
+        background: rgba(248, 252, 250, 0.9);
+      }
+
+      .advanced summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 14px 16px;
+        font-weight: 700;
+        color: var(--accent-strong);
+      }
+
+      .advanced summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .advanced-body {
+        padding: 0 16px 16px;
+      }
+
+      .path {
         margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(15, 118, 110, 0.08);
+        border: 1px solid rgba(15, 118, 110, 0.12);
+        font-family: Consolas, "SFMono-Regular", monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        word-break: break-all;
+      }
+
+      .subtle {
         color: var(--muted);
         font-size: 13px;
         line-height: 1.65;
@@ -211,66 +254,76 @@
       <section class="hero">
         <div class="eyebrow">AiTrans · First Launch</div>
         <h1 id="displayName">AiTrans 截图翻译</h1>
-        <p class="lead">安装包已经内置 OCR。首次启动只需要在本窗口补齐翻译端点配置，之后就可以直接通过托盘或快捷键开始截图翻译。</p>
+        <p class="lead">先补齐翻译端点和快捷键，就能直接开始截图翻译。普通用户主路径是“在本窗口填写并保存”，不是手工编辑配置文件。</p>
       </section>
 
       <section class="card">
         <div class="title">当前状态</div>
         <div id="status" class="status">正在检查配置…</div>
-        <div id="configPath" class="path"></div>
-        <p id="capabilitySummary" class="capability-summary">正在检测运行时能力。</p>
         <p id="hint" class="hint">正在读取当前运行时配置。</p>
+        <div class="chip-row">
+          <span id="entryModeChip" class="chip">入口模式：读取中</span>
+          <span id="shortcutChip" class="chip">快捷键：读取中</span>
+          <span id="captureChip" class="chip">截图能力：读取中</span>
+        </div>
       </section>
 
       <section class="card">
         <div class="title">直接填写并保存</div>
         <form id="setupForm" class="form-grid">
           <div class="field">
-            <label for="baseUrl">translation.base_url</label>
+            <label for="baseUrl">翻译端点地址</label>
             <input id="baseUrl" type="url" placeholder="http://127.0.0.1:8000/v1 或 https://api.openai.com/v1" />
             <small>支持 OpenAI 官方端点和 OpenAI-compatible 局域网端点。</small>
           </div>
           <div class="field">
-            <label for="apiKey">translation.api_key</label>
+            <label for="apiKey">接口密钥</label>
             <input id="apiKey" type="password" placeholder="输入 API Key；本地兼容端点如允许无密钥可留空" />
             <small>优先通过本界面保存。除高级排障外，不要求用户手工编辑 JSON。</small>
           </div>
           <div class="field">
-            <label for="captureShortcut">capture_shortcut</label>
+            <label for="captureShortcut">截图快捷键</label>
             <input id="captureShortcut" type="text" placeholder="例如 CommandOrControl+Shift+1" />
             <small>快捷键支持重绑；保存后会立即重新注册到当前运行中的应用。</small>
           </div>
-          <button id="save" type="submit" class="primary">保存并立即生效</button>
+          <div class="footer">
+            <div class="subtle">保存后立即生效，不需要重新安装。</div>
+            <div class="footer-actions">
+              <button id="save" type="submit" class="primary">保存并立即生效</button>
+              <button id="saveAndStart" type="button" class="secondary">保存并开始截图</button>
+            </div>
+          </div>
         </form>
       </section>
 
       <section class="card">
-        <div class="title">高级操作</div>
+        <div class="title">使用提示</div>
         <ul>
-          <li>如果需要排查端点问题，可手动打开配置文件或配置目录。</li>
-          <li>保存后立即生效，不需要重新安装应用。</li>
-          <li>本地兼容端点只要可达并返回兼容结果即可。</li>
           <li>截图遮罩中按 Enter 或双击可直接触发当前显示器整屏截图。</li>
+          <li>如果快捷键不可用，仍可从托盘入口继续使用。</li>
+          <li>如果截图能力不可用，请先处理系统权限、远程桌面限制或显卡采集环境问题。</li>
         </ul>
-        <div class="actions">
-          <button id="openFile" class="secondary">打开配置文件</button>
-          <button id="openDir" class="secondary">打开配置目录</button>
-          <button id="copyPath" class="secondary">复制配置路径</button>
-          <button id="refresh" class="secondary">重新检查</button>
-        </div>
       </section>
 
-      <section class="card">
-        <div class="title">补充说明</div>
-        <ul>
-          <li>默认会自动生成内部运行时配置文件，但用户主路径是“界面填写并保存”。</li>
-          <li>如果你使用 OpenAI 官方端点，必须提供有效 API Key。</li>
-          <li>只有在需要手工排障时，才建议直接打开运行时配置文件。</li>
-        </ul>
-      </section>
+      <details class="advanced">
+        <summary>高级排障</summary>
+        <div class="advanced-body">
+          <p class="subtle">只有在需要手工排查配置问题时，才建议使用下面这些动作。</p>
+          <div id="configPath" class="path"></div>
+          <div class="actions">
+            <button id="openFile" class="secondary" type="button">打开配置文件</button>
+            <button id="openDir" class="secondary" type="button">打开配置目录</button>
+            <button id="copyPath" class="secondary" type="button">复制配置路径</button>
+            <button id="refresh" class="secondary" type="button">重新检查</button>
+          </div>
+        </div>
+      </details>
 
       <div class="footer">
-        <button id="close" class="primary">完成，返回托盘</button>
+        <div class="subtle">完成后可直接返回托盘继续使用。</div>
+        <div class="footer-actions">
+          <button id="close" class="primary" type="button">完成</button>
+        </div>
       </div>
     </main>
     <script src="./setup.js"></script>

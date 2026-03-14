@@ -70,6 +70,8 @@ announcements = ["capture started", "capture cancelled", "translation ready", "t
 # [desktop] 固定桌面产品真相。
 # 这一段定义用户可见的平台承诺、入口方式和权限降级体验，
 # 但不决定具体运行时、权限 API 或窗口实现库。
+# 当前项目的托盘入口层级、首次配置界面主路径与降级提示方式，
+# 由 `projects/desktop_screenshot_translate/桌面入口与配置界面契约.md` 补充承接。
 [desktop]
 platforms = ["windows", "macos"]
 entry_points = ["tray", "global_shortcut"]

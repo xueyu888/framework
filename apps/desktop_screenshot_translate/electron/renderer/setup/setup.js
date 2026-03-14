@@ -42,11 +42,9 @@ function render(payload) {
 
   document.getElementById('displayName').textContent = displayName;
   document.getElementById('configPath').textContent = guide.runtimeOverridesPath || '未检测到配置路径';
-  document.getElementById('capabilitySummary').textContent = [
-    `入口模式：${capabilities.entryMode || 'tray_and_shortcut'}`,
-    `快捷键：${capabilities.shortcutAvailable === false ? '不可用' : '可用'}`,
-    `截图能力：${capabilities.screenCaptureAvailable === false ? '不可用' : '可用'}`,
-  ].join(' / ');
+  document.getElementById('entryModeChip').textContent = `入口模式：${capabilities.entryMode || 'tray_and_shortcut'}`;
+  document.getElementById('shortcutChip').textContent = `快捷键：${capabilities.shortcutAvailable === false ? '不可用' : '可用'}`;
+  document.getElementById('captureChip').textContent = `截图能力：${capabilities.screenCaptureAvailable === false ? '不可用' : '可用'}`;
 
   syncForm(guide);
 
@@ -81,16 +79,22 @@ window.aitransDesktop.onSetupData((payload) => {
 
 document.getElementById('setupForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  await saveConfig(false);
+});
+
+async function saveConfig(startCapture) {
   const saveButton = document.getElementById('save');
+  const startButton = document.getElementById('saveAndStart');
   const baseUrl = document.getElementById('baseUrl').value.trim();
   const apiKey = document.getElementById('apiKey').value.trim();
   const captureShortcut = document.getElementById('captureShortcut').value.trim();
 
   saveButton.disabled = true;
-  setStatus('正在保存配置…', 'info');
+  startButton.disabled = true;
+  setStatus(startCapture ? '正在保存并准备截图…' : '正在保存配置…', 'info');
 
   try {
-    const result = await window.aitransDesktop.saveSetupConfig({ baseUrl, apiKey, captureShortcut });
+    const result = await window.aitransDesktop.saveSetupConfig({ baseUrl, apiKey, captureShortcut, startCapture });
     if (!result?.ok) {
       setStatus(result?.error || '保存配置失败', 'error');
       return;
@@ -101,10 +105,15 @@ document.getElementById('setupForm').addEventListener('submit', async (event) =>
       },
       guide: result.guide || {},
     });
-    setStatus('配置已保存，可以直接开始截图翻译', 'success');
+    setStatus(startCapture ? '配置已保存，正在进入截图' : '配置已保存，可以直接开始截图翻译', 'success');
   } finally {
     saveButton.disabled = false;
+    startButton.disabled = false;
   }
+}
+
+document.getElementById('saveAndStart').addEventListener('click', async () => {
+  await saveConfig(true);
 });
 
 document.getElementById('openFile').addEventListener('click', async () => {

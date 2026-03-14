@@ -418,18 +418,27 @@ function resolveConfiguredCaptureShortcut() {
 
 function buildTrayMenu() {
   const updateState = updateRuntime ? updateRuntime.getState() : null;
-  return Menu.buildFromTemplate([
+  const guideState = getSetupGuideState();
+  const settingsLabel = guideState.configured ? '设置与连接' : '完成首次配置';
+  const template = [
     { label: '开始截图翻译', click: () => showOverlay() },
+    { label: settingsLabel, click: () => showSetupGuide() },
     {
       label: runtimeCapabilities.shortcutAvailable === false
-        ? '快捷键暂不可用，已降级为托盘入口'
+        ? '快捷键暂不可用，当前已降级为托盘入口'
         : `快捷键：${currentCaptureShortcut || config.shortcut}`,
       enabled: false,
     },
-    { type: 'separator' },
-    { label: '显示结果面板', click: () => showPanel(buildStubResult(lastSelection || getFallbackSelection())) },
-    { label: '首次配置指引', click: () => showSetupGuide() },
-    { label: '打开配置目录', click: () => shell.openPath(path.dirname(getActiveRuntimeOverridePath())) },
+  ];
+
+  if (runtimeCapabilities.screenCaptureAvailable === false) {
+    template.push({
+      label: '截图能力当前不可用，请先完成引导修复',
+      enabled: false,
+    });
+  }
+
+  template.push(
     { type: 'separator' },
     {
       label: updateRuntime ? updateRuntime.getTrayStatusLabel() : '自动更新：未初始化',
@@ -463,7 +472,9 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     { label: '退出', click: () => { app.isQuitting = true; app.quit(); } },
-  ]);
+  );
+
+  return Menu.buildFromTemplate(template);
 }
 
 function refreshTrayMenu() {
@@ -754,7 +765,10 @@ function createTray() {
   tray.setToolTip(config.productSpec.project.display_name);
   appendStartupLog('tray:created');
   refreshTrayMenu();
-  tray.on('click', () => showOverlay());
+  tray.on('click', () => {
+    tray.popUpContextMenu(buildTrayMenu());
+  });
+  tray.on('double-click', () => showOverlay());
 }
 
 function getFallbackSelection() {
@@ -1089,6 +1103,7 @@ ipcMain.handle('setup:save-config', async (_event, payload) => {
     payload && typeof payload.captureShortcut === 'string'
       ? payload.captureShortcut.trim()
       : resolveConfiguredCaptureShortcut();
+  const startCapture = Boolean(payload && payload.startCapture);
 
   if (!baseUrlInput) {
     return { ok: false, error: 'missing translation.base_url' };
@@ -1127,7 +1142,15 @@ ipcMain.handle('setup:save-config', async (_event, payload) => {
     usingOfficialEndpoint: normalizedBaseUrl === OFFICIAL_OPENAI_BASE_URL,
     apiKeyPresent: Boolean(apiKeyInput),
     captureShortcut: shortcutResult.shortcut,
+    startCapture,
   });
+
+  if (startCapture) {
+    if (setupWindow && !setupWindow.isDestroyed()) {
+      setupWindow.hide();
+    }
+    await showOverlay();
+  }
 
   return {
     ok: true,
