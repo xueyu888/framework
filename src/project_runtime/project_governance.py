@@ -9,6 +9,11 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECTS_DIR = REPO_ROOT / "projects"
 PROJECT_FILE_NAME = "project.toml"
+CANONICAL_GRAPH_FILE_NAME = "canonical_graph.json"
+LEGACY_CANONICAL_SCHEMA_PREFIXES = (
+    "framework-package-canonical/",
+    "knowledge-base-layered-canonical/",
+)
 
 
 def _relative_path(path: Path) -> str:
@@ -30,15 +35,24 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _looks_like_canonical_graph(payload: dict[str, Any]) -> bool:
+    schema_version = payload.get("schema_version")
+    if isinstance(schema_version, str):
+        return schema_version.startswith(LEGACY_CANONICAL_SCHEMA_PREFIXES)
+    return False
+
+
 def _load_canonical_graph(project_dir: Path) -> tuple[Path, dict[str, Any]]:
     generated_dir = project_dir / "generated"
     if not generated_dir.exists():
         raise ValueError(f"{project_dir}: missing generated directory")
+    canonical_path = generated_dir / CANONICAL_GRAPH_FILE_NAME
+    if canonical_path.exists():
+        return canonical_path, _read_json(canonical_path)
     candidates = sorted(generated_dir.glob("*.json"))
     for path in candidates:
         payload = _read_json(path)
-        schema_version = payload.get("schema_version")
-        if isinstance(schema_version, str) and schema_version.startswith("framework-package-canonical/"):
+        if _looks_like_canonical_graph(payload):
             return path, payload
     raise ValueError(f"{project_dir}: canonical graph not found in generated directory")
 
