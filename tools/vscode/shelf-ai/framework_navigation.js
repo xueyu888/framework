@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const workspaceGuard = require("./guarding");
 
 const FRAMEWORK_FILE_PATH_PATTERN = /^(framework|framework_drafts)\/([^/]+)\/L(\d+)-M(\d+)-[^/]+\.md$/;
 const MODULE_REF_WITH_RULES_PATTERN =
@@ -11,8 +12,7 @@ const UPPER_SYMBOL_PATTERN = /[A-Z][A-Z0-9_]+/g;
 const BACKTICK_SEGMENT_PATTERN = /`([^`]+)`/g;
 const SYMBOL_TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
 const TOML_SECTION_PATTERN = /^\s*\[([A-Za-z0-9_.-]+)\]\s*$/;
-const DEFAULT_PRODUCT_SPEC_FILE = path.join("projects", "knowledge_base_basic", "product_spec.toml");
-const GOVERNANCE_MANIFEST_RELATIVE_PATH = path.join("generated", "governance_manifest.json");
+const DEFAULT_PROJECT_FILE = path.join("projects", "knowledge_base_basic", "project.toml");
 
 const SECTION_PREFIXES = [
   ["## 1. 能力声明", "capability"],
@@ -35,156 +35,25 @@ function uniqueSections(sections) {
   return ordered;
 }
 
+function normalizeConfigSection(section) {
+  if (!section) {
+    return "";
+  }
+  if (section.startsWith("exact.") || section.startsWith("communication.") || section.startsWith("framework.")) {
+    return section;
+  }
+  return section;
+}
+
 function createBoundaryConfigMapping(primarySection, relatedSections = [primarySection], options = {}) {
+  const normalizedPrimarySection = normalizeConfigSection(primarySection);
   return {
-    primarySection,
-    relatedSections: uniqueSections([primarySection, ...relatedSections]),
+    primarySection: normalizedPrimarySection,
+    relatedSections: uniqueSections([normalizedPrimarySection, ...relatedSections.map(normalizeConfigSection)]),
     mappingMode: options.mappingMode || "direct",
     note: options.note || "",
   };
 }
-
-function directConfigMapping(primarySection, relatedSections = [primarySection]) {
-  return createBoundaryConfigMapping(primarySection, relatedSections, { mappingMode: "direct" });
-}
-
-function derivedConfigMapping(primarySection, relatedSections = [primarySection], note = "") {
-  return createBoundaryConfigMapping(primarySection, relatedSections, {
-    mappingMode: "derived",
-    note,
-  });
-}
-
-const FRAMEWORK_BOUNDARY_SECTION_MAP = {
-  frontend: {
-    SURFACE: directConfigMapping("surface", ["surface.copy"]),
-    VISUAL: directConfigMapping("visual"),
-    ROUTE: directConfigMapping("route"),
-    A11Y: directConfigMapping("a11y"),
-  },
-  knowledge_base: {
-    SURFACE: directConfigMapping("surface", ["surface.copy"]),
-    LIBRARY: directConfigMapping("library", ["library.copy"]),
-    PREVIEW: directConfigMapping("preview"),
-    CHAT: directConfigMapping("chat", ["chat.copy"]),
-    CONTEXT: directConfigMapping("context"),
-    RETURN: directConfigMapping("return"),
-    A11Y: derivedConfigMapping("a11y", ["a11y"], "该边界由工作台实例的可访问配置承接。"),
-    FILESET: derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。"),
-    INGEST: derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。"),
-    CLASSIFY: derivedConfigMapping("library", ["library"], "该边界由知识库实例 section 承接。"),
-    LIMIT: derivedConfigMapping("library", ["library"], "该边界由知识库实例 section 承接。"),
-    VISIBILITY: derivedConfigMapping(
-      "library",
-      ["library", "preview"],
-      "该边界由知识库入口与来源预览配置共同承接。"
-    ),
-    ENTRY: derivedConfigMapping(
-      "library",
-      ["library", "route"],
-      "该边界由知识库入口配置与工作台路由共同承接。"
-    ),
-    DOCVIEW: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
-    TOC: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
-    META: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
-    FOCUS: derivedConfigMapping(
-      "preview",
-      ["preview", "a11y"],
-      "该边界由来源预览与可访问配置共同承接。"
-    ),
-    ANCHOR: derivedConfigMapping(
-      "preview",
-      ["preview", "return"],
-      "该边界由来源锚点与返回路径配置共同承接。"
-    ),
-    TURN: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
-    INPUT: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
-    STATUS: derivedConfigMapping(
-      "chat",
-      ["chat", "chat.copy", "preview"],
-      "该边界由对话输出与来源状态配置共同承接。"
-    ),
-    CITATION: derivedConfigMapping(
-      "chat",
-      ["chat", "chat.copy", "context", "return", "preview"],
-      "该边界由对话、上下文、返回与来源预览配置共同承接。"
-    ),
-    SCOPE: derivedConfigMapping(
-      "context",
-      ["context", "preview"],
-      "该边界由上下文选择与来源预览配置共同承接。"
-    ),
-    TURNLINK: derivedConfigMapping(
-      "return",
-      ["return", "chat", "context"],
-      "该边界由回合返回链路与上下文配置共同承接。"
-    ),
-    TRACE: derivedConfigMapping(
-      "context",
-      ["context", "preview", "return"],
-      "该边界由上下文、来源追踪与返回链路配置共同承接。"
-    ),
-    EMPTY: derivedConfigMapping(
-      "chat",
-      ["chat", "chat.copy", "preview", "library"],
-      "该边界由聊天、预览与知识库空态配置共同承接。"
-    ),
-    REGION: derivedConfigMapping(
-      "surface",
-      ["surface", "surface.copy"],
-      "该边界由工作台界面承载配置承接。"
-    ),
-    RESPONSIVE: derivedConfigMapping(
-      "surface",
-      ["surface", "visual"],
-      "该边界由界面承载与视觉配置共同承接。"
-    ),
-  },
-  backend: {
-    LIBRARY: derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。"),
-    LIBAPI: derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。"),
-    FILE: derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。"),
-    PREVIEW: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
-    PREVIEWAPI: derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。"),
-    CHAT: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
-    CHATAPI: derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。"),
-    CITATION: derivedConfigMapping(
-      "chat",
-      ["chat", "chat.copy", "context", "return", "preview"],
-      "该边界由对话、返回与来源预览配置共同承接。"
-    ),
-    TRACE: derivedConfigMapping(
-      "context",
-      ["context", "return"],
-      "该边界由上下文与返回链路配置共同承接。"
-    ),
-    RESULT: derivedConfigMapping(
-      "return",
-      ["return", "chat", "library", "preview"],
-      "该边界由返回链路与统一结果结构配置共同承接。"
-    ),
-    AUTH: derivedConfigMapping(
-      "return",
-      ["return", "chat"],
-      "该边界由接口返回治理与对话入口配置共同承接。"
-    ),
-    ERROR: derivedConfigMapping(
-      "return",
-      ["return", "chat", "preview"],
-      "该边界由错误返回链路与界面反馈配置共同承接。"
-    ),
-    VALID: derivedConfigMapping(
-      "return",
-      ["return", "chat"],
-      "该边界由返回链路与交互约束配置共同承接。"
-    ),
-    CONSIST: derivedConfigMapping(
-      "return",
-      ["return", "chat", "library", "preview"],
-      "该边界由统一返回与多接口一致性配置共同承接。"
-    ),
-  },
-};
 
 function normalizePathSlashes(value) {
   return value.replace(/\\/g, "/");
@@ -603,30 +472,17 @@ function buildTomlSectionIndex(text) {
   return sections;
 }
 
-function resolveProductSpecSectionFile(productSpecFilePath, sectionName) {
-  const topLevelSection = String(sectionName || "").split(".", 1)[0];
-  if (!topLevelSection) {
-    return productSpecFilePath;
-  }
-  const splitSectionFile = path.join(path.dirname(productSpecFilePath), "product_spec", `${topLevelSection}.toml`);
-  if (fs.existsSync(splitSectionFile) && fs.statSync(splitSectionFile).isFile()) {
-    return splitSectionFile;
-  }
-  return productSpecFilePath;
-}
-
-function resolveTomlSectionTarget(productSpecFilePath, sectionNames) {
+function resolveTomlSectionTarget(projectFilePath, sectionNames) {
   const wantedSections = [...new Set((sectionNames || []).filter(Boolean))];
+  const targetText = fs.readFileSync(projectFilePath, "utf8");
+  const sectionIndex = buildTomlSectionIndex(targetText);
   for (const sectionName of wantedSections) {
-    const targetFilePath = resolveProductSpecSectionFile(productSpecFilePath, sectionName);
-    const targetText = fs.readFileSync(targetFilePath, "utf8");
-    const sectionIndex = buildTomlSectionIndex(targetText);
     const sectionTarget = sectionIndex.get(sectionName);
     if (!sectionTarget) {
       continue;
     }
     return {
-      filePath: targetFilePath,
+      filePath: projectFilePath,
       line: sectionTarget.line,
       character: sectionTarget.character,
       length: sectionTarget.length,
@@ -636,213 +492,87 @@ function resolveTomlSectionTarget(productSpecFilePath, sectionNames) {
   return null;
 }
 
-function getBoundaryConfigMapping(frameworkName, token) {
-  const mapping = FRAMEWORK_BOUNDARY_SECTION_MAP[frameworkName];
-  if (mapping && mapping[token]) {
-    return mapping[token];
-  }
-  return inferBoundaryConfigMapping(frameworkName, token);
-}
-
-function inferFrontendBoundaryConfigMapping(token) {
-  const upper = String(token || "").toUpperCase();
-  if (!upper) {
+function readProjectCanonical(projectFilePath) {
+  const canonicalPath = path.join(path.dirname(projectFilePath), "generated", "canonical.json");
+  if (!fs.existsSync(canonicalPath) || !fs.statSync(canonicalPath).isFile()) {
     return null;
   }
-
-  if (
-    upper === "A11Y" ||
-    upper.endsWith("A11Y") ||
-    new Set(["READ", "ORDER", "FOCUS"]).has(upper)
-  ) {
-    return derivedConfigMapping("a11y", ["a11y"], "该边界按可访问与阅读路径归属到实例可访问配置。");
+  try {
+    const raw = JSON.parse(fs.readFileSync(canonicalPath, "utf8"));
+    return raw && typeof raw === "object" ? raw : null;
+  } catch {
+    return null;
   }
+}
 
-  if (new Set(["ROUTE", "NAV", "ENTRY", "RETURN", "PAGESET", "SCENE", "STEP", "REF"]).has(upper)) {
-    return derivedConfigMapping("route", ["route"], "该边界按导航与返回路径归属到实例路由配置。");
-  }
-
-  if (
-    new Set([
-      "VISUAL",
-      "TOKEN",
-      "THEME",
-      "DENSITY",
-      "ALERT",
-      "TAG",
-      "BUBBLE",
-      "TEXTTONE",
-      "TEXTTYPO",
-      "BTNCHROME",
-      "PANELTONE",
-      "FEEDBACK",
-    ]).has(upper) ||
-    upper.includes("TONE") ||
-    upper.includes("TYPO") ||
-    upper.includes("CHROME")
-  ) {
-    return derivedConfigMapping("visual", ["visual"], "该边界按视觉与主题语义归属到实例视觉配置。");
-  }
-
-  return derivedConfigMapping(
-    "surface",
-    ["surface", "surface.copy"],
-    "该边界按界面承载与组件装配归属到实例界面配置。"
+function readCanonicalBoundaryProjection(canonical, moduleId, token) {
+  const frameworkModules = Array.isArray(canonical?.framework?.modules) ? canonical.framework.modules : [];
+  const frameworkModule = frameworkModules.find(
+    (item) => item && typeof item === "object" && String(item.module_id || "") === moduleId
   );
-}
-
-function inferKnowledgeBaseBoundaryConfigMapping(token) {
-  const upper = String(token || "").toUpperCase();
-  if (!upper) {
+  if (!frameworkModule) {
     return null;
   }
-
-  if (upper === "A11Y" || upper.endsWith("A11Y")) {
-    return derivedConfigMapping("a11y", ["a11y"], "该边界由工作台实例的可访问配置承接。");
-  }
-  if (new Set(["RETURN", "TURNLINK"]).has(upper)) {
-    return derivedConfigMapping(
-      "return",
-      ["return", "chat", "context"],
-      "该边界由回合返回链路与上下文配置共同承接。"
-    );
-  }
-  if (new Set(["CHAT", "TURN", "INPUT", "STATUS"]).has(upper)) {
-    return derivedConfigMapping("chat", ["chat", "chat.copy"], "该边界由对话产品规格承接。");
-  }
-  if (upper === "CITATION") {
-    return derivedConfigMapping(
-      "chat",
-      ["chat", "chat.copy", "context", "return", "preview"],
-      "该边界由对话、上下文、返回与来源预览配置共同承接。"
-    );
-  }
-  if (new Set(["CONTEXT", "SCOPE", "TRACE"]).has(upper)) {
-    return derivedConfigMapping(
-      "context",
-      ["context", "preview", "return"],
-      "该边界由上下文、来源追踪与返回链路配置共同承接。"
-    );
-  }
-  if (new Set(["PREVIEW", "DOCVIEW", "TOC", "ANCHOR", "META", "FOCUS", "EMPTY"]).has(upper)) {
-    return derivedConfigMapping(
-      "preview",
-      ["preview", "return"],
-      "该边界由来源预览与锚点返回配置共同承接。"
-    );
-  }
-  if (new Set(["LIBRARY", "ENTRY", "FILESET", "INGEST", "LIMIT", "CLASSIFY", "VISIBILITY"]).has(upper)) {
-    return derivedConfigMapping(
-      "library",
-      ["library", "library.copy", "preview"],
-      "该边界由知识库入口与来源预览配置共同承接。"
-    );
-  }
-  if (new Set(["SURFACE", "REGION", "RESPONSIVE"]).has(upper)) {
-    return derivedConfigMapping(
-      "surface",
-      ["surface", "surface.copy", "visual"],
-      "该边界由工作台界面承载与视觉配置共同承接。"
-    );
-  }
-
-  return null;
-}
-
-function inferBackendBoundaryConfigMapping(token) {
-  const upper = String(token || "").toUpperCase();
-  if (!upper) {
+  const boundaries = Array.isArray(frameworkModule.boundaries) ? frameworkModule.boundaries : [];
+  const boundary = boundaries.find(
+    (item) => item && typeof item === "object" && String(item.boundary_id || "") === token
+  );
+  if (!boundary || typeof boundary.config_projection !== "object" || !boundary.config_projection) {
     return null;
   }
-
-  if (upper.startsWith("LIB") || upper === "FILE" || upper === "LIBRARY") {
-    return derivedConfigMapping("library", ["library", "library.copy"], "该边界由知识库实例 section 承接。");
-  }
-  if (upper.startsWith("PREVIEW") || upper === "PREVIEW") {
-    return derivedConfigMapping("preview", ["preview"], "该边界由来源预览配置承接。");
-  }
-  if (upper.startsWith("CHAT") || upper === "CITATION") {
-    return derivedConfigMapping(
-      "chat",
-      ["chat", "chat.copy", "context", "return", "preview"],
-      "该边界由对话、返回与来源预览配置共同承接。"
-    );
-  }
-  if (upper === "TRACE") {
-    return derivedConfigMapping(
-      "context",
-      ["context", "return"],
-      "该边界由上下文与返回链路配置共同承接。"
-    );
-  }
-  if (new Set(["RESULT", "AUTH", "ERROR", "VALID", "CONSIST"]).has(upper)) {
-    return derivedConfigMapping(
-      "return",
-      ["return", "chat", "library", "preview"],
-      "该边界由统一返回结构与跨接口约束配置共同承接。"
-    );
-  }
-
-  return null;
+  return boundary.config_projection;
 }
 
-function inferBoundaryConfigMapping(frameworkName, token) {
-  if (frameworkName === "frontend") {
-    return inferFrontendBoundaryConfigMapping(token);
+function canonicalBoundaryConfigMapping(repoRoot, frameworkName, moduleId, token) {
+  const projectFilePath = resolvePreferredProjectFile(repoRoot, frameworkName);
+  if (!projectFilePath || !moduleId) {
+    return null;
   }
-  if (frameworkName === "knowledge_base") {
-    return inferKnowledgeBaseBoundaryConfigMapping(token);
+  const freshness = workspaceGuard.getProjectCanonicalFreshness(repoRoot, projectFilePath);
+  if (freshness.status !== "fresh") {
+    return null;
   }
-  if (frameworkName === "backend") {
-    return inferBackendBoundaryConfigMapping(token);
+  const canonical = readProjectCanonical(projectFilePath);
+  if (!canonical) {
+    return null;
   }
-  return null;
+  const projection = readCanonicalBoundaryProjection(canonical, moduleId, token);
+  if (!projection) {
+    return null;
+  }
+  const primarySection = normalizeConfigSection(String(projection.primary_exact_path || ""));
+  const relatedSections = Array.isArray(projection.related_exact_paths)
+    ? projection.related_exact_paths.map((item) => normalizeConfigSection(String(item || ""))).filter(Boolean)
+    : [primarySection];
+  return {
+    projectFilePath,
+    mapping: createBoundaryConfigMapping(primarySection, relatedSections, {
+      mappingMode: String(projection.mapping_mode || "direct"),
+      note: String(projection.note || ""),
+    }),
+  };
 }
 
-function discoverGovernanceManifestFiles(repoRoot) {
+function discoverProjectFiles(repoRoot) {
   const projectsDir = path.join(repoRoot, "projects");
   if (!fs.existsSync(projectsDir) || !fs.statSync(projectsDir).isDirectory()) {
     return [];
   }
   const files = [];
   for (const entry of fs.readdirSync(projectsDir)) {
-    const manifestPath = path.join(projectsDir, entry, GOVERNANCE_MANIFEST_RELATIVE_PATH);
-    if (fs.existsSync(manifestPath) && fs.statSync(manifestPath).isFile()) {
-      files.push(manifestPath);
+    const projectFile = path.join(projectsDir, entry, "project.toml");
+    if (fs.existsSync(projectFile) && fs.statSync(projectFile).isFile()) {
+      files.push(projectFile);
     }
   }
   return files.sort();
 }
 
-function discoverProductSpecFiles(repoRoot) {
-  const projectsDir = path.join(repoRoot, "projects");
-  if (!fs.existsSync(projectsDir) || !fs.statSync(projectsDir).isDirectory()) {
-    return [];
-  }
-  const files = [];
-  for (const entry of fs.readdirSync(projectsDir)) {
-    const productSpecFile = path.join(projectsDir, entry, "product_spec.toml");
-    if (fs.existsSync(productSpecFile) && fs.statSync(productSpecFile).isFile()) {
-      files.push(productSpecFile);
-    }
-  }
-  return files.sort();
-}
-
-function inferConfiguredFrameworks(productSpecText) {
+function inferConfiguredFrameworks(projectText) {
   const frameworks = new Set();
-  const lines = String(productSpecText).split(/\r?\n/);
-  let inFrameworkSection = false;
+  const lines = String(projectText).split(/\r?\n/);
   for (const lineText of lines) {
-    const sectionMatch = TOML_SECTION_PATTERN.exec(lineText);
-    if (sectionMatch) {
-      inFrameworkSection = sectionMatch[1] === "framework";
-      continue;
-    }
-    if (!inFrameworkSection) {
-      continue;
-    }
-    const valueMatch = /^\s*[A-Za-z0-9_-]+\s*=\s*"framework\/([^/]+)\//.exec(lineText);
+    const valueMatch = /^\s*framework_file\s*=\s*"framework\/([^/]+)\//.exec(lineText);
     if (valueMatch) {
       frameworks.add(valueMatch[1]);
     }
@@ -850,9 +580,9 @@ function inferConfiguredFrameworks(productSpecText) {
   return frameworks;
 }
 
-function resolvePreferredProductSpecFile(repoRoot, frameworkName) {
-  const candidates = discoverProductSpecFiles(repoRoot);
-  const preferredDefault = path.join(repoRoot, DEFAULT_PRODUCT_SPEC_FILE);
+function resolvePreferredProjectFile(repoRoot, frameworkName) {
+  const candidates = discoverProjectFiles(repoRoot);
+  const preferredDefault = path.join(repoRoot, DEFAULT_PROJECT_FILE);
   let bestFile = null;
   let bestScore = -1;
   for (const filePath of candidates) {
@@ -879,128 +609,18 @@ function resolvePreferredProductSpecFile(repoRoot, frameworkName) {
   return null;
 }
 
-function collectDerivedFromEntries(node, results = []) {
-  if (Array.isArray(node)) {
-    for (const value of node) {
-      collectDerivedFromEntries(value, results);
-    }
-    return results;
-  }
-  if (!node || typeof node !== "object") {
-    return results;
-  }
-  if (node.derived_from && typeof node.derived_from === "object") {
-    results.push(node.derived_from);
-  }
-  for (const value of Object.values(node)) {
-    collectDerivedFromEntries(value, results);
-  }
-  return results;
-}
-
-function resolveGovernanceBoundaryTargets(repoRoot, frameworkName, token) {
-  const manifests = discoverGovernanceManifestFiles(repoRoot);
-  if (!manifests.length) {
-    return [];
-  }
-
-  const preferredProductSpec = resolvePreferredProductSpecFile(repoRoot, frameworkName);
-  const candidates = [];
-  const seen = new Set();
-
-  for (const manifestPath of manifests) {
-    let manifest = null;
-    try {
-      manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-    } catch {
-      continue;
-    }
-    if (!manifest || typeof manifest !== "object") {
-      continue;
-    }
-
-    const relProductSpec = normalizePathSlashes(String(manifest.product_spec_file || ""));
-    if (!relProductSpec) {
-      continue;
-    }
-    const productSpecFilePath = path.resolve(repoRoot, relProductSpec);
-    if (!fs.existsSync(productSpecFilePath)) {
-      continue;
-    }
-
-    for (const derivedFrom of collectDerivedFromEntries(manifest)) {
-      const frameworkModules = derivedFrom && typeof derivedFrom.framework_modules === "object"
-        ? derivedFrom.framework_modules
-        : null;
-      const boundarySections = derivedFrom && typeof derivedFrom.boundary_sections === "object"
-        ? derivedFrom.boundary_sections
-        : null;
-      if (!frameworkModules || !boundarySections) {
-        continue;
-      }
-      const mappedSection = boundarySections[token];
-      if (typeof mappedSection !== "string" || !mappedSection.trim()) {
-        continue;
-      }
-      const sectionTarget = resolveTomlSectionTarget(productSpecFilePath, [mappedSection]);
-      if (!sectionTarget) {
-        continue;
-      }
-
-      const frameworkNames = new Set();
-      for (const moduleId of Object.values(frameworkModules)) {
-        if (typeof moduleId !== "string" || !moduleId.includes(".")) {
-          continue;
-        }
-        frameworkNames.add(moduleId.split(".", 1)[0]);
-      }
-      if (!frameworkNames.has(frameworkName)) {
-        continue;
-      }
-
-      const dedupeKey = `${productSpecFilePath}:${mappedSection}:${frameworkName}:${token}`;
-      if (seen.has(dedupeKey)) {
-        continue;
-      }
-      seen.add(dedupeKey);
-      candidates.push({
-        filePath: sectionTarget.filePath,
-        line: sectionTarget.line,
-        character: sectionTarget.character,
-        length: sectionTarget.length,
-        primarySection: mappedSection,
-        targetSection: sectionTarget.targetSection,
-        relatedSections: [mappedSection],
-        mappingMode: "governance",
-        note: "该映射来自已物化项目的治理清单。",
-        preferred: preferredProductSpec === productSpecFilePath,
-      });
-    }
-  }
-
-  return candidates.sort((left, right) => {
-    if (left.preferred !== right.preferred) {
-      return left.preferred ? -1 : 1;
-    }
-    return left.filePath.localeCompare(right.filePath);
-  });
-}
-
-function resolveBoundaryConfigTarget(repoRoot, frameworkName, token) {
-  const governanceTargets = resolveGovernanceBoundaryTargets(repoRoot, frameworkName, token);
-  if (governanceTargets.length) {
-    return governanceTargets[0];
-  }
-  const mapping = getBoundaryConfigMapping(frameworkName, token);
-  if (!mapping) {
+function resolveBoundaryConfigTarget(repoRoot, frameworkName, moduleId, token) {
+  const mappingResult = canonicalBoundaryConfigMapping(repoRoot, frameworkName, moduleId, token);
+  if (!mappingResult || !mappingResult.mapping) {
     return null;
   }
-  const productSpecFilePath = resolvePreferredProductSpecFile(repoRoot, frameworkName);
-  if (!productSpecFilePath || !fs.existsSync(productSpecFilePath)) {
+  const mapping = mappingResult.mapping;
+  const projectFilePath = mappingResult.projectFilePath;
+  if (!projectFilePath || !fs.existsSync(projectFilePath)) {
     return null;
   }
   const orderedSections = [mapping.primarySection, ...mapping.relatedSections];
-  const sectionTarget = resolveTomlSectionTarget(productSpecFilePath, orderedSections);
+  const sectionTarget = resolveTomlSectionTarget(projectFilePath, orderedSections);
   if (!sectionTarget) {
     return null;
   }
@@ -1049,6 +669,10 @@ function buildModuleLabel(moduleInfo) {
   return moduleInfo
     ? `${moduleInfo.frameworkName}.${moduleInfo.level}.${moduleInfo.moduleId}`
     : "module";
+}
+
+function canonicalModuleId(moduleInfo) {
+  return moduleInfo ? `${moduleInfo.frameworkName}.${moduleInfo.level}.${moduleInfo.moduleId}` : "";
 }
 
 function pushItemSection(parts, title, items) {
@@ -1132,13 +756,16 @@ function buildRuleHoverMarkdown(moduleInfo, rule) {
   return parts.join("\n");
 }
 
-function appendBoundaryConfigHover(parts, repoRoot, frameworkName, token) {
-  const boundaryTarget = resolveBoundaryConfigTarget(repoRoot, frameworkName, token);
+function appendBoundaryConfigHover(parts, repoRoot, frameworkName, moduleId, token, allowCanonicalProjection) {
+  if (!allowCanonicalProjection) {
+    return;
+  }
+  const boundaryTarget = resolveBoundaryConfigTarget(repoRoot, frameworkName, moduleId, token);
   if (!boundaryTarget) {
     return;
   }
   const relFile = normalizePathSlashes(path.relative(repoRoot, boundaryTarget.filePath));
-  parts.push("", "Product Spec");
+  parts.push("", "Project Config");
   parts.push(`- 文件：\`${relFile}\``);
   parts.push(`- 主归属 section：\`[${boundaryTarget.primarySection}]\``);
   if (boundaryTarget.targetSection && boundaryTarget.targetSection !== boundaryTarget.primarySection) {
@@ -1154,7 +781,7 @@ function appendBoundaryConfigHover(parts, repoRoot, frameworkName, token) {
   }
 }
 
-function buildSymbolHoverMarkdown(moduleInfo, index, token, repoRoot) {
+function buildSymbolHoverMarkdown(moduleInfo, index, token, repoRoot, allowCanonicalProjection = true) {
   const item = getItemForToken(index, token);
   if (!item) {
     return null;
@@ -1183,12 +810,19 @@ function buildSymbolHoverMarkdown(moduleInfo, index, token, repoRoot) {
 
   const parts = [`**${buildModuleLabel(moduleInfo)} · \`${item.token}\`**`, item.text];
   if (item.kind === "boundary" && repoRoot && moduleInfo?.frameworkName) {
-    appendBoundaryConfigHover(parts, repoRoot, moduleInfo.frameworkName, item.token);
+    appendBoundaryConfigHover(
+      parts,
+      repoRoot,
+      moduleInfo.frameworkName,
+      canonicalModuleId(moduleInfo),
+      item.token,
+      allowCanonicalProjection
+    );
   }
   return parts.join("\n");
 }
 
-function resolveDefinitionTarget({ repoRoot, filePath, text, line, character }) {
+function resolveDefinitionTarget({ repoRoot, filePath, text, line, character, allowCanonicalProjection = true }) {
   const documentInfo = getFrameworkDocumentInfo(filePath, repoRoot);
   if (!documentInfo) {
     return null;
@@ -1246,6 +880,7 @@ function resolveDefinitionTarget({ repoRoot, filePath, text, line, character }) 
   }
   const localItem = getItemForToken(index, tokenContext.token);
   if (
+    allowCanonicalProjection &&
     localItem &&
     localItem.kind === "boundary" &&
     localItem.line !== line &&
@@ -1254,6 +889,7 @@ function resolveDefinitionTarget({ repoRoot, filePath, text, line, character }) 
     const boundaryTarget = resolveBoundaryConfigTarget(
       repoRoot,
       documentInfo.frameworkName,
+      canonicalModuleId(documentInfo),
       tokenContext.token
     );
     if (boundaryTarget) {
@@ -1268,12 +904,11 @@ function resolveDefinitionTarget({ repoRoot, filePath, text, line, character }) 
   };
 }
 
-function resolveHoverTarget({ repoRoot, filePath, text, line, character }) {
+function resolveHoverTarget({ repoRoot, filePath, text, line, character, allowCanonicalProjection = true }) {
   const documentInfo = getFrameworkDocumentInfo(filePath, repoRoot);
   if (!documentInfo) {
     return null;
   }
-
   const lines = text.split(/\r?\n/);
   const lineText = lines[line] || "";
   const tokenContext = findTokenContext(lineText, character);
@@ -1299,7 +934,7 @@ function resolveHoverTarget({ repoRoot, filePath, text, line, character }) {
     const targetInfo = getFrameworkDocumentInfo(targetFilePath, repoRoot);
     const markdown = tokenContext.kind === "moduleRef"
       ? buildModuleHoverMarkdown(targetInfo, targetIndex)
-      : buildSymbolHoverMarkdown(targetInfo, targetIndex, tokenContext.token, repoRoot);
+      : buildSymbolHoverMarkdown(targetInfo, targetIndex, tokenContext.token, repoRoot, allowCanonicalProjection);
     if (!markdown) {
       return null;
     }
@@ -1312,7 +947,13 @@ function resolveHoverTarget({ repoRoot, filePath, text, line, character }) {
   }
 
   const currentIndex = buildDefinitionIndex(text);
-  const markdown = buildSymbolHoverMarkdown(documentInfo, currentIndex, tokenContext.token, repoRoot);
+  const markdown = buildSymbolHoverMarkdown(
+    documentInfo,
+    currentIndex,
+    tokenContext.token,
+    repoRoot,
+    allowCanonicalProjection
+  );
   if (!markdown) {
     return null;
   }
@@ -1341,12 +982,11 @@ function dedupeTargets(targets) {
   return deduped;
 }
 
-function resolveReferenceTargets({ repoRoot, filePath, text, line, character }) {
+function resolveReferenceTargets({ repoRoot, filePath, text, line, character, allowCanonicalProjection = true }) {
   const documentInfo = getFrameworkDocumentInfo(filePath, repoRoot);
   if (!documentInfo) {
     return [];
   }
-
   const lines = text.split(/\r?\n/);
   const lineText = lines[line] || "";
   const tokenContext = findTokenContext(lineText, character);
@@ -1383,8 +1023,18 @@ function resolveReferenceTargets({ repoRoot, filePath, text, line, character }) 
   }
 
   const localItem = getItemForToken(index, tokenContext.token);
-  if (localItem && localItem.kind === "boundary" && documentInfo.frameworkName) {
-    const boundaryTarget = resolveBoundaryConfigTarget(repoRoot, documentInfo.frameworkName, tokenContext.token);
+  if (
+    allowCanonicalProjection &&
+    localItem &&
+    localItem.kind === "boundary" &&
+    documentInfo.frameworkName
+  ) {
+    const boundaryTarget = resolveBoundaryConfigTarget(
+      repoRoot,
+      documentInfo.frameworkName,
+      canonicalModuleId(documentInfo),
+      tokenContext.token
+    );
     if (boundaryTarget) {
       targets.push(boundaryTarget);
     }

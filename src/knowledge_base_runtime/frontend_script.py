@@ -4,17 +4,24 @@ from dataclasses import dataclass
 import json
 from textwrap import dedent
 
-from project_runtime.knowledge_base import KnowledgeBaseCodeModule
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
+from knowledge_base_runtime.runtime_exports import (
+    project_runtime_routes,
+    resolve_backend_service_spec,
+    resolve_frontend_app_spec,
+    resolve_knowledge_base_domain_spec,
+)
+from project_runtime import ProjectRuntimeAssembly
 
 
-def _require_script_profile(project: KnowledgeBaseCodeModule) -> str:
-    implementation = project.ui_spec.get("implementation")
+def _require_script_profile(project: ProjectRuntimeAssembly) -> str:
+    implementation = resolve_frontend_app_spec(project)["ui"].get("implementation")
     if not isinstance(implementation, dict):
-        raise ValueError("ui_spec.implementation is required for frontend script selection")
+        raise ValueError("frontend_app_spec.ui.implementation is required for frontend script selection")
     value = implementation.get("script_profile")
     if not isinstance(value, str):
-        raise ValueError("ui_spec.implementation.script_profile must be a string")
-    if value not in project.template_contract.supported_frontend_script_profiles:
+        raise ValueError("frontend_app_spec.ui.implementation.script_profile must be a string")
+    if value not in load_knowledge_base_runtime_profile().supported_frontend_script_profiles:
         raise ValueError(f"unsupported frontend script_profile: {value}")
     return value
 
@@ -41,22 +48,24 @@ class ChatScriptTemplateContext:
 def _chat_script_bootstrap(project_spec_json: str) -> str:
     return dedent(
         f"""
-      const runtimeBundle = {project_spec_json};
-      const productSpec = runtimeBundle.product_spec;
-      const uiSpec = runtimeBundle.ui_spec;
-      const backendSpec = runtimeBundle.backend_spec;
+      const runtimeSnapshot = {project_spec_json};
+      const projectConfig = runtimeSnapshot.project_config;
+      const frontendSpec = runtimeSnapshot.frontend_app_spec;
+      const uiSpec = frontendSpec.ui;
+      const backendSpec = runtimeSnapshot.backend_service_spec;
+      const domainSpec = runtimeSnapshot.knowledge_base_domain_spec;
       const messageStreamSpec = uiSpec.components.message_stream;
       const composerSpec = uiSpec.components.chat_composer;
       const drawerSpec = uiSpec.components.citation_drawer;
       const switchDialogSpec = uiSpec.components.knowledge_switch_dialog;
       const conversationSpec = uiSpec.conversation;
-      const storageKey = `shelf-kb-conversations:${{productSpec.product.project_id}}`;
+      const storageKey = `shelf-kb-conversations:${{projectConfig.project.project_id}}`;
       const state = {{
         knowledgeBases: [],
         documents: [],
         conversations: [],
         activeConversationId: "",
-        currentKnowledgeBaseId: backendSpec.knowledge_base.knowledge_base_id,
+        currentKnowledgeBaseId: domainSpec.workbench.library.knowledge_base_id,
         contextDocumentId: "",
         contextSectionId: "",
         drawerOpen: false,
@@ -243,14 +252,14 @@ def _chat_script_rendering_section() -> str:
 
       function currentKnowledgeBaseName() {
         const active = state.knowledgeBases.find((item) => item.knowledge_base_id === state.currentKnowledgeBaseId);
-        return active ? active.name : backendSpec.knowledge_base.knowledge_base_name;
+        return active ? active.name : domainSpec.workbench.library.knowledge_base_name;
       }
 
       function renderHeader(conversation) {
-        elements.headerTitle.textContent = conversation ? conversation.title : productSpec.product.display_name;
+        elements.headerTitle.textContent = conversation ? conversation.title : projectConfig.project.display_name;
         elements.headerSubtitle.textContent = uiSpec.components.chat_header.subtitle_template.replace("{knowledge_base_name}", currentKnowledgeBaseName());
         elements.knowledgeBadge.textContent = uiSpec.components.conversation_sidebar.knowledge_entry_label.replace(
-          backendSpec.knowledge_base.knowledge_base_name,
+          domainSpec.workbench.library.knowledge_base_name,
           currentKnowledgeBaseName()
         );
         elements.knowledgeBadgeSecondary.textContent = uiSpec.components.chat_header.knowledge_badge_template.replace(
@@ -357,14 +366,14 @@ def _chat_script_loading_section() -> str:
     return dedent(
         """
       async function loadKnowledgeBases() {
-        const response = await fetch(runtimeBundle.routes.api.knowledge_bases);
+        const response = await fetch(runtimeSnapshot.routes.api.knowledge_bases);
         state.knowledgeBases = response.ok ? await response.json() : [];
         renderKnowledgeDialog();
         renderActiveConversation();
       }
 
       async function loadDocuments() {
-        const response = await fetch(runtimeBundle.routes.api.documents);
+        const response = await fetch(runtimeSnapshot.routes.api.documents);
         state.documents = response.ok ? await response.json() : [];
       }
 
@@ -419,7 +428,7 @@ def _chat_script_drawer_section() -> str:
     return dedent(
         """
       async function fetchSectionHtml(citation) {
-        const url = runtimeBundle.routes.api.section_detail
+        const url = runtimeSnapshot.routes.api.section_detail
           .replace("{document_id}", citation.document_id)
           .replace("{section_id}", citation.section_id);
         const response = await fetch(url);
@@ -544,7 +553,7 @@ def _chat_script_route_and_submit_section() -> str:
         }
 
         try {
-          const response = await fetch(runtimeBundle.routes.api.chat_turns, {
+          const response = await fetch(runtimeSnapshot.routes.api.chat_turns, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -616,9 +625,16 @@ def _chat_script_init_section() -> str:
     )
 
 
-def build_chat_script(project: KnowledgeBaseCodeModule) -> str:
+def build_chat_script(project: ProjectRuntimeAssembly) -> str:
     _require_script_profile(project)
+    runtime_payload = {
+        "project_config": project.project_config_view,
+        "frontend_app_spec": resolve_frontend_app_spec(project),
+        "knowledge_base_domain_spec": resolve_knowledge_base_domain_spec(project),
+        "backend_service_spec": resolve_backend_service_spec(project),
+        "routes": project_runtime_routes(project),
+    }
     context = ChatScriptTemplateContext(
-        project_spec_json=json.dumps(project.to_spec_dict(), ensure_ascii=False),
+        project_spec_json=json.dumps(runtime_payload, ensure_ascii=False),
     )
     return context.render()

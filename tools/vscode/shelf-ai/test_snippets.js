@@ -44,10 +44,10 @@ function main() {
     (item) => item.command === "shelf.openFrameworkTree"
   );
   assert(openFrameworkTreeCommand, "package.json must contribute the framework tree open command");
-  const openGovernanceTreeCommand = (packageJson.contributes?.commands || []).find(
-    (item) => item.command === "shelf.openGovernanceTree"
+  const openEvidenceTreeCommand = (packageJson.contributes?.commands || []).find(
+    (item) => item.command === "shelf.openEvidenceTree"
   );
-  assert(openGovernanceTreeCommand, "package.json must contribute the governance tree open command");
+  assert(openEvidenceTreeCommand, "package.json must contribute the evidence tree open command");
 
   assert(
     (packageJson.activationEvents || []).includes("onCommand:shelf.insertFrameworkModuleTemplate"),
@@ -62,8 +62,8 @@ function main() {
     "package.json must activate on the framework tree open command"
   );
   assert(
-    (packageJson.activationEvents || []).includes("onCommand:shelf.openGovernanceTree"),
-    "package.json must activate on the governance tree open command"
+    (packageJson.activationEvents || []).includes("onCommand:shelf.openEvidenceTree"),
+    "package.json must activate on the evidence tree open command"
   );
 
   const configuration = packageJson.contributes?.configuration?.properties || {};
@@ -73,17 +73,21 @@ function main() {
     "shelf.runMypyOnPythonChanges",
     "shelf.protectGeneratedFiles",
     "shelf.promptInstallGitHooks",
-    "shelf.frameworkTreeJsonPath",
-    "shelf.frameworkTreeHtmlPath",
-    "shelf.frameworkTreeGenerateCommand",
-    "shelf.governanceTreeJsonPath",
-    "shelf.governanceTreeHtmlPath",
-    "shelf.governanceTreeGenerateCommand",
     "shelf.materializeCommand",
     "shelf.typeCheckCommand",
   ]) {
     assert(Object.prototype.hasOwnProperty.call(configuration, key), `package.json must expose ${key}`);
   }
+  assert.strictEqual(
+    configuration["shelf.changeValidationCommand"]?.default,
+    "uv run python scripts/validate_canonical.py --check-changes",
+    "package.json must default shelf.changeValidationCommand to the supported canonical validation command"
+  );
+  assert.strictEqual(
+    configuration["shelf.fullValidationCommand"]?.default,
+    "uv run python scripts/validate_canonical.py",
+    "package.json must default shelf.fullValidationCommand to the supported canonical validation command"
+  );
 
   const frameworkSnippet = snippetJson["@framework Module Template"];
   assert(frameworkSnippet, "markdown snippets must keep the @framework module template");
@@ -124,8 +128,8 @@ function main() {
     "extension.js must register the framework tree open command"
   );
   assert(
-    /registerCommand\s*\(\s*"shelf\.openGovernanceTree"/.test(extensionSource),
-    "extension.js must register the governance tree open command"
+    /registerCommand\s*\(\s*"shelf\.openEvidenceTree"/.test(extensionSource),
+    "extension.js must register the evidence tree open command"
   );
   assert(
     /registerCompletionItemProvider\s*\(/.test(extensionSource),
@@ -156,16 +160,8 @@ function main() {
     "README must document the framework tree refresh command"
   );
   assert(
-    readme.includes("Shelf: Open Governance Tree"),
-    "README must document the governance tree open command"
-  );
-  assert(
-    readme.includes("shelf.frameworkTreeJsonPath"),
-    "README must document the framework tree JSON path setting"
-  );
-  assert(
-    readme.includes("shelf.governanceTreeJsonPath"),
-    "README must document the governance tree JSON path setting"
+    readme.includes("Shelf: Open Evidence Tree"),
+    "README must document the evidence tree open command"
   );
   assert(
     readme.includes("The `@framework` template entry is a repository-side hard authoring contract"),
@@ -174,6 +170,30 @@ function main() {
   assert(
     readme.includes("shelf.guardMode = strict"),
     "README must document strict guard mode"
+  );
+  assert(
+    readme.includes("uv run python scripts/validate_canonical.py --check-changes"),
+    "README must document the supported save-triggered canonical validation command"
+  );
+  assert(
+    readme.includes("uv run python scripts/validate_canonical.py"),
+    "README must document the supported full canonical validation command"
+  );
+  assert(
+    !readme.includes("validate_canonical.py --json"),
+    "README must not document the optional --json canonical flag as the default command"
+  );
+  assert(
+    readme.includes("Treats stale / missing / invalid canonical as non-authoritative"),
+    "README must document strict canonical freshness behavior"
+  );
+  assert(
+    readme.includes("Shelf blocks the formal evidence tree until you materialize again"),
+    "README must explain how the evidence tree behaves when canonical is stale"
+  );
+  assert(
+    readme.includes("No persisted tree artifact"),
+    "README must state tree views are runtime projections without persisted artifacts"
   );
 
   const atEntries = frameworkCompletion.getFrameworkCompletionEntries("@", "@", false);
