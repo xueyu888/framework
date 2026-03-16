@@ -1,6 +1,6 @@
 [project]
 name = "shelf"
-version = "0.1.0"
+version = "0.1.1"
 description = "Logic-consistent shelf framework with executable Python reference implementation."
 readme = "README.md"
 requires-python = ">=3.11"

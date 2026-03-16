@@ -1,6 +1,6 @@
 ---
 name: Framework proposal
-about: Propose a framework, spec, or mapping change
+about: Propose a framework, config, code, evidence, or tooling change
 title: "[Proposal] "
 labels: proposal
 assignees: ""
@@ -19,11 +19,11 @@ Explain why this is a framework-level, project-level, or tooling-level change in
 Select the main layer:
 
 - Framework
-- Product Spec
-- Implementation Config
-- Mapping / Validation
-- Runtime template
-- ArchSync
+- Config
+- Code
+- Evidence
+- Canonical / Validation
+- Shelf AI
 
 ## Structural impact
 

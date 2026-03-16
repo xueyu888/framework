@@ -7,11 +7,10 @@ Describe the change briefly.
 Which layer changed?
 
 - Framework
-- Product Spec
-- Implementation Config
+- Config
 - Code
 - Evidence
-- ArchSync
+- Shelf AI
 
 ## Why this change belongs there
 
@@ -27,8 +26,8 @@ Check what you ran:
 
 - [ ] `uv run mypy`
 - [ ] `uv run python scripts/materialize_project.py`
-- [ ] `uv run python scripts/validate_strict_mapping.py`
-- [ ] `uv run python scripts/validate_strict_mapping.py --check-changes`
+- [ ] `uv run python scripts/validate_canonical.py`
+- [ ] `uv run python scripts/validate_canonical.py --check-changes`
 
 ## Generated artifacts
 

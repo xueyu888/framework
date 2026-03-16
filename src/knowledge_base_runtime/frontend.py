@@ -1,126 +1,136 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from html import escape
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from framework_core import Base, BoundaryDefinition, BoundaryItem, Capability, VerificationInput, VerificationResult, verify
+from fastapi import HTTPException
 from knowledge_base_runtime.frontend_script import build_chat_script
+from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 from knowledge_base_runtime.frontend_style import build_shared_style
-from project_runtime.knowledge_base import KnowledgeBaseProject, KnowledgeDocument, load_knowledge_base_project
+from knowledge_base_runtime.runtime_exports import resolve_frontend_app_spec, resolve_knowledge_base_domain_spec
+from project_runtime import (
+    KnowledgeDocument,
+    ProjectRuntimeAssembly,
+    load_project_runtime,
+)
 
 if TYPE_CHECKING:
     from knowledge_base_runtime.backend import KnowledgeBaseDetailResponse, KnowledgeRepository
 
 
-def _resolve_project(project: KnowledgeBaseProject | None) -> KnowledgeBaseProject:
-    return project or load_knowledge_base_project()
+@dataclass(frozen=True)
+class NavLinkSpec:
+    key: str
+    href: str
+    label: str
 
 
-def _require_frontend_renderer(project: KnowledgeBaseProject) -> str:
-    implementation = project.ui_spec.get("implementation")
+@dataclass(frozen=True)
+class AuxPageSpec:
+    active_nav: str
+    title: str
+    subtitle: str
+    actions: tuple[NavLinkSpec, ...]
+    content_html: str
+
+
+def _resolve_project(
+    project: ProjectRuntimeAssembly | None,
+) -> ProjectRuntimeAssembly:
+    return project or load_project_runtime()
+
+
+def _frontend_app_spec(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    return dict(resolve_frontend_app_spec(project))
+
+
+def _frontend_ui(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    value = _frontend_app_spec(project)["ui"]
+    if not isinstance(value, dict):
+        raise ValueError("frontend_app_spec.ui must be a dict")
+    return dict(value)
+
+
+def _workbench(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    value = resolve_knowledge_base_domain_spec(project).get("workbench")
+    if not isinstance(value, dict):
+        raise ValueError("knowledge_base_domain_spec.workbench must be a dict")
+    return dict(value)
+
+
+def _library(project: ProjectRuntimeAssembly) -> dict[str, Any]:
+    value = _workbench(project).get("library")
+    if not isinstance(value, dict):
+        raise ValueError("knowledge_base_domain_spec.workbench.library must be a dict")
+    return dict(value)
+
+
+def _copy(project: ProjectRuntimeAssembly) -> dict[str, str]:
+    copy = _frontend_app_spec(project)["copy"]  # type: ignore[index]
+    if not isinstance(copy, dict):
+        raise ValueError("frontend_app_spec.copy must be a dict")
+    return {str(key): str(value) for key, value in copy.items()}
+
+
+def _require_frontend_renderer(project: ProjectRuntimeAssembly) -> str:
+    implementation = _frontend_ui(project).get("implementation")
     if not isinstance(implementation, dict):
-        raise ValueError("ui_spec.implementation is required for frontend renderer selection")
+        raise ValueError("frontend_app_spec.ui.implementation is required for frontend renderer selection")
     value = implementation.get("frontend_renderer")
-    if value != "knowledge_chat_client_v1":
+    if not isinstance(value, str):
+        raise ValueError("frontend_app_spec.ui.implementation.frontend_renderer must be a string")
+    if value not in load_knowledge_base_runtime_profile().supported_frontend_renderers:
         raise ValueError(f"unsupported frontend renderer: {value}")
     return value
 
 
-def _module_capabilities(project: KnowledgeBaseProject) -> tuple[Capability, ...]:
-    return tuple(Capability(item.capability_id, item.statement) for item in project.frontend_ir.capabilities)
-
-
-def _module_boundary(project: KnowledgeBaseProject) -> BoundaryDefinition:
-    return BoundaryDefinition(
-        items=tuple(BoundaryItem(item.boundary_id, item.statement) for item in project.frontend_ir.boundaries)
-    )
-
-
-def _module_bases(project: KnowledgeBaseProject) -> tuple[Base, ...]:
-    return tuple(Base(item.base_id, item.name, item.inline_expr or item.statement) for item in project.frontend_ir.bases)
-
-
-KNOWLEDGE_BASE_FRONTEND_CAPABILITIES = (
-    Capability("C1", "把会话侧栏、消息流、输入器和引用抽屉装配为稳定知识问答客户端。"),
-    Capability("C2", "以统一前端结构承接聊天、知识库切换、来源抽屉和文档详情页。"),
-    Capability("C3", "为知识库领域输出 ChatGPT 风格但可追溯来源的稳定承载面。"),
-)
-
-KNOWLEDGE_BASE_FRONTEND_BOUNDARY = BoundaryDefinition(
-    items=(
-        BoundaryItem("SURFACE", "会话侧栏、聊天主区、引用抽屉和辅助页面职责必须明确。"),
-        BoundaryItem("INTERACT", "新建会话、切换知识库、提问、打开引用和进入文档详情动作必须稳定。"),
-        BoundaryItem("STATE", "当前会话、当前知识库、当前文档、当前章节和抽屉状态必须显式可见。"),
-        BoundaryItem("EXTEND", "领域工作台和后端契约只能通过固定槽位接入。"),
-        BoundaryItem("ROUTE", "聊天页、知识库页、文档详情页和来源返回路径必须可承接。"),
-        BoundaryItem("A11Y", "阅读顺序、键盘路径和抽屉焦点切换必须稳定。"),
-    )
-)
-
-KNOWLEDGE_BASE_FRONTEND_BASES = (
-    Base("B1", "聊天界面装配基", "conversation sidebar / chat main / composer assembly"),
-    Base("B2", "引用交互契约基", "inline refs / citation drawer / document detail routing"),
-    Base("B3", "领域承接基", "knowledge base selector / secondary pages / backend extension slots"),
-)
-
-
-def verify_knowledge_base_frontend(project: KnowledgeBaseProject | None = None) -> VerificationResult:
-    resolved = _resolve_project(project)
-    boundary = _module_boundary(resolved)
-    boundary_valid, boundary_errors = boundary.validate()
-    result = verify(
-        VerificationInput(
-            subject="knowledge base frontend",
-            pass_criteria=[
-                "conversation sidebar, chat main, and citation drawer all exist in one chat shell",
-                "knowledge base switch, inline citations, and document detail routing stay explicit in the page contract",
-                "theme tokens and route contracts are compiled from one instance config",
-            ],
-            evidence={
-                "project": resolved.public_summary(),
-                "capabilities": [item.to_dict() for item in _module_capabilities(resolved)],
-                "boundary": boundary.to_dict(),
-                "bases": [item.to_dict() for item in _module_bases(resolved)],
-                "frontend_contract": resolved.frontend_contract,
-                "ui_spec": resolved.ui_spec,
-                "rule_validation": resolved.validation_reports.get("frontend", {}),
-            },
-        )
-    )
-    return VerificationResult(
-        passed=boundary_valid and result.passed,
-        reasons=[*boundary_errors, *result.reasons],
-        evidence=result.evidence,
-    )
-
-
-def _shared_style(project: KnowledgeBaseProject) -> str:
+def _shared_style(project: ProjectRuntimeAssembly) -> str:
     _require_frontend_renderer(project)
     return build_shared_style(project)
 
 
-def _aux_sidebar(project: KnowledgeBaseProject, active: str) -> str:
-    ui_spec = project.ui_spec
-    aux_sidebar = ui_spec["components"]["aux_sidebar"]
-    knowledge_detail_href = ui_spec["pages"]["knowledge_detail"]["path"].replace(
-        "{knowledge_base_id}", project.library.knowledge_base_id
+def _ghost_link(href: str, label: str) -> str:
+    return f'<a class="ghost-link" href="{escape(href)}">{escape(label)}</a>'
+
+
+def _chip(text: str) -> str:
+    return f'<span class="chip">{escape(text)}</span>'
+
+
+def _chip_list(items: tuple[str, ...] | list[str]) -> str:
+    return "".join(_chip(item) for item in items)
+
+
+def _aux_sidebar(project: ProjectRuntimeAssembly, active: str) -> str:
+    frontend_ui = _frontend_ui(project)
+    library = _library(project)
+    aux_sidebar = frontend_ui["components"]["aux_sidebar"]
+    knowledge_detail_href = frontend_ui["pages"]["knowledge_detail"]["path"].replace(
+        "{knowledge_base_id}",
+        str(library["knowledge_base_id"]),
     )
     items = (
-        ("chat", ui_spec["pages"]["chat_home"]["path"], aux_sidebar["nav"]["chat"]),
-        ("basketball-showcase", ui_spec["pages"]["basketball_showcase"]["path"], aux_sidebar["nav"]["basketball_showcase"]),
-        ("knowledge-list", ui_spec["pages"]["knowledge_list"]["path"], aux_sidebar["nav"]["knowledge_list"]),
-        ("knowledge-detail", knowledge_detail_href, aux_sidebar["nav"]["knowledge_detail"]),
+        NavLinkSpec("chat", frontend_ui["pages"]["chat_home"]["path"], aux_sidebar["nav"]["chat"]),
+        NavLinkSpec(
+            "basketball-showcase",
+            frontend_ui["pages"]["basketball_showcase"]["path"],
+            aux_sidebar["nav"]["basketball_showcase"],
+        ),
+        NavLinkSpec("knowledge-list", frontend_ui["pages"]["knowledge_list"]["path"], aux_sidebar["nav"]["knowledge_list"]),
+        NavLinkSpec("knowledge-detail", knowledge_detail_href, aux_sidebar["nav"]["knowledge_detail"]),
     )
     links = []
-    for key, href, label in items:
-        class_name = "active" if key == active else ""
-        links.append(f'<a class="{class_name}" href="{escape(href)}">{escape(label)}</a>')
+    for item in items:
+        class_name = "active" if item.key == active else ""
+        links.append(f'<a class="{class_name}" href="{escape(item.href)}">{escape(item.label)}</a>')
+    copy = _copy(project)
     return f"""
     <aside class="aux-sidebar">
       <div>
-        <span class="eyebrow">{escape(project.copy["hero_kicker"])}</span>
+        <span class="eyebrow">{escape(copy["hero_kicker"])}</span>
         <h1>{escape(project.metadata.display_name)}</h1>
-        <p>{escape(project.library.knowledge_base_description)}</p>
+        <p>{escape(str(library["knowledge_base_description"]))}</p>
       </div>
       <nav class="aux-nav">
         {''.join(links)}
@@ -147,7 +157,31 @@ def _render_page(title: str, style: str, body: str) -> str:
 """
 
 
-def compose_basketball_showcase_page(project: KnowledgeBaseProject) -> str:
+def _render_aux_page(project: ProjectRuntimeAssembly, *, style: str, page: AuxPageSpec) -> str:
+    header_actions = "".join(_ghost_link(item.href, item.label) for item in page.actions)
+    body = f"""
+    <div class="aux-shell">
+      {_aux_sidebar(project, page.active_nav)}
+      <main class="aux-main">
+        <header class="aux-header">
+          <div class="header-copy">
+            <div class="header-title">{escape(page.title)}</div>
+            <div class="header-subtitle">{escape(page.subtitle)}</div>
+          </div>
+          <div class="header-actions">
+            {header_actions}
+          </div>
+        </header>
+        <section class="aux-content">
+          {page.content_html}
+        </section>
+      </main>
+    </div>
+    """
+    return _render_page(page.title, style, body)
+
+
+def compose_basketball_showcase_page(project: ProjectRuntimeAssembly) -> str:
     style = (
         _shared_style(project)
         + """
@@ -362,77 +396,77 @@ def compose_basketball_showcase_page(project: KnowledgeBaseProject) -> str:
     }
     """
     )
-    ui_spec = project.ui_spec
-    page_spec = ui_spec["pages"]["basketball_showcase"]
-    body = f"""
-    <div class="aux-shell">
-      {_aux_sidebar(project, "basketball-showcase")}
-      <main class="aux-main">
-        <header class="aux-header">
-          <div class="header-copy">
-            <div class="header-title">{escape(page_spec['title'])}</div>
-            <div class="header-subtitle">{escape(page_spec['intro'])}</div>
-          </div>
-          <div class="header-actions">
-            <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['back_to_chat_label'])}</a>
-            <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(page_spec['browse_knowledge_label'])}</a>
-          </div>
-        </header>
-        <section class="aux-content">
-          <article class="showcase-stage">
-            <span class="showcase-kicker">{escape(page_spec['kicker'])}</span>
-            <div class="showcase-grid">
-              <div class="showcase-copy">
-                <h2>{escape(page_spec['headline'])}</h2>
-                <p>{escape(page_spec['intro'])}</p>
-                <div class="showcase-metrics">
-                  <div class="showcase-metric">
-                    <strong>前端扩展页</strong>
-                    <span>不离开知识库工作台，也能挂一个独立专题页。</span>
-                  </div>
-                  <div class="showcase-metric">
-                    <strong>治理树可追踪</strong>
-                    <span>路由、surface contract、ui spec 会一起收敛，不是树外彩蛋。</span>
-                  </div>
-                  <div class="showcase-metric">
-                    <strong>视觉可变体</strong>
-                    <span>主界面保持知识问答秩序，专题页允许更强的视觉表达。</span>
-                  </div>
-                </div>
-                <div class="showcase-cta">
-                  <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['back_to_chat_label'])}</a>
-                  <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(page_spec['browse_knowledge_label'])}</a>
-                </div>
-                <div class="showcase-note">页面主题是“蔡徐坤打球”，这里把它做成一个纯前端视觉专题，用来验证知识库产品也能承接轻量扩展场景。</div>
-              </div>
-              <div class="showcase-court" aria-hidden="true">
-                <div class="showcase-ball"></div>
-                <div class="showcase-player">
-                  <div class="head"></div>
-                  <div class="torso"></div>
-                  <div class="arm left"></div>
-                  <div class="arm right"></div>
-                  <div class="leg left"></div>
-                  <div class="leg right"></div>
-                </div>
-              </div>
+    frontend_ui = _frontend_ui(project)
+    page_spec = frontend_ui["pages"]["basketball_showcase"]
+    showcase_content = f"""
+    <article class="showcase-stage">
+      <span class="showcase-kicker">{escape(page_spec['kicker'])}</span>
+      <div class="showcase-grid">
+        <div class="showcase-copy">
+          <h2>{escape(page_spec['headline'])}</h2>
+          <p>{escape(page_spec['intro'])}</p>
+          <div class="showcase-metrics">
+            <div class="showcase-metric">
+              <strong>前端扩展页</strong>
+              <span>不离开知识库工作台，也能挂一个独立专题页。</span>
             </div>
-          </article>
-        </section>
-      </main>
-    </div>
+            <div class="showcase-metric">
+              <strong>证据树可追踪</strong>
+              <span>路由、surface contract、ui spec 会一起收敛，不是树外彩蛋。</span>
+            </div>
+            <div class="showcase-metric">
+              <strong>视觉可变体</strong>
+              <span>主界面保持知识问答秩序，专题页允许更强的视觉表达。</span>
+            </div>
+          </div>
+          <div class="showcase-cta">
+            {_ghost_link(frontend_ui['pages']['chat_home']['path'], page_spec['back_to_chat_label'])}
+            {_ghost_link(frontend_ui['pages']['knowledge_list']['path'], page_spec['browse_knowledge_label'])}
+          </div>
+          <div class="showcase-note">页面主题是“蔡徐坤打球”，这里把它做成一个纯前端视觉专题，用来验证知识库产品也能承接轻量扩展场景。</div>
+        </div>
+        <div class="showcase-court" aria-hidden="true">
+          <div class="showcase-ball"></div>
+          <div class="showcase-player">
+            <div class="head"></div>
+            <div class="torso"></div>
+            <div class="arm left"></div>
+            <div class="arm right"></div>
+            <div class="leg left"></div>
+            <div class="leg right"></div>
+          </div>
+        </div>
+      </div>
+    </article>
     """
-    return _render_page(page_spec["title"], style, body)
+    return _render_aux_page(
+        project,
+        style=style,
+        page=AuxPageSpec(
+            active_nav="basketball-showcase",
+            title=page_spec["title"],
+            subtitle=page_spec["intro"],
+            actions=(
+                NavLinkSpec("chat", frontend_ui["pages"]["chat_home"]["path"], page_spec["back_to_chat_label"]),
+                NavLinkSpec(
+                    "knowledge-list",
+                    frontend_ui["pages"]["knowledge_list"]["path"],
+                    page_spec["browse_knowledge_label"],
+                ),
+            ),
+            content_html=showcase_content,
+        ),
+    )
 
 
-def compose_knowledge_base_list_page(project: KnowledgeBaseProject, repository: "KnowledgeRepository") -> str:
+def compose_knowledge_base_list_page(project: ProjectRuntimeAssembly, repository: "KnowledgeRepository") -> str:
     style = _shared_style(project)
-    ui_spec = project.ui_spec
-    page_spec = ui_spec["pages"]["knowledge_list"]
+    frontend_ui = _frontend_ui(project)
+    page_spec = frontend_ui["pages"]["knowledge_list"]
     knowledge_bases = repository.list_knowledge_bases()
     cards = []
     for item in knowledge_bases:
-        detail_href = ui_spec["pages"]["knowledge_detail"]["path"].replace("{knowledge_base_id}", item.knowledge_base_id)
+        detail_href = frontend_ui["pages"]["knowledge_detail"]["path"].replace("{knowledge_base_id}", item.knowledge_base_id)
         cards.append(
             f"""
             <article class="kb-card">
@@ -443,47 +477,44 @@ def compose_knowledge_base_list_page(project: KnowledgeBaseProject, repository: 
                 <span class="meta-chip">{escape(item.updated_at)}</span>
               </div>
               <div class="card-meta">
-                <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['chat_action_label'])}</a>
+                <a class="ghost-link" href="{escape(frontend_ui['pages']['chat_home']['path'])}">{escape(page_spec['chat_action_label'])}</a>
                 <a class="ghost-link" href="{escape(detail_href)}">{escape(page_spec['detail_action_label'])}</a>
               </div>
             </article>
             """
         )
-    body = f"""
-    <div class="aux-shell">
-      {_aux_sidebar(project, "knowledge-list")}
-      <main class="aux-main">
-        <header class="aux-header">
-          <div class="header-copy">
-            <div class="header-title">{escape(page_spec['title'])}</div>
-            <div class="header-subtitle">{escape(page_spec['subtitle'])}</div>
-          </div>
-          <div class="header-actions">
-            <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['primary_action_label'])}</a>
-          </div>
-        </header>
-        <section class="aux-content">
-          <div class="page-card">
-            <h2>{escape(page_spec['rationale_title'])}</h2>
-            <p>{escape(page_spec['rationale_copy'])}</p>
-          </div>
-          <div class="page-grid">
-            {''.join(cards)}
-          </div>
-        </section>
-      </main>
+    content_html = f"""
+    <div class="page-card">
+      <h2>{escape(page_spec['rationale_title'])}</h2>
+      <p>{escape(page_spec['rationale_copy'])}</p>
+    </div>
+    <div class="page-grid">
+      {''.join(cards)}
     </div>
     """
-    return _render_page("Knowledge Bases", style, body)
+    return _render_aux_page(
+        project,
+        style=style,
+        page=AuxPageSpec(
+            active_nav="knowledge-list",
+            title=page_spec["title"],
+            subtitle=page_spec["subtitle"],
+            actions=(NavLinkSpec("chat", frontend_ui["pages"]["chat_home"]["path"], page_spec["primary_action_label"]),),
+            content_html=content_html,
+        ),
+    )
 
 
-def compose_knowledge_base_detail_page(project: KnowledgeBaseProject, knowledge_base: "KnowledgeBaseDetailResponse") -> str:
+def compose_knowledge_base_detail_page(
+    project: ProjectRuntimeAssembly,
+    knowledge_base: "KnowledgeBaseDetailResponse",
+) -> str:
     style = _shared_style(project)
-    ui_spec = project.ui_spec
-    page_spec = ui_spec["pages"]["knowledge_detail"]
+    frontend_ui = _frontend_ui(project)
+    page_spec = frontend_ui["pages"]["knowledge_detail"]
     cards = []
     for document in knowledge_base.documents:
-        detail_href = ui_spec["pages"]["document_detail"]["path"].replace("{document_id}", document.document_id)
+        detail_href = frontend_ui["pages"]["document_detail"]["path"].replace("{document_id}", document.document_id)
         cards.append(
             f"""
             <article class="doc-card">
@@ -495,52 +526,46 @@ def compose_knowledge_base_detail_page(project: KnowledgeBaseProject, knowledge_
                 <span class="chip">{document.section_count} sections</span>
               </div>
               <div class="card-meta">
-                <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}?document={escape(document.document_id)}">{escape(page_spec['return_chat_with_document_label'])}</a>
+                <a class="ghost-link" href="{escape(frontend_ui['pages']['chat_home']['path'])}?document={escape(document.document_id)}">{escape(page_spec['return_chat_with_document_label'])}</a>
                 <a class="ghost-link" href="{escape(detail_href)}">{escape(page_spec['document_detail_action_label'])}</a>
               </div>
             </article>
             """
         )
-    body = f"""
-    <div class="aux-shell">
-      {_aux_sidebar(project, "knowledge-detail")}
-      <main class="aux-main">
-        <header class="aux-header">
-          <div class="header-copy">
-            <div class="header-title">{escape(knowledge_base.name)}</div>
-            <div class="header-subtitle">{escape(knowledge_base.description)}</div>
-          </div>
-          <div class="header-actions">
-            <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}">{escape(page_spec['chat_action_label'])}</a>
-          </div>
-        </header>
-        <section class="aux-content">
-          <div class="page-card">
-            <h2>{escape(page_spec['overview_title'])}</h2>
-            <div class="chip-row">
-              <span class="chip">{knowledge_base.document_count} documents</span>
-              <span class="chip">{escape(knowledge_base.updated_at)}</span>
-              {''.join(f'<span class="chip">{escape(item)}</span>' for item in knowledge_base.source_types)}
-            </div>
-          </div>
-          <div class="stack">
-            {''.join(cards)}
-          </div>
-        </section>
-      </main>
+    content_html = f"""
+    <div class="page-card">
+      <h2>{escape(page_spec['overview_title'])}</h2>
+      <div class="chip-row">
+        {_chip(str(knowledge_base.document_count) + ' documents')}
+        {_chip(knowledge_base.updated_at)}
+        {_chip_list(list(knowledge_base.source_types))}
+      </div>
+    </div>
+    <div class="stack">
+      {''.join(cards)}
     </div>
     """
-    return _render_page(knowledge_base.name, style, body)
+    return _render_aux_page(
+        project,
+        style=style,
+        page=AuxPageSpec(
+            active_nav="knowledge-detail",
+            title=knowledge_base.name,
+            subtitle=knowledge_base.description,
+            actions=(NavLinkSpec("chat", frontend_ui["pages"]["chat_home"]["path"], page_spec["chat_action_label"]),),
+            content_html=content_html,
+        ),
+    )
 
 
 def compose_document_detail_page(
-    project: KnowledgeBaseProject,
+    project: ProjectRuntimeAssembly,
     document: KnowledgeDocument,
     active_section_id: str | None = None,
 ) -> str:
     style = _shared_style(project)
-    ui_spec = project.ui_spec
-    page_spec = ui_spec["pages"]["document_detail"]
+    frontend_ui = _frontend_ui(project)
+    page_spec = frontend_ui["pages"]["document_detail"]
     sections = []
     for section in document.sections:
         class_name = "document-section active" if section.section_id == active_section_id else "document-section"
@@ -552,61 +577,72 @@ def compose_document_detail_page(
             </section>
             """
         )
-    body = f"""
-    <div class="aux-shell">
-      {_aux_sidebar(project, "knowledge-detail")}
-      <main class="aux-main">
-        <header class="aux-header">
-          <div class="header-copy">
-            <div class="header-title">{escape(page_spec['title'])}</div>
-            <div class="header-subtitle">{escape(page_spec['subtitle'])}</div>
-          </div>
-          <div class="header-actions">
-            <a class="ghost-link" href="{escape(ui_spec['pages']['chat_home']['path'])}?document={escape(document.document_id)}">{escape(page_spec['return_chat_label'])}</a>
-            <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_detail']['path'].replace('{knowledge_base_id}', project.library.knowledge_base_id))}">{escape(page_spec['return_knowledge_detail_label'])}</a>
-          </div>
-        </header>
-        <section class="aux-content">
-          <article class="document-header">
-            <h2>{escape(document.title)}</h2>
-            <p>{escape(document.summary)}</p>
-            <div class="chip-row">
-              {''.join(f'<span class="chip">{escape(tag)}</span>' for tag in document.tags)}
-              <span class="chip">{escape(document.updated_at)}</span>
-            </div>
-          </article>
-          <div class="stack">
-            {''.join(sections)}
-          </div>
-        </section>
-      </main>
+    content_html = f"""
+    <article class="document-header">
+      <h2>{escape(document.title)}</h2>
+      <p>{escape(document.summary)}</p>
+      <div class="chip-row">
+        {_chip_list(list(document.tags))}
+        {_chip(document.updated_at)}
+      </div>
+    </article>
+    <div class="stack">
+      {''.join(sections)}
     </div>
     """
-    return _render_page(document.title, style, body)
+    return _render_aux_page(
+        project,
+        style=style,
+        page=AuxPageSpec(
+            active_nav="knowledge-detail",
+            title=page_spec["title"],
+            subtitle=page_spec["subtitle"],
+            actions=(
+                NavLinkSpec(
+                    "chat",
+                    f"{frontend_ui['pages']['chat_home']['path']}?document={escape(document.document_id)}",
+                    page_spec["return_chat_label"],
+                ),
+                NavLinkSpec(
+                    "knowledge-detail",
+                    frontend_ui["pages"]["knowledge_detail"]["path"].replace(
+                        "{knowledge_base_id}",
+                        str(_library(project)["knowledge_base_id"]),
+                    ),
+                    page_spec["return_knowledge_detail_label"],
+                ),
+            ),
+            content_html=content_html,
+        ),
+    )
 
 
-def _chat_script(project: KnowledgeBaseProject) -> str:
+def _chat_script(project: ProjectRuntimeAssembly) -> str:
     _require_frontend_renderer(project)
     return build_chat_script(project)
 
 
-def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> str:
+def compose_knowledge_base_page(
+    project: ProjectRuntimeAssembly | None = None,
+) -> str:
     resolved = _resolve_project(project)
-    ui_spec = resolved.ui_spec
-    sidebar_spec = ui_spec["components"]["conversation_sidebar"]
-    header_spec = ui_spec["components"]["chat_header"]
-    composer_spec = ui_spec["components"]["chat_composer"]
-    drawer_spec = ui_spec["components"]["citation_drawer"]
-    switch_dialog_spec = ui_spec["components"]["knowledge_switch_dialog"]
-    conversation_spec = ui_spec["conversation"]
+    frontend_ui = _frontend_ui(resolved)
+    library = _library(resolved)
+    sidebar_spec = frontend_ui["components"]["conversation_sidebar"]
+    header_spec = frontend_ui["components"]["chat_header"]
+    composer_spec = frontend_ui["components"]["chat_composer"]
+    drawer_spec = frontend_ui["components"]["citation_drawer"]
+    switch_dialog_spec = frontend_ui["components"]["knowledge_switch_dialog"]
+    conversation_spec = frontend_ui["conversation"]
     style = _shared_style(resolved)
+    copy = _copy(resolved)
     body = f"""
     <div class="chat-shell">
       <aside class="conversation-sidebar">
         <section class="sidebar-brand">
-          <span class="eyebrow">{escape(resolved.copy["hero_kicker"])}</span>
-          <h1>{escape(resolved.copy["hero_title"])}</h1>
-          <p>{escape(resolved.copy["hero_copy"])}</p>
+          <span class="eyebrow">{escape(copy["hero_kicker"])}</span>
+          <h1>{escape(copy["hero_title"])}</h1>
+          <p>{escape(copy["hero_copy"])}</p>
         </section>
 
         <button class="sidebar-primary-btn" id="new-chat" type="button">+ {escape(sidebar_spec["new_chat_label"])}</button>
@@ -618,8 +654,8 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
 
         <section class="sidebar-footer">
           <button class="sidebar-primary-btn" type="button" data-open-knowledge-switch="true" id="knowledge-badge"></button>
-          <a class="secondary-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(sidebar_spec['browse_knowledge_label'])}</a>
-          <a class="secondary-link" href="{escape(ui_spec['pages']['basketball_showcase']['path'])}">{escape(sidebar_spec['basketball_showcase_label'])}</a>
+          <a class="secondary-link" href="{escape(frontend_ui['pages']['knowledge_list']['path'])}">{escape(sidebar_spec['browse_knowledge_label'])}</a>
+          <a class="secondary-link" href="{escape(frontend_ui['pages']['basketball_showcase']['path'])}">{escape(sidebar_spec['basketball_showcase_label'])}</a>
         </section>
       </aside>
 
@@ -627,12 +663,12 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
         <header class="chat-header" id="chat-header">
           <div class="header-copy">
             <div class="header-title" id="active-conversation-title">{escape(resolved.metadata.display_name)}</div>
-            <div class="header-subtitle" id="active-conversation-subtitle">{escape(header_spec['subtitle_template'].replace('{knowledge_base_name}', resolved.library.knowledge_base_name))}</div>
+            <div class="header-subtitle" id="active-conversation-subtitle">{escape(header_spec['subtitle_template'].replace('{knowledge_base_name}', str(library['knowledge_base_name'])))}</div>
           </div>
           <div class="header-actions">
             <button class="pill-button" type="button" data-open-knowledge-switch="true" id="knowledge-badge-secondary"></button>
-            <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(header_spec['knowledge_entry_link_label'])}</a>
-            <a class="ghost-link" href="{escape(ui_spec['pages']['basketball_showcase']['path'])}">{escape(header_spec['showcase_link_label'])}</a>
+            <a class="ghost-link" href="{escape(frontend_ui['pages']['knowledge_list']['path'])}">{escape(header_spec['knowledge_entry_link_label'])}</a>
+            <a class="ghost-link" href="{escape(frontend_ui['pages']['basketball_showcase']['path'])}">{escape(header_spec['showcase_link_label'])}</a>
           </div>
         </header>
 
@@ -643,7 +679,7 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
                 <span class="eyebrow">{escape(conversation_spec['welcome_kicker'])}</span>
                 <h2>{escape(conversation_spec['welcome_title'])}</h2>
                 <p>{escape(conversation_spec['welcome_copy'])}</p>
-                <div class="kb-pill" style="justify-content:center;">{escape(conversation_spec['current_knowledge_base_template'].replace('{knowledge_base_name}', resolved.library.knowledge_base_name))}</div>
+                <div class="kb-pill" style="justify-content:center;">{escape(conversation_spec['current_knowledge_base_template'].replace('{knowledge_base_name}', str(library['knowledge_base_name'])))}</div>
                 <div class="prompt-grid" id="prompt-grid"></div>
               </div>
             </section>
@@ -654,7 +690,7 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
         <div class="chat-composer-wrap">
           <form class="chat-composer" id="chat-form">
             <div class="composer-status">
-              <span id="composer-context">{escape(composer_spec['context_template'].replace('{context_label}', resolved.library.knowledge_base_name))}</span>
+              <span id="composer-context">{escape(composer_spec['context_template'].replace('{context_label}', str(library['knowledge_base_name'])))}</span>
               <span>{escape(composer_spec['citation_hint'])}</span>
             </div>
             <textarea
@@ -666,8 +702,8 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
             <div class="composer-actions">
               <div class="left">
                 <span class="source-chip">{escape(composer_spec['mode_label'])}</span>
-                <a class="ghost-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(composer_spec['knowledge_link_label'])}</a>
-                <a class="ghost-link" href="{escape(ui_spec['pages']['basketball_showcase']['path'])}">{escape(composer_spec['showcase_link_label'])}</a>
+                <a class="ghost-link" href="{escape(frontend_ui['pages']['knowledge_list']['path'])}">{escape(composer_spec['knowledge_link_label'])}</a>
+                <a class="ghost-link" href="{escape(frontend_ui['pages']['basketball_showcase']['path'])}">{escape(composer_spec['showcase_link_label'])}</a>
               </div>
               <button class="primary-btn" type="submit">{escape(composer_spec['submit_label'])}</button>
             </div>
@@ -688,7 +724,7 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
         <article class="drawer-card" id="drawer-section"></article>
       </section>
       <footer class="drawer-actions">
-        <a class="ghost-link" id="drawer-document-link" href="{escape(ui_spec['pages']['knowledge_list']['path'])}">{escape(drawer_spec['document_link_label'])}</a>
+        <a class="ghost-link" id="drawer-document-link" href="{escape(frontend_ui['pages']['knowledge_list']['path'])}">{escape(drawer_spec['document_link_label'])}</a>
       </footer>
     </aside>
 
@@ -712,3 +748,76 @@ def compose_knowledge_base_page(project: KnowledgeBaseProject | None = None) -> 
     {_chat_script(resolved)}
     """
     return _render_page(resolved.metadata.display_name, style, body)
+
+
+def build_knowledge_base_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    def handler() -> str:
+        return compose_knowledge_base_page(project)
+
+    return handler
+
+
+def build_basketball_showcase_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    def handler() -> str:
+        return compose_basketball_showcase_page(project)
+
+    return handler
+
+
+def build_knowledge_base_list_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    resolved_repository = _require_repository(project, repository)
+
+    def handler() -> str:
+        return compose_knowledge_base_list_page(project, resolved_repository)
+
+    return handler
+
+
+def build_knowledge_base_detail_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    resolved_repository = _require_repository(project, repository)
+
+    def handler(knowledge_base_id: str) -> str:
+        knowledge_base = resolved_repository.get_knowledge_base(knowledge_base_id)
+        if knowledge_base is None:
+            raise HTTPException(status_code=404, detail="Knowledge base not found")
+        return compose_knowledge_base_detail_page(project, knowledge_base)
+
+    return handler
+
+
+def build_document_detail_page_handler(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None = None,
+) -> Any:
+    resolved_repository = _require_repository(project, repository)
+
+    def handler(document_id: str, section: str | None = None) -> str:
+        document = resolved_repository.get_document(document_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return compose_document_detail_page(project, document, active_section_id=section)
+
+    return handler
+
+
+def _require_repository(
+    project: ProjectRuntimeAssembly,
+    repository: "KnowledgeRepository" | None,
+) -> "KnowledgeRepository":
+    if repository is not None:
+        return repository
+    from knowledge_base_runtime.backend import KnowledgeRepository
+
+    return KnowledgeRepository(project)
