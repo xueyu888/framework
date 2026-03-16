@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9 - 2026-03-17
+
+- Removed redundant `boundary_id` / `mapping_mode` mirror keys from `projects/knowledge_base_basic/project.toml` so project config no longer repeats boundary identity already derived from framework and canonical.
+- Stripped those mirror keys from compiled config boundary payloads to keep `communication_export` / `exact_export` free of dead projection metadata.
+- Revalidated the repository, regenerated canonical output, and repackaged Shelf AI `0.1.9` so the published VSIX matches the current validated workspace.
+
 ## 0.1.8 - 2026-03-16
 
 - Fixed the GitHub `Publish Shelf AI` workflow so the runner now installs extension dependencies before invoking `vsce package`, matching the validated local packaging environment.
