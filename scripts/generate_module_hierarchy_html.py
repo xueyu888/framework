@@ -2,47 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
 from pathlib import Path
+import sys
 from typing import Any
 
+from dataclasses import dataclass
 
-@dataclass(frozen=True)
-class HierarchyNode:
-    node_id: str
-    label: str
-    level: int
-    description: str
-    order: int | None = None
-    metadata: dict[str, Any] | None = None
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-
-@dataclass(frozen=True)
-class HierarchyEdge:
-    source: str
-    target: str
-    relation: str
-    metadata: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class HierarchyFrameworkGroup:
-    name: str
-    order: int
-    local_levels: list[int]
-    level_node_counts: dict[int, int]
-
-
-@dataclass(frozen=True)
-class HierarchyGraph:
-    title: str
-    description: str
-    level_labels: dict[int, str]
-    nodes: list[HierarchyNode]
-    edges: list[HierarchyEdge]
-    layout_mode: str = "global_levels"
-    framework_groups: list[HierarchyFrameworkGroup] | None = None
-    storage_key_stem: str | None = None
+from hierarchy_models import HierarchyEdge, HierarchyFrameworkGroup, HierarchyGraph, HierarchyNode
 
 
 @dataclass(frozen=True)
@@ -92,6 +63,7 @@ def load_hierarchy(path: Path) -> HierarchyGraph:
 
     title = _expect_str(root.get("title"), "title")
     description = _expect_str(root.get("description"), "description")
+    foot_text = _expect_optional_str(root.get("foot_text"), "foot_text")
     storage_key_stem = _expect_optional_str(root.get("storage_key_stem"), "storage_key_stem")
 
     raw_level_labels = _expect_dict(root.get("level_labels"), "level_labels")
@@ -210,6 +182,7 @@ def load_hierarchy(path: Path) -> HierarchyGraph:
     return HierarchyGraph(
         title=title,
         description=description,
+        foot_text=foot_text,
         level_labels=level_labels,
         nodes=nodes,
         edges=edges,
@@ -527,6 +500,7 @@ def _build_payload(
     return {
         "title": graph.title,
         "description": graph.description,
+        "foot_text": graph.foot_text,
         "width": layout.width,
         "height": layout.height,
         "nodes": nodes_payload,
@@ -1589,8 +1563,13 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     if (levelStatsTitleEl) {
       levelStatsTitleEl.textContent = isFrameworkColumns ? "框架层级统计" : "层级统计";
     }
-    if (graphFootEl && isFrameworkColumns) {
-      graphFootEl.textContent = "图中按 framework 分组展示 M 模块关系；每个分组内部保留自己的本地 Lx 层。";
+    if (graphFootEl) {
+      const customFoot = typeof graphData.foot_text === "string" ? graphData.foot_text.trim() : "";
+      if (customFoot) {
+        graphFootEl.textContent = customFoot;
+      } else if (isFrameworkColumns) {
+        graphFootEl.textContent = "图中按 framework 分组展示 M 模块关系；每个分组内部保留自己的本地 Lx 层。";
+      }
     }
 
     svg.setAttribute("viewBox", `0 0 ${graphData.width} ${graphData.height}`);
@@ -2643,6 +2622,11 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
     }
 
     function renderHoverContent(node) {
+      const kicker = escapeHtml(
+        typeof node.hover_kicker === "string" && node.hover_kicker
+          ? node.hover_kicker
+          : (isFrameworkColumns ? "Framework Module" : "Hierarchy Node")
+      );
       const title = escapeHtml(node.module_title || node.label || node.id);
       const refParts = [];
       if (node.module_name) {
@@ -2660,7 +2644,7 @@ def render_html(graph: HierarchyGraph, output_path: Path, width: int = 1520, hei
         ? `${sourceFile} · Ctrl/⌘ + 点击跳转到文档`
         : "Ctrl/⌘ + 点击跳转到文档";
       return `
-        <p class="hover-kicker">Framework Module</p>
+        <p class="hover-kicker">${kicker}</p>
         <h3 class="hover-title">${title}</h3>
         <p class="hover-subtitle">${subtitle}</p>
         <div class="hover-grid">
