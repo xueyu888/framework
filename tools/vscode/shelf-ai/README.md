@@ -14,6 +14,8 @@
 - Treats stale / missing / invalid canonical as non-authoritative: formal config jumps and the evidence tree wait for fresh canonical.
 - Runs canonical validation and optionally `mypy` from the extension.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
+- Adds a governed-task intent gate: map request text to canonical framework paths (`module_id / boundary_id / exact.*`) before guarded implementation saves.
+- Blocks or warns on guarded saves (`src/`, `projects/`, `tools/` by default) when no active governed-task session is granted.
 
 ## Contract
 
@@ -36,6 +38,9 @@
 
 - `Shelf: Insert Framework Module Template`
 - `Shelf: Install Git Hooks`
+- `Shelf: Start Governed Task`
+- `Shelf: Show Governed Task Session`
+- `Shelf: Clear Governed Task Session`
 - `Shelf: Validate Canonical Now`
 - `Shelf: Run Codegen Preflight`
 - `Shelf: Publish Current Framework Draft`
@@ -48,6 +53,16 @@
 ## Configuration
 
 - `shelf.guardMode = strict`
+- `shelf.intentGateEnabled = true`
+- `shelf.intentGateEnforcementMode = block`
+- `shelf.intentGateRequireMappingEcho = true`
+- `shelf.intentGateRunChangeValidationBeforeGrant = true`
+- `shelf.intentGateAutoOpenOutput = true`
+- `shelf.intentGateMinimumScore = 4`
+- `shelf.intentGateMaxMatches = 8`
+- `shelf.intentGateSessionTtlMinutes = 120`
+- `shelf.intentGateGuardedPathPrefixes = [\"*\"]`
+- `shelf.intentGateIgnoredPathPrefixes = [\".git/\", \".github/\", \".venv/\", \"node_modules/\", \"dist/\", \"build/\", \"out/\", \".pytest_cache/\", \".mypy_cache/\", \"__pycache__/\"]`
 - `shelf.frameworkTreeNodeHorizontalGap = 8`
 - `shelf.frameworkTreeLevelVerticalGap = 80`
 - `shelf.treeZoomMinScale = 0.68`
@@ -61,6 +76,16 @@
 - `shelf.validationDebounceMs = 250`
 
 Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload.
+
+## Governed Task Flow
+
+1. Run `Shelf: Start Governed Task`.
+2. Enter the requested change text.
+3. Shelf runs `validate_canonical.py --check-changes` (configurable), computes canonical-backed mapping candidates, and asks for confirmation.
+4. Once granted, guarded implementation saves are allowed until the session expires or is cleared.
+5. Without a granted session, guarded saves are warned or blocked/reverted (depending on `shelf.intentGateEnforcementMode`).
+
+Default governed-path strategy is `["*"]`, so Shelf intercepts all workspace code paths unless a prefix is explicitly listed in `shelf.intentGateIgnoredPathPrefixes`.
 
 ## Validation
 

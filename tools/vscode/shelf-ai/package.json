@@ -28,6 +28,7 @@
     "framework_completion.js",
     "framework_navigation.js",
     "validation_runtime.js",
+    "intent_gate.js",
     "media/**",
     "snippets/**"
   ],
@@ -38,7 +39,7 @@
   "scripts": {
     "build:webview": "node scripts/build_tree_webview.mjs",
     "check:webview-types": "tsc --pretty false --noEmit -p webview/tree/tsconfig.json",
-    "test": "node test_guarding.js && node test_framework_navigation.js && node test_evidence_tree.js && node test_validation_runtime.js && node test_snippets.js && node test_tree_runtime_models.js && node test_tree_webview_bridge.js",
+    "test": "node test_guarding.js && node test_framework_navigation.js && node test_evidence_tree.js && node test_validation_runtime.js && node test_intent_gate.js && node test_snippets.js && node test_tree_runtime_models.js && node test_tree_webview_bridge.js",
     "vscode:prepublish": "npm run build:webview"
   },
   "devDependencies": {
@@ -56,6 +57,9 @@
     "onView:shelf.sidebarHome",
     "onCommand:shelf.insertFrameworkModuleTemplate",
     "onCommand:shelf.installGitHooks",
+    "onCommand:shelf.startGovernedTask",
+    "onCommand:shelf.showGovernedTaskSession",
+    "onCommand:shelf.clearGovernedTaskSession",
     "onCommand:shelf.validateNow",
     "onCommand:shelf.codegenPreflight",
     "onCommand:shelf.publishFrameworkDraft",
@@ -92,6 +96,18 @@
       {
         "command": "shelf.installGitHooks",
         "title": "Shelf: Install Git Hooks"
+      },
+      {
+        "command": "shelf.startGovernedTask",
+        "title": "Shelf: Start Governed Task"
+      },
+      {
+        "command": "shelf.showGovernedTaskSession",
+        "title": "Shelf: Show Governed Task Session"
+      },
+      {
+        "command": "shelf.clearGovernedTaskSession",
+        "title": "Shelf: Clear Governed Task Session"
       },
       {
         "command": "shelf.showIssues",
@@ -144,44 +160,49 @@
     "menus": {
       "view/title": [
         {
-          "command": "shelf.openFrameworkTree",
+          "command": "shelf.startGovernedTask",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@1"
         },
         {
-          "command": "shelf.refreshFrameworkTree",
+          "command": "shelf.openFrameworkTree",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@2"
         },
         {
-          "command": "shelf.openEvidenceTree",
+          "command": "shelf.refreshFrameworkTree",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@3"
         },
         {
-          "command": "shelf.refreshEvidenceTree",
+          "command": "shelf.openEvidenceTree",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@4"
         },
         {
-          "command": "shelf.validateNow",
+          "command": "shelf.refreshEvidenceTree",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@5"
         },
         {
-          "command": "shelf.codegenPreflight",
+          "command": "shelf.validateNow",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@6"
         },
         {
-          "command": "shelf.publishFrameworkDraft",
+          "command": "shelf.codegenPreflight",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@7"
         },
         {
-          "command": "shelf.installGitHooks",
+          "command": "shelf.publishFrameworkDraft",
           "when": "view == shelf.sidebarHome",
           "group": "navigation@8"
+        },
+        {
+          "command": "shelf.installGitHooks",
+          "when": "view == shelf.sidebarHome",
+          "group": "navigation@9"
         }
       ]
     },
@@ -236,6 +257,85 @@
           "type": "boolean",
           "default": true,
           "description": "Prompt once per session to enable the repository .githooks path when missing."
+        },
+        "shelf.intentGateEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the governed-task intent gate. Guarded implementation saves require an active mapping-confirmed task session."
+        },
+        "shelf.intentGateEnforcementMode": {
+          "type": "string",
+          "enum": [
+            "warn",
+            "block"
+          ],
+          "default": "block",
+          "description": "Choose whether guarded saves only warn or are blocked/reverted when no active governed-task session exists."
+        },
+        "shelf.intentGateRequireMappingEcho": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require an explicit QuickPick confirmation of canonical mappings before granting a governed-task session."
+        },
+        "shelf.intentGateRunChangeValidationBeforeGrant": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run `validate_canonical.py --check-changes` before granting a governed-task session."
+        },
+        "shelf.intentGateAutoOpenOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-open the Shelf output channel after intent-to-framework mapping analysis."
+        },
+        "shelf.intentGateMinimumScore": {
+          "type": "integer",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Minimum mapping score threshold for intent-to-framework gate matching."
+        },
+        "shelf.intentGateMaxMatches": {
+          "type": "integer",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum number of canonical mapping candidates retained in a governed-task session."
+        },
+        "shelf.intentGateSessionTtlMinutes": {
+          "type": "integer",
+          "default": 120,
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "Time-to-live for a governed-task session. Expired sessions are cleared and guarded saves are blocked again."
+        },
+        "shelf.intentGateGuardedPathPrefixes": {
+          "type": "array",
+          "default": [
+            "*"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Workspace-relative path prefixes guarded by the intent gate on save. Use `*` to guard all workspace code paths."
+        },
+        "shelf.intentGateIgnoredPathPrefixes": {
+          "type": "array",
+          "default": [
+            ".git/",
+            ".github/",
+            ".venv/",
+            "node_modules/",
+            "dist/",
+            "build/",
+            "out/",
+            ".pytest_cache/",
+            ".mypy_cache/",
+            "__pycache__/"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Workspace-relative path prefixes excluded from intent-gate save interception."
         },
         "shelf.changeValidationCommand": {
           "type": "string",
