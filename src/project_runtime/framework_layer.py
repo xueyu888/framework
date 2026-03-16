@@ -7,6 +7,11 @@ from typing import Any
 from framework_ir import FrameworkModule as ParsedFrameworkModule
 from framework_ir import load_framework_catalog
 
+from project_runtime.correspondence_contracts import (
+    boundary_field_name,
+    module_class_name_fragment,
+    module_key_from_id,
+)
 from project_runtime.models import SelectedFrameworkModule
 
 
@@ -199,7 +204,8 @@ class FrameworkModuleClass:
 
 
 def _module_name_fragment(module: ParsedFrameworkModule) -> str:
-    return f"{module.framework.capitalize()}L{module.level}M{module.module}"
+    module_id = f"{module.framework}.L{module.level}.M{module.module}"
+    return module_class_name_fragment(module_id)
 
 
 def _class_id(kind: str, *parts: str) -> str:
@@ -247,13 +253,23 @@ def _boundary_name_to_section(boundary_id: str) -> str:
 
 def _module_boundary_projection(module: ParsedFrameworkModule, boundary_id: str) -> dict[str, Any]:
     section = _boundary_name_to_section(boundary_id)
+    module_id = module.module_id
+    module_key = module_key_from_id(module_id)
+    field_name = boundary_field_name(boundary_id)
     return _boundary_projection(
         module,
         boundary_id,
         primary_exact_path=f"exact.{module.framework}.{section}",
         mapping_mode="direct",
         note="边界一对一映射：boundary_id 与 config/code 锚点同名。",
-    )
+    ) | {
+        "module_key": module_key,
+        "static_field_name": field_name,
+        "runtime_field_name": field_name,
+        "exact_export_static_path": f"exact_export.modules.{module_key}.static_params.{field_name}",
+        "communication_export_static_path": f"communication_export.modules.{module_key}.static_params.{field_name}",
+        "merge_policy": "runtime_override_else_static",
+    }
 
 
 def _boundary_projection_map(module: ParsedFrameworkModule) -> dict[str, dict[str, Any]]:
