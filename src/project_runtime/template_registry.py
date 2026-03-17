@@ -43,8 +43,10 @@ _REGISTRY: dict[str, ProjectTemplateRegistration] = {}
 def _ensure_builtin_project_templates_loaded() -> None:
     if _REGISTRY:
         return
-    import_module("project_runtime.knowledge_base")
     import_module("project_runtime.document_chunking")
+    knowledge_base_module = Path(__file__).with_name("knowledge_base.py")
+    if knowledge_base_module.exists():
+        import_module("project_runtime.knowledge_base")
 
 
 def _callable_identity(value: Callable[..., Any] | None) -> tuple[str, str] | None:

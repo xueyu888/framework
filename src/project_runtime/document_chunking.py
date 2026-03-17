@@ -7,7 +7,7 @@ from pathlib import Path
 import tomllib
 from typing import Any
 
-from framework_ir import FrameworkModule as FrameworkModuleIR, load_framework_registry, parse_framework_module
+from framework_ir import FrameworkModule as FrameworkModuleIR, load_framework_catalog, parse_framework_module
 from project_runtime.config_layout import config_layout
 from project_runtime.project_governance import (
     FrameworkDrivenProjectRecord,
@@ -489,7 +489,7 @@ def _resolve_framework_module(ref: str) -> FrameworkModuleIR:
 
 
 def _collect_framework_closure(root: FrameworkModuleIR) -> tuple[FrameworkModuleIR, ...]:
-    registry = load_framework_registry()
+    registry = load_framework_catalog()
     ordered: list[FrameworkModuleIR] = []
     seen: set[str] = set()
 

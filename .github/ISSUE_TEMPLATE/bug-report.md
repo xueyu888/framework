@@ -15,11 +15,10 @@ Describe the problem in one or two sentences.
 Which layer does this affect?
 
 - Framework
-- Product Spec
-- Implementation Config
+- Config
 - Code
 - Evidence
-- ArchSync
+- Shelf AI
 
 ## Reproduction
 
@@ -48,8 +47,8 @@ Paste relevant command output if available:
 ```bash
 uv run mypy
 uv run python scripts/materialize_project.py
-uv run python scripts/validate_strict_mapping.py
-uv run python scripts/validate_strict_mapping.py --check-changes
+uv run python scripts/validate_canonical.py
+uv run python scripts/validate_canonical.py --check-changes
 ```
 
 ## Additional context

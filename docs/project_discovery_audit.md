@@ -1,11 +1,18 @@
-# 项目发现审计
+# Project Discovery Audit
 
-- 审计版本：`project-discovery-audit/v1`
-- 扫描目录：`projects`
-- 识别为框架驱动项目：`1`
-- 排除项目：`1`
+- schema_version: `project-discovery-audit/v2`
+- project_count: `1`
 
-| 项目目录 | 结果 | 分类 | 模板 | 原因 |
-| --- | --- | --- | --- | --- |
-| projects/document_chunking_basic | 排除 | `template_not_registered` | `document_chunking_pipeline` | template document_chunking_pipeline is not registered: unsupported project template: document_chunking_pipeline |
-| projects/knowledge_base_basic | 识别 | `recognized` | `knowledge_base_workbench` | product_spec.toml and implementation_config.toml both exist<br>registered template resolved: knowledge_base_workbench<br>project loads through the registered framework-driven materialization chain<br>framework selections resolve to concrete framework modules<br>implementation config exposes generated artifact contract |
+## knowledge_base_basic
+
+- project_file: `projects/knowledge_base_basic/project.toml`
+- runtime_scene: `knowledge_chat`
+- generated_dir: `projects/knowledge_base_basic/generated`
+- canonical_json: `projects/knowledge_base_basic/generated/canonical.json`
+- classification: `four-layer-project`
+- root[backend]: `framework/backend/L2-M0-知识库接口框架标准模块.md`
+- root[frontend]: `framework/frontend/L2-M0-前端框架标准模块.md`
+- root[knowledge_base]: `framework/knowledge_base/L2-M0-知识库工作台场景模块.md`
+- reason: contains project entry file
+- reason: config compiles into framework/config/code/evidence canonical layers
+- reason: derived artifacts point back to canonical.json
