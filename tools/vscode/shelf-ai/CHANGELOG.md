@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 - 2026-03-17
+
+- Refined the dedicated monochrome Activity Bar duck glyph so the icon now fills the sidebar slot more decisively while keeping thinner, cleaner inner lines.
+- Kept the colorful README / Marketplace artwork unchanged; this patch only tunes the VS Code sidebar-specific icon adaptation.
+- Repackaged and reinstalled the local VSIX after the icon tweak so the shipped asset matches the current validated workspace.
+
 ## 0.1.11 - 2026-03-17
 
 - Refreshed Shelf AI branding with a new duck icon set: the extension now ships a colorful README/Marketplace icon together with a dedicated monochrome Activity Bar glyph tuned for VS Code's sidebar constraints.
