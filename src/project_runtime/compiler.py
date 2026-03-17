@@ -7,6 +7,7 @@ from typing import Any
 
 from project_runtime.config_layer import build_config_modules, load_project_config
 from project_runtime.code_layer import build_code_modules
+from project_runtime.correspondence_view import build_correspondence_view
 from project_runtime.evidence_layer import build_evidence_modules
 from project_runtime.framework_layer import resolve_selected_framework_modules
 from project_runtime.models import GeneratedArtifactPaths, ProjectRuntimeAssembly
@@ -18,12 +19,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROJECT_FILE = REPO_ROOT / "projects" / "knowledge_base_basic" / "project.toml"
 
 
-def _artifact_paths(project_file: Path, canonical_name: str, runtime_snapshot_name: str) -> GeneratedArtifactPaths:
+def _artifact_paths(project_file: Path, canonical_name: str) -> GeneratedArtifactPaths:
     output_dir = project_file.parent / "generated"
     return GeneratedArtifactPaths(
         directory=relative_path(output_dir),
         canonical_json=relative_path(output_dir / canonical_name),
-        runtime_snapshot_py=relative_path(output_dir / runtime_snapshot_name),
     )
 
 
@@ -38,6 +38,10 @@ def _build_links(
     code_to_evidence = []
     boundary_bindings = []
     base_bindings = []
+    module_class_bindings = []
+    base_class_bindings = []
+    rule_class_bindings = []
+    boundary_param_bindings = []
     for config_binding, code_binding, evidence_module in zip(config_modules, code_modules, evidence_modules):
         framework_to_config.append(
             {
@@ -105,6 +109,59 @@ def _build_links(
                     "link_role": "trace_view",
                 }
             )
+        code_bindings = code_binding.code_module.code_bindings
+        module_class_binding = code_bindings.get("module_class_binding")
+        if isinstance(module_class_binding, dict):
+            module_class_bindings.append(
+                {
+                    **module_class_binding,
+                    "config_module_id": config_binding.config_module.module_id,
+                    "config_module_class_id": config_binding.config_module.class_id,
+                    "code_module_id": code_binding.code_module.module_id,
+                    "code_module_class_id": code_binding.code_module.class_id,
+                    "code_module_class": code_binding.code_module.__name__,
+                    "link_role": "correspondence",
+                }
+            )
+        for item in code_bindings.get("base_class_bindings", []):
+            if isinstance(item, dict):
+                base_class_bindings.append(
+                    {
+                        **item,
+                        "config_module_id": config_binding.config_module.module_id,
+                        "config_module_class_id": config_binding.config_module.class_id,
+                        "code_module_id": code_binding.code_module.module_id,
+                        "code_module_class_id": code_binding.code_module.class_id,
+                        "code_module_class": code_binding.code_module.__name__,
+                        "link_role": "correspondence",
+                    }
+                )
+        for item in code_bindings.get("rule_class_bindings", []):
+            if isinstance(item, dict):
+                rule_class_bindings.append(
+                    {
+                        **item,
+                        "config_module_id": config_binding.config_module.module_id,
+                        "config_module_class_id": config_binding.config_module.class_id,
+                        "code_module_id": code_binding.code_module.module_id,
+                        "code_module_class_id": code_binding.code_module.class_id,
+                        "code_module_class": code_binding.code_module.__name__,
+                        "link_role": "correspondence",
+                    }
+                )
+        for item in code_bindings.get("boundary_param_bindings", []):
+            if isinstance(item, dict):
+                boundary_param_bindings.append(
+                    {
+                        **item,
+                        "config_module_id": config_binding.config_module.module_id,
+                        "config_module_class_id": config_binding.config_module.class_id,
+                        "code_module_id": code_binding.code_module.module_id,
+                        "code_module_class_id": code_binding.code_module.class_id,
+                        "code_module_class": code_binding.code_module.__name__,
+                        "link_role": "correspondence",
+                    }
+                )
     return {
         "link_roles": {
             "framework_to_config": "mainline",
@@ -112,12 +169,20 @@ def _build_links(
             "code_to_evidence": "mainline",
             "boundary_bindings": "trace_view",
             "base_bindings": "trace_view",
+            "module_class_bindings": "correspondence",
+            "base_class_bindings": "correspondence",
+            "rule_class_bindings": "correspondence",
+            "boundary_param_bindings": "correspondence",
         },
         "framework_to_config": framework_to_config,
         "config_to_code": config_to_code,
         "code_to_evidence": code_to_evidence,
         "boundary_bindings": boundary_bindings,
         "base_bindings": base_bindings,
+        "module_class_bindings": module_class_bindings,
+        "base_class_bindings": base_class_bindings,
+        "rule_class_bindings": rule_class_bindings,
+        "boundary_param_bindings": boundary_param_bindings,
     }
 
 
@@ -129,7 +194,7 @@ def _build_canonical(
     evidence_modules: tuple[type[Any], ...],
     evidence_exports: dict[str, Any],
 ) -> dict[str, Any]:
-    return {
+    canonical = {
         "schema_version": "four-layer-canonical/v2",
         "project": assembly.metadata.to_dict(),
         "framework": {
@@ -159,6 +224,8 @@ def _build_canonical(
         },
         "links": _build_links(framework_modules, config_modules, code_modules, evidence_modules),
     }
+    canonical["correspondence"] = build_correspondence_view(canonical)
+    return canonical
 
 
 def compile_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> ProjectRuntimeAssembly:
@@ -177,7 +244,6 @@ def compile_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> 
         generated_artifacts=_artifact_paths(
             resolved_project_file,
             project_config.artifacts.canonical_json,
-            project_config.artifacts.runtime_snapshot_py,
         ),
     )
     evidence_modules, evidence_exports, validation_reports = build_evidence_modules(draft_assembly, code_modules)
@@ -224,28 +290,10 @@ def materialize_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE)
     generated.mkdir(parents=True, exist_ok=True)
     expected = {
         assembly.config.artifacts.canonical_json,
-        assembly.config.artifacts.runtime_snapshot_py,
     }
     cleanup_generated_output_dir(generated, expected)
     canonical_path = generated / assembly.config.artifacts.canonical_json
-    runtime_snapshot_path = generated / assembly.config.artifacts.runtime_snapshot_py
     canonical_text = json.dumps(assembly.canonical, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     canonical_path.write_text(canonical_text, encoding="utf-8")
-    runtime_snapshot = {
-        **assembly.to_runtime_snapshot_dict(),
-        "frontend_app_spec": assembly.require_runtime_export("frontend_app_spec"),
-        "knowledge_base_domain_spec": assembly.require_runtime_export("knowledge_base_domain_spec"),
-        "backend_service_spec": assembly.require_runtime_export("backend_service_spec"),
-        "runtime_blueprint": assembly.require_runtime_export("runtime_blueprint"),
-    }
-    runtime_snapshot_path.write_text(
-        "from __future__ import annotations\n\n"
-        "# GENERATED FILE. DO NOT EDIT.\n"
-        "import json\n\n"
-        f"RUNTIME_SNAPSHOT = json.loads(r'''{json.dumps(runtime_snapshot, ensure_ascii=False)}''')\n"
-        "PROJECT_CONFIG = RUNTIME_SNAPSHOT['project_config']\n"
-        "CANONICAL = RUNTIME_SNAPSHOT['canonical']\n",
-        encoding="utf-8",
-    )
     load_project_runtime.cache_clear()
     return assembly

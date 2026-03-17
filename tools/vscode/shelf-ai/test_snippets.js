@@ -31,6 +31,10 @@ function main() {
     (packageJson.files || []).includes("guarding.js"),
     "package.json must package guarding.js"
   );
+  assert(
+    (packageJson.files || []).includes("local_settings.js"),
+    "package.json must package local_settings.js"
+  );
 
   const commandContribution = (packageJson.contributes?.commands || []).find(
     (item) => item.command === "shelf.insertFrameworkModuleTemplate"
@@ -73,12 +77,6 @@ function main() {
     "shelf.runMypyOnPythonChanges",
     "shelf.protectGeneratedFiles",
     "shelf.promptInstallGitHooks",
-    "shelf.frameworkTreeJsonPath",
-    "shelf.frameworkTreeHtmlPath",
-    "shelf.frameworkTreeGenerateCommand",
-    "shelf.evidenceTreeJsonPath",
-    "shelf.evidenceTreeHtmlPath",
-    "shelf.evidenceTreeGenerateCommand",
     "shelf.materializeCommand",
     "shelf.typeCheckCommand",
   ]) {
@@ -170,20 +168,20 @@ function main() {
     "README must document the evidence tree open command"
   );
   assert(
-    readme.includes("shelf.frameworkTreeJsonPath"),
-    "README must document the framework tree JSON path setting"
-  );
-  assert(
-    readme.includes("shelf.evidenceTreeJsonPath"),
-    "README must document the evidence tree JSON path setting"
-  );
-  assert(
     readme.includes("The `@framework` template entry is a repository-side hard authoring contract"),
     "README must document the non-removable @framework authoring contract"
   );
   assert(
     readme.includes("shelf.guardMode = strict"),
     "README must document strict guard mode"
+  );
+  assert(
+    readme.includes(".shelf/settings.jsonc"),
+    "README must document the local .shelf settings entrypoint"
+  );
+  assert(
+    readme.includes("VSCode `shelf.*` setting has highest priority"),
+    "README must document local settings precedence"
   );
   assert(
     readme.includes("uv run python scripts/validate_canonical.py --check-changes"),
@@ -196,6 +194,18 @@ function main() {
   assert(
     !readme.includes("validate_canonical.py --json"),
     "README must not document the optional --json canonical flag as the default command"
+  );
+  assert(
+    readme.includes("Treats stale / missing / invalid canonical as non-authoritative"),
+    "README must document strict canonical freshness behavior"
+  );
+  assert(
+    readme.includes("Shelf blocks the formal evidence tree until you materialize again"),
+    "README must explain how the evidence tree behaves when canonical is stale"
+  );
+  assert(
+    readme.includes("No persisted tree artifact"),
+    "README must state tree views are runtime projections without persisted artifacts"
   );
 
   const atEntries = frameworkCompletion.getFrameworkCompletionEntries("@", "@", false);

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.1.12 - 2026-03-17
+
+- Refined the dedicated monochrome Activity Bar duck glyph so the icon now fills the sidebar slot more decisively while keeping thinner, cleaner inner lines.
+- Kept the colorful README / Marketplace artwork unchanged; this patch only tunes the VS Code sidebar-specific icon adaptation.
+- Repackaged and reinstalled the local VSIX after the icon tweak so the shipped asset matches the current validated workspace.
+
+## 0.1.11 - 2026-03-17
+
+- Refreshed Shelf AI branding with a new duck icon set: the extension now ships a colorful README/Marketplace icon together with a dedicated monochrome Activity Bar glyph tuned for VS Code's sidebar constraints.
+- Added the icon working assets under `tools/vscode/shelf-ai/design/` so the final shipped icon remains traceable to its design iterations.
+- Repackaged and reinstalled the local VSIX after the icon refresh so the published asset matches the validated workspace.
+
+## 0.1.10 - 2026-03-17
+
+- Kept framework tree module edges visible even when canonical is `stale`, so the authoring graph no longer drops arrows just because correspondence freshness is temporarily unavailable.
+- Added branch-scoped git-hook enforcement in repository hooks and install flow, with default protected branches set to `framework` and `main` (other branches now skip hook blocking by default).
+- Added explicit ignore coverage for `projects/knowledge_base_basic/generated/canonical.json`, keeping local canonical regeneration out of tracked diffs in fresh plugin/repo setups.
+
+## 0.1.9 - 2026-03-17
+
+- Removed redundant `boundary_id` / `mapping_mode` mirror keys from `projects/knowledge_base_basic/project.toml` so project config no longer repeats boundary identity already derived from framework and canonical.
+- Stripped those mirror keys from compiled config boundary payloads to keep `communication_export` / `exact_export` free of dead projection metadata.
+- Revalidated the repository, regenerated canonical output, and repackaged Shelf AI `0.1.9` so the published VSIX matches the current validated workspace.
+
+## 0.1.8 - 2026-03-16
+
+- Fixed the GitHub `Publish Shelf AI` workflow so the runner now installs extension dependencies before invoking `vsce package`, matching the validated local packaging environment.
+- Shipped this patch release as a release-pipeline repair only: no new Shelf AI features, but the public tag/release path now produces the expected `.vsix` asset again.
+- Repackaged and reinstalled the local VSIX as `0.1.8` after verifying the workflow fix and existing plugin test/build checks.
+
+## 0.1.7 - 2026-03-16
+
+- Rebuilt Shelf AI tree views into a dedicated runtime webview subsystem with explicit model/layout/render/bridge layering instead of a monolithic extension-side renderer.
+- Restored the framework tree to the denser round-node visual baseline with layer-fixed auto layout, hover metadata, edge inspection, and collapsible inspector behavior.
+- Added settings-first runtime tuning for framework tree spacing, tree zoom and inspector sizing, plus validation timeout/debounce/suppression thresholds, then repackaged and reinstalled the local VSIX.
+
 ## 0.1.6 - 2026-03-15
 
 - Tightened framework-to-config navigation so boundary jumps now resolve from canonical-backed framework exports instead of extension-side inferred fallback tables.
