@@ -5,22 +5,16 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from project_runtime.knowledge_base import (
-    DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE,
-    build_knowledge_base_runtime_app_from_spec,
-)
-
-PRODUCT_SPEC_FILE_ENV = "SHELF_PRODUCT_SPEC_FILE"
-DEFAULT_PRODUCT_SPEC_FILE = DEFAULT_KNOWLEDGE_BASE_PRODUCT_SPEC_FILE
+from project_runtime.compiler import DEFAULT_PROJECT_FILE
+from project_runtime.runtime_app import build_project_app_from_project_file
 
 
-def build_project_app(product_spec_file: str | Path | None = None) -> FastAPI:
-    resolved_file = (
-        product_spec_file
-        or os.environ.get(PRODUCT_SPEC_FILE_ENV)
-        or DEFAULT_PRODUCT_SPEC_FILE
-    )
-    return build_knowledge_base_runtime_app_from_spec(resolved_file)
+PROJECT_FILE_ENV = "SHELF_PROJECT_FILE"
+
+
+def build_project_app(project_file: str | Path | None = None) -> FastAPI:
+    resolved_file = project_file or os.environ.get(PROJECT_FILE_ENV) or DEFAULT_PROJECT_FILE
+    return build_project_app_from_project_file(str(resolved_file))
 
 
 app = build_project_app()

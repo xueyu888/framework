@@ -1,91 +1,78 @@
 # Contributing to Shelf
 
-Shelf is a structure-first repository.
+Shelf 只接受一套主架构语言：
 
-The main convergence chain is:
+`Framework -> Config -> Code -> Evidence`
 
-`Framework -> Product Spec -> Implementation Config -> Code -> Evidence`
-
-Contributions should preserve that direction.
+`projects/*/generated/canonical.json` 是唯一机器真相源。
 
 ## Read This First
 
+- [docs/four-layer-architecture.md](./docs/four-layer-architecture.md)
 - [specs/规范总纲与树形结构.md](./specs/规范总纲与树形结构.md)
 - [specs/框架设计核心标准.md](./specs/框架设计核心标准.md)
-- [projects/README.md](./projects/README.md)
 - [AGENTS.md](./AGENTS.md)
 
 ## Environment
 
-Use `uv` for Python dependencies and execution:
+使用 `uv` 管理依赖与执行：
 
 ```bash
 uv sync
 bash scripts/install_git_hooks.sh
 ```
 
-If you work from WSL, run these commands inside WSL. For VS Code workflows, prefer a VS Code window connected to the same WSL workspace.
-
 ## Required Checks
 
-Run these before pushing changes that affect standards, scripts, or runtime behavior:
+影响 framework、project config、runtime、validation 或 generated evidence 的改动，提交前至少执行：
 
 ```bash
 uv run mypy
 uv run python scripts/materialize_project.py
-uv run python scripts/validate_strict_mapping.py
-uv run python scripts/validate_strict_mapping.py --check-changes
+uv run python scripts/validate_canonical.py
 ```
 
 ## Source-Of-Truth Rules
 
-- Do not manually edit `projects/<project_id>/generated/*`.
-- If project behavior changes, update `framework/*.md`, `product_spec.toml`, or `implementation_config.toml` first.
-- `Product Spec` defines product truth.
-- `Implementation Config` defines one technical realization path.
-- Code and generated artifacts must not become the primary source of truth for higher layers.
+- 不要手改 `projects/<project_id>/generated/*`
+- 行为变化先改 `framework/*.md` 或 `projects/<project_id>/project.toml`
+- `project.toml` 只保留：
+  - `framework`
+  - `communication`
+  - `exact`
 
 ## Framework Authoring Rules
 
-Framework modules should remain explicit about:
+Framework 模块必须显式写出：
 
 - capability
 - boundary
-- minimal viable bases
+- minimum viable bases
 - combination rules
 - verification
 
-The repository authoring entrypoint for framework modules is the `@framework` template and the Shelf AI insertion command.
+仓库保留 `@framework` 模板和 Shelf AI 插入命令作为默认作者入口。
 
 ## Project Authoring Rules
 
-Project instance files should keep comments clear and layered:
+`projects/<project_id>/project.toml` 是唯一项目配置入口。
 
-- `projects/<project_id>/product_spec.toml`
-  - explain product truth
-- `projects/<project_id>/implementation_config.toml`
-  - explain implementation refinement
+保持注释清晰并明确分层：
 
-When practical, prefer detailed Chinese comments over minimal labels.
+- `[framework]`
+  只声明项目装配哪些 framework 模块
+- `[communication]`
+  只写人与 AI 协作的结构化沟通要求
+- `[exact]`
+  只写 Code 层可精确消费的字段、参数、路径与策略
 
-## Good Contribution Areas
-
-- framework module quality
-- project templates and examples
-- mapping validation and materialization
-- runtime templates
-- Shelf AI navigation and validation UX
-- public docs and onboarding
+尽量保留中文注释，不要让 prose 变成机器真相。
 
 ## Pull Request Notes
 
-When opening a PR, explain:
+PR 里需要说明：
 
-- which layer changed
-- why the change belongs to that layer
-- which validations were run
-- whether the change affects generated artifacts
-
-Shelf is not optimized for "quick patch first, structure later".
-
-It is optimized for getting the structure right first and keeping the implementation aligned.
+- 改动属于哪一层
+- 为什么落在这一层
+- 跑了哪些校验
+- 是否影响 `generated/canonical.json` 或其派生产物

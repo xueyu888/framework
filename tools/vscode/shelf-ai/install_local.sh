@@ -8,6 +8,56 @@ require_command() {
   fi
 }
 
+ensure_extension_dependencies() {
+  local script_dir="$1"
+
+  if [[ ! -d "${script_dir}/node_modules" ]]; then
+    echo "Installing extension dependencies..."
+    (
+      cd "${script_dir}"
+      npm install
+    )
+    return
+  fi
+
+  if ! (
+    cd "${script_dir}"
+    npm ls --depth=0 esbuild >/dev/null 2>&1
+  ); then
+    echo "Refreshing extension dependencies..."
+    (
+      cd "${script_dir}"
+      npm install
+    )
+  fi
+}
+
+major_node_version() {
+  node -p "process.versions.node.split('.')[0]"
+}
+
+package_vsix() {
+  local script_dir="$1"
+  local output_path="$2"
+  local major_version
+
+  major_version="$(major_node_version)"
+  if [[ "${major_version}" =~ ^[0-9]+$ ]] && (( major_version >= 20 )); then
+    (
+      cd "${script_dir}"
+      npx --yes @vscode/vsce package -o "${output_path}"
+    )
+    return
+  fi
+
+  echo "Node ${major_version} detected; packaging VSIX with temporary Node 20 toolchain..."
+  (
+    cd "${script_dir}"
+    TARGET_VSIX="${output_path}" \
+      npx --yes -p node@20 -p @vscode/vsce bash -lc 'vsce package -o "$TARGET_VSIX"'
+  )
+}
+
 resolve_code_bin() {
   if [[ -n "${CODE_BIN:-}" ]]; then
     echo "${CODE_BIN}"
@@ -40,6 +90,8 @@ CODE_BIN="$(resolve_code_bin)"
 
 require_command node
 require_command npx
+require_command npm
+ensure_extension_dependencies "${SCRIPT_DIR}"
 
 VERSION="$(cd "${SCRIPT_DIR}" && node -p "require('./package.json').version")"
 RELEASES_DIR="${SCRIPT_DIR}/releases"
@@ -49,10 +101,7 @@ PREVIOUS_VERSION="$(installed_version "${CODE_BIN}" || true)"
 mkdir -p "${RELEASES_DIR}"
 
 echo "Packaging Shelf AI ${VERSION}..."
-(
-  cd "${SCRIPT_DIR}"
-  npx --yes @vscode/vsce package -o "${VSIX_PATH}"
-)
+package_vsix "${SCRIPT_DIR}" "${VSIX_PATH}"
 
 if [[ -n "${PREVIOUS_VERSION}" ]]; then
   echo "Installed version before update: ${PREVIOUS_VERSION}"
