@@ -1,11 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, make_dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 
 from project_runtime.config_layer import ConfigModuleBinding
+from project_runtime.correspondence_contracts import (
+    BaseContract,
+    ModuleContract,
+    RuleContract,
+    RuntimeBoundaryParamsContract,
+    StaticBoundaryParamsContract,
+    UNSET,
+    boundary_field_name,
+    module_class_name_fragment,
+    module_key_from_id,
+)
 from project_runtime.documents import export_documents
 from project_runtime.framework_layer import FrameworkModuleClass
 from project_runtime.models import KnowledgeDocument, SeedDocumentSource
@@ -14,22 +27,112 @@ from project_runtime.models import KnowledgeDocument, SeedDocumentSource
 class CodeModuleClass:
     class_id: str
     module_id: str
+    module_key: str
     framework_file: str
     source_ref: dict[str, Any]
     exact_export: dict[str, Any]
     code_exports: dict[str, Any]
     code_bindings: dict[str, Any]
+    ModuleType: type[ModuleContract]
+    StaticBoundaryParamsType: type[StaticBoundaryParamsContract]
+    RuntimeBoundaryParamsType: type[RuntimeBoundaryParamsContract]
+    BaseTypes: tuple[type[BaseContract], ...]
+    RuleTypes: tuple[type[RuleContract], ...]
+    boundary_static_classes: tuple[type["CodeBoundaryStaticClass"], ...]
+    boundary_runtime_classes: tuple[type["CodeBoundaryRuntimeClass"], ...]
 
     @classmethod
     def to_dict(cls) -> dict[str, Any]:
         return {
             "class_id": cls.class_id,
             "module_id": cls.module_id,
+            "module_key": cls.module_key,
             "framework_file": cls.framework_file,
             "source_ref": dict(cls.source_ref),
             "exact_export": cls.exact_export,
             "code_exports": cls.code_exports,
             "code_bindings": cls.code_bindings,
+            "module_type_symbol": _class_symbol(cls.ModuleType),
+            "static_params_class_symbol": _class_symbol(cls.StaticBoundaryParamsType),
+            "runtime_params_class_symbol": _class_symbol(cls.RuntimeBoundaryParamsType),
+            "base_class_symbols": [_class_symbol(item) for item in cls.BaseTypes],
+            "rule_class_symbols": [_class_symbol(item) for item in cls.RuleTypes],
+            "boundary_static_classes": [item.to_dict() for item in cls.boundary_static_classes],
+            "boundary_runtime_classes": [item.to_dict() for item in cls.boundary_runtime_classes],
+            "class_name": cls.__name__,
+        }
+
+
+@lru_cache(maxsize=1)
+def _code_layer_lines() -> tuple[str, ...]:
+    return tuple(Path(__file__).read_text(encoding="utf-8").splitlines())
+
+
+def _find_code_line(needle: str, *, fallback: int = 1) -> int:
+    if not needle:
+        return fallback
+    for index, line_text in enumerate(_code_layer_lines(), start=1):
+        if needle in line_text:
+            return index
+    return fallback
+
+
+def _class_symbol(class_type: type[Any]) -> str:
+    return f"{class_type.__module__}:{class_type.__name__}"
+
+
+class CodeBoundaryStaticClass:
+    class_id: str
+    canonical_id: str
+    module_id: str
+    boundary_id: str
+    owner_id: str
+    source_symbol: str
+    anchor_path: str
+    projection_paths: list[str]
+    field_name: str
+    deprecated_boundary_anchor_path: str
+    source_ref: dict[str, Any]
+
+    @classmethod
+    def to_dict(cls) -> dict[str, Any]:
+        return {
+            "class_id": cls.class_id,
+            "canonical_id": cls.canonical_id,
+            "module_id": cls.module_id,
+            "boundary_id": cls.boundary_id,
+            "owner_id": cls.owner_id,
+            "source_symbol": cls.source_symbol,
+            "anchor_path": cls.anchor_path,
+            "projection_paths": list(cls.projection_paths),
+            "field_name": cls.field_name,
+            "deprecated_boundary_anchor_path": cls.deprecated_boundary_anchor_path,
+            "source_ref": dict(cls.source_ref),
+            "class_name": cls.__name__,
+        }
+
+
+class CodeBoundaryRuntimeClass:
+    class_id: str
+    canonical_id: str
+    module_id: str
+    boundary_id: str
+    owner_id: str
+    static_class_id: str
+    runtime_slots: list[dict[str, Any]]
+    source_ref: dict[str, Any]
+
+    @classmethod
+    def to_dict(cls) -> dict[str, Any]:
+        return {
+            "class_id": cls.class_id,
+            "canonical_id": cls.canonical_id,
+            "module_id": cls.module_id,
+            "boundary_id": cls.boundary_id,
+            "owner_id": cls.owner_id,
+            "static_class_id": cls.static_class_id,
+            "runtime_slots": list(cls.runtime_slots),
+            "source_ref": dict(cls.source_ref),
             "class_name": cls.__name__,
         }
 
@@ -396,6 +499,220 @@ def _compile_backend_service_spec(
     }
 
 
+def _module_field_bindings(binding: ConfigModuleBinding) -> list[dict[str, str]]:
+    projections = binding.config_module.exact_export.get("boundary_projections")
+    if not isinstance(projections, dict):
+        projections = {}
+    records: list[dict[str, str]] = []
+    module_key = module_key_from_id(binding.framework_module.module_id)
+    for boundary in binding.framework_module.boundaries:
+        projection = projections.get(boundary.boundary_id, {})
+        if not isinstance(projection, dict):
+            projection = {}
+        static_field = str(
+            projection.get("static_field_name")
+            or boundary_field_name(boundary.boundary_id)
+        )
+        runtime_field = str(
+            projection.get("runtime_field_name")
+            or static_field
+        )
+        records.append(
+            {
+                "boundary_id": boundary.boundary_id,
+                "module_key": str(projection.get("module_key") or module_key),
+                "static_field_name": static_field,
+                "runtime_field_name": runtime_field,
+                "exact_export_static_path": str(
+                    projection.get("exact_export_static_path")
+                    or (
+                        f"exact_export.modules."
+                        f"{module_key}.static_params.{static_field}"
+                    )
+                ),
+                "communication_export_static_path": str(
+                    projection.get("communication_export_static_path")
+                    or (
+                        "communication_export.modules."
+                        f"{module_key}.static_params.{static_field}"
+                    )
+                ),
+                "merge_policy": str(
+                    projection.get("merge_policy")
+                    or "runtime_override_else_static"
+                ),
+            }
+        )
+    return records
+
+
+def _module_static_payload(
+    exact_export: dict[str, Any],
+    *,
+    module_key: str,
+) -> dict[str, Any]:
+    modules = exact_export.get("modules")
+    if not isinstance(modules, dict):
+        raise ValueError("exact_export.modules must be a dict")
+    module_payload = modules.get(module_key)
+    if not isinstance(module_payload, dict):
+        raise ValueError(f"missing exact_export.modules.{module_key}")
+    static_params = module_payload.get("static_params")
+    if not isinstance(static_params, dict):
+        raise ValueError(f"missing exact_export.modules.{module_key}.static_params")
+    return static_params
+
+
+def _build_static_params_type(
+    *,
+    module_id: str,
+    module_key: str,
+    module_name_fragment: str,
+    field_bindings: list[dict[str, str]],
+) -> type[StaticBoundaryParamsContract]:
+    field_defs = [
+        (binding["static_field_name"], object, field(default=None))
+        for binding in field_bindings
+    ]
+    class_name = f"{module_name_fragment}StaticBoundaryParams"
+    class_type = make_dataclass(
+        class_name,
+        field_defs,
+        bases=(StaticBoundaryParamsContract,),
+        frozen=True,
+        slots=True,
+    )
+    setattr(class_type, "__module__", __name__)
+    setattr(class_type, "framework_module_id", module_id)
+    setattr(class_type, "module_key", module_key)
+    setattr(
+        class_type,
+        "boundary_field_map",
+        {binding["boundary_id"]: binding["static_field_name"] for binding in field_bindings},
+    )
+    return class_type
+
+
+def _build_runtime_params_type(
+    *,
+    module_id: str,
+    module_key: str,
+    module_name_fragment: str,
+    field_bindings: list[dict[str, str]],
+) -> type[RuntimeBoundaryParamsContract]:
+    field_defs = [
+        (
+            binding["runtime_field_name"],
+            object,
+            field(default=UNSET),
+        )
+        for binding in field_bindings
+    ]
+    class_name = f"{module_name_fragment}RuntimeBoundaryParams"
+    class_type = make_dataclass(
+        class_name,
+        field_defs,
+        bases=(RuntimeBoundaryParamsContract,),
+        frozen=True,
+        slots=True,
+    )
+    setattr(class_type, "__module__", __name__)
+    setattr(class_type, "framework_module_id", module_id)
+    setattr(class_type, "module_key", module_key)
+    setattr(
+        class_type,
+        "boundary_field_map",
+        {binding["boundary_id"]: binding["runtime_field_name"] for binding in field_bindings},
+    )
+    return class_type
+
+
+def _build_base_contract_types(
+    binding: ConfigModuleBinding,
+    *,
+    module_name_fragment: str,
+) -> tuple[type[BaseContract], ...]:
+    module_id = binding.framework_module.module_id
+    records: list[type[BaseContract]] = []
+    for base_class in binding.framework_module.base_classes:
+        class_name = f"{module_name_fragment}{base_class.base_id}Base"
+        records.append(
+            type(
+                class_name,
+                (BaseContract,),
+                {
+                    "__module__": __name__,
+                    "framework_base_id": f"{module_id}.{base_class.base_id}",
+                    "framework_base_short_id": base_class.base_id,
+                    "owner_module_id": module_id,
+                    "boundary_ids": tuple(base_class.boundary_bindings),
+                },
+            )
+        )
+    return tuple(records)
+
+
+def _build_rule_contract_types(
+    binding: ConfigModuleBinding,
+    *,
+    module_name_fragment: str,
+) -> tuple[type[RuleContract], ...]:
+    module_id = binding.framework_module.module_id
+    records: list[type[RuleContract]] = []
+    for rule_class in binding.framework_module.rule_classes:
+        class_name = f"{module_name_fragment}{rule_class.rule_id}Rule"
+        records.append(
+            type(
+                class_name,
+                (RuleContract,),
+                {
+                    "__module__": __name__,
+                    "framework_rule_id": f"{module_id}.{rule_class.rule_id}",
+                    "framework_rule_short_id": rule_class.rule_id,
+                    "owner_module_id": module_id,
+                    "base_ids": tuple(
+                        f"{module_id}.{base_id}"
+                        for base_id in rule_class.participant_bases
+                    ),
+                    "boundary_ids": tuple(rule_class.boundary_bindings),
+                },
+            )
+        )
+    return tuple(records)
+
+
+def _build_module_contract_type(
+    *,
+    module_id: str,
+    module_key: str,
+    module_name_fragment: str,
+    static_params_type: type[StaticBoundaryParamsContract],
+    runtime_params_type: type[RuntimeBoundaryParamsContract],
+    base_types: tuple[type[BaseContract], ...],
+    rule_types: tuple[type[RuleContract], ...],
+    field_bindings: list[dict[str, str]],
+) -> type[ModuleContract]:
+    class_name = f"{module_name_fragment}Module"
+    return type(
+        class_name,
+        (ModuleContract,),
+        {
+            "__module__": __name__,
+            "framework_module_id": module_id,
+            "module_key": module_key,
+            "StaticBoundaryParams": static_params_type,
+            "RuntimeBoundaryParams": runtime_params_type,
+            "BaseTypes": base_types,
+            "RuleTypes": rule_types,
+            "boundary_field_map": {
+                item["boundary_id"]: item["static_field_name"]
+                for item in field_bindings
+            },
+            "merge_policy": "runtime_override_else_static",
+        },
+    )
+
+
 def _module_compile_symbol(module_id: str, root_module_ids: dict[str, str]) -> str:
     if module_id == root_module_ids.get("frontend"):
         return "project_runtime.code_layer:_compile_frontend_app_spec"
@@ -473,12 +790,60 @@ def _module_runtime_slot_map(module_id: str, root_module_ids: dict[str, str]) ->
     return {}
 
 
+def _boundary_slot_source_ref(
+    module_id: str,
+    boundary_id: str,
+    *,
+    root_module_ids: dict[str, str],
+) -> dict[str, Any]:
+    fallback_line = _find_code_line("def _build_implementation_slots(", fallback=1)
+    needle = ""
+    section = "implementation_slots"
+    if module_id == root_module_ids.get("frontend"):
+        needle = f'_require_boundary(exact_export, "{boundary_id}")'
+        section = "compile_frontend_app_spec"
+    elif module_id == root_module_ids.get("knowledge_base"):
+        needle = f'_require_boundary(exact_export, "{boundary_id}")'
+        section = "compile_knowledge_base_domain_spec"
+    elif module_id == root_module_ids.get("backend"):
+        needle = f'_require_boundary(exact_export, "{boundary_id}")'
+        section = "compile_backend_service_spec"
+    line = _find_code_line(needle, fallback=fallback_line)
+    return {
+        "file_path": "src/project_runtime/code_layer.py",
+        "line": line,
+        "section": section,
+        "anchor": f"{module_id}:{boundary_id}",
+        "token": boundary_id,
+    }
+
+
+def _runtime_slot_source_ref(
+    module_id: str,
+    boundary_id: str,
+    anchor_path: str,
+) -> dict[str, Any]:
+    fallback_line = _find_code_line("def _module_runtime_slot_map(", fallback=1)
+    line = _find_code_line(f'"{anchor_path}"', fallback=fallback_line)
+    return {
+        "file_path": "src/project_runtime/code_layer.py",
+        "line": line,
+        "section": "runtime_slot_map",
+        "anchor": f"{module_id}:{boundary_id}:{anchor_path}",
+        "token": boundary_id,
+    }
+
+
 def _build_implementation_slots(
     binding: ConfigModuleBinding,
     *,
     root_module_ids: dict[str, str],
 ) -> list[dict[str, Any]]:
     exact_export = binding.config_module.exact_export
+    module_key = str(
+        exact_export.get("module_key")
+        or module_key_from_id(binding.framework_module.module_id)
+    )
     boundary_projections = exact_export.get("boundary_projections", {})
     if not isinstance(boundary_projections, dict):
         boundary_projections = {}
@@ -487,18 +852,52 @@ def _build_implementation_slots(
     compile_symbol = _module_compile_symbol(binding.framework_module.module_id, root_module_ids)
     for boundary in binding.framework_module.boundaries:
         projection = boundary_projections.get(boundary.boundary_id, {})
+        if not isinstance(projection, dict):
+            projection = {}
         related_exact_paths = projection.get("related_exact_paths", [])
         if not isinstance(related_exact_paths, list):
             related_exact_paths = []
+        static_field_name = str(
+            projection.get("static_field_name")
+            or boundary_field_name(boundary.boundary_id)
+        )
+        exact_export_static_path = str(
+            projection.get("exact_export_static_path")
+            or (
+                f"exact_export.modules.{module_key}."
+                f"static_params.{static_field_name}"
+            )
+        )
+        deprecated_anchor_path = f"exact_export.boundaries.{boundary.boundary_id}"
+        projection_paths = list(
+            dict.fromkeys(
+                [*related_exact_paths, exact_export_static_path, deprecated_anchor_path]
+            )
+        )
         slots.append(
             {
-                "slot_id": f"code_slot::{binding.framework_module.module_id}::{boundary.boundary_id}::exact_boundary",
-                "slot_kind": "exact_boundary",
+                "slot_id": (
+                    "code_slot::"
+                    f"{binding.framework_module.module_id}::"
+                    f"{boundary.boundary_id}::module_static_param"
+                ),
+                "slot_kind": "module_static_param",
                 "boundary_id": boundary.boundary_id,
+                "module_key": module_key,
+                "field_name": static_field_name,
                 "owner_id": f"code_owner::{binding.framework_module.module_id}",
-                "source_symbol": f"{binding.framework_module.module_id}.exact_export.boundaries.{boundary.boundary_id}",
-                "anchor_path": f"exact_export.boundaries.{boundary.boundary_id}",
-                "projection_paths": list(dict.fromkeys(related_exact_paths)),
+                "source_symbol": (
+                    f"{binding.framework_module.module_id}."
+                    f"{exact_export_static_path}"
+                ),
+                "anchor_path": exact_export_static_path,
+                "projection_paths": projection_paths,
+                "deprecated_boundary_anchor_path": deprecated_anchor_path,
+                "source_ref": _boundary_slot_source_ref(
+                    binding.framework_module.module_id,
+                    boundary.boundary_id,
+                    root_module_ids=root_module_ids,
+                ),
             }
         )
         for anchor_path in runtime_slot_map.get(boundary.boundary_id, ()):
@@ -511,9 +910,93 @@ def _build_implementation_slots(
                     "source_symbol": f"{compile_symbol}->{anchor_path}",
                     "anchor_path": anchor_path,
                     "projection_paths": list(dict.fromkeys(related_exact_paths)),
+                    "source_ref": _runtime_slot_source_ref(
+                        binding.framework_module.module_id,
+                        boundary.boundary_id,
+                        anchor_path,
+                    ),
                 }
             )
     return slots
+
+
+def _build_boundary_code_classes(
+    binding: ConfigModuleBinding,
+    *,
+    implementation_slots: list[dict[str, Any]],
+) -> tuple[tuple[type[CodeBoundaryStaticClass], ...], tuple[type[CodeBoundaryRuntimeClass], ...]]:
+    boundary_slots: dict[str, list[dict[str, Any]]] = {}
+    for slot in implementation_slots:
+        boundary_id = str(slot.get("boundary_id") or "").strip()
+        if not boundary_id:
+            continue
+        boundary_slots.setdefault(boundary_id, []).append(slot)
+    static_classes: list[type[CodeBoundaryStaticClass]] = []
+    runtime_classes: list[type[CodeBoundaryRuntimeClass]] = []
+    class_prefix = binding.framework_module.__name__.replace("FrameworkModule", "")
+    for boundary in binding.framework_module.boundaries:
+        boundary_id = boundary.boundary_id
+        slots = boundary_slots.get(boundary_id, [])
+        exact_slot = next(
+            (
+                slot
+                for slot in slots
+                if slot.get("slot_kind") in {"module_static_param", "exact_boundary"}
+            ),
+            None,
+        )
+        if not exact_slot:
+            continue
+        static_class_name = f"{class_prefix}{boundary_id}BoundaryStaticCode"
+        static_class_id = f"code_boundary_static_class::{binding.framework_module.module_id}::{boundary_id}"
+        static_class = type(
+            static_class_name,
+            (CodeBoundaryStaticClass,),
+            {
+                "class_id": static_class_id,
+                "canonical_id": f"code_boundary_static::{binding.framework_module.module_id}::{boundary_id}",
+                "module_id": binding.framework_module.module_id,
+                "boundary_id": boundary_id,
+                "owner_id": str(exact_slot.get("owner_id") or ""),
+                "source_symbol": str(exact_slot.get("source_symbol") or ""),
+                "anchor_path": str(exact_slot.get("anchor_path") or ""),
+                "projection_paths": list(exact_slot.get("projection_paths") or []),
+                "field_name": str(exact_slot.get("field_name") or ""),
+                "deprecated_boundary_anchor_path": str(
+                    exact_slot.get("deprecated_boundary_anchor_path") or ""
+                ),
+                "source_ref": dict(exact_slot.get("source_ref") or {}),
+            },
+        )
+        static_classes.append(static_class)
+        runtime_slots = [
+            {
+                "slot_id": str(slot.get("slot_id") or ""),
+                "source_symbol": str(slot.get("source_symbol") or ""),
+                "anchor_path": str(slot.get("anchor_path") or ""),
+                "slot_kind": str(slot.get("slot_kind") or ""),
+            }
+            for slot in slots
+            if slot.get("slot_kind") == "runtime_export"
+        ]
+        runtime_class_name = f"{class_prefix}{boundary_id}BoundaryRuntimeCode"
+        runtime_classes.append(
+            type(
+                runtime_class_name,
+                (CodeBoundaryRuntimeClass,),
+                {
+                    "class_id": f"code_boundary_runtime_class::{binding.framework_module.module_id}::{boundary_id}",
+                    "canonical_id": f"code_boundary_runtime::{binding.framework_module.module_id}::{boundary_id}",
+                    "module_id": binding.framework_module.module_id,
+                    "boundary_id": boundary_id,
+                    "owner_id": str(exact_slot.get("owner_id") or ""),
+                    "static_class_id": static_class_id,
+                    "runtime_slots": runtime_slots,
+                    "source_ref": dict(exact_slot.get("source_ref") or {}),
+                },
+            )
+        )
+    return tuple(static_classes), tuple(runtime_classes)
 
 
 def _base_binding_records(
@@ -556,6 +1039,45 @@ def _base_binding_records(
     return records
 
 
+def _rule_binding_records(
+    binding: ConfigModuleBinding,
+    *,
+    class_name: str,
+    implementation_slots: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    module_id = binding.framework_module.module_id
+    boundary_slots_by_id: dict[str, list[str]] = {}
+    for slot in implementation_slots:
+        boundary_id = str(slot.get("boundary_id") or "")
+        slot_id = str(slot.get("slot_id") or "")
+        if not boundary_id or not slot_id:
+            continue
+        boundary_slots_by_id.setdefault(boundary_id, []).append(slot_id)
+    records: list[dict[str, Any]] = []
+    for rule_class in binding.framework_module.rule_classes:
+        full_base_ids = tuple(f"{module_id}.{base_id}" for base_id in rule_class.participant_bases)
+        boundary_ids = tuple(rule_class.boundary_bindings)
+        slot_ids = [
+            slot_id
+            for boundary_id in boundary_ids
+            for slot_id in boundary_slots_by_id.get(boundary_id, [])
+        ]
+        records.append(
+            {
+                "rule_id": f"{module_id}.{rule_class.rule_id}",
+                "rule_short_id": rule_class.rule_id,
+                "rule_class_id": rule_class.class_id,
+                "owner_module_id": module_id,
+                "owner_module_class_id": f"code_module_class::{module_id}",
+                "owner_module_class_name": class_name,
+                "base_ids": list(full_base_ids),
+                "boundary_ids": list(boundary_ids),
+                "implementation_slot_ids": slot_ids,
+            }
+        )
+    return records
+
+
 def build_code_modules(
     config_modules: tuple[ConfigModuleBinding, ...],
     *,
@@ -588,52 +1110,215 @@ def build_code_modules(
     runtime_exports["runtime_documents"] = runtime_documents
     runtime_exports["backend_service_spec"] = backend_service_spec
     for binding in config_modules:
+        module_id = binding.framework_module.module_id
+        module_key = module_key_from_id(module_id)
         exact_export = binding.config_module.exact_export
         code_exports: dict[str, Any] = {}
-        if binding.framework_module.module_id == root_module_ids.get("frontend"):
+        if module_id == root_module_ids.get("frontend"):
             code_exports["frontend_app_spec"] = frontend_app_spec
-        if binding.framework_module.module_id == root_module_ids.get("knowledge_base"):
+        if module_id == root_module_ids.get("knowledge_base"):
             code_exports["knowledge_base_domain_spec"] = knowledge_base_domain_spec
             code_exports["runtime_documents"] = runtime_documents
-        if binding.framework_module.module_id == root_module_ids.get("backend"):
+        if module_id == root_module_ids.get("backend"):
             code_exports["backend_service_spec"] = backend_service_spec
-        class_name = binding.framework_module.__name__.replace("FrameworkModule", "CodeModule")
+        module_name_fragment = module_class_name_fragment(module_id)
+        class_name = f"{module_name_fragment}CodeModule"
         implementation_slots = _build_implementation_slots(binding, root_module_ids=root_module_ids)
+        field_bindings = _module_field_bindings(binding)
+        static_params_type = _build_static_params_type(
+            module_id=module_id,
+            module_key=module_key,
+            module_name_fragment=module_name_fragment,
+            field_bindings=field_bindings,
+        )
+        runtime_params_type = _build_runtime_params_type(
+            module_id=module_id,
+            module_key=module_key,
+            module_name_fragment=module_name_fragment,
+            field_bindings=field_bindings,
+        )
+        base_types = _build_base_contract_types(
+            binding,
+            module_name_fragment=module_name_fragment,
+        )
+        rule_types = _build_rule_contract_types(
+            binding,
+            module_name_fragment=module_name_fragment,
+        )
+        module_type = _build_module_contract_type(
+            module_id=module_id,
+            module_key=module_key,
+            module_name_fragment=module_name_fragment,
+            static_params_type=static_params_type,
+            runtime_params_type=runtime_params_type,
+            base_types=base_types,
+            rule_types=rule_types,
+            field_bindings=field_bindings,
+        )
+        raw_static_payload = _module_static_payload(exact_export, module_key=module_key)
+        boundary_aliases = exact_export.get("boundaries")
+        if not isinstance(boundary_aliases, dict):
+            boundary_aliases = {}
+        static_payload: dict[str, Any] = {}
+        for item in field_bindings:
+            boundary_id = item["boundary_id"]
+            static_field = item["static_field_name"]
+            if static_field in raw_static_payload:
+                static_payload[static_field] = raw_static_payload[static_field]
+                continue
+            alias_payload = boundary_aliases.get(boundary_id)
+            if alias_payload is None:
+                raise ValueError(
+                    "missing static boundary value for "
+                    f"{module_id}:{boundary_id} ({static_field})"
+                )
+            static_payload[static_field] = alias_payload
+        static_params = module_type.static_params_from_mapping(static_payload)
+        runtime_params = module_type.runtime_params_default()
+        merged_boundary_context = module_type.build_boundary_context(
+            static_params,
+            runtime_params,
+        )
+        boundary_static_classes, boundary_runtime_classes = _build_boundary_code_classes(
+            binding,
+            implementation_slots=implementation_slots,
+        )
         base_bindings = _base_binding_records(
             binding,
             class_name=class_name,
             implementation_slots=implementation_slots,
             root_module_ids=root_module_ids,
         )
-        owner_source_symbol = _module_compile_symbol(binding.framework_module.module_id, root_module_ids)
+        rule_bindings = _rule_binding_records(
+            binding,
+            class_name=class_name,
+            implementation_slots=implementation_slots,
+        )
+        owner_source_symbol = _class_symbol(module_type)
+        config_static_bindings = (
+            binding.config_module.compiled_config_export.get("module_static_param_bindings")
+            if isinstance(binding.config_module.compiled_config_export, dict)
+            else []
+        )
+        if not isinstance(config_static_bindings, list):
+            config_static_bindings = []
+        config_static_by_boundary = {
+            str(item.get("boundary_id") or ""): item
+            for item in config_static_bindings
+            if isinstance(item, dict)
+        }
+        boundary_param_bindings: list[dict[str, Any]] = []
+        for item in field_bindings:
+            boundary_id = item["boundary_id"]
+            config_record = config_static_by_boundary.get(boundary_id, {})
+            boundary_param_bindings.append(
+                {
+                    "boundary_id": boundary_id,
+                    "owner_module_id": module_id,
+                    "module_key": module_key,
+                    "config_source_exact_path": str(
+                        config_record.get("config_source_exact_path")
+                        or binding.framework_module.boundary_projection_map.get(boundary_id, {}).get("primary_exact_path")
+                        or ""
+                    ),
+                    "config_source_communication_path": str(
+                        config_record.get("config_source_communication_path")
+                        or binding.framework_module.boundary_projection_map.get(boundary_id, {}).get("primary_communication_path")
+                        or ""
+                    ),
+                    "exact_export_static_path": str(
+                        config_record.get("exact_export_static_path")
+                        or item["exact_export_static_path"]
+                    ),
+                    "communication_export_static_path": str(
+                        config_record.get("communication_export_static_path")
+                        or item["communication_export_static_path"]
+                    ),
+                    "static_params_class_symbol": _class_symbol(static_params_type),
+                    "runtime_params_class_symbol": _class_symbol(runtime_params_type),
+                    "static_field_name": item["static_field_name"],
+                    "runtime_field_name": item["runtime_field_name"],
+                    "merge_policy": item["merge_policy"],
+                    "deprecated_boundary_anchor_path": str(
+                        config_record.get("deprecated_boundary_anchor_path")
+                        or f"exact_export.boundaries.{boundary_id}"
+                    ),
+                }
+            )
+        module_class_binding = {
+            "module_id": module_id,
+            "module_key": module_key,
+            "module_class_symbol": _class_symbol(module_type),
+            "static_params_class_symbol": _class_symbol(static_params_type),
+            "runtime_params_class_symbol": _class_symbol(runtime_params_type),
+            "base_ids": [item.framework_base_id for item in base_types],
+            "rule_ids": [item.framework_rule_id for item in rule_types],
+            "boundary_ids": [item["boundary_id"] for item in field_bindings],
+            "merge_policy": module_type.merge_policy,
+        }
+        base_class_bindings = [
+            {
+                "base_id": base_type.framework_base_id,
+                "owner_module_id": base_type.owner_module_id,
+                "base_class_symbol": _class_symbol(base_type),
+                "boundary_ids": list(base_type.boundary_ids),
+            }
+            for base_type in base_types
+        ]
+        rule_class_bindings = [
+            {
+                "rule_id": rule_type.framework_rule_id,
+                "owner_module_id": rule_type.owner_module_id,
+                "rule_class_symbol": _class_symbol(rule_type),
+                "base_ids": list(rule_type.base_ids),
+                "boundary_ids": list(rule_type.boundary_ids),
+            }
+            for rule_type in rule_types
+        ]
         code_module = type(
             class_name,
             (CodeModuleClass,),
             {
-                "class_id": f"code_module_class::{binding.framework_module.module_id}",
-                "module_id": binding.framework_module.module_id,
+                "class_id": f"code_module_class::{module_id}",
+                "module_id": module_id,
+                "module_key": module_key,
                 "framework_file": binding.framework_module.framework_file,
                 "source_ref": {
                     "file_path": "src/project_runtime/code_layer.py",
                     "section": "code_module",
-                    "anchor": binding.framework_module.module_id,
-                    "token": binding.framework_module.module_id,
+                    "anchor": module_id,
+                    "token": module_id,
                 },
                 "exact_export": exact_export,
                 "code_exports": code_exports,
+                "ModuleType": module_type,
+                "StaticBoundaryParamsType": static_params_type,
+                "RuntimeBoundaryParamsType": runtime_params_type,
+                "BaseTypes": base_types,
+                "RuleTypes": rule_types,
                 "code_bindings": {
                     "module_class": class_name,
-                    "module_class_id": f"code_module_class::{binding.framework_module.module_id}",
+                    "module_class_id": f"code_module_class::{module_id}",
                     "source_symbol": owner_source_symbol,
                     "owner": {
-                        "owner_id": f"code_owner::{binding.framework_module.module_id}",
-                        "owner_class_id": f"code_module_class::{binding.framework_module.module_id}",
+                        "owner_id": f"code_owner::{module_id}",
+                        "owner_class_id": f"code_module_class::{module_id}",
                         "owner_class_name": class_name,
                         "source_symbol": owner_source_symbol,
                     },
+                    "module_class_binding": module_class_binding,
+                    "base_class_bindings": base_class_bindings,
+                    "rule_class_bindings": rule_class_bindings,
+                    "boundary_param_bindings": boundary_param_bindings,
                     "implementation_slots": implementation_slots,
                     "base_bindings": base_bindings,
+                    "rule_bindings": rule_bindings,
+                    "static_params_instance": static_params.to_dict(),
+                    "runtime_params_template": runtime_params.to_dict(),
+                    "boundary_context": merged_boundary_context,
                 },
+                "boundary_static_classes": boundary_static_classes,
+                "boundary_runtime_classes": boundary_runtime_classes,
             },
         )
         bindings.append(
