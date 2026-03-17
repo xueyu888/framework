@@ -1,7 +1,7 @@
 {
   "name": "archsync",
   "displayName": "ArchSync",
-  "description": "ArchSync: framework tree webview + strict mapping validation guard.",
+  "description": "ArchSync: framework tree webview + canonical validation guard.",
   "version": "0.0.30",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -47,11 +47,11 @@
     "commands": [
       {
         "command": "archSync.validateNow",
-        "title": "ArchSync: Validate Mapping Now"
+        "title": "ArchSync: Validate Canonical Now"
       },
       {
         "command": "archSync.showIssues",
-        "title": "ArchSync: Show Mapping Issues"
+        "title": "ArchSync: Show Canonical Issues"
       },
       {
         "command": "archSync.openFrameworkTree",
@@ -114,21 +114,21 @@
         "archSync.enableOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Run strict mapping validation when a relevant file is saved."
+          "description": "Run canonical validation when a relevant file is saved."
         },
         "archSync.notifyOnAutoFail": {
           "type": "boolean",
           "default": true,
-          "description": "Show notification when auto validation detects mapping issues."
+          "description": "Show notification when auto validation detects canonical issues."
         },
         "archSync.changeValidationCommand": {
           "type": "string",
-          "default": "uv run python scripts/validate_strict_mapping.py --check-changes --json",
+          "default": "uv run python scripts/validate_canonical.py --check-changes --json",
           "description": "Command used for save-triggered validation."
         },
         "archSync.fullValidationCommand": {
           "type": "string",
-          "default": "uv run python scripts/validate_strict_mapping.py --json",
+          "default": "uv run python scripts/validate_canonical.py --json",
           "description": "Command used for manual full validation."
         },
         "archSync.frameworkTreeHtmlPath": {

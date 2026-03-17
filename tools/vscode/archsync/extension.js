@@ -4,16 +4,17 @@ const path = require("path");
 const vscode = require("vscode");
 const frameworkNavigation = require("./framework_navigation");
 
-const WATCH_PREFIXES = ["framework/", "specs/", "mapping/", "src/", "docs/"];
+const WATCH_PREFIXES = ["framework/", "specs/", "src/", "docs/", "projects/"];
 const WATCH_FILES = new Set([
   "AGENTS.md",
   "README.md",
-  "scripts/validate_strict_mapping.py",
+  "scripts/validate_canonical.py",
   "scripts/generate_framework_tree_hierarchy.py"
 ]);
 
 const STANDARDS_TREE_FILE = path.join("specs", "规范总纲与树形结构.md");
-const REGISTRY_FILE = path.join("mapping", "mapping_registry.json");
+const DEFAULT_PROJECT_FILE = path.join("projects", "knowledge_base_basic", "project.toml");
+const DEFAULT_CANONICAL_FILE = path.join("projects", "knowledge_base_basic", "generated", "canonical.json");
 const DEFAULT_FRAMEWORK_TREE_HTML = path.join("docs", "hierarchy", "shelf_framework_tree.html");
 const SIDEBAR_VIEW_ID = "archSync.sidebarHome";
 const DEFAULT_FRAMEWORK_TREE_GENERATE_COMMAND =
@@ -857,12 +858,12 @@ function activate(context) {
     const watcherPatterns = [
       "framework/**",
       "specs/**",
-      "mapping/**",
+      "projects/**",
       "src/**",
       "docs/**",
       "AGENTS.md",
       "README.md",
-      "scripts/validate_strict_mapping.py",
+      "scripts/validate_canonical.py",
       "scripts/generate_framework_tree_hierarchy.py"
     ];
 
@@ -964,6 +965,37 @@ function parseResult(stdout, stderr, code) {
         errors: data.errors.map(normalizeIssue)
       };
     }
+    if (typeof data.passed === "boolean" && data.scopes && typeof data.scopes === "object") {
+      const errors = [];
+      for (const [scopeName, scopeSummary] of Object.entries(data.scopes)) {
+        if (!scopeSummary || typeof scopeSummary !== "object" || !Array.isArray(scopeSummary.rules)) {
+          continue;
+        }
+        for (const rule of scopeSummary.rules) {
+          if (!rule || typeof rule !== "object" || rule.passed !== false) {
+            continue;
+          }
+          const reasons = Array.isArray(rule.reasons) ? rule.reasons : [];
+          if (!reasons.length) {
+            errors.push(normalizeIssue({
+              message: `[${scopeName}] ${String(rule.rule_id || "RULE")} failed`,
+              code: String(rule.rule_id || "ARCHSYNC_CANONICAL")
+            }));
+            continue;
+          }
+          for (const reason of reasons) {
+            errors.push(normalizeIssue({
+              message: `[${scopeName}] ${String(reason)}`,
+              code: String(rule.rule_id || "ARCHSYNC_CANONICAL")
+            }));
+          }
+        }
+      }
+      return {
+        passed: data.passed,
+        errors
+      };
+    }
   } catch (_) {
     // Fallback to text parsing below.
   }
@@ -1000,7 +1032,7 @@ function applyDiagnostics(parsed, collection, repoRoot, triggerUri) {
       ? candidateTarget
       : (triggerUri
         ? triggerUri.fsPath
-        : path.join(repoRoot, REGISTRY_FILE));
+        : defaultIssueTarget(repoRoot));
 
     if (!grouped.has(target)) {
       grouped.set(target, []);
@@ -1777,7 +1809,7 @@ async function revealIssue(issue, repoRoot) {
   const candidate = resolveIssueFile(issue.file, repoRoot);
   const target = (candidate && fs.existsSync(candidate))
     ? candidate
-    : path.join(repoRoot, REGISTRY_FILE);
+    : defaultIssueTarget(repoRoot);
   const uri = vscode.Uri.file(target);
   const doc = await vscode.workspace.openTextDocument(uri);
   const line = Math.max(0, Number(issue.line || 1) - 1);
@@ -1822,6 +1854,14 @@ function normalizeIssue(item) {
     code: item.code || "ARCHSYNC_MAPPING",
     related: Array.isArray(item.related) ? item.related : []
   };
+}
+
+function defaultIssueTarget(repoRoot) {
+  const canonicalFile = path.join(repoRoot, DEFAULT_CANONICAL_FILE);
+  if (fs.existsSync(canonicalFile)) {
+    return canonicalFile;
+  }
+  return path.join(repoRoot, DEFAULT_PROJECT_FILE);
 }
 
 function normalizeFrameworkRuleCode(rawCode) {

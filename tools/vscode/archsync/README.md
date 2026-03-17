@@ -11,9 +11,9 @@
 - Module refs such as `frontend.L1.M2` are treated as one hover/click target, jump straight to the target module's first `B*`, and show capability/base/rule summaries on hover.
 - Hover also works for bracketed module rules such as `frontend.L1.M2[R1,R2]` and local `B/C/R/V` plus boundary symbols, showing the resolved definition content directly in place; boundary hovers also show the mapped config file, primary owning section, related sections, and inferred ownership note when applicable.
 - `Find All References` / `Shift+F12` is implemented for navigable framework symbols, so boundary tokens can return the current usage, framework definition, and mapped config target in one place.
-- Runs strict mapping validation automatically on startup.
-- Runs strict mapping validation on save/create/rename/delete for relevant files.
-- Runs strict mapping validation when watched files change outside VSCode and when window regains focus.
+- Runs canonical validation automatically on startup.
+- Runs canonical validation on save/create/rename/delete for relevant files.
+- Runs canonical validation when watched files change outside VSCode and when window regains focus.
 - Auto-disables validation for repositories that do not contain `specs/规范总纲与树形结构.md`.
 - Shows validation issues in VSCode Problems panel.
 - Status bar (`ArchSync issues`) is clickable and opens an issue picker for direct file/line jump.
@@ -55,8 +55,8 @@
 ## Commands
 - `ArchSync: Open Framework Tree`
 - `ArchSync: Refresh Framework Tree`
-- `ArchSync: Validate Mapping Now`
-- `ArchSync: Show Mapping Issues`
+- `ArchSync: Validate Canonical Now`
+- `ArchSync: Show Canonical Issues`
 
 ## Markdown Snippets
 - `@framework`: insert neutral module template only.
@@ -93,8 +93,8 @@
 - `archSync.frameworkTreeGenerateCommand`
 
 Default commands use the repository validator:
-- `uv run python scripts/validate_strict_mapping.py --check-changes --json`
-- `uv run python scripts/validate_strict_mapping.py --json`
+- `uv run python scripts/validate_canonical.py --check-changes --json`
+- `uv run python scripts/validate_canonical.py --json`
 
 Default framework tree generation command:
 - `uv run python scripts/generate_framework_tree_hierarchy.py --source framework --framework-dir framework --output-json docs/hierarchy/shelf_framework_tree.json --output-html docs/hierarchy/shelf_framework_tree.html`
