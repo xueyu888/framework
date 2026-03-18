@@ -17,11 +17,11 @@
 
 - `POSTFILE` 边界：file (属性: 必选，类型: string($binary), 有效范围: 格式txt|csv 编码utf-8) 
                   table_name (属性: 可选，类型: string | (string | null))
-                  device_name (属性: 必选，类型: string)
+                  device_name (属性: 必选，类型: string，有效范围: 已存在的device_name)
                   skip（属性: 可选，类型: integer, 有效范围:[`0`,`上传文件总行数-1`]）来源：`C1`。
-- `GETFILE` 边界：page (属性: 可选，类型: integer，默认值: 1)
-                  limit (属性: 可选，类型: integer, 默认值: 20)
-                  device_name (属性: 可选，类型: string | (string | null))
+- `GETFILE` 边界：page (属性: 可选，类型: integer，默认值: 1，有效范围:≥1)
+                  limit (属性: 可选，类型: integer, 默认值: 20，有效范围:≥1)
+                  table_name (属性: 可选，类型: string | (string | null))
                   user（属性: 可选，类型: string | (string | null)）
                   device_name（属性: 可选，类型: string | (string | null)）来源：`C2`。
 - `GETSINGLEFILE` 边界：hash_table_name (属性: 必选，类型: string, 有效范围: 已存在的hash_table_name) 来源：`C3`。
@@ -44,11 +44,11 @@
          调用接口: GET /api/file
          输入参数：page
                   limit 
-                  device_name 
+                  table_name 
                   user
                   device_name
          调用结果：调用成功状态码返回2000，调用失败状态码返回!2000
-       构成的参数查询所有文件列表结构。来源：`C2 + GETFILE`。
+       构成的测试查询所有文件列表结构。来源：`C2 + GETFILE`。
 
 - `B3` 测试查询单个特定文件基：
        由
