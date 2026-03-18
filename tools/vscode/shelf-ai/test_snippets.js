@@ -31,6 +31,10 @@ function main() {
     (packageJson.files || []).includes("guarding.js"),
     "package.json must package guarding.js"
   );
+  assert(
+    (packageJson.files || []).includes("local_settings.js"),
+    "package.json must package local_settings.js"
+  );
 
   const commandContribution = (packageJson.contributes?.commands || []).find(
     (item) => item.command === "shelf.insertFrameworkModuleTemplate"
@@ -40,6 +44,14 @@ function main() {
     (item) => item.command === "shelf.installGitHooks"
   );
   assert(installHooksCommand, "package.json must contribute the git hooks install command");
+  const openFrameworkTreeCommand = (packageJson.contributes?.commands || []).find(
+    (item) => item.command === "shelf.openFrameworkTree"
+  );
+  assert(openFrameworkTreeCommand, "package.json must contribute the framework tree open command");
+  const openEvidenceTreeCommand = (packageJson.contributes?.commands || []).find(
+    (item) => item.command === "shelf.openEvidenceTree"
+  );
+  assert(openEvidenceTreeCommand, "package.json must contribute the evidence tree open command");
 
   assert(
     (packageJson.activationEvents || []).includes("onCommand:shelf.insertFrameworkModuleTemplate"),
@@ -48,6 +60,14 @@ function main() {
   assert(
     (packageJson.activationEvents || []).includes("onCommand:shelf.installGitHooks"),
     "package.json must activate on the git hooks install command"
+  );
+  assert(
+    (packageJson.activationEvents || []).includes("onCommand:shelf.openFrameworkTree"),
+    "package.json must activate on the framework tree open command"
+  );
+  assert(
+    (packageJson.activationEvents || []).includes("onCommand:shelf.openEvidenceTree"),
+    "package.json must activate on the evidence tree open command"
   );
 
   const configuration = packageJson.contributes?.configuration?.properties || {};
@@ -62,6 +82,16 @@ function main() {
   ]) {
     assert(Object.prototype.hasOwnProperty.call(configuration, key), `package.json must expose ${key}`);
   }
+  assert.strictEqual(
+    configuration["shelf.changeValidationCommand"]?.default,
+    "uv run python scripts/validate_canonical.py --check-changes",
+    "package.json must default shelf.changeValidationCommand to the supported canonical validation command"
+  );
+  assert.strictEqual(
+    configuration["shelf.fullValidationCommand"]?.default,
+    "uv run python scripts/validate_canonical.py",
+    "package.json must default shelf.fullValidationCommand to the supported canonical validation command"
+  );
 
   const frameworkSnippet = snippetJson["@framework Module Template"];
   assert(frameworkSnippet, "markdown snippets must keep the @framework module template");
@@ -98,8 +128,24 @@ function main() {
     "extension.js must register the git hooks install command"
   );
   assert(
+    /registerCommand\s*\(\s*"shelf\.openFrameworkTree"/.test(extensionSource),
+    "extension.js must register the framework tree open command"
+  );
+  assert(
+    /registerCommand\s*\(\s*"shelf\.openEvidenceTree"/.test(extensionSource),
+    "extension.js must register the evidence tree open command"
+  );
+  assert(
     /registerCompletionItemProvider\s*\(/.test(extensionSource),
     "extension.js must register a markdown completion provider"
+  );
+  assert(
+    /onDidChangeTextDocument\s*\(/.test(extensionSource),
+    "extension.js must clear stale shelf diagnostics when watched documents are edited"
+  );
+  assert(
+    extensionSource.includes('$(close) Shelf failed'),
+    "extension.js must expose a visible cross icon for failing Shelf status"
   );
   assert(
     readme.includes("Shelf: Insert Framework Module Template"),
@@ -110,12 +156,56 @@ function main() {
     "README must document the git hooks install command"
   );
   assert(
+    readme.includes("Shelf: Open Framework Tree"),
+    "README must document the framework tree open command"
+  );
+  assert(
+    readme.includes("Shelf: Refresh Framework Tree"),
+    "README must document the framework tree refresh command"
+  );
+  assert(
+    readme.includes("Shelf: Open Evidence Tree"),
+    "README must document the evidence tree open command"
+  );
+  assert(
     readme.includes("The `@framework` template entry is a repository-side hard authoring contract"),
     "README must document the non-removable @framework authoring contract"
   );
   assert(
     readme.includes("shelf.guardMode = strict"),
     "README must document strict guard mode"
+  );
+  assert(
+    readme.includes(".shelf/settings.jsonc"),
+    "README must document the local .shelf settings entrypoint"
+  );
+  assert(
+    readme.includes("VSCode `shelf.*` setting has highest priority"),
+    "README must document local settings precedence"
+  );
+  assert(
+    readme.includes("uv run python scripts/validate_canonical.py --check-changes"),
+    "README must document the supported save-triggered canonical validation command"
+  );
+  assert(
+    readme.includes("uv run python scripts/validate_canonical.py"),
+    "README must document the supported full canonical validation command"
+  );
+  assert(
+    !readme.includes("validate_canonical.py --json"),
+    "README must not document the optional --json canonical flag as the default command"
+  );
+  assert(
+    readme.includes("Treats stale / missing / invalid canonical as non-authoritative"),
+    "README must document strict canonical freshness behavior"
+  );
+  assert(
+    readme.includes("Shelf blocks the formal evidence tree until you materialize again"),
+    "README must explain how the evidence tree behaves when canonical is stale"
+  );
+  assert(
+    readme.includes("No persisted tree artifact"),
+    "README must state tree views are runtime projections without persisted artifacts"
   );
 
   const atEntries = frameworkCompletion.getFrameworkCompletionEntries("@", "@", false);
