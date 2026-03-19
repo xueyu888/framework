@@ -11,6 +11,8 @@ __pycache__/
 node_modules/
 .vscode-test/
 
+projects/knowledge_base_basic/generated/canonical.json
+
 # Local temporary files
 *~
 *.swp
@@ -38,3 +40,4 @@ tools/vscode/shelf-ai/releases/
 
 # Local presentation exports
 docs/presentations/*.pptx
+.shelf/
