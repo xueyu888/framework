@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const workspaceGuard = require("./guarding");
 
-const DEFAULT_PROJECT_FILE = path.join("projects", "project.toml");
 const SUPPORTED_CORRESPONDENCE_SCHEMA_VERSION = 1;
 const DEFAULT_API_PREFIX = "/api/knowledge";
 
@@ -115,11 +114,11 @@ function readProjectCanonical(projectFilePath) {
  */
 function resolvePreferredProjectFile(repoRoot, frameworkName = "") {
   const candidates = workspaceGuard.discoverProjectFiles(repoRoot);
-  const preferredDefault = path.join(repoRoot, DEFAULT_PROJECT_FILE);
+  const preferredDefault = candidates.length > 0 ? candidates[0] : null;
   let bestFile = null;
   let bestScore = -1;
   for (const filePath of candidates) {
-    let score = filePath === preferredDefault ? 1 : 0;
+    let score = preferredDefault && filePath === preferredDefault ? 1 : 0;
     if (frameworkName) {
       try {
         const frameworks = workspaceGuard.inferConfiguredFrameworks(fs.readFileSync(filePath, "utf8"));
@@ -137,9 +136,6 @@ function resolvePreferredProjectFile(repoRoot, frameworkName = "") {
   }
   if (bestFile) {
     return bestFile;
-  }
-  if (fs.existsSync(preferredDefault) && fs.statSync(preferredDefault).isFile()) {
-    return preferredDefault;
   }
   return null;
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.18 - 2026-03-20
+
+- Replaced hard-coded per-module `if module_id == ...` export assignment branches in runtime/evidence layers with mapping-driven export injection.
+- Removed fixed `frontend/knowledge_base/backend` overlay branching in framework projection and switched to framework-name-driven overlay path generation.
+- Added repository-level hardcode regression guard (`tests/test_no_hardcode_guard.py`) and enforced anti-hardcode execution requirements in `AGENTS.md`.
+
 ## 0.1.17 - 2026-03-20
 
 - Removed hard-coded root-role coupling checks in `project_runtime.code_layer` and switched consistency validation to framework-upstream-derived dependencies plus explicit config overrides.

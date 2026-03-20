@@ -126,17 +126,53 @@ def _read_path_scope_overrides(
     return read_list("guarded_path_prefixes"), read_list("ignored_path_prefixes")
 
 
+def _module_id_by_export_key(code_modules: tuple[CodeModuleBinding, ...], export_key: str) -> str:
+    matches: list[str] = []
+    for binding in code_modules:
+        exports = binding.code_module.code_exports
+        if not isinstance(exports, dict) or export_key not in exports:
+            continue
+        module_id = str(binding.framework_module.module_id).strip()
+        if module_id and module_id not in matches:
+            matches.append(module_id)
+    if len(matches) != 1:
+        return ""
+    return matches[0]
+
+
+def _append_module_evidence_exports(
+    exports_by_module_id: dict[str, dict[str, Any]],
+    *,
+    module_id: str,
+    payload: dict[str, Any],
+) -> None:
+    normalized_module_id = str(module_id).strip()
+    if not normalized_module_id or not payload:
+        return
+    existing = exports_by_module_id.setdefault(normalized_module_id, {})
+    for key, value in payload.items():
+        if key in existing and existing[key] != value:
+            raise ValueError(
+                "conflicting evidence export assignment for module: "
+                f"module_id={normalized_module_id} key={key}"
+            )
+        existing[key] = value
+
+
 def build_evidence_modules(
     assembly: ProjectRuntimeAssembly,
     code_modules: tuple[CodeModuleBinding, ...],
 ) -> tuple[tuple[type[EvidenceModuleClass], ...], dict[str, Any], ValidationReports]:
-    frontend_root_module_id = str(assembly.root_module_ids.get("frontend") or "")
-    knowledge_root_module_id = str(assembly.root_module_ids.get("knowledge_base") or "")
+    frontend_root_module_id = _module_id_by_export_key(code_modules, "frontend_app_spec")
+    knowledge_root_module_id = _module_id_by_export_key(code_modules, "knowledge_base_domain_spec")
 
     if frontend_root_module_id:
         from frontend_kernel.validators import summarize_frontend_rules, validate_frontend_rules
 
-        frontend_summary = summarize_frontend_rules(validate_frontend_rules(assembly))
+        frontend_summary = summarize_frontend_rules(
+            validate_frontend_rules(assembly),
+            module_id=frontend_root_module_id,
+        )
     else:
         frontend_summary = _build_skipped_summary(
             module_id="frontend.unselected",
@@ -233,6 +269,23 @@ def build_evidence_modules(
         evidence_exports["runtime_blueprint"] = runtime_blueprint
     if document_digests is not None:
         evidence_exports["document_digests"] = document_digests
+    module_evidence_exports_by_id: dict[str, dict[str, Any]] = {}
+    _append_module_evidence_exports(
+        module_evidence_exports_by_id,
+        module_id=frontend_root_module_id,
+        payload={
+            "frontend_rules": frontend_summary.to_dict(),
+            **({"runtime_blueprint": runtime_blueprint} if runtime_blueprint is not None else {}),
+        },
+    )
+    _append_module_evidence_exports(
+        module_evidence_exports_by_id,
+        module_id=knowledge_root_module_id,
+        payload={
+            "knowledge_base_rules": knowledge_summary.to_dict(),
+            **({"document_digests": document_digests} if document_digests is not None else {}),
+        },
+    )
 
     evidence_modules: list[type[EvidenceModuleClass]] = []
     for binding in code_modules:
@@ -241,14 +294,7 @@ def build_evidence_modules(
             "module_id": binding.framework_module.module_id,
             "code_exports": binding.code_module.code_exports,
         }
-        if binding.framework_module.module_id == assembly.root_module_ids.get("frontend"):
-            module_exports["frontend_rules"] = frontend_summary.to_dict()
-            if runtime_blueprint is not None:
-                module_exports["runtime_blueprint"] = runtime_blueprint
-        if binding.framework_module.module_id == assembly.root_module_ids.get("knowledge_base"):
-            module_exports["knowledge_base_rules"] = knowledge_summary.to_dict()
-            if document_digests is not None:
-                module_exports["document_digests"] = document_digests
+        module_exports.update(module_evidence_exports_by_id.get(binding.framework_module.module_id, {}))
         evidence_module = type(
             class_name,
             (EvidenceModuleClass,),

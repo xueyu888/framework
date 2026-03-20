@@ -30,6 +30,38 @@ function loadFrameworkFileIfExists(relativePath) {
   };
 }
 
+function discoverKnowledgeProjectRelPath() {
+  const projectsDir = path.join(repoRoot, "projects");
+  if (!fs.existsSync(projectsDir)) {
+    return null;
+  }
+  const entries = fs.readdirSync(projectsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const projectRelPath = `projects/${entry.name}/project.toml`;
+    const projectAbsPath = path.join(repoRoot, projectRelPath);
+    if (!fs.existsSync(projectAbsPath) || !fs.statSync(projectAbsPath).isFile()) {
+      continue;
+    }
+    const text = fs.readFileSync(projectAbsPath, "utf8");
+    if (text.includes("framework/knowledge_base/")) {
+      return projectRelPath;
+    }
+  }
+  return null;
+}
+
+function moduleIdFromFrameworkPath(relativeFrameworkPath) {
+  const normalized = String(relativeFrameworkPath || "").replace(/\\/g, "/");
+  const match = /^framework\/([^/]+)\/L(\d+)-M(\d+)-/.exec(normalized);
+  if (!match) {
+    return "";
+  }
+  return `${match[1]}.L${match[2]}.M${match[3]}`;
+}
+
 function fallbackWorkbenchModuleText() {
   return `
 # 知识库工作台场景模块
@@ -118,8 +150,9 @@ function main() {
   const workbenchL2 = loadFrameworkFileIfExists("framework/knowledge_base/L2-M0-知识库工作台场景模块.md");
   const workbenchText = workbenchL2 ? workbenchL2.text : fallbackWorkbenchModuleText();
   const boundaryConfigRef = locate(workbenchText, "CHAT + CONTEXT + RETURN");
+  const knowledgeProjectRelPath = discoverKnowledgeProjectRelPath();
 
-  if (workbenchL2 && fs.existsSync(path.join(repoRoot, "projects", "knowledge_base_basic", "project.toml"))) {
+  if (workbenchL2 && knowledgeProjectRelPath) {
     const boundaryConfigResult = resolveDefinitionTarget({
       repoRoot,
       filePath: workbenchL2.filePath,
@@ -128,9 +161,9 @@ function main() {
       character: boundaryConfigRef.character,
     });
     assert(boundaryConfigResult, "boundary config ref should resolve");
-    assert(boundaryConfigResult.filePath.endsWith("projects/knowledge_base_basic/project.toml"));
+    assert(boundaryConfigResult.filePath.endsWith(knowledgeProjectRelPath));
     assert.strictEqual(targetLineText(boundaryConfigResult).trim(), "[exact.knowledge_base.chat]");
-    assert.strictEqual(boundaryConfigResult.objectId, "knowledge_base.L2.M0::boundary::CHAT");
+    assert(boundaryConfigResult.objectId.endsWith("::boundary::CHAT"));
 
     const boundaryHover = resolveHoverTarget({
       repoRoot,
@@ -141,7 +174,7 @@ function main() {
     });
     assert(boundaryHover, "boundary hover should resolve");
     assert(boundaryHover.markdown.includes("Project Config"));
-    assert(boundaryHover.markdown.includes("projects/knowledge_base_basic/project.toml"));
+    assert(boundaryHover.markdown.includes(knowledgeProjectRelPath));
     assert(boundaryHover.markdown.includes("`[exact.knowledge_base.chat]`"));
 
     const boundaryRefs = resolveReferenceTargets({
@@ -152,7 +185,7 @@ function main() {
       character: boundaryConfigRef.character,
     });
     assert(
-      boundaryRefs.some((item) => item.filePath.endsWith("projects/knowledge_base_basic/project.toml")),
+      boundaryRefs.some((item) => item.filePath.endsWith(knowledgeProjectRelPath)),
       "boundary references should include the unified project config target"
     );
   }
@@ -225,7 +258,7 @@ framework_file = "framework/knowledge_base/L2-M0-知识库工作台场景模块.
           framework: {
             modules: [
               {
-                module_id: "knowledge_base.L2.M0",
+                module_id: moduleIdFromFrameworkPath("framework/knowledge_base/L2-M0-知识库工作台场景模块.md"),
                 boundaries: [
                   {
                     boundary_id: "CHAT",

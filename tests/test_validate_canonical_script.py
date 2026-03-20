@@ -41,7 +41,7 @@ def test_validate_check_changes_bootstrap_skip_when_no_project_files(
     (tmp_path / "projects").mkdir(parents=True, exist_ok=True)
 
     args = argparse.Namespace(
-        project_file="projects/project.toml",
+        project_file="projects/bootstrap/project.toml",
         check_changes=True,
         json=False,
     )
@@ -71,7 +71,7 @@ def test_validate_check_changes_bootstrap_skip_json_output(
     (tmp_path / "projects").mkdir(parents=True, exist_ok=True)
 
     args = argparse.Namespace(
-        project_file="projects/project.toml",
+        project_file="projects/bootstrap/project.toml",
         check_changes=True,
         json=True,
     )

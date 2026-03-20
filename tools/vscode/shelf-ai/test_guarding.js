@@ -29,15 +29,22 @@ function setMtime(filePath, timeMs) {
 }
 
 function main() {
-  assert(isWatchedPath("projects/knowledge_base_basic/project.toml"));
+  const projectFiles = discoverProjectFiles(repoRoot);
+  assert(projectFiles.length >= 1);
+  const firstProjectFile = projectFiles[0];
+  const firstProjectId = path.basename(path.dirname(firstProjectFile));
+  const firstProjectRelPath = `projects/${firstProjectId}/project.toml`;
+  const firstProjectCanonicalRelPath = `projects/${firstProjectId}/generated/canonical.json`;
+
+  assert(isWatchedPath(firstProjectRelPath));
   assert(isWatchedPath("scripts/validate_canonical.py"));
   assert(isWatchedPath("tools/vscode/shelf-ai/extension.js"));
   assert(!isWatchedPath("../outside.txt"));
 
-  assert(isProtectedGeneratedPath("projects/knowledge_base_basic/generated/canonical.json"));
+  assert(isProtectedGeneratedPath(firstProjectCanonicalRelPath));
   assert(!isProtectedGeneratedPath("docs/hierarchy/shelf_framework_tree.json"));
   assert(!isProtectedGeneratedPath("docs/hierarchy/shelf_evidence_tree.json"));
-  assert(!isProtectedGeneratedPath("projects/knowledge_base_basic/project.toml"));
+  assert(!isProtectedGeneratedPath(firstProjectRelPath));
 
   assert(shouldRunMypyForRelPath("src/project_runtime/compiler.py"));
   assert(shouldRunMypyForRelPath("scripts/materialize_project.py"));
@@ -45,19 +52,13 @@ function main() {
   assert(!shouldRunMypyForRelPath("tools/vscode/shelf-ai/extension.js"));
 
   assert.strictEqual(
-    resolveProjectFilePath(repoRoot, "projects/knowledge_base_basic/project.toml"),
-    path.join(repoRoot, "projects", "knowledge_base_basic", "project.toml")
+    resolveProjectFilePath(repoRoot, firstProjectRelPath),
+    firstProjectFile
   );
   assert.strictEqual(
-    resolveProjectFilePath(repoRoot, "projects/knowledge_base_basic/generated/canonical.json"),
-    path.join(repoRoot, "projects", "knowledge_base_basic", "project.toml")
+    resolveProjectFilePath(repoRoot, firstProjectCanonicalRelPath),
+    firstProjectFile
   );
-
-  const projectFiles = discoverProjectFiles(repoRoot);
-  assert(projectFiles.length >= 1);
-  const firstProjectFile = projectFiles[0];
-  const firstProjectId = path.basename(path.dirname(firstProjectFile));
-  const firstProjectRelPath = `projects/${firstProjectId}/project.toml`;
 
   const frameworks = inferConfiguredFrameworks(`
 [[framework.modules]]

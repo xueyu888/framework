@@ -21,6 +21,8 @@
 9. `generated/canonical.json` 是唯一机器真相源。其他 tree、report、evidence view 都只能是它的派生视图。
 10. 不要恢复旧的核心架构。不要保留并行真相源，不要把旧系统换个名字继续跑。
 11. 写任何代码前，先评估是否存在更简洁的等效实现；若存在必须优先采用。只有在正确性、性能、兼容性或可测试性明确需要时，才允许增加实现复杂度。
+12. 禁止硬编码门禁/依赖/默认项目路径。涉及模块选择、跨层依赖、root 关系、默认项目定位时，必须基于 framework upstream、project 配置或运行时发现，不得写死 `frontend/knowledge_base/backend` 固定分支或 `projects/project.toml` 固定回退。
+13. 防回退要求：提交前必须通过 `tests/test_no_hardcode_guard.py`，若出现命中项必须先改为配置化/结构化来源再继续。
 
 ## 默认工作顺序
 1. 读相关 `framework/*.md`
@@ -59,6 +61,7 @@
 ### 2. 运行与验证命令
 - 运行主程序：`uv run python src/main.py`
 - 静态类型检查：`uv run mypy`
+- 硬编码守卫：`uv run pytest -q tests/test_no_hardcode_guard.py`
 - 项目生成产物物化：`uv run python scripts/materialize_project.py`
 - canonical 验证：`uv run python scripts/validate_canonical.py`
 - 变更传导验证：`uv run python scripts/validate_canonical.py --check-changes`
@@ -67,6 +70,7 @@
 ### 3. 变更执行要求
 - 修改标准或代码后，必须执行对应验证命令。
 - Python 代码变更后，必须通过静态类型检查（`uv run mypy`）。
+- 触及 `src/project_runtime/**`、`src/frontend_kernel/**`、`tools/vscode/shelf-ai/**` 或 `scripts/**` 时，必须执行硬编码守卫测试（`uv run pytest -q tests/test_no_hardcode_guard.py`）。
 - 项目行为变更必须先改 `framework/*.md` 或 `projects/<project_id>/project.toml`，再执行 `uv run python scripts/materialize_project.py` 生成产物；禁止直接手改 `projects/<project_id>/generated/*`。
 - 禁止在仓库规范文档中引入 `pip install` 作为标准流程。
 - 必须启用仓库 `pre-push` hook：`bash scripts/install_git_hooks.sh`。
