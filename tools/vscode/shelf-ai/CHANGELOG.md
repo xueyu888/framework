@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.19 - 2026-03-20
+
+- Removed fixed default-project assumptions in runtime and scripts: project resolution now supports discovery from `projects/*/project.toml` or explicit input instead of `projects/project.toml` fallback.
+- Hardened no-project handling in CLI/validation/materialization paths with explicit messages and bootstrap-aware checks.
+- Synced repository docs and guards to the current `message_queue_basic` baseline and canonical path conventions.
+
 ## 0.1.18 - 2026-03-20
 
 - Replaced hard-coded per-module `if module_id == ...` export assignment branches in runtime/evidence layers with mapping-driven export injection.
