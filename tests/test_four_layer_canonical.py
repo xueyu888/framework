@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from typing import Any, cast
 
+from framework_ir.parser import load_framework_catalog
 from project_runtime.compiler import compile_project_runtime
 from project_runtime.config_layer import build_config_modules, load_project_config
 from project_runtime.correspondence_validator import summarize_correspondence_guard
@@ -13,9 +14,15 @@ from project_runtime.code_layer import build_code_modules
 from project_runtime.framework_violation_guard import summarize_framework_violation_guard
 from project_runtime.framework_layer import resolve_selected_framework_modules
 from project_runtime.path_scope_guard import summarize_path_scope_guard
+from project_runtime.static_modules import STATIC_MODULE_CONTRACTS
 
 
 class FourLayerCanonicalTest(unittest.TestCase):
+    def test_static_contract_registry_covers_all_framework_modules(self) -> None:
+        framework_module_ids = {module.module_id for module in load_framework_catalog().modules}
+        static_contract_module_ids = set(STATIC_MODULE_CONTRACTS)
+        self.assertEqual(framework_module_ids, static_contract_module_ids)
+
     def test_framework_identities_and_source_refs_are_stable(self) -> None:
         first = compile_project_runtime().canonical
         second = compile_project_runtime().canonical
@@ -211,6 +218,9 @@ class FourLayerCanonicalTest(unittest.TestCase):
         self.assertIn("correspondence_guard", validation_reports)
         self.assertTrue(validation_reports["correspondence_guard"]["passed"])
         self.assertEqual(validation_reports["correspondence_guard"]["rule_count"], 1)
+        self.assertIn("codegen_consistency_guard", validation_reports)
+        self.assertTrue(validation_reports["codegen_consistency_guard"]["passed"])
+        self.assertEqual(validation_reports["codegen_consistency_guard"]["rule_count"], 1)
         self.assertIn("path_scope_guard", validation_reports)
         self.assertTrue(validation_reports["path_scope_guard"]["passed"])
         self.assertEqual(validation_reports["path_scope_guard"]["rule_count"], 1)
@@ -275,7 +285,7 @@ class FourLayerCanonicalTest(unittest.TestCase):
             self.assertTrue(str(item.get("display_name") or ""))
             self.assertIn(
                 item["materialization_kind"],
-                {"runtime_dynamic_type", "source_symbol", "generated_readonly"},
+                {"runtime_dynamic_type", "source_symbol", "generated_readonly", "static_python_class"},
             )
             self.assertIn(
                 item["primary_nav_target_kind"],
@@ -426,6 +436,41 @@ class FourLayerCanonicalTest(unittest.TestCase):
         reasons = summary.rules[0].reasons
         self.assertTrue(any("rule base id not in owner module" in reason for reason in reasons))
         self.assertTrue(any("rule boundary id not in owner module" in reason for reason in reasons))
+
+    def test_correspondence_guard_fails_when_base_declares_missing_or_invalid_boundary(self) -> None:
+        project_config = load_project_config("projects/knowledge_base_basic/project.toml")
+        framework_modules, root_module_ids = resolve_selected_framework_modules(project_config.framework_modules)
+        config_bindings = build_config_modules(project_config, framework_modules)
+        code_bindings, _ = build_code_modules(config_bindings, root_module_ids=root_module_ids)
+
+        target = next(
+            item
+            for item in code_bindings
+            if item.framework_module.module_id == "knowledge_base.L2.M0"
+        )
+        first_base = target.code_module.BaseTypes[0]
+
+        setattr(first_base, "boundary_ids", tuple())
+        summary_missing = summarize_correspondence_guard(
+            framework_modules=framework_modules,
+            config_modules=config_bindings,
+            code_modules=code_bindings,
+        )
+        self.assertFalse(summary_missing.passed)
+        self.assertTrue(
+            any("base boundary_ids missing" in reason for reason in summary_missing.rules[0].reasons)
+        )
+
+        setattr(first_base, "boundary_ids", ("BOUNDARY_NOT_EXIST",))
+        summary_invalid = summarize_correspondence_guard(
+            framework_modules=framework_modules,
+            config_modules=config_bindings,
+            code_modules=code_bindings,
+        )
+        self.assertFalse(summary_invalid.passed)
+        self.assertTrue(
+            any("base boundary id not in owner module" in reason for reason in summary_invalid.rules[0].reasons)
+        )
 
     def test_correspondence_guard_fails_when_config_mapping_missing(self) -> None:
         project_config = load_project_config("projects/knowledge_base_basic/project.toml")
