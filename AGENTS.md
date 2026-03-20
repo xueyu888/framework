@@ -36,6 +36,7 @@
 - 门禁范围只看：`shelf.intentGateGuardedPathPrefixes` 与 `shelf.intentGateIgnoredPathPrefixes`。若未显式覆盖，插件默认受检目录为：`framework/`、`framework_drafts/`、`projects/`、`src/project_runtime/`、`scripts/`。
 - 检查开关只看：`shelf.intentGateEnabled`、`shelf.intentGateRunChangeValidationBeforeGrant`、`shelf.intentGateTemporaryBypasses`。当 `intentGateEnabled = false`，或 `intentGateRunChangeValidationBeforeGrant = false`，或 `intentGateTemporaryBypasses` 包含 `grant_pre_validation` / `*` 时，可临时关闭“改前 check-changes 检查”。
 - 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中“门禁作用范围”且未命中上述关闭条件，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
+- bootstrap 例外：若 `--check-changes` 失败原因为“当前仓库不存在任何 `projects/*/project.toml`”，可进入 bootstrap 模式继续生成首个 `project.toml` 与对应代码/产物；生成后必须立刻恢复常规门禁并重新执行 `--check-changes`。
 - 若上述命令失败，或输出包含 `FRAMEWORK_VIOLATION`，AI 必须拒绝继续修改命中门禁范围的文件，并明确提示“先由人修改 framework，再继续实现层变更”。
 - AI 完成命中门禁范围的修改后，提交前必须再次执行：`uv run python scripts/validate_canonical.py --check-changes`，除非命中上述临时关闭条件；未关闭时必须确保未引入新的 framework 语义越权。
 - 该守卫属于“对话级自动触发”，不得要求用户手工复制临时 `project.toml` 才触发。

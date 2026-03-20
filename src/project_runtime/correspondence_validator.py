@@ -236,7 +236,7 @@ def summarize_correspondence_guard(
                 )
             base_id = str(getattr(base_type, "framework_base_id", "")).strip()
             owner_id = str(getattr(base_type, "owner_module_id", "")).strip()
-            boundary_ids = _tuple_of_text(getattr(base_type, "boundary_ids", tuple()))
+            base_boundary_ids = _tuple_of_text(getattr(base_type, "boundary_ids", tuple()))
             if not base_id:
                 reasons.append(f"CORRESPONDENCE_VIOLATION: base class missing framework_base_id in {module_id}")
                 continue
@@ -245,9 +245,9 @@ def summarize_correspondence_guard(
                     "CORRESPONDENCE_VIOLATION: base class owner mismatch "
                     f"{base_id} owner={owner_id} expected={module_id}"
                 )
-            if not boundary_ids:
+            if not base_boundary_ids:
                 reasons.append(f"CORRESPONDENCE_VIOLATION: base boundary_ids missing {base_id}")
-            for boundary_id in boundary_ids:
+            for boundary_id in base_boundary_ids:
                 if boundary_id not in expected_boundary_ids:
                     reasons.append(
                         "CORRESPONDENCE_VIOLATION: base boundary id not in owner module "
@@ -281,7 +281,7 @@ def summarize_correspondence_guard(
             rule_id = str(getattr(rule_type, "framework_rule_id", "")).strip()
             owner_id = str(getattr(rule_type, "owner_module_id", "")).strip()
             base_ids = _tuple_of_text(getattr(rule_type, "base_ids", tuple()))
-            boundary_ids = _tuple_of_text(getattr(rule_type, "boundary_ids", tuple()))
+            rule_boundary_ids = _tuple_of_text(getattr(rule_type, "boundary_ids", tuple()))
             if not rule_id:
                 reasons.append(f"CORRESPONDENCE_VIOLATION: rule class missing framework_rule_id in {module_id}")
                 continue
@@ -292,7 +292,7 @@ def summarize_correspondence_guard(
                 )
             if not base_ids:
                 reasons.append(f"CORRESPONDENCE_VIOLATION: rule base_ids missing {rule_id}")
-            if not boundary_ids:
+            if not rule_boundary_ids:
                 reasons.append(f"CORRESPONDENCE_VIOLATION: rule boundary_ids missing {rule_id}")
             for base_id in base_ids:
                 if base_id not in expected_base_ids:
@@ -300,7 +300,7 @@ def summarize_correspondence_guard(
                         "CORRESPONDENCE_VIOLATION: rule base id not in owner module "
                         f"{rule_id} -> {base_id}"
                     )
-            for boundary_id in boundary_ids:
+            for boundary_id in rule_boundary_ids:
                 if boundary_id not in expected_boundary_ids:
                     reasons.append(
                         "CORRESPONDENCE_VIOLATION: rule boundary id not in owner module "

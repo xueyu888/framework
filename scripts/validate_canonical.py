@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
@@ -11,6 +12,34 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from project_runtime import DEFAULT_PROJECT_FILE, materialize_project_runtime
+
+
+def _discover_project_files(repo_root: Path) -> list[Path]:
+    return sorted((repo_root / "projects").glob("*/project.toml"))
+
+
+def _resolve_project_file(repo_root: Path, project_file: str) -> Path:
+    candidate = Path(project_file)
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    return candidate
+
+
+def _bootstrap_skip_payload(project_file: str) -> dict[str, Any]:
+    return {
+        "passed": True,
+        "passed_count": 0,
+        "rule_count": 0,
+        "project_id": "",
+        "canonical_json": "",
+        "scopes": {},
+        "bootstrap_mode": True,
+        "message": (
+            "skip check-changes: no projects/*/project.toml found; "
+            "allow bootstrap generation from framework first"
+        ),
+        "project_file": project_file,
+    }
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -37,6 +66,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = _build_parser().parse_args()
+    resolved_project_file = _resolve_project_file(REPO_ROOT, args.project_file)
+    if args.check_changes and not resolved_project_file.is_file():
+        discovered_projects = _discover_project_files(REPO_ROOT)
+        if not discovered_projects:
+            payload = _bootstrap_skip_payload(args.project_file)
+            if args.json:
+                print(json.dumps(payload, ensure_ascii=False))
+            else:
+                print(f"[validate] passed=True bootstrap_mode=True project={payload['project_file']}")
+                print(f"- {payload['message']}")
+            return 0
+
     assembly = materialize_project_runtime(args.project_file)
     failed_rules = [
         outcome
