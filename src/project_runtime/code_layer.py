@@ -185,6 +185,22 @@ def _compile_kv_database_runtime_spec(
     boundary_context: dict[str, dict[str, Any]],
     exact_export: dict[str, Any],
 ) -> dict[str, Any]:
+    if "SNAPSHOTPATH" in boundary_context:
+        return _compile_kv_database_s2_runtime_spec(
+            boundary_context=boundary_context,
+            exact_export=exact_export,
+        )
+    return _compile_kv_database_s1_runtime_spec(
+        boundary_context=boundary_context,
+        exact_export=exact_export,
+    )
+
+
+def _compile_kv_database_s1_runtime_spec(
+    *,
+    boundary_context: dict[str, dict[str, Any]],
+    exact_export: dict[str, Any],
+) -> dict[str, Any]:
     operation = _require_boundary_context_value(boundary_context, "OPERATION")
     key = _require_boundary_context_value(boundary_context, "KEY")
     value = _require_boundary_context_value(boundary_context, "VALUE")
@@ -249,6 +265,120 @@ def _compile_kv_database_runtime_spec(
             "api": {
                 "factory": "kv_database_runtime.store:MemoryKvDatabase.from_config",
                 "methods": ["put", "get", "delete", "recover", "snapshot"],
+            },
+        },
+        "source_overlays": exact_export.get("overlays", {}),
+    }
+
+
+def _compile_kv_database_s2_runtime_spec(
+    *,
+    boundary_context: dict[str, dict[str, Any]],
+    exact_export: dict[str, Any],
+) -> dict[str, Any]:
+    count = _require_boundary_context_value(boundary_context, "COUNT")
+    operation = _require_boundary_context_value(boundary_context, "OPERATION")
+    key = _require_boundary_context_value(boundary_context, "KEY")
+    value = _require_boundary_context_value(boundary_context, "VALUE")
+    wal_path = _require_boundary_context_value(boundary_context, "LOGPATH")
+    wal_log = _require_boundary_context_value(boundary_context, "LOG")
+    snapshot_path = _require_boundary_context_value(boundary_context, "SNAPSHOTPATH")
+    snapshot = _require_boundary_context_value(boundary_context, "SNAPSHOT")
+    record_timing = _require_boundary_context_value(boundary_context, "RECORDTIMING")
+    recover = _require_boundary_context_value(boundary_context, "RECOVER")
+    wal_directory = Path(str(wal_path["wal_directory"]))
+    wal_filename = str(wal_path["wal_filename"])
+    snapshot_directory = Path(str(snapshot_path["snapshot_directory"]))
+    snapshot_filename = str(snapshot_path["snapshot_filename"])
+    implementation = {
+        "database_class": "kv_database_s2_runtime.store:MemoryKvDatabaseS2",
+        "config_class": "kv_database_s2_runtime.store:MemoryKvDatabaseS2Config",
+        "log_class": "kv_database_s2_runtime.store:WriteAheadLog",
+        "snapshot_class": "kv_database_s2_runtime.store:SnapshotStore",
+        "record_class": "kv_database_s2_runtime.store:WalRecord",
+        "summary_factory": "kv_database_s2_runtime.runtime_exports:project_runtime_public_summary",
+    }
+    return {
+        "contract": {
+            "count": {
+                "max_items": int(count["max_items"]),
+                "overflow_policy": str(count["overflow_policy"]),
+            },
+            "operation": {
+                "allowed_operations": list(operation["allowed_operations"]),
+                "write_operations": list(operation["write_operations"]),
+                "read_operation": str(operation["read_operation"]),
+                "missing_key_policy": str(operation["missing_key_policy"]),
+            },
+            "key": {
+                "python_type": str(key["python_type"]),
+                "empty_key_allowed": bool(key["empty_key_allowed"]),
+                "normalization": str(key["normalization"]),
+            },
+            "value": {
+                "python_type": str(value["python_type"]),
+                "serialization": str(value["serialization"]),
+                "nullable": bool(value["nullable"]),
+            },
+            "recover": {
+                "strategy": str(recover["strategy"]),
+            },
+        },
+        "wal": {
+            "directory": wal_directory.as_posix(),
+            "filename": wal_filename,
+            "path": (wal_directory / wal_filename).as_posix(),
+            "create_parent_on_boot": bool(wal_path["create_parent_on_boot"]),
+            "record_format": str(wal_log["record_format"]),
+            "field_order": list(wal_log["field_order"]),
+            "line_delimiter": str(wal_log["line_delimiter"]),
+            "replay_strategy": str(wal_log["replay_strategy"]),
+        },
+        "snapshot": {
+            "directory": snapshot_directory.as_posix(),
+            "filename": snapshot_filename,
+            "path": (snapshot_directory / snapshot_filename).as_posix(),
+            "create_parent_on_boot": bool(snapshot_path["create_parent_on_boot"]),
+            "record_format": str(snapshot["record_format"]),
+            "line_delimiter": str(snapshot["line_delimiter"]),
+            "compact_wal_on_checkpoint": bool(snapshot["compact_wal_on_checkpoint"]),
+        },
+        "checkpoint": {
+            "trigger": str(record_timing["trigger"]),
+            "every_write_operations": int(record_timing["every_write_operations"]),
+        },
+        "runtime": {
+            "config": {
+                "max_items": int(count["max_items"]),
+                "overflow_policy": str(count["overflow_policy"]),
+                "allowed_operations": list(operation["allowed_operations"]),
+                "read_operation": str(operation["read_operation"]),
+                "write_operations": list(operation["write_operations"]),
+                "missing_key_policy": str(operation["missing_key_policy"]),
+                "key_python_type": str(key["python_type"]),
+                "value_python_type": str(value["python_type"]),
+                "value_serialization": str(value["serialization"]),
+                "wal_directory": wal_directory.as_posix(),
+                "wal_filename": wal_filename,
+                "create_parent_on_boot": bool(wal_path["create_parent_on_boot"]),
+                "record_format": str(wal_log["record_format"]),
+                "field_order": list(wal_log["field_order"]),
+                "line_delimiter": str(wal_log["line_delimiter"]),
+                "replay_strategy": str(wal_log["replay_strategy"]),
+                "snapshot_directory": snapshot_directory.as_posix(),
+                "snapshot_filename": snapshot_filename,
+                "snapshot_create_parent_on_boot": bool(snapshot_path["create_parent_on_boot"]),
+                "snapshot_record_format": str(snapshot["record_format"]),
+                "snapshot_line_delimiter": str(snapshot["line_delimiter"]),
+                "compact_wal_on_checkpoint": bool(snapshot["compact_wal_on_checkpoint"]),
+                "checkpoint_trigger": str(record_timing["trigger"]),
+                "checkpoint_every_write_operations": int(record_timing["every_write_operations"]),
+                "recovery_strategy": str(recover["strategy"]),
+            },
+            "implementation": implementation,
+            "api": {
+                "factory": "kv_database_s2_runtime.store:MemoryKvDatabaseS2.from_config",
+                "methods": ["put", "get", "delete", "recover", "snapshot", "checkpoint"],
             },
         },
         "source_overlays": exact_export.get("overlays", {}),
@@ -887,6 +1017,7 @@ def _module_compile_symbol(module_id: str, root_module_ids: dict[str, str]) -> s
 def _module_runtime_slot_map(module_id: str, root_module_ids: dict[str, str]) -> dict[str, tuple[str, ...]]:
     if module_id == root_module_ids.get("kv_database"):
         return {
+            "COUNT": ("kv_database_runtime_spec.contract.count",),
             "OPERATION": (
                 "kv_database_runtime_spec.contract.operation",
                 "kv_database_runtime_spec.runtime.api",
@@ -900,10 +1031,24 @@ def _module_runtime_slot_map(module_id: str, root_module_ids: dict[str, str]) ->
                 "kv_database_runtime_spec.wal.directory",
                 "kv_database_runtime_spec.wal.path",
             ),
+            "LOGPATH": (
+                "kv_database_runtime_spec.wal.directory",
+                "kv_database_runtime_spec.wal.path",
+            ),
             "LOG": (
                 "kv_database_runtime_spec.wal.record_format",
                 "kv_database_runtime_spec.wal.replay_strategy",
             ),
+            "SNAPSHOTPATH": (
+                "kv_database_runtime_spec.snapshot.directory",
+                "kv_database_runtime_spec.snapshot.path",
+            ),
+            "SNAPSHOT": (
+                "kv_database_runtime_spec.snapshot.record_format",
+                "kv_database_runtime_spec.snapshot.compact_wal_on_checkpoint",
+            ),
+            "RECORDTIMING": ("kv_database_runtime_spec.checkpoint",),
+            "RECOVER": ("kv_database_runtime_spec.contract.recover",),
         }
     if module_id == root_module_ids.get("frontend"):
         return {

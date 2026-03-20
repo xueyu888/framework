@@ -118,11 +118,23 @@ def _summarize_kv_database_rules(assembly: ProjectRuntimeAssembly) -> RuleValida
         )
     contract = spec.get("contract", {})
     wal = spec.get("wal", {})
+    snapshot = spec.get("snapshot", {})
     runtime = spec.get("runtime", {})
     implementation = runtime.get("implementation", {}) if isinstance(runtime, dict) else {}
     operation = contract.get("operation", {}) if isinstance(contract, dict) else {}
     key = contract.get("key", {}) if isinstance(contract, dict) else {}
     value = contract.get("value", {}) if isinstance(contract, dict) else {}
+    recover = contract.get("recover", {}) if isinstance(contract, dict) else {}
+    has_snapshot = isinstance(snapshot, dict) and bool(snapshot)
+    expected_replay_strategy = "snapshot_then_wal_replay" if has_snapshot else "append_only_replay"
+    required_implementation_keys: tuple[str, ...] = (
+        "database_class",
+        "config_class",
+        "log_class",
+        "record_class",
+    )
+    if has_snapshot:
+        required_implementation_keys = (*required_implementation_keys, "snapshot_class")
     rules = (
         RuleValidationOutcome(
             rule_id="KV_DATABASE_ALLOWED_OPERATIONS",
@@ -143,23 +155,38 @@ def _summarize_kv_database_rules(assembly: ProjectRuntimeAssembly) -> RuleValida
         RuleValidationOutcome(
             rule_id="KV_DATABASE_WAL_POLICY",
             name="WAL path and replay strategy are explicit",
-            passed=bool(wal.get("path")) and str(wal.get("replay_strategy")) == "append_only_replay",
+            passed=bool(wal.get("path")) and str(wal.get("replay_strategy")) == expected_replay_strategy,
             reasons=()
-            if bool(wal.get("path")) and str(wal.get("replay_strategy")) == "append_only_replay"
-            else ("wal.path must be non-empty and wal.replay_strategy must be append_only_replay",),
+            if bool(wal.get("path")) and str(wal.get("replay_strategy")) == expected_replay_strategy
+            else (f"wal.path must be non-empty and wal.replay_strategy must be {expected_replay_strategy}",),
             evidence={"wal": wal},
+        ),
+        RuleValidationOutcome(
+            rule_id="KV_DATABASE_RECOVERY_POLICY",
+            name="recovery policy stays explicit",
+            passed=(
+                not has_snapshot
+                or (bool(snapshot.get("path")) and str(recover.get("strategy")) == "snapshot_then_wal_replay")
+            ),
+            reasons=()
+            if (
+                not has_snapshot
+                or (bool(snapshot.get("path")) and str(recover.get("strategy")) == "snapshot_then_wal_replay")
+            )
+            else ("snapshot.path must be non-empty and recover.strategy must be snapshot_then_wal_replay",),
+            evidence={"snapshot": snapshot, "recover": recover},
         ),
         RuleValidationOutcome(
             rule_id="KV_DATABASE_IMPLEMENTATION_BINDING",
             name="runtime implementation classes are bound",
             passed=all(
                 isinstance(implementation.get(key_name), str) and implementation.get(key_name)
-                for key_name in ("database_class", "config_class", "log_class", "record_class")
+                for key_name in required_implementation_keys
             ) and str(value.get("serialization")) == "repr",
             reasons=()
             if all(
                 isinstance(implementation.get(key_name), str) and implementation.get(key_name)
-                for key_name in ("database_class", "config_class", "log_class", "record_class")
+                for key_name in required_implementation_keys
             ) and str(value.get("serialization")) == "repr"
             else ("implementation class bindings must exist and value.serialization must stay repr",),
             evidence={
