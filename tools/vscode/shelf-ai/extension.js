@@ -125,14 +125,14 @@ function localizeIssueLine(rawLine) {
     /^declared boundary not effectively read by base:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (baseBoundaryMiss) {
-    return `基类声明的参数边界未被有效读取：${baseBoundaryMiss[1]} -> ${baseBoundaryMiss[2]}`;
+    return `基类声明的参数边界未被有效读取：${baseBoundaryMiss[2]}。建议：在对应 Base 实现中读取该参数；若确实不需要，请从来源声明移除。`;
   }
 
   const ruleBoundaryMiss = line.match(
     /^declared rule boundary not effectively read:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (ruleBoundaryMiss) {
-    return `规则声明的参数边界未被有效读取：${ruleBoundaryMiss[1]} -> ${ruleBoundaryMiss[2]}`;
+    return `规则声明的参数边界未被有效读取：${ruleBoundaryMiss[2]}。建议：在规则实现中读取该参数，或调整规则参数绑定声明。`;
   }
 
   const exactScopeViolation = line.match(
@@ -171,6 +171,9 @@ function localizeIssueLine(rawLine) {
   }
   if (/^Shelf validation issue$/i.test(line)) {
     return DEFAULT_SHELF_ISSUE_MESSAGE;
+  }
+  if (/^[\x00-\x7F\s.,:;_()[\]{}<>=+\-*/\\'"`!?|]+$/.test(line) && /[A-Za-z]/.test(line)) {
+    return "未本地化的校验错误。请打开 Shelf 输出查看原始明细。";
   }
   return sourceLine;
 }
