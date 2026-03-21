@@ -70,13 +70,13 @@ function fallbackWorkbenchModuleText() {
 
 - \`C1\`：最小场景能力
 
-## 2. 参数定义
+## 2. 边界定义（Boundary / Parameter 参数）
 
 - \`CHAT\`：聊天参数
 - \`CONTEXT\`：上下文参数
 - \`RETURN\`：回跳参数
 
-## 3. 最小可行基
+## 3. 最小结构基（Minimal Structural Bases）
 
 - \`B1\`：最小承载基
 

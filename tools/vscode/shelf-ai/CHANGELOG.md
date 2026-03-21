@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.21 - 2026-03-21
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.20..shelf-ai-v0.1.21`.
+- Added real-time framework markdown lint diagnostics and quick fixes, with grant-stage intent-gate behavior alignment.
+- Unified authoring section naming to `## 2. 边界定义（Boundary / Parameter 参数）` and `## 3. 最小结构基（Minimal Structural Bases）` across parser/lint/completion/navigation/snippets/tests/framework docs.
+- Added Boundary-section dash auto-expansion (`-` -> parameter item template) with inferred `P` numbering.
+- Rebuilt and revalidated Shelf AI assets before packaging and installation.
+
 ## 0.1.20 - 2026-03-20
 
 - Switched Shelf AI Problems diagnostics to Chinese by default instead of leaking English validation text from generated-artifact guards and correspondence summaries.
