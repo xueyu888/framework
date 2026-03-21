@@ -92,6 +92,15 @@ function main() {
     "uv run python scripts/validate_canonical.py",
     "package.json must default shelf.fullValidationCommand to the supported canonical validation command"
   );
+  const defaultGuardedPrefixes = configuration["shelf.intentGateGuardedPathPrefixes"]?.default || [];
+  assert(
+    Array.isArray(defaultGuardedPrefixes) && defaultGuardedPrefixes.includes("framework/"),
+    "package.json must keep framework/ in default guarded path prefixes"
+  );
+  assert(
+    !defaultGuardedPrefixes.includes("tools/vscode/shelf-ai/"),
+    "package.json must not guard Shelf extension source paths by default"
+  );
 
   const frameworkSnippet = snippetJson["@framework Module Template"];
   assert(frameworkSnippet, "markdown snippets must keep the @framework module template");
@@ -103,8 +112,8 @@ function main() {
     "@framework snippet must include capability statement section"
   );
   assert(
-    frameworkSnippet.body.includes("## 2. 边界定义（Boundary / 参数）"),
-    "@framework snippet must include boundary section"
+    frameworkSnippet.body.includes("## 2. 参数定义（Parameter）"),
+    "@framework snippet must include parameter section"
   );
   assert(
     frameworkSnippet.body.includes("## 3. 最小可行基（Minimum Viable Bases）"),
@@ -144,7 +153,7 @@ function main() {
     "extension.js must clear stale shelf diagnostics when watched documents are edited"
   );
   assert(
-    extensionSource.includes('$(close) Shelf failed'),
+    extensionSource.includes('$(close) Shelf 失败'),
     "extension.js must expose a visible cross icon for failing Shelf status"
   );
   assert(
@@ -236,7 +245,7 @@ function main() {
     "rule child completion must include R*.1"
   );
   assert(
-    ruleChildEntries.some((entry) => entry.label === "R*.4 边界绑定"),
+    ruleChildEntries.some((entry) => entry.label === "R*.4 参数绑定"),
     "rule child completion must include R*.4"
   );
 }
