@@ -2,7 +2,7 @@
   "name": "shelf-ai",
   "displayName": "Shelf AI",
   "description": "Shelf AI: canonical-first navigation for the Framework -> Config -> Code -> Evidence chain.",
-  "version": "0.1.15",
+  "version": "0.1.20",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
@@ -312,8 +312,7 @@
             "framework_drafts/",
             "projects/",
             "src/project_runtime/",
-            "scripts/",
-            "tools/vscode/shelf-ai/"
+            "scripts/"
           ],
           "items": {
             "type": "string"
