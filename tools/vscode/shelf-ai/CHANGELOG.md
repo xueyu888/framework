@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.21 - 2026-03-21
+
+- Unified framework section naming to `## 2. 边界定义（Boundary / Parameter 参数）` and `## 3. 最小结构基（Minimal Structural Bases）` across parser, lint, completion, snippets, navigation, tests, and framework docs.
+- Added in-editor dash auto-expansion in the Boundary section: typing `-` now expands directly into a parameter entry snippet with inferred `P` numbering.
+- Rebuilt and revalidated Shelf AI assets (webview bundle, extension tests, hardcode guard, mypy, canonical check-changes) and repackaged the VSIX for release.
+
 ## 0.1.20 - 2026-03-20
 
 - Switched Shelf AI Problems diagnostics to Chinese by default instead of leaking English validation text from generated-artifact guards and correspondence summaries.

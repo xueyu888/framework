@@ -2,7 +2,7 @@
   "name": "shelf-ai",
   "displayName": "Shelf AI",
   "description": "Shelf AI: canonical-first navigation for the Framework -> Config -> Code -> Evidence chain.",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
@@ -424,6 +424,21 @@
           "minimum": 0,
           "maximum": 5000,
           "description": "%configuration.shelf.frameworkLintDebounceMs.description%"
+        },
+        "shelf.frameworkAutoCompleteEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.frameworkAutoCompleteEnabled.description%"
+        },
+        "shelf.frameworkAutoTriggerSuggest": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.frameworkAutoTriggerSuggest.description%"
+        },
+        "shelf.frameworkQuickFixEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.frameworkQuickFixEnabled.description%"
         }
       }
     }

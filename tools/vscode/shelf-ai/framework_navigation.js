@@ -16,9 +16,8 @@ const TOML_SECTION_PATTERN = /^\s*\[([A-Za-z0-9_.-]+)\]\s*$/;
 
 const SECTION_PREFIXES = [
   ["## 1. 能力声明", "capability"],
-  ["## 2. 参数定义", "boundary"],
   ["## 2. 边界定义", "boundary"],
-  ["## 3. 最小可行基", "base"],
+  ["## 3. 最小结构基", "base"],
   ["## 4. 基组合原则", "rule"],
   ["## 5. 验证", "verification"],
 ];
@@ -747,7 +746,7 @@ function buildModuleHoverMarkdown(moduleInfo, index) {
   }
 
   pushItemSection(parts, "能力声明", index.capabilities);
-  pushItemSection(parts, "最小可行基", index.bases);
+  pushItemSection(parts, "最小结构基", index.bases);
 
   if (index.rules.length > 0) {
     parts.push("", "基组合原则");

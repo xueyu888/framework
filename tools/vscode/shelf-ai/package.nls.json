@@ -33,5 +33,8 @@
   "configuration.shelf.validationDebounceMs.description": "Debounce delay, in milliseconds, before Shelf starts a queued validation run.",
   "configuration.shelf.frameworkLintEnabled.description": "Enable real-time framework markdown syntax diagnostics (independent of project selection).",
   "configuration.shelf.frameworkLintOnType.description": "Run framework markdown syntax diagnostics while typing.",
-  "configuration.shelf.frameworkLintDebounceMs.description": "Debounce delay, in milliseconds, before on-type framework markdown lint diagnostics."
+  "configuration.shelf.frameworkLintDebounceMs.description": "Debounce delay, in milliseconds, before on-type framework markdown lint diagnostics.",
+  "configuration.shelf.frameworkAutoCompleteEnabled.description": "Enable context-aware framework markdown completion templates.",
+  "configuration.shelf.frameworkAutoTriggerSuggest.description": "Automatically trigger completion suggestions while typing framework syntax markers.",
+  "configuration.shelf.frameworkQuickFixEnabled.description": "Enable Quick Fix actions for framework markdown lint diagnostics."
 }

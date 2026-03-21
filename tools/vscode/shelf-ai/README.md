@@ -23,6 +23,7 @@ Authoring-term note:
 - Treats stale / missing / invalid canonical as non-authoritative: formal config jumps and the evidence tree wait for fresh canonical.
 - Runs canonical validation and optionally `mypy` from the extension.
 - Adds project-independent framework markdown syntax diagnostics (Problems 波浪线) while typing/saving.
+- Adds context-aware framework markdown completion (section-aware + auto-number defaults) and lint Quick Fix actions.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
 - Adds a governed-task intent gate: map request text to canonical framework paths (`module_id / boundary_id / exact.*`) before implementation.
 - Enforces one-to-one parameter mapping for governed-task sessions: if any canonical parameter still projects to multiple related paths, session grant is rejected until framework is clarified.
@@ -92,8 +93,11 @@ Local workspace overlay file:
 - `shelf.frameworkLintEnabled = true`
 - `shelf.frameworkLintOnType = true`
 - `shelf.frameworkLintDebounceMs = 300`
+- `shelf.frameworkAutoCompleteEnabled = true`
+- `shelf.frameworkAutoTriggerSuggest = true`
+- `shelf.frameworkQuickFixEnabled = true`
 
-Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload. Framework lint settings take effect immediately for currently opened framework markdown files.
+Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload. Framework lint/completion/quick-fix settings take effect immediately for currently opened framework markdown files.
 
 Intent-gate temporary bypass supports multi-option configuration:
 
@@ -133,6 +137,7 @@ Default commands:
 `Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation.
 
 Framework markdown lint is independent from project selection: syntax diagnostics are computed directly from the current `framework/**` or `framework_drafts/**` document and rendered as standard VSCode Problems diagnostics.
+The same diagnostics expose Quick Fix actions (lightbulb) for common formatting mistakes, including list marker normalization, missing `@framework`, missing standard sections, and invalid C/P/B/R/V entry formatting.
 
 The `@framework` template entry is a repository-side hard authoring contract and must not be removed without an equally direct replacement.
 

@@ -24,6 +24,33 @@ const DEFAULT_CHANGE_VALIDATION_COMMAND = "uv run python scripts/validate_canoni
 const DEFAULT_INTENT_GATE_TTL_MINUTES = 120;
 const DEFAULT_INTENT_GATE_MINIMUM_SCORE = 4;
 const DEFAULT_INTENT_GATE_MAX_MATCHES = 8;
+const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze([
+  "@",
+  "#",
+  "-",
+  "`",
+  ".",
+  "C",
+  "P",
+  "B",
+  "R",
+  "V",
+  "N",
+  "c",
+  "p",
+  "b",
+  "r",
+  "v",
+  "n",
+]);
+const FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS = new Set(FRAMEWORK_COMPLETION_TRIGGER_CHARS);
+const FRAMEWORK_REQUIRED_SECTION_HEADINGS = Object.freeze([
+  "## 1. 能力声明（Capability Statement）",
+  "## 2. 边界定义（Boundary / Parameter 参数）",
+  "## 3. 最小结构基（Minimal Structural Bases）",
+  "## 4. 基组合原则（Base Combination Principles）",
+  "## 5. 验证（Verification）",
+]);
 const FRAMEWORK_RULE_HINTS = {
   FW002: "@framework 必须无参数",
   FW003: "标题必须为 中文名:EnglishName",
@@ -50,8 +77,8 @@ const FRAMEWORK_RULE_HINTS = {
   FWL003: "必须包含 1~5 标准章节",
   FWL004: "列表项必须使用 -",
   FWL005: "能力声明条目格式必须合法",
-  FWL006: "参数定义条目格式必须合法",
-  FWL007: "最小可行基条目格式必须合法",
+  FWL006: "边界定义条目格式必须合法",
+  FWL007: "最小结构基条目格式必须合法",
   FWL008: "规则条目格式必须合法",
   FWL009: "验证条目格式必须合法",
   FWL010: "章节内必须至少存在一个可解析条目"
@@ -390,6 +417,9 @@ function activate(context) {
     "shelf.frameworkLintEnabled",
     "shelf.frameworkLintOnType",
     "shelf.frameworkLintDebounceMs",
+    "shelf.frameworkAutoCompleteEnabled",
+    "shelf.frameworkAutoTriggerSuggest",
+    "shelf.frameworkQuickFixEnabled",
   ];
 
   const clampInt = (value, minimum, maximum, fallback) => {
@@ -479,6 +509,9 @@ function activate(context) {
       enabled: Boolean(config.get("frameworkLintEnabled", true)),
       onType: Boolean(config.get("frameworkLintOnType", true)),
       debounceMs: clampInt(config.get("frameworkLintDebounceMs", 300), 0, 5_000, 300),
+      autoCompleteEnabled: Boolean(config.get("frameworkAutoCompleteEnabled", true)),
+      autoTriggerSuggest: Boolean(config.get("frameworkAutoTriggerSuggest", true)),
+      quickFixEnabled: Boolean(config.get("frameworkQuickFixEnabled", true)),
     };
   };
 
@@ -1635,6 +1668,445 @@ function activate(context) {
     }
   };
 
+  const inferFrameworkSymbolNumberFromLine = (lineText, symbol) => {
+    const safeSymbol = String(symbol || "").trim().toUpperCase();
+    if (!safeSymbol) {
+      return 0;
+    }
+    const escapedSymbol = safeSymbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = String(lineText || "").match(new RegExp(`\`${escapedSymbol}(\\d+)(?:\\.\\d+)?\``));
+    if (!match) {
+      return 0;
+    }
+    const parsed = Number(match[1] || 0);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  };
+
+  const nextFrameworkSymbolNumber = (documentText, symbol) => {
+    const safeSymbol = String(symbol || "").trim().toUpperCase();
+    if (!safeSymbol) {
+      return 1;
+    }
+    const escapedSymbol = safeSymbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`\`${escapedSymbol}(\\d+)(?:\\.\\d+)?\``, "g");
+    let max = 0;
+    for (const match of String(documentText || "").matchAll(pattern)) {
+      const parsed = Number(match[1] || 0);
+      if (Number.isInteger(parsed) && parsed > max) {
+        max = parsed;
+      }
+    }
+    return max + 1;
+  };
+
+  const detectFrameworkSectionAtLine = (document, lineNumber) => {
+    const safeLine = Math.max(0, Math.min(Number(lineNumber || 0), Math.max(0, document.lineCount - 1)));
+    let sectionId = "";
+    for (let index = 0; index <= safeLine; index += 1) {
+      const trimmed = document.lineAt(index).text.trim();
+      if (trimmed === "## 1. 能力声明（Capability Statement）") {
+        sectionId = "capability";
+        continue;
+      }
+      if (
+        trimmed === "## 2. 边界定义（Boundary / Parameter 参数）"
+      ) {
+        sectionId = "parameter";
+        continue;
+      }
+      if (trimmed === "## 3. 最小结构基（Minimal Structural Bases）") {
+        sectionId = "base";
+        continue;
+      }
+      if (trimmed === "## 4. 基组合原则（Base Combination Principles）") {
+        sectionId = "rule";
+        continue;
+      }
+      if (trimmed === "## 5. 验证（Verification）") {
+        sectionId = "verification";
+      }
+    }
+    return sectionId;
+  };
+
+  const inferNearestRuleNumber = (document, lineNumber) => {
+    const safeLine = Math.max(0, Math.min(Number(lineNumber || 0), Math.max(0, document.lineCount - 1)));
+    for (let index = safeLine; index >= 0; index -= 1) {
+      const trimmed = document.lineAt(index).text.trim();
+      if (index !== safeLine && trimmed.startsWith("## ")) {
+        break;
+      }
+      const match = /^-\s+`R(\d+)`\s+/.exec(trimmed);
+      if (match) {
+        return Number(match[1]);
+      }
+    }
+    return 0;
+  };
+
+  const createFrameworkQuickFix = (document, diagnostic, title, buildEdit) => {
+    const edit = new vscode.WorkspaceEdit();
+    if (!buildEdit(edit)) {
+      return null;
+    }
+    const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+    action.edit = edit;
+    action.diagnostics = [diagnostic];
+    return action;
+  };
+
+  const buildFrameworkLintQuickFixes = (document, diagnostic) => {
+    const code = String(diagnostic?.code || "").trim().toUpperCase();
+    if (!code.startsWith("FWL")) {
+      return [];
+    }
+    const documentText = document.getText();
+    const lineIndex = diagnostic.range.start.line;
+    const currentLine = document.lineAt(lineIndex);
+    const lineText = currentLine.text;
+    const lineRange = currentLine.rangeIncludingLineBreak;
+    const quickFixes = [];
+
+    if (code === "FWL001") {
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准标题格式",
+          (edit) => {
+            let targetLine = 0;
+            for (let index = 0; index < document.lineCount; index += 1) {
+              if (document.lineAt(index).text.trim()) {
+                targetLine = index;
+                break;
+              }
+            }
+            const targetTextLine = document.lineAt(targetLine);
+            edit.replace(document.uri, targetTextLine.rangeIncludingLineBreak, "# 中文模块名:EnglishName\n");
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL002") {
+      const directiveLines = [];
+      for (let index = 0; index < document.lineCount; index += 1) {
+        const trimmed = document.lineAt(index).text.trim();
+        if (trimmed.startsWith("@framework")) {
+          directiveLines.push({ line: index, text: trimmed });
+        }
+      }
+      const invalidDirectiveLines = directiveLines.filter((item) => item.text !== "@framework");
+      if (invalidDirectiveLines.length) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "规范化 @framework 指令",
+            (edit) => {
+              for (const item of invalidDirectiveLines) {
+                const targetLine = document.lineAt(item.line);
+                edit.replace(document.uri, targetLine.rangeIncludingLineBreak, "@framework\n");
+              }
+              return true;
+            }
+          )
+        );
+      } else if (!directiveLines.length) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "插入 @framework 指令",
+            (edit) => {
+              let titleLine = -1;
+              for (let index = 0; index < document.lineCount; index += 1) {
+                if (document.lineAt(index).text.trim()) {
+                  titleLine = index;
+                  break;
+                }
+              }
+              if (titleLine < 0) {
+                edit.insert(document.uri, new vscode.Position(0, 0), "# 中文模块名:EnglishName\n\n@framework\n");
+                return true;
+              }
+              const titleEnd = new vscode.Position(titleLine, document.lineAt(titleLine).text.length);
+              edit.insert(document.uri, titleEnd, "\n\n@framework");
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL003") {
+      const existingHeadings = new Set();
+      for (let index = 0; index < document.lineCount; index += 1) {
+        existingHeadings.add(document.lineAt(index).text.trim());
+      }
+      const missingHeadings = FRAMEWORK_REQUIRED_SECTION_HEADINGS.filter((heading) => !existingHeadings.has(heading));
+      if (missingHeadings.length) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "补全标准章节（1~5）",
+            (edit) => {
+              const tailLine = Math.max(0, document.lineCount - 1);
+              const tailPos = new vscode.Position(tailLine, document.lineAt(tailLine).text.length);
+              const suffix = documentText.endsWith("\n") ? "" : "\n";
+              edit.insert(
+                document.uri,
+                tailPos,
+                `${suffix}\n${missingHeadings.join("\n\n")}\n`
+              );
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL004") {
+      const marker = /^(\s*)\*/.exec(lineText);
+      if (marker) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "将 `*` 列表改为 `-`",
+            (edit) => {
+              const column = marker[1].length;
+              edit.replace(
+                document.uri,
+                new vscode.Range(lineIndex, column, lineIndex, column + 1),
+                "-"
+              );
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL005") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "C")
+        || nextFrameworkSymbolNumber(documentText, "C");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 C 条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL006") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "P")
+        || nextFrameworkSymbolNumber(documentText, "P");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准参数条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`P${inferred}\` 参数名：待定义参数约束。来源：\`C1\`。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL007") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "B")
+        || nextFrameworkSymbolNumber(documentText, "B");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 B 条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`B${inferred}\` 结构基名：待定义结构。来源：\`C1 + P1\`。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL008") {
+      const inferredRuleNumber = inferFrameworkSymbolNumberFromLine(lineText, "R")
+        || inferNearestRuleNumber(document, lineIndex)
+        || nextFrameworkSymbolNumber(documentText, "R");
+      const blockText = [
+        `- \`R${inferredRuleNumber}\` 规则名`,
+        `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
+        `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
+        `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
+        `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
+      ].join("\n");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 R 规则块",
+          (edit) => {
+            edit.replace(document.uri, lineRange, `${blockText}\n`);
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL009") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "V")
+        || nextFrameworkSymbolNumber(documentText, "V");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 V 条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`V${inferred}\` 验证名：待补充验证要求。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL010") {
+      const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
+      let template = "";
+      if (sectionId === "capability") {
+        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
+      } else if (sectionId === "parameter") {
+        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。来源：\`C1\`。`;
+      } else if (sectionId === "base") {
+        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构。来源：\`C1 + P1\`。`;
+      } else if (sectionId === "rule") {
+        const inferredRuleNumber = nextFrameworkSymbolNumber(documentText, "R");
+        template = [
+          `- \`R${inferredRuleNumber}\` 规则名`,
+          `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
+          `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
+          `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
+          `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
+        ].join("\n");
+      } else if (sectionId === "verification") {
+        template = `- \`V${nextFrameworkSymbolNumber(documentText, "V")}\` 验证名：待补充验证要求。`;
+      }
+      if (template) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "插入章节标准条目模板",
+            (edit) => {
+              const insertionPoint = new vscode.Position(lineIndex, document.lineAt(lineIndex).text.length);
+              edit.insert(document.uri, insertionPoint, `\n${template}`);
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    return quickFixes.filter(Boolean);
+  };
+
+  const maybeAutoTriggerFrameworkSuggest = (event) => {
+    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+      return;
+    }
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.autoCompleteEnabled || !lintSettings.autoTriggerSuggest) {
+      return;
+    }
+    if (!Array.isArray(event.contentChanges) || event.contentChanges.length !== 1) {
+      return;
+    }
+    const change = event.contentChanges[0];
+    if (!change || typeof change.text !== "string" || change.text.length !== 1 || change.rangeLength !== 0) {
+      return;
+    }
+    if (!FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS.has(change.text)) {
+      return;
+    }
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || activeEditor.document.uri.toString() !== event.document.uri.toString()) {
+      return;
+    }
+    void vscode.commands.executeCommand("editor.action.triggerSuggest");
+  };
+
+  const maybeAutoExpandFrameworkDashEntry = (event) => {
+    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+      return false;
+    }
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.autoCompleteEnabled) {
+      return false;
+    }
+    if (!Array.isArray(event.contentChanges) || event.contentChanges.length !== 1) {
+      return false;
+    }
+    const change = event.contentChanges[0];
+    if (!change || change.text !== "-" || change.rangeLength !== 0) {
+      return false;
+    }
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || activeEditor.document.uri.toString() !== event.document.uri.toString()) {
+      return false;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(event.document.uri);
+    const repoRoot = folder?.uri.fsPath || "";
+    if (!repoRoot || !frameworkNavigation.isFrameworkMarkdownFile(event.document.uri.fsPath, repoRoot)) {
+      return false;
+    }
+    const cursorPosition = new vscode.Position(change.range.start.line, change.range.start.character + 1);
+    const lineText = event.document.lineAt(cursorPosition.line).text;
+    if (lineText.slice(cursorPosition.character).trim() !== "") {
+      return false;
+    }
+    const linePrefix = lineText.slice(0, cursorPosition.character);
+    const autoExpansion = frameworkCompletion.getFrameworkDashAutoExpansion(
+      linePrefix,
+      true,
+      {
+        documentText: event.document.getText(),
+        lineNumber: cursorPosition.line,
+      }
+    );
+    if (!autoExpansion) {
+      return false;
+    }
+    void activeEditor.insertSnippet(
+      new vscode.SnippetString(autoExpansion.insertText),
+      new vscode.Range(cursorPosition, cursorPosition)
+    );
+    return true;
+  };
+
   const renderSidebarHome = () => {
     const defaultActionItems = [
       {
@@ -2346,6 +2818,10 @@ function activate(context) {
     { language: "markdown", scheme: "file" },
     {
       provideCompletionItems(document, position) {
+        const lintSettings = readFrameworkLintSettings();
+        if (!lintSettings.autoCompleteEnabled) {
+          return undefined;
+        }
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
         const repoRoot = folder?.uri.fsPath || "";
         const isFrameworkFile = repoRoot
@@ -2361,7 +2837,11 @@ function activate(context) {
         const entries = frameworkCompletion.getFrameworkCompletionEntries(
           linePrefix,
           wordPrefix,
-          isFrameworkFile
+          isFrameworkFile,
+          {
+            documentText: document.getText(),
+            lineNumber: position.line,
+          }
         );
         if (!entries.length) {
           return undefined;
@@ -2382,11 +2862,31 @@ function activate(context) {
         });
       }
     },
-    "@",
-    "#",
-    "-",
-    "`",
-    "."
+    ...FRAMEWORK_COMPLETION_TRIGGER_CHARS
+  );
+
+  const frameworkLintQuickFixDisposable = vscode.languages.registerCodeActionsProvider(
+    { language: "markdown", scheme: "file" },
+    {
+      provideCodeActions(document, _range, context) {
+        if (!isFrameworkLintDocument(document)) {
+          return undefined;
+        }
+        const lintSettings = readFrameworkLintSettings();
+        if (!lintSettings.enabled || !lintSettings.quickFixEnabled) {
+          return undefined;
+        }
+        const diagnosticsList = Array.isArray(context?.diagnostics) ? context.diagnostics : [];
+        const actions = [];
+        for (const diagnostic of diagnosticsList) {
+          actions.push(...buildFrameworkLintQuickFixes(document, diagnostic));
+        }
+        return actions.length ? actions : undefined;
+      }
+    },
+    {
+      providedCodeActionKinds: [vscode.CodeActionKind.QuickFix],
+    }
   );
 
   const startGovernedTaskDisposable = vscode.commands.registerCommand(
@@ -2723,6 +3223,10 @@ function activate(context) {
       return;
     }
     scheduleFrameworkLintForDocument(event.document, { immediate: false });
+    const didAutoExpandFrameworkDashEntry = maybeAutoExpandFrameworkDashEntry(event);
+    if (!didAutoExpandFrameworkDashEntry) {
+      maybeAutoTriggerFrameworkSuggest(event);
+    }
     const relPath = workspaceGuard.normalizeRelPath(path.relative(folder.uri.fsPath, event.document.uri.fsPath));
     if (!workspaceGuard.isWatchedPath(relPath) || isSuppressedGeneratedPath(relPath)) {
       return;
@@ -2847,6 +3351,7 @@ function activate(context) {
     frameworkHoverDisposable,
     frameworkReferenceDisposable,
     frameworkCompletionDisposable,
+    frameworkLintQuickFixDisposable,
     insertFrameworkTemplateDisposable,
     startGovernedTaskDisposable,
     showGovernedTaskSessionDisposable,

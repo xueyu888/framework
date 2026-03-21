@@ -33,5 +33,8 @@
   "configuration.shelf.validationDebounceMs.description": "Shelf 启动排队校验前的防抖延迟（毫秒）。",
   "configuration.shelf.frameworkLintEnabled.description": "启用 framework markdown 的实时语法诊断（与项目选择无关）。",
   "configuration.shelf.frameworkLintOnType.description": "在输入过程中实时执行 framework markdown 语法诊断。",
-  "configuration.shelf.frameworkLintDebounceMs.description": "输入触发 framework markdown 语法诊断前的防抖延迟（毫秒）。"
+  "configuration.shelf.frameworkLintDebounceMs.description": "输入触发 framework markdown 语法诊断前的防抖延迟（毫秒）。",
+  "configuration.shelf.frameworkAutoCompleteEnabled.description": "启用按章节与符号感知的 framework markdown 自动补全模板。",
+  "configuration.shelf.frameworkAutoTriggerSuggest.description": "在输入 framework 语法标记时自动弹出补全建议。",
+  "configuration.shelf.frameworkQuickFixEnabled.description": "为 framework markdown lint 诊断启用 Quick Fix 快速修复。"
 }

@@ -11,10 +11,9 @@ const RULE_CHILD_PATTERN = /^\s*-\s+`(?<id>R\d+\.\d+)`\s+(?<body>.+)$/;
 
 const SECTION_CAPABILITY_TITLES = ["## 1. 能力声明（Capability Statement）"];
 const SECTION_PARAMETER_TITLES = [
-  "## 2. 参数定义（Parameter）",
-  "## 2. 边界定义（Boundary / 参数）",
+  "## 2. 边界定义（Boundary / Parameter 参数）",
 ];
-const SECTION_BASE_TITLES = ["## 3. 最小可行基（Minimum Viable Bases）"];
+const SECTION_BASE_TITLES = ["## 3. 最小结构基（Minimal Structural Bases）"];
 const SECTION_RULE_TITLES = ["## 4. 基组合原则（Base Combination Principles）"];
 const SECTION_VERIFICATION_TITLES = ["## 5. 验证（Verification）"];
 
@@ -352,7 +351,7 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
       issues,
       validPattern: BASE_LINE_PATTERN,
       invalidCode: "FWL007",
-      invalidMessage: "最小可行基章节条目格式错误，必须匹配 `- `B*` 名称：描述。来源：`...``。",
+      invalidMessage: "最小结构基章节条目格式错误，必须匹配 `- `B*` 名称：描述。来源：`...``。",
     });
   }
 
