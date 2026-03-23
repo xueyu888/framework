@@ -15,7 +15,7 @@
 
 - `N1` 非职责声明：不考虑并发处理，不考虑高效查询。
 
-## 2. 边界定义（Boundary / 参数）
+## 2. 边界定义（Boundary / Parameter 参数）
 
 - `OPERATION` 操作边界：对数据的操作只能是"put"，"get"，"delete"。来源：`C1 + C3 + C4`。
 - `KEY` KEY边界：每次操作必须输入一个KEY，且是str类型。来源：`C1 + C2 + C3 + C4`。
@@ -23,7 +23,7 @@
 - `PATH` 路径边界：日志存放的路径，和日志文件名必须明确。来源`C5 + C6`。
 - `LOG` 日志内容边界：日志以"操作"，"KEY"，"VALUE"的格式进行排列。来源`C5 + C6`。
 
-## 3. 最小可行基（Minimum Viable Bases）
+## 3. 最小结构基（Minimal Structural Bases）
 
 - `B1` 字典：python自带的dict。来源：`C1 + C2 + C3 + C4 + OPERATION + KEY + VALUE`。
 - `B2` 日志：记录"操作"，"KEY"，"VALUE"内容。来源：`C5 + C6 + PATH + LOG`

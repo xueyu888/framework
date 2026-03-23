@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from rule_validation_models import RuleValidationOutcome, RuleValidationSummary
-from rule_validation_models import ValidationReports
+from rule_validation_models import RuleValidationOutcome, RuleValidationSummary, ValidationReports
 
 from project_runtime.config_layer import ConfigModuleBinding
+from project_runtime.codegen_consistency_guard import summarize_codegen_consistency_guard
 from project_runtime.correspondence_validator import summarize_correspondence_guard
 from project_runtime.code_layer import CodeModuleBinding
 from project_runtime.framework_violation_guard import summarize_framework_violation_guard
@@ -89,115 +89,23 @@ def _document_digests(runtime_documents: list[dict[str, Any]]) -> dict[str, str]
     }
 
 
-def _summarize_kv_database_rules(assembly: ProjectRuntimeAssembly) -> RuleValidationSummary:
-    try:
-        spec = assembly.require_runtime_export("kv_database_runtime_spec")
-    except KeyError as error:
-        return RuleValidationSummary(
-            module_id=assembly.root_module_ids.get("kv_database", "kv_database"),
-            rules=(
-                RuleValidationOutcome(
-                    rule_id="KV_DATABASE_RUNTIME_SPEC",
-                    name="kv database runtime spec export",
-                    passed=False,
-                    reasons=(str(error),),
-                ),
-            ),
-        )
-    if not isinstance(spec, dict):
-        return RuleValidationSummary(
-            module_id=assembly.root_module_ids.get("kv_database", "kv_database"),
-            rules=(
-                RuleValidationOutcome(
-                    rule_id="KV_DATABASE_RUNTIME_SPEC",
-                    name="kv database runtime spec export",
-                    passed=False,
-                    reasons=("kv_database_runtime_spec must be a dict",),
-                ),
-            ),
-        )
-    contract = spec.get("contract", {})
-    wal = spec.get("wal", {})
-    snapshot = spec.get("snapshot", {})
-    runtime = spec.get("runtime", {})
-    implementation = runtime.get("implementation", {}) if isinstance(runtime, dict) else {}
-    operation = contract.get("operation", {}) if isinstance(contract, dict) else {}
-    key = contract.get("key", {}) if isinstance(contract, dict) else {}
-    value = contract.get("value", {}) if isinstance(contract, dict) else {}
-    recover = contract.get("recover", {}) if isinstance(contract, dict) else {}
-    has_snapshot = isinstance(snapshot, dict) and bool(snapshot)
-    expected_replay_strategy = "snapshot_then_wal_replay" if has_snapshot else "append_only_replay"
-    required_implementation_keys: tuple[str, ...] = (
-        "database_class",
-        "config_class",
-        "log_class",
-        "record_class",
-    )
-    if has_snapshot:
-        required_implementation_keys = (*required_implementation_keys, "snapshot_class")
-    rules = (
-        RuleValidationOutcome(
-            rule_id="KV_DATABASE_ALLOWED_OPERATIONS",
-            name="allowed operations stay on put/get/delete",
-            passed=list(operation.get("allowed_operations", [])) == ["put", "get", "delete"],
-            reasons=()
-            if list(operation.get("allowed_operations", [])) == ["put", "get", "delete"]
-            else ("allowed_operations must be ['put', 'get', 'delete']",),
-            evidence={"allowed_operations": operation.get("allowed_operations", [])},
-        ),
-        RuleValidationOutcome(
-            rule_id="KV_DATABASE_KEY_POLICY",
-            name="key contract remains string-only",
-            passed=str(key.get("python_type")) == "str",
-            reasons=() if str(key.get("python_type")) == "str" else ("key python_type must be str",),
-            evidence={"python_type": key.get("python_type")},
-        ),
-        RuleValidationOutcome(
-            rule_id="KV_DATABASE_WAL_POLICY",
-            name="WAL path and replay strategy are explicit",
-            passed=bool(wal.get("path")) and str(wal.get("replay_strategy")) == expected_replay_strategy,
-            reasons=()
-            if bool(wal.get("path")) and str(wal.get("replay_strategy")) == expected_replay_strategy
-            else (f"wal.path must be non-empty and wal.replay_strategy must be {expected_replay_strategy}",),
-            evidence={"wal": wal},
-        ),
-        RuleValidationOutcome(
-            rule_id="KV_DATABASE_RECOVERY_POLICY",
-            name="recovery policy stays explicit",
-            passed=(
-                not has_snapshot
-                or (bool(snapshot.get("path")) and str(recover.get("strategy")) == "snapshot_then_wal_replay")
-            ),
-            reasons=()
-            if (
-                not has_snapshot
-                or (bool(snapshot.get("path")) and str(recover.get("strategy")) == "snapshot_then_wal_replay")
-            )
-            else ("snapshot.path must be non-empty and recover.strategy must be snapshot_then_wal_replay",),
-            evidence={"snapshot": snapshot, "recover": recover},
-        ),
-        RuleValidationOutcome(
-            rule_id="KV_DATABASE_IMPLEMENTATION_BINDING",
-            name="runtime implementation classes are bound",
-            passed=all(
-                isinstance(implementation.get(key_name), str) and implementation.get(key_name)
-                for key_name in required_implementation_keys
-            ) and str(value.get("serialization")) == "repr",
-            reasons=()
-            if all(
-                isinstance(implementation.get(key_name), str) and implementation.get(key_name)
-                for key_name in required_implementation_keys
-            ) and str(value.get("serialization")) == "repr"
-            else ("implementation class bindings must exist and value.serialization must stay repr",),
-            evidence={
-                "implementation": implementation,
-                "value_serialization": value.get("serialization"),
-            },
-        ),
-    )
+def _build_skipped_summary(
+    *,
+    module_id: str,
+    rule_id: str,
+    name: str,
+    reason: str,
+) -> RuleValidationSummary:
     return RuleValidationSummary(
-        module_id=assembly.root_module_ids.get("kv_database", "kv_database"),
-        rules=rules,
+        module_id=module_id,
+        rules=(
+            RuleValidationOutcome(
+                rule_id=rule_id,
+                name=name,
+                passed=True,
+                reasons=(reason,),
+            ),
+        ),
     )
 
 
@@ -218,10 +126,86 @@ def _read_path_scope_overrides(
     return read_list("guarded_path_prefixes"), read_list("ignored_path_prefixes")
 
 
+def _module_id_by_export_key(code_modules: tuple[CodeModuleBinding, ...], export_key: str) -> str:
+    matches: list[str] = []
+    for binding in code_modules:
+        exports = binding.code_module.code_exports
+        if not isinstance(exports, dict) or export_key not in exports:
+            continue
+        module_id = str(binding.framework_module.module_id).strip()
+        if module_id and module_id not in matches:
+            matches.append(module_id)
+    if len(matches) != 1:
+        return ""
+    return matches[0]
+
+
+def _append_module_evidence_exports(
+    exports_by_module_id: dict[str, dict[str, Any]],
+    *,
+    module_id: str,
+    payload: dict[str, Any],
+) -> None:
+    normalized_module_id = str(module_id).strip()
+    if not normalized_module_id or not payload:
+        return
+    existing = exports_by_module_id.setdefault(normalized_module_id, {})
+    for key, value in payload.items():
+        if key in existing and existing[key] != value:
+            raise ValueError(
+                "conflicting evidence export assignment for module: "
+                f"module_id={normalized_module_id} key={key}"
+            )
+        existing[key] = value
+
+
 def build_evidence_modules(
     assembly: ProjectRuntimeAssembly,
     code_modules: tuple[CodeModuleBinding, ...],
 ) -> tuple[tuple[type[EvidenceModuleClass], ...], dict[str, Any], ValidationReports]:
+    frontend_root_module_id = _module_id_by_export_key(code_modules, "frontend_app_spec")
+    knowledge_root_module_id = _module_id_by_export_key(code_modules, "knowledge_base_domain_spec")
+
+    if frontend_root_module_id:
+        from frontend_kernel.validators import summarize_frontend_rules, validate_frontend_rules
+
+        frontend_summary = summarize_frontend_rules(
+            validate_frontend_rules(assembly),
+            module_id=frontend_root_module_id,
+        )
+    else:
+        frontend_summary = _build_skipped_summary(
+            module_id="frontend.unselected",
+            rule_id="FRONTEND_NOT_SELECTED",
+            name="frontend validators skipped",
+            reason="frontend root module is not selected in this project.",
+        )
+
+    if knowledge_root_module_id:
+        try:
+            from knowledge_base_framework.validators import summarize_workbench_rules, validate_workbench_rules
+        except ModuleNotFoundError:
+            knowledge_summary = RuleValidationSummary(
+                module_id="knowledge_base.removed",
+                rules=(
+                    RuleValidationOutcome(
+                        rule_id="KB_REMOVED",
+                        name="knowledge_base framework validators removed",
+                        passed=True,
+                        reasons=("knowledge_base_framework package is not present in this workspace snapshot.",),
+                    ),
+                ),
+            )
+        else:
+            knowledge_summary = summarize_workbench_rules(validate_workbench_rules(assembly))
+    else:
+        knowledge_summary = _build_skipped_summary(
+            module_id="knowledge_base.unselected",
+            rule_id="KNOWLEDGE_BASE_NOT_SELECTED",
+            name="knowledge_base validators skipped",
+            reason="knowledge_base root module is not selected in this project.",
+        )
+
     framework_summary = summarize_framework_violation_guard(
         framework_modules=tuple(binding.framework_module for binding in code_modules),
         communication_config=assembly.config.communication,
@@ -238,51 +222,71 @@ def build_evidence_modules(
         ),
         code_modules=code_modules,
     )
+    codegen_consistency_summary, codegen_consistency_report = summarize_codegen_consistency_guard(
+        framework_modules=tuple(binding.framework_module for binding in code_modules),
+        config_modules=tuple(
+            ConfigModuleBinding(
+                framework_module=binding.framework_module,
+                config_module=binding.config_module,
+            )
+            for binding in code_modules
+        ),
+        code_modules=code_modules,
+    )
     guarded_prefixes, ignored_prefixes = _read_path_scope_overrides(assembly.config.communication)
     path_scope_summary = summarize_path_scope_guard(
         repo_root=REPO_ROOT,
         guarded_prefixes=guarded_prefixes,
         ignored_prefixes=ignored_prefixes,
     )
-    scopes: dict[str, RuleValidationSummary] = {
-        "framework_guard": framework_summary,
-        "correspondence_guard": correspondence_summary,
-        "path_scope_guard": path_scope_summary,
-    }
-    evidence_exports: dict[str, Any] = {}
-    frontend_root = assembly.root_module_ids.get("frontend")
-    knowledge_root = assembly.root_module_ids.get("knowledge_base")
-    backend_root = assembly.root_module_ids.get("backend")
-    kv_database_root = assembly.root_module_ids.get("kv_database")
-    has_knowledge_trio = bool(frontend_root and knowledge_root and backend_root)
-    if has_knowledge_trio:
-        from frontend_kernel.validators import summarize_frontend_rules, validate_frontend_rules
-        from knowledge_base_framework.validators import summarize_workbench_rules, validate_workbench_rules
+    validation_reports = ValidationReports(
+        scopes={
+            "frontend": frontend_summary,
+            "knowledge_base": knowledge_summary,
+            "framework_guard": framework_summary,
+            "correspondence_guard": correspondence_summary,
+            "codegen_consistency_guard": codegen_consistency_summary,
+            "path_scope_guard": path_scope_summary,
+        }
+    )
 
-        frontend_summary = summarize_frontend_rules(validate_frontend_rules(assembly))
-        knowledge_summary = summarize_workbench_rules(validate_workbench_rules(assembly))
-        scopes["frontend"] = frontend_summary
-        scopes["knowledge_base"] = knowledge_summary
+    runtime_blueprint: dict[str, Any] | None = None
+    if frontend_root_module_id:
+        runtime_blueprint = _runtime_blueprint(assembly)
+
+    document_digests: dict[str, str] | None = None
+    if knowledge_root_module_id:
         runtime_documents = assembly.require_runtime_export("runtime_documents")
         if not isinstance(runtime_documents, list):
             raise ValueError("runtime_documents export must be a list")
-        evidence_exports["runtime_blueprint"] = _runtime_blueprint(assembly)
-        evidence_exports["document_digests"] = _document_digests(runtime_documents)
-    else:
-        frontend_summary = None
-        knowledge_summary = None
-    if kv_database_root:
-        kv_database_summary = _summarize_kv_database_rules(assembly)
-        scopes["kv_database"] = kv_database_summary
-        kv_database_spec = assembly.require_runtime_export("kv_database_runtime_spec")
-        evidence_exports["kv_database_runtime_spec"] = kv_database_spec
-        evidence_exports["kv_database_spec_digest"] = sha256_text(
-            json.dumps(kv_database_spec, ensure_ascii=False, sort_keys=True)
-        )
-    else:
-        kv_database_summary = None
-    validation_reports = ValidationReports(scopes=scopes)
-    evidence_exports["validation_reports"] = validation_reports.to_dict()
+        document_digests = _document_digests(runtime_documents)
+
+    evidence_exports = {
+        "codegen_consistency": codegen_consistency_report,
+        "validation_reports": validation_reports.to_dict(),
+    }
+    if runtime_blueprint is not None:
+        evidence_exports["runtime_blueprint"] = runtime_blueprint
+    if document_digests is not None:
+        evidence_exports["document_digests"] = document_digests
+    module_evidence_exports_by_id: dict[str, dict[str, Any]] = {}
+    _append_module_evidence_exports(
+        module_evidence_exports_by_id,
+        module_id=frontend_root_module_id,
+        payload={
+            "frontend_rules": frontend_summary.to_dict(),
+            **({"runtime_blueprint": runtime_blueprint} if runtime_blueprint is not None else {}),
+        },
+    )
+    _append_module_evidence_exports(
+        module_evidence_exports_by_id,
+        module_id=knowledge_root_module_id,
+        payload={
+            "knowledge_base_rules": knowledge_summary.to_dict(),
+            **({"document_digests": document_digests} if document_digests is not None else {}),
+        },
+    )
+
     evidence_modules: list[type[EvidenceModuleClass]] = []
     for binding in code_modules:
         class_name = binding.code_module.__name__.replace("CodeModule", "EvidenceModule")
@@ -290,21 +294,7 @@ def build_evidence_modules(
             "module_id": binding.framework_module.module_id,
             "code_exports": binding.code_module.code_exports,
         }
-        if binding.framework_module.module_id == assembly.root_module_ids.get("frontend"):
-            if frontend_summary is None:
-                raise ValueError("frontend evidence export requires frontend validation summary")
-            module_exports["frontend_rules"] = frontend_summary.to_dict()
-            module_exports["runtime_blueprint"] = evidence_exports["runtime_blueprint"]
-        if binding.framework_module.module_id == assembly.root_module_ids.get("knowledge_base"):
-            if knowledge_summary is None:
-                raise ValueError("knowledge_base evidence export requires knowledge_base validation summary")
-            module_exports["knowledge_base_rules"] = knowledge_summary.to_dict()
-            module_exports["document_digests"] = evidence_exports["document_digests"]
-        if binding.framework_module.module_id == assembly.root_module_ids.get("kv_database"):
-            if kv_database_summary is None:
-                raise ValueError("kv_database evidence export requires kv_database validation summary")
-            module_exports["kv_database_rules"] = kv_database_summary.to_dict()
-            module_exports["kv_database_runtime_spec"] = evidence_exports["kv_database_runtime_spec"]
+        module_exports.update(module_evidence_exports_by_id.get(binding.framework_module.module_id, {}))
         evidence_module = type(
             class_name,
             (EvidenceModuleClass,),

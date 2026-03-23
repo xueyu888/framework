@@ -1,5 +1,4 @@
-# 中文模块名
-:EnglishName
+# 中文模块名:EnglishName
 
 @framework
 
@@ -20,7 +19,7 @@
 
 - `N1` 非职责声明：不负责具并发处理、高效查询、范围查询。
 
-## 2. 参数定义（Parameter）
+## 2. 边界定义（Boundary / Parameter 参数）
 
 - `COUNT` 数量边界：可承载的KEY/VALUE的数量存在上限限制。来源：`C1`。
 - `OPERATION` 操作边界：对数据的操作只能是"put"，"get"，"delete"。来源：`C3 + C4 + C5`。
@@ -33,7 +32,7 @@
 - `RECORDTIMING` 快照记录时机边界：需要明确进行快照记录的时机。来源：`C7`。
 - `RECOVER` 恢复依据边界：数据只能根据日志和快照进行恢复。来源：`C8`，.
 
-## 3. 最小可行基（Minimum Viable Bases）
+## 3. 最小结构基（Minimal Structural Bases）
 
 - `B1` KEY-VALUE容器：将KEY-VALUE以一对一的形式存放数据的容器。来源：`C1 + C2 + C3 + C4 + C5 + COUNT + OPERATION + KEY + VALUE`。
 - `B2` 日志：记录执行的操作。来源：`C6 + C8 + LOGPATH + LOG + RECOVER`。
