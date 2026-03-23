@@ -11441,7 +11441,7 @@
     return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
   }
   function escapeHtml(value) {
-    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function kindClass(kind) {
     if (kind.includes("root")) {
@@ -12112,8 +12112,8 @@
           <ul class="hover-list">${hoverList(node.capabilityItems || [], "无能力声明", 2)}</ul>
         </section>
         <section class="hover-section">
-          <h4 class="hover-section-title">最小可行基</h4>
-          <ul class="hover-list">${hoverList(node.baseItems || [], "无最小可行基", 2)}</ul>
+          <h4 class="hover-section-title">最小结构基</h4>
+          <ul class="hover-list">${hoverList(node.baseItems || [], "无最小结构基", 2)}</ul>
         </section>
       </div>
       <div class="hover-footer">${footer}</div>
@@ -12198,7 +12198,7 @@
     return "all";
   }
   function escapeHtml2(value) {
-    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function detailList(items) {
     if (!items.length) {
