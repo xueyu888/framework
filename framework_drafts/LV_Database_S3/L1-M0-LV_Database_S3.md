@@ -1,24 +1,24 @@
-# 中文模块名
-:EnglishName
+# KV数据库S3
+:KVDatabaseS3
 
 @framework
 
-这个模块是KV数据库+WAL+Checkpoint的模块。
+这个模块是KV数据库+WAL+Checkpoint的模块，增加了高效查询，范围查询。取消了内部的dict结构。
 
 ## 1. 能力声明（Capability Statement）
 
 - `C1` 数据承载能力：能承载KEY和VALUE。
 - `C2` 数据关系映射能力：能映射KEY和VALUE之间的关系，每个KEY有些仅有一个映射的VALUE，且这个映射是单向的。
-- `C3` "put"能力：能添加新的KEY和映射的VALUE。
-- `C4` "get"能力：能根据KEY查询其映射的VALUE。
-- `C5` "delete"能力：能删除KEY和其映射的VALUE。
+- `C3` 数据输入能力：能写入新的KEY和映射的VALUE。
+- `C4` 数据读取能力：能根据KEY读取其映射的VALUE。
+- `C5` 数据删除能力：能删除KEY和其映射的VALUE。
 - `C6` 日志记录能力：在执行添加和删除之前记录对应的操作、KEY、VALUE。
 - `C7` 快照记录能力：能记录当前数据库状态，并落盘成快照文件。
-- `C8` 数据恢复能力：能根据日志和快照恢复程序上次结束运行时的状态。-
+- `C8` 数据恢复能力：能根据日志和快照恢复程序上次结束运行时的状态。
 
 ### 非职责声明（Non-Responsibility Statement）
 
-- `N1` 非职责声明：不负责具并发处理、高效查询、范围查询。
+- `N1` 非职责声明：不负责具并发处理。
 
 ## 2. 参数定义（Parameter）
 
