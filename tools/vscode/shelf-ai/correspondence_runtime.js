@@ -90,104 +90,144 @@ function normalizeApiPath(value) {
   return text.startsWith("/") ? text : `/${text}`;
 }
 
+function parseBoundaryReadMissReason(rawReason) {
+  const reason = asText(rawReason);
+  if (!reason) {
+    return null;
+  }
+  const baseBoundaryMiss = reason.match(
+    /^declared boundary not effectively read by base:\s*(.+?)\s*->\s*(.+)$/i
+  );
+  if (baseBoundaryMiss) {
+    return {
+      kind: "base",
+      objectId: baseBoundaryMiss[1].trim(),
+      boundaryId: baseBoundaryMiss[2].trim(),
+    };
+  }
+  const ruleBoundaryMiss = reason.match(
+    /^declared rule boundary not effectively read:\s*(.+?)\s*->\s*(.+)$/i
+  );
+  if (ruleBoundaryMiss) {
+    return {
+      kind: "rule",
+      objectId: ruleBoundaryMiss[1].trim(),
+      boundaryId: ruleBoundaryMiss[2].trim(),
+    };
+  }
+  return null;
+}
+
+function buildBoundaryReadMissMessage(kind, boundaryIds) {
+  const ids = Array.isArray(boundaryIds)
+    ? boundaryIds.map((item) => asText(item)).filter(Boolean)
+    : [];
+  const boundaryText = ids.length ? ids.join("、") : "（未提供）";
+  const pronoun = ids.length > 1 ? "这些参数" : "该参数";
+  if (kind === "rule") {
+    return `规则声明的参数边界未被有效读取：${boundaryText}。建议：在规则实现中读取${pronoun}，或调整规则参数绑定声明。`;
+  }
+  return `基类声明的参数边界未被有效读取：${boundaryText}。建议：在对应 Base 实现中读取${pronoun}；若确实不需要，请从来源声明移除。`;
+}
+
 function localizeCorrespondenceReason(rawReason) {
   const reason = asText(rawReason);
   if (!reason) {
-    return "correspondence 校验问题";
+    return "对应关系校验问题。";
   }
 
   const unsupportedExtraction = reason.match(/^effective extraction unsupported:\s*(.+)$/i);
   if (unsupportedExtraction) {
-    return `effective 提取暂不支持：${unsupportedExtraction[1]}`;
+    return `effective 提取暂不支持：${unsupportedExtraction[1]}。建议：为该模块补齐静态 contract，或在代码中暴露可解析的 class/anchor。`;
   }
 
   const missingDeclaredBase = reason.match(/^declared base not assembled in module __init__:\s*(.+)$/i);
   if (missingDeclaredBase) {
-    return `模块 __init__ 未装配已声明的基类：${missingDeclaredBase[1]}`;
+    return `模块 __init__ 未装配已声明的基类：${missingDeclaredBase[1]}。建议：在模块装配入口补齐该 Base。`;
   }
 
   const undeclaredAssembledBase = reason.match(/^module __init__ assembled undeclared base:\s*(.+)$/i);
   if (undeclaredAssembledBase) {
-    return `模块 __init__ 装配了未声明的基类：${undeclaredAssembledBase[1]}`;
+    return `模块 __init__ 装配了未声明的基类：${undeclaredAssembledBase[1]}。建议：移除多余装配，或先更新 framework 声明。`;
   }
 
   const missingDeclaredRule = reason.match(/^declared rule not assembled in module __init__:\s*(.+)$/i);
   if (missingDeclaredRule) {
-    return `模块 __init__ 未装配已声明的规则：${missingDeclaredRule[1]}`;
+    return `模块 __init__ 未装配已声明的规则：${missingDeclaredRule[1]}。建议：在模块装配入口补齐该 Rule。`;
   }
 
   const undeclaredAssembledRule = reason.match(/^module __init__ assembled undeclared rule:\s*(.+)$/i);
   if (undeclaredAssembledRule) {
-    return `模块 __init__ 装配了未声明的规则：${undeclaredAssembledRule[1]}`;
+    return `模块 __init__ 装配了未声明的规则：${undeclaredAssembledRule[1]}。建议：移除多余装配，或先更新 framework 声明。`;
   }
 
   const boundaryMapMismatch = reason.match(
     /^boundary_field_map mismatch\s+expected=(.+?)\s+actual=(.+)$/i
   );
   if (boundaryMapMismatch) {
-    return `boundary_field_map 不一致：期望=${boundaryMapMismatch[1]}，实际=${boundaryMapMismatch[2]}`;
+    return `boundary_field_map 不一致：期望=${boundaryMapMismatch[1]}，实际=${boundaryMapMismatch[2]}。建议：对齐 framework 声明、config 映射与代码字段读取。`;
   }
 
   const missingEffectiveBase = reason.match(/^effective base extraction missing:\s*(.+)$/i);
   if (missingEffectiveBase) {
-    return `缺少基类 effective 提取结果：${missingEffectiveBase[1]}`;
+    return `缺少基类 effective 提取结果：${missingEffectiveBase[1]}。建议：检查 Base 的实现锚点与导出路径是否可被 correspondence 提取。`;
   }
 
   const baseReadsUndeclaredBoundary = reason.match(
     /^base reads undeclared boundary:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (baseReadsUndeclaredBoundary) {
-    return `基类读取了未声明的参数边界：${baseReadsUndeclaredBoundary[1]} -> ${baseReadsUndeclaredBoundary[2]}`;
+    return `基类读取了未声明的参数边界：${baseReadsUndeclaredBoundary[2]}。建议：补充 framework 来源声明，或移除该边界读取。`;
   }
 
-  const baseBoundaryMiss = reason.match(
-    /^declared boundary not effectively read by base:\s*(.+?)\s*->\s*(.+)$/i
-  );
-  if (baseBoundaryMiss) {
-    return `基类声明的参数边界未被有效读取：${baseBoundaryMiss[1]} -> ${baseBoundaryMiss[2]}`;
+  const boundaryReadMiss = parseBoundaryReadMissReason(reason);
+  if (boundaryReadMiss && boundaryReadMiss.kind === "base") {
+    return buildBoundaryReadMissMessage("base", [boundaryReadMiss.boundaryId]);
   }
 
   const missingEffectiveRule = reason.match(/^effective rule extraction missing:\s*(.+)$/i);
   if (missingEffectiveRule) {
-    return `缺少规则 effective 提取结果：${missingEffectiveRule[1]}`;
+    return `缺少规则 effective 提取结果：${missingEffectiveRule[1]}。建议：检查 Rule 的实现锚点与导出路径是否可被 correspondence 提取。`;
   }
 
   const ruleInjectsUndeclaredBase = reason.match(
     /^rule constructor injects undeclared base:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (ruleInjectsUndeclaredBase) {
-    return `规则构造器注入了未声明的基类：${ruleInjectsUndeclaredBase[1]} -> ${ruleInjectsUndeclaredBase[2]}`;
+    return `规则构造器注入了未声明的基类：${ruleInjectsUndeclaredBase[2]}。建议：补充规则依赖声明，或移除该构造注入。`;
   }
 
   const missingInjectedRuleBase = reason.match(
     /^declared rule base not injected by constructor:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (missingInjectedRuleBase) {
-    return `规则声明的基类未被构造器注入：${missingInjectedRuleBase[1]} -> ${missingInjectedRuleBase[2]}`;
+    return `规则声明的基类未被构造器注入：${missingInjectedRuleBase[2]}。建议：在规则构造器中补齐该 Base 注入。`;
   }
 
   const ruleReadsUndeclaredBoundary = reason.match(
     /^rule reads undeclared boundary:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (ruleReadsUndeclaredBoundary) {
-    return `规则读取了未声明的参数边界：${ruleReadsUndeclaredBoundary[1]} -> ${ruleReadsUndeclaredBoundary[2]}`;
+    return `规则读取了未声明的参数边界：${ruleReadsUndeclaredBoundary[2]}。建议：补充规则参数绑定声明，或移除该边界读取。`;
   }
 
-  const ruleBoundaryMiss = reason.match(
-    /^declared rule boundary not effectively read:\s*(.+?)\s*->\s*(.+)$/i
-  );
-  if (ruleBoundaryMiss) {
-    return `规则声明的参数边界未被有效读取：${ruleBoundaryMiss[1]} -> ${ruleBoundaryMiss[2]}`;
+  if (boundaryReadMiss && boundaryReadMiss.kind === "rule") {
+    return buildBoundaryReadMissMessage("rule", [boundaryReadMiss.boundaryId]);
   }
 
   const ruleBaseMismatch = reason.match(
     /^rule constructor bases and module assembly injected bases mismatch\s+(.+?):\s*constructor=(.+?)\s+module_init=(.+)$/i
   );
   if (ruleBaseMismatch) {
-    return `规则构造器基类与模块装配注入基类不一致：${ruleBaseMismatch[1]}：constructor=${ruleBaseMismatch[2]}，module_init=${ruleBaseMismatch[3]}`;
+    return `规则构造器基类与模块装配注入基类不一致：${ruleBaseMismatch[1]}（constructor=${ruleBaseMismatch[2]}，module_init=${ruleBaseMismatch[3]}）。建议：统一规则构造器依赖与模块装配声明。`;
   }
 
-  return reason;
+  const correspondenceViolation = reason.match(/^CORRESPONDENCE_VIOLATION:\s*(.+)$/i);
+  if (correspondenceViolation) {
+    return "对应关系校验失败。建议：对齐 framework 声明、config 映射与代码装配。";
+  }
+
+  return "对应关系校验失败。建议：打开 Shelf 输出查看原始明细并补齐对应关系。";
 }
 
 /**
@@ -555,28 +595,77 @@ function buildValidationIssues(summary, objectIndex) {
   if (!summary || !Array.isArray(summary.issues) || !summary.issues.length) {
     return [];
   }
-  return summary.issues.map((issue) => {
-    const primaryObjectId = asText(issue.primary_object_id)
-      || (Array.isArray(issue.object_ids) ? asText(issue.object_ids[0]) : "");
+  const groupedBoundaryMisses = new Map();
+  const groupedOrder = [];
+  const passthroughIssues = [];
+
+  const resolveIssueLocation = (primaryObjectId) => {
     const objectValue = primaryObjectId ? objectIndex[primaryObjectId] : null;
     const primaryTarget = resolvePrimaryNavigationTarget(objectValue)
       || objectValue?.correspondence_anchor
       || objectValue?.implementation_anchor
       || null;
-    const localizedReason = localizeCorrespondenceReason(issue.reason);
     return {
-      message: primaryObjectId
-        ? `[${primaryObjectId}] ${localizedReason}`
-        : localizedReason,
       file: primaryTarget ? primaryTarget.file_path : "projects/*/generated/canonical.json",
       line: primaryTarget ? primaryTarget.start_line : 1,
-      column: 1,
-      code: "SHELF_CORRESPONDENCE",
-      level: asText(issue.level).toLowerCase() === "warning" ? "warning" : "error",
-      objectId: primaryObjectId,
       targetKind: primaryTarget ? primaryTarget.target_kind : "",
     };
+  };
+
+  const asIssueRecord = (primaryObjectId, message, levelValue) => {
+    const location = resolveIssueLocation(primaryObjectId);
+    return {
+      message: primaryObjectId ? `[${primaryObjectId}] ${message}` : message,
+      file: location.file,
+      line: location.line,
+      column: 1,
+      code: "SHELF_CORRESPONDENCE",
+      level: levelValue,
+      objectId: primaryObjectId,
+      targetKind: location.targetKind,
+    };
+  };
+
+  for (const issue of summary.issues) {
+    const primaryObjectId = asText(issue.primary_object_id)
+      || (Array.isArray(issue.object_ids) ? asText(issue.object_ids[0]) : "");
+    const parsedBoundaryMiss = parseBoundaryReadMissReason(issue.reason);
+    const levelValue = asText(issue.level).toLowerCase() === "warning" ? "warning" : "error";
+    const groupedObjectId = primaryObjectId || parsedBoundaryMiss?.objectId || "";
+    if (!parsedBoundaryMiss || !groupedObjectId) {
+      passthroughIssues.push(
+        asIssueRecord(primaryObjectId, localizeCorrespondenceReason(issue.reason), levelValue)
+      );
+      continue;
+    }
+    const groupKey = `${parsedBoundaryMiss.kind}|${groupedObjectId}|${levelValue}`;
+    if (!groupedBoundaryMisses.has(groupKey)) {
+      groupedBoundaryMisses.set(groupKey, {
+        kind: parsedBoundaryMiss.kind,
+        objectId: groupedObjectId,
+        level: levelValue,
+        boundaries: [],
+        boundarySet: new Set(),
+      });
+      groupedOrder.push(groupKey);
+    }
+    const group = groupedBoundaryMisses.get(groupKey);
+    const boundaryId = asText(parsedBoundaryMiss.boundaryId);
+    if (boundaryId && !group.boundarySet.has(boundaryId)) {
+      group.boundarySet.add(boundaryId);
+      group.boundaries.push(boundaryId);
+    }
+  }
+
+  const groupedIssues = groupedOrder.map((groupKey) => {
+    const group = groupedBoundaryMisses.get(groupKey);
+    return asIssueRecord(
+      group.objectId,
+      buildBoundaryReadMissMessage(group.kind, group.boundaries),
+      group.level
+    );
   });
+  return [...groupedIssues, ...passthroughIssues];
 }
 
 /**
