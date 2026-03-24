@@ -179,6 +179,10 @@ function main() {
     frameworkSnippet.body.includes("## 5. 验证（Verification）"),
     "@framework snippet must include verification section"
   );
+  assert(
+    !frameworkSnippet.body.some((line) => String(line || "").startsWith("### ")),
+    "@framework snippet should not include third-level headings"
+  );
 
   assert(
     /registerCommand\s*\(\s*"shelf\.insertFrameworkModuleTemplate"/.test(extensionSource),
@@ -351,6 +355,11 @@ function main() {
   assert(
     capabilityEntries.some((entry) => entry.label === "N 条目"),
     "capability section completion must include non-responsibility entry"
+  );
+  const templateText = frameworkCompletion.getFrameworkTemplateSnippetText();
+  assert(
+    !templateText.includes("### 非职责声明（Non-Responsibility Statement）"),
+    "framework template text should place N entries directly after C entries"
   );
 
   const baseEntries = frameworkCompletion.getFrameworkCompletionEntries("- `B", "B", true, {

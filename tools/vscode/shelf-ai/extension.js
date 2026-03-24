@@ -76,13 +76,14 @@ const FRAMEWORK_RULE_HINTS = {
   FWL002: "@framework 必须为无参数单行",
   FWL003: "必须包含 1~5 标准章节",
   FWL004: "列表项必须使用 -",
-  FWL005: "能力声明条目格式必须合法",
+  FWL005: "能力章节条目格式必须合法（C*/N*）",
   FWL006: "边界定义条目格式必须合法",
   FWL007: "最小结构基条目格式必须合法",
   FWL008: "规则条目格式必须合法",
   FWL009: "验证条目格式必须合法",
   FWL010: "章节内必须至少存在一个可解析条目",
-  FWL011: "规则引用的符号必须先在本模块中定义"
+  FWL011: "规则引用的符号必须先在本模块中定义",
+  FWL012: "标准二级标题内容与顺序必须合法"
 };
 
 function resetStatusToIdle(status) {
@@ -2009,18 +2010,25 @@ function activate(context) {
     }
 
     if (code === "FWL005") {
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "C")
-        || nextFrameworkSymbolNumber(documentText, "C");
+      const normalizedLineText = String(lineText || "");
+      const preferNonResponsibility = /`N\d*(?:\.\d+)?`/.test(normalizedLineText)
+        || normalizedLineText.includes("非职责");
+      const symbol = preferNonResponsibility ? "N" : "C";
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, symbol)
+        || nextFrameworkSymbolNumber(documentText, symbol);
+      const replacement = preferNonResponsibility
+        ? `- \`N${inferred}\` 非职责声明：待补充非职责范围。\n`
+        : `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`;
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准 C 条目",
+          `替换为标准 ${symbol} 条目`,
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`
+              replacement
             );
             return true;
           }

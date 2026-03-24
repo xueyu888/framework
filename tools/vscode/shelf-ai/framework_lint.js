@@ -9,6 +9,7 @@ const VERIFY_LINE_PATTERN = /^-\s+`(?<id>V\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<b
 const RULE_TOP_PATTERN = /^-\s+`(?<id>R\d+)`\s+(?<name>.+)$/;
 const RULE_CHILD_PATTERN = /^\s*-\s+`(?<id>R\d+\.\d+)`\s+(?<body>.+)$/;
 
+const SECTION_GOAL_TITLE = "## 0. 目标";
 const SECTION_CAPABILITY_TITLES = ["## 1. 能力声明（Capability Statement）"];
 const SECTION_PARAMETER_TITLES = [
   "## 2. 边界定义（Boundary / Parameter 参数）",
@@ -106,6 +107,106 @@ function markerColumn(rawLine) {
   return firstChar >= 0 ? firstChar + 1 : 1;
 }
 
+function headingColumn(rawLine) {
+  const firstChar = String(rawLine || "").search(/\S/);
+  return firstChar >= 0 ? firstChar + 1 : 1;
+}
+
+function frameworkRequiredSectionTitles() {
+  return [
+    SECTION_CAPABILITY_TITLES[0],
+    SECTION_PARAMETER_TITLES[0],
+    SECTION_BASE_TITLES[0],
+    SECTION_RULE_TITLES[0],
+    SECTION_VERIFICATION_TITLES[0],
+  ];
+}
+
+function validateSectionHeadingSequence({ lines, file, issues, sectionBlocks }) {
+  const actualHeadings = sectionBlocks.map((block) => ({
+    title: block.title,
+    line: block.line,
+    text: String(lines[block.line - 1] || block.title),
+  }));
+  const requiredTitles = frameworkRequiredSectionTitles();
+  const expectedTitles = actualHeadings.some((heading) => heading.title === SECTION_GOAL_TITLE)
+    ? [SECTION_GOAL_TITLE, ...requiredTitles]
+    : requiredTitles;
+
+  let actualIndex = 0;
+  let expectedIndex = 0;
+
+  while (actualIndex < actualHeadings.length && expectedIndex < expectedTitles.length) {
+    const actual = actualHeadings[actualIndex];
+    const expected = expectedTitles[expectedIndex];
+    if (actual.title === expected) {
+      actualIndex += 1;
+      expectedIndex += 1;
+      continue;
+    }
+    const matchedElsewhereIndex = expectedTitles.indexOf(actual.title);
+    if (matchedElsewhereIndex > expectedIndex) {
+      for (let missingIndex = expectedIndex; missingIndex < matchedElsewhereIndex; missingIndex += 1) {
+        issues.push(
+          createIssue({
+            file,
+            line: actual.line,
+            column: headingColumn(actual.text),
+            code: "FWL003",
+            message: `缺少必需章节：${expectedTitles[missingIndex]}`,
+          })
+        );
+      }
+      expectedIndex = matchedElsewhereIndex;
+      continue;
+    }
+
+    issues.push(
+      createIssue({
+        file,
+        line: actual.line,
+        column: headingColumn(actual.text),
+        code: "FWL012",
+        message: matchedElsewhereIndex >= 0
+          ? `标准二级标题顺序错误：这里应为“${expected}”，实际是“${actual.title}”。`
+          : `标准二级标题错误：这里应为“${expected}”，实际是“${actual.title}”。`,
+      })
+    );
+    actualIndex += 1;
+    if (matchedElsewhereIndex < 0) {
+      expectedIndex += 1;
+    }
+  }
+
+  for (let index = actualIndex; index < actualHeadings.length; index += 1) {
+    const actual = actualHeadings[index];
+    issues.push(
+      createIssue({
+        file,
+        line: actual.line,
+        column: headingColumn(actual.text),
+        code: "FWL012",
+        message: `发现非标准二级标题“${actual.title}”。`,
+      })
+    );
+  }
+
+  const missingAnchorLine = actualHeadings.length
+    ? actualHeadings[actualHeadings.length - 1].line
+    : 1;
+  for (let index = expectedIndex; index < expectedTitles.length; index += 1) {
+    issues.push(
+      createIssue({
+        file,
+        line: missingAnchorLine,
+        column: 1,
+        code: "FWL003",
+        message: `缺少必需章节：${expectedTitles[index]}`,
+      })
+    );
+  }
+}
+
 function lintFlatListSection({
   block,
   file,
@@ -114,7 +215,6 @@ function lintFlatListSection({
   allowPatterns = [],
   invalidCode,
   invalidMessage,
-  allowHeading = false,
 }) {
   let matchCount = 0;
 
@@ -122,7 +222,7 @@ function lintFlatListSection({
     if (!row.trimmed || row.trimmed === "---") {
       continue;
     }
-    if (allowHeading && row.trimmed.startsWith("### ")) {
+    if (row.trimmed.startsWith("### ")) {
       continue;
     }
     if (!/^[-*]\s+/.test(row.trimmed)) {
@@ -178,6 +278,9 @@ function lintRuleSection({ block, file, issues }) {
 
   for (const row of block.entries) {
     if (!row.trimmed || row.trimmed === "---") {
+      continue;
+    }
+    if (row.trimmed.startsWith("### ")) {
       continue;
     }
     if (!/^\s*[-*]\s+/.test(row.text)) {
@@ -559,28 +662,12 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
   }
 
   const sectionBlocks = splitSectionBlocks(lines);
-  const requiredSections = [
-    SECTION_CAPABILITY_TITLES,
-    SECTION_PARAMETER_TITLES,
-    SECTION_BASE_TITLES,
-    SECTION_RULE_TITLES,
-    SECTION_VERIFICATION_TITLES,
-  ];
-
-  for (const titles of requiredSections) {
-    if (findSectionBlock(sectionBlocks, titles)) {
-      continue;
-    }
-    issues.push(
-      createIssue({
-        file,
-        line: 1,
-        column: 1,
-        code: "FWL003",
-        message: `缺少必需章节：${titles.join(" / ")}`,
-      })
-    );
-  }
+  validateSectionHeadingSequence({
+    lines,
+    file,
+    issues,
+    sectionBlocks,
+  });
 
   const capabilitySection = findSectionBlock(sectionBlocks, SECTION_CAPABILITY_TITLES);
   if (capabilitySection) {
@@ -591,8 +678,7 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
       validPattern: CAPABILITY_LINE_PATTERN,
       allowPatterns: [NON_RESPONSIBILITY_LINE_PATTERN],
       invalidCode: "FWL005",
-      invalidMessage: "能力章节条目格式错误，必须匹配 `- `C*` 名称：描述。`。",
-      allowHeading: true,
+      invalidMessage: "能力章节条目格式错误，必须匹配 `- `C*` 名称：描述。` 或 `- `N*` 名称：描述。`。",
     });
   }
 
