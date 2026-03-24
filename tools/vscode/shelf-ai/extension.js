@@ -401,7 +401,6 @@ function activate(context) {
   const TREE_WEBVIEW_SETTING_KEYS = [
     "shelf.frameworkTreeNodeHorizontalGap",
     "shelf.frameworkTreeLevelVerticalGap",
-    "shelf.frameworkTreeSourceMode",
     "shelf.frameworkTreeAutoRefreshOnSave",
     "shelf.treeZoomMinScale",
     "shelf.treeZoomMaxScale",
@@ -542,12 +541,6 @@ function activate(context) {
     };
   };
 
-  const normalizeFrameworkTreeSourceMode = (value) => (
-    String(value || "").trim().toLowerCase() === "author_source"
-      ? "author_source"
-      : "auto"
-  );
-
   const normalizeStatusBarClickAction = (value) => {
     const action = String(value || "").trim();
     if (action === "showIssues") {
@@ -562,7 +555,6 @@ function activate(context) {
   const readTreeBehaviorSettings = () => {
     const config = getShelfConfig();
     return {
-      frameworkSourceMode: normalizeFrameworkTreeSourceMode(config.get("frameworkTreeSourceMode", "author_source")),
       frameworkAutoRefreshOnSave: Boolean(config.get("frameworkTreeAutoRefreshOnSave", true)),
       statusBarClickAction: normalizeStatusBarClickAction(config.get("statusBarClickAction", "openFrameworkTree")),
     };
@@ -1283,8 +1275,19 @@ function activate(context) {
       return { issues, materializedProjects };
     }
 
+    const hasFrameworkChanges = (changePlan.relPaths || [])
+      .some((relPath) => String(relPath || "").startsWith("framework/"));
+    const configuredMaterializeCommand = String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND);
+    const effectiveMaterializeCommand = hasFrameworkChanges
+      ? enableFrameworkOnlyFallbackForMaterializeCommand(configuredMaterializeCommand)
+      : configuredMaterializeCommand;
+    if (hasFrameworkChanges && effectiveMaterializeCommand !== configuredMaterializeCommand) {
+      output.appendLine(
+        "[materialize] framework change detected; enabling --allow-framework-only-fallback for canonical framework snapshot continuity."
+      );
+    }
     const materializeCommand = buildMaterializeCommand(
-      String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND),
+      effectiveMaterializeCommand,
       pendingMaterializeProjects
     );
     const materializeResult = await runParsedCommand(
@@ -1601,10 +1604,7 @@ function activate(context) {
         return;
       }
 
-      const behavior = readTreeBehaviorSettings();
-      const model = treeRuntimeModels.buildRuntimeTreeModel(repoRoot, kind, {
-        frameworkSourceMode: behavior.frameworkSourceMode,
-      });
+      const model = treeRuntimeModels.buildRuntimeTreeModel(repoRoot, kind);
       const scriptUri = panel.webview.asWebviewUri(vscode.Uri.file(scriptPath)).toString();
       const styleUri = panel.webview.asWebviewUri(vscode.Uri.file(stylePath)).toString();
       panel.webview.html = treeWebviewBridge.buildRuntimeTreeHtml({
@@ -3356,11 +3356,6 @@ function activate(context) {
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (doc) => {
     scheduleFrameworkLintForDocument(doc, { immediate: true });
-    await maybeRefreshFrameworkTreeForSavedDocument(doc);
-    const config = getShelfConfig();
-    if (!config.get("enableOnSave") || !shouldRunValidationTrigger("save")) {
-      return;
-    }
 
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
@@ -3371,9 +3366,18 @@ function activate(context) {
     if (!workspaceGuard.isWatchedPath(rel) || isSuppressedGeneratedPath(rel)) {
       return;
     }
+    const isFrameworkDoc = frameworkNavigation.isFrameworkMarkdownFile(doc.uri.fsPath, folder.uri.fsPath);
+    const config = getShelfConfig();
 
     dirtyWatchedFiles.delete(doc.uri.fsPath);
-    scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+    if (config.get("enableOnSave") && shouldRunValidationTrigger("save")) {
+      if (isFrameworkDoc) {
+        await runValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+      } else {
+        scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+      }
+    }
+    await maybeRefreshFrameworkTreeForSavedDocument(doc);
   });
 
   const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -3557,6 +3561,20 @@ function shellQuote(value) {
     return text;
   }
   return `'${text.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function enableFrameworkOnlyFallbackForMaterializeCommand(baseCommand) {
+  const command = String(baseCommand || DEFAULT_MATERIALIZE_COMMAND).trim();
+  if (!command) {
+    return DEFAULT_MATERIALIZE_COMMAND;
+  }
+  if (!/\bmaterialize_project\.py\b/.test(command)) {
+    return command;
+  }
+  if (/\s--allow-framework-only-fallback(?:\s|$)/.test(command)) {
+    return command;
+  }
+  return `${command} --allow-framework-only-fallback`;
 }
 
 function buildMaterializeCommand(baseCommand, projectFiles) {

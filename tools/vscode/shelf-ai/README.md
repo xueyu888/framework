@@ -83,7 +83,6 @@ Local workspace overlay file:
 - `shelf.intentGateTemporaryBypasses = []`
 - `shelf.frameworkTreeNodeHorizontalGap = 8`
 - `shelf.frameworkTreeLevelVerticalGap = 80`
-- `shelf.frameworkTreeSourceMode = author_source`
 - `shelf.frameworkTreeAutoRefreshOnSave = true`
 - `shelf.statusBarClickAction = openFrameworkTree`
 - `shelf.treeZoomMinScale = 0.68`
@@ -111,12 +110,9 @@ Notification popup behavior:
 
 Framework tree behavior settings:
 
-- `shelf.frameworkTreeSourceMode = author_source`:
-  force author-source tree from `framework/**` for real-time framework editing.
-- `shelf.frameworkTreeSourceMode = auto`:
-  canonical-first framework tree projection (fallback to author-source when canonical is unavailable).
 - `shelf.frameworkTreeAutoRefreshOnSave = true`:
-  auto-refresh an open framework tree when a framework markdown file is saved.
+  after framework markdown is saved, Shelf runs save-time change validation/materialization first, then refreshes an open framework tree.
+  when full materialization fails and the materialize command uses `scripts/materialize_project.py`, Shelf enables `--allow-framework-only-fallback` to refresh `canonical.framework` snapshot first.
 - `shelf.statusBarClickAction = openFrameworkTree`:
   clicking Shelf status bar opens the framework tree panel (floating/dockable/resizable webview tab).
 - `shelf.statusBarClickAction = quickPick`:
@@ -171,8 +167,9 @@ The evidence tree is the canonical-derived workspace evidence view.
 No persisted tree artifact is used for these views; both trees are runtime projections.
 Both tree views render as interactive webview graphs (dagre layout + d3-zoom runtime interaction), and framework nodes stay layer-fixed with layout-engine auto sorting.
 Tree interactions include search, upstream/downstream focus, keyboard navigation (arrow keys + Enter), and viewport/selection state persistence.
-The framework tree can run in author-source mode (`shelf.frameworkTreeSourceMode = author_source`) for real-time framework file updates without waiting for canonical materialization.
+The framework tree is canonical-projected; framework markdown saves should materialize canonical before tree refresh.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
+Framework-only fallback snapshots are marked as degraded materialization state, so evidence tree remains blocked until the next full materialization succeeds.
 
 ## Project Config Navigation
 

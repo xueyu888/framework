@@ -118,11 +118,6 @@ function main() {
     "package.json must enable framework lint quick fixes by default"
   );
   assert.strictEqual(
-    configuration["shelf.frameworkTreeSourceMode"]?.default,
-    "author_source",
-    "package.json must default framework tree source mode to author_source"
-  );
-  assert.strictEqual(
     configuration["shelf.frameworkTreeAutoRefreshOnSave"]?.default,
     true,
     "package.json must auto-refresh framework tree on save by default"
@@ -239,10 +234,6 @@ function main() {
   assert(
     readme.includes("shelf.statusBarClickAction = quickPick"),
     "README must document quickPick status bar action mode"
-  );
-  assert(
-    readme.includes("shelf.frameworkTreeSourceMode = author_source"),
-    "README must document framework author-source tree mode"
   );
   assert(
     readme.includes("Shelf: Refresh Framework Tree"),

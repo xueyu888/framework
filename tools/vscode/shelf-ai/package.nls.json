@@ -23,7 +23,6 @@
   "configuration.shelf.typeCheckCommand.description": "Command used when Shelf runs Python type checks after relevant source changes.",
   "configuration.shelf.frameworkTreeNodeHorizontalGap.description": "Horizontal gap, in pixels, between framework tree nodes within the same level.",
   "configuration.shelf.frameworkTreeLevelVerticalGap.description": "Vertical gap, in pixels, between framework tree levels.",
-  "configuration.shelf.frameworkTreeSourceMode.description": "Framework tree source mode. `author_source` follows framework files directly for real-time authoring; `auto` keeps canonical-first projection.",
   "configuration.shelf.frameworkTreeAutoRefreshOnSave.description": "Automatically refresh an open framework tree panel when a framework markdown file is saved.",
   "configuration.shelf.statusBarClickAction.description": "Action triggered when clicking the Shelf status bar item: open framework tree, show issues, or show a choice menu.",
   "configuration.shelf.treeZoomMinScale.description": "Minimum zoom scale for Shelf tree webviews.",

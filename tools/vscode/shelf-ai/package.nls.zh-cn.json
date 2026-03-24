@@ -23,7 +23,6 @@
   "configuration.shelf.typeCheckCommand.description": "在相关源码变化后，Shelf 运行 Python 类型检查时使用的命令。",
   "configuration.shelf.frameworkTreeNodeHorizontalGap.description": "框架树同层节点之间的水平间距（像素）。",
   "configuration.shelf.frameworkTreeLevelVerticalGap.description": "框架树层级之间的垂直间距（像素）。",
-  "configuration.shelf.frameworkTreeSourceMode.description": "框架树数据源模式。`author_source` 为作者源直读（实时查看 framework 文件变更）；`auto` 为 canonical 优先投影。",
   "configuration.shelf.frameworkTreeAutoRefreshOnSave.description": "保存 framework markdown 文件时，自动刷新已打开的框架树面板。",
   "configuration.shelf.statusBarClickAction.description": "点击 Shelf 状态栏项时触发的动作：直接打开框架树、查看问题，或先弹出二选一菜单。",
   "configuration.shelf.treeZoomMinScale.description": "Shelf 树形 Webview 的最小缩放比例。",
