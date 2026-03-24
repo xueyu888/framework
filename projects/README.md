@@ -28,14 +28,21 @@
 当前样板：
 
 - [projects/knowledge_base_basic/project.toml](./knowledge_base_basic/project.toml)
+- [projects/review_workbench_multi_scene_basic/project.toml](./review_workbench_multi_scene_basic/project.toml)
 
 说明：
 
 - `knowledge_base_basic` 是用于验证四层编译链和运行时效果的样例项目
 - 它保留在仓库里参与物化与测试，但不是公开发布对象
+- `review_workbench_multi_scene_basic` 是用于验证“统一平台 + 多场景切换”已经进入四层主链的最小样例项目
+- 它重点证明统一平台对合法场景实例集合的承接、切换与验证，而不是完整业务实现
 
 重新物化：
 
 ```bash
 uv run python scripts/materialize_project.py --project-file projects/knowledge_base_basic/project.toml
+```
+
+```bash
+uv run python scripts/materialize_project.py --project-file projects/review_workbench_multi_scene_basic/project.toml
 ```

@@ -102,6 +102,7 @@ def load_project_config(project_file: str | Path) -> ProjectConfig:
         artifacts=ArtifactConfig(
             canonical_json=_require_string(artifacts_table, "canonical_json"),
             runtime_snapshot_py=_require_string(artifacts_table, "runtime_snapshot_py"),
+            frontend_app_dir=str(artifacts_table.get("frontend_app_dir", "frontend_app")),
         ),
     )
 

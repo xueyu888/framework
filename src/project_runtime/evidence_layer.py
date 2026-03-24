@@ -29,7 +29,7 @@ class EvidenceModuleClass:
         }
 
 
-def _runtime_blueprint(assembly: ProjectRuntimeAssembly) -> dict[str, Any]:
+def _knowledge_base_runtime_blueprint(assembly: ProjectRuntimeAssembly) -> dict[str, Any]:
     frontend_app_spec = assembly.require_runtime_export("frontend_app_spec")
     backend_service_spec = assembly.require_runtime_export("backend_service_spec")
     pages = frontend_app_spec["ui"]["pages"]
@@ -77,6 +77,36 @@ def _runtime_blueprint(assembly: ProjectRuntimeAssembly) -> dict[str, Any]:
     }
 
 
+def _review_workbench_runtime_blueprint(assembly: ProjectRuntimeAssembly) -> dict[str, Any]:
+    frontend_app_spec = assembly.require_runtime_export("frontend_app_spec")
+    backend_service_spec = assembly.require_runtime_export("backend_service_spec")
+    pages = frontend_app_spec["ui"]["pages"]
+    return {
+        "transport": {
+            "mode": backend_service_spec["transport"]["mode"],
+            "project_config_endpoint": backend_service_spec["transport"]["project_config_endpoint"],
+        },
+        "summary_factory": "review_workbench_runtime.runtime_exports:project_runtime_public_summary",
+        "repository_factory": None,
+        "api_router_factory": None,
+        "landing_path": pages["workbench"]["path"],
+        "page_routes": [
+            {
+                "route_id": "workbench",
+                "path": pages["workbench"]["path"],
+                "response_class": "html",
+                "handler_factory": "review_workbench_runtime.frontend:build_review_workbench_page_handler",
+            }
+        ],
+    }
+
+
+def _runtime_blueprint(assembly: ProjectRuntimeAssembly) -> dict[str, Any]:
+    if "review_workbench_domain_spec" in assembly.runtime_exports:
+        return _review_workbench_runtime_blueprint(assembly)
+    return _knowledge_base_runtime_blueprint(assembly)
+
+
 def _document_digests(runtime_documents: list[dict[str, Any]]) -> dict[str, str]:
     return {
         item["document_id"]: sha256_text(json.dumps(item, ensure_ascii=False, sort_keys=True))
@@ -88,25 +118,42 @@ def build_evidence_modules(
     assembly: ProjectRuntimeAssembly,
     code_modules: tuple[CodeModuleBinding, ...],
 ) -> tuple[tuple[type[EvidenceModuleClass], ...], dict[str, Any], ValidationReports]:
-    from frontend_kernel.validators import summarize_frontend_rules, validate_frontend_rules
-    from knowledge_base_framework.validators import summarize_workbench_rules, validate_workbench_rules
+    validation_scopes: dict[str, Any]
+    frontend_summary: Any | None = None
+    knowledge_summary: Any | None = None
+    review_workbench_summary: Any | None = None
+    if "review_workbench_domain_spec" in assembly.runtime_exports:
+        from review_workbench_framework.validators import (
+            summarize_review_workbench_rules,
+            validate_review_workbench_rules,
+        )
 
-    frontend_summary = summarize_frontend_rules(validate_frontend_rules(assembly))
-    knowledge_summary = summarize_workbench_rules(validate_workbench_rules(assembly))
-    validation_reports = ValidationReports(
-        scopes={
+        review_workbench_summary = summarize_review_workbench_rules(
+            validate_review_workbench_rules(assembly)
+        )
+        validation_scopes = {
+            "review_workbench": review_workbench_summary,
+        }
+    else:
+        from frontend_kernel.validators import summarize_frontend_rules, validate_frontend_rules
+        from knowledge_base_framework.validators import summarize_workbench_rules, validate_workbench_rules
+
+        frontend_summary = summarize_frontend_rules(validate_frontend_rules(assembly))
+        knowledge_summary = summarize_workbench_rules(validate_workbench_rules(assembly))
+        validation_scopes = {
             "frontend": frontend_summary,
             "knowledge_base": knowledge_summary,
         }
-    )
-    runtime_documents = assembly.require_runtime_export("runtime_documents")
-    if not isinstance(runtime_documents, list):
-        raise ValueError("runtime_documents export must be a list")
+    validation_reports = ValidationReports(scopes=validation_scopes)
     evidence_exports = {
         "runtime_blueprint": _runtime_blueprint(assembly),
-        "document_digests": _document_digests(runtime_documents),
         "validation_reports": validation_reports.to_dict(),
     }
+    if "runtime_documents" in assembly.runtime_exports:
+        runtime_documents = assembly.require_runtime_export("runtime_documents")
+        if not isinstance(runtime_documents, list):
+            raise ValueError("runtime_documents export must be a list")
+        evidence_exports["document_digests"] = _document_digests(runtime_documents)
     evidence_modules: list[type[EvidenceModuleClass]] = []
     for binding in code_modules:
         class_name = binding.code_module.__name__.replace("CodeModule", "EvidenceModule")
@@ -115,11 +162,17 @@ def build_evidence_modules(
             "code_exports": binding.code_module.code_exports,
         }
         if binding.framework_module.module_id == assembly.root_module_ids.get("frontend"):
-            module_exports["frontend_rules"] = frontend_summary.to_dict()
+            if frontend_summary is not None:
+                module_exports["frontend_rules"] = frontend_summary.to_dict()
             module_exports["runtime_blueprint"] = evidence_exports["runtime_blueprint"]
         if binding.framework_module.module_id == assembly.root_module_ids.get("knowledge_base"):
-            module_exports["knowledge_base_rules"] = knowledge_summary.to_dict()
-            module_exports["document_digests"] = evidence_exports["document_digests"]
+            if knowledge_summary is not None:
+                module_exports["knowledge_base_rules"] = knowledge_summary.to_dict()
+            if "document_digests" in evidence_exports:
+                module_exports["document_digests"] = evidence_exports["document_digests"]
+        if binding.framework_module.module_id == assembly.root_module_ids.get("review_workbench"):
+            if review_workbench_summary is not None:
+                module_exports["review_workbench_rules"] = review_workbench_summary.to_dict()
         evidence_module = type(
             class_name,
             (EvidenceModuleClass,),

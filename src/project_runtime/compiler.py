@@ -9,6 +9,7 @@ from project_runtime.config_layer import build_config_modules, load_project_conf
 from project_runtime.code_layer import build_code_modules
 from project_runtime.evidence_layer import build_evidence_modules
 from project_runtime.framework_layer import resolve_selected_framework_modules
+from project_runtime.frontend_scaffold import materialize_frontend_scaffold
 from project_runtime.models import GeneratedArtifactPaths, ProjectRuntimeAssembly
 from project_runtime.utils import cleanup_generated_output_dir, normalize_project_path, relative_path
 from rule_validation_models import ValidationReports
@@ -18,12 +19,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROJECT_FILE = REPO_ROOT / "projects" / "knowledge_base_basic" / "project.toml"
 
 
-def _artifact_paths(project_file: Path, canonical_name: str, runtime_snapshot_name: str) -> GeneratedArtifactPaths:
+def _artifact_paths(
+    project_file: Path,
+    canonical_name: str,
+    runtime_snapshot_name: str,
+    frontend_app_dir: str,
+) -> GeneratedArtifactPaths:
     output_dir = project_file.parent / "generated"
     return GeneratedArtifactPaths(
         directory=relative_path(output_dir),
         canonical_json=relative_path(output_dir / canonical_name),
         runtime_snapshot_py=relative_path(output_dir / runtime_snapshot_name),
+        frontend_app_dir=relative_path(output_dir / frontend_app_dir),
     )
 
 
@@ -178,6 +185,7 @@ def compile_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> 
             resolved_project_file,
             project_config.artifacts.canonical_json,
             project_config.artifacts.runtime_snapshot_py,
+            project_config.artifacts.frontend_app_dir,
         ),
     )
     evidence_modules, evidence_exports, validation_reports = build_evidence_modules(draft_assembly, code_modules)
@@ -234,10 +242,15 @@ def materialize_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE)
     runtime_snapshot = {
         **assembly.to_runtime_snapshot_dict(),
         "frontend_app_spec": assembly.require_runtime_export("frontend_app_spec"),
-        "knowledge_base_domain_spec": assembly.require_runtime_export("knowledge_base_domain_spec"),
         "backend_service_spec": assembly.require_runtime_export("backend_service_spec"),
         "runtime_blueprint": assembly.require_runtime_export("runtime_blueprint"),
     }
+    if "knowledge_base_domain_spec" in assembly.runtime_exports:
+        runtime_snapshot["knowledge_base_domain_spec"] = assembly.require_runtime_export("knowledge_base_domain_spec")
+    if "review_workbench_domain_spec" in assembly.runtime_exports:
+        runtime_snapshot["review_workbench_domain_spec"] = assembly.require_runtime_export("review_workbench_domain_spec")
+    if "runtime_documents" in assembly.runtime_exports:
+        runtime_snapshot["runtime_documents"] = assembly.require_runtime_export("runtime_documents")
     runtime_snapshot_path.write_text(
         "from __future__ import annotations\n\n"
         "# GENERATED FILE. DO NOT EDIT.\n"
@@ -247,5 +260,7 @@ def materialize_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE)
         "CANONICAL = RUNTIME_SNAPSHOT['canonical']\n",
         encoding="utf-8",
     )
+    frontend_output_dir = generated / assembly.config.artifacts.frontend_app_dir
+    materialize_frontend_scaffold(assembly, frontend_output_dir)
     load_project_runtime.cache_clear()
     return assembly

@@ -41,6 +41,7 @@ class SelectedFrameworkModule:
 class ArtifactConfig:
     canonical_json: str
     runtime_snapshot_py: str
+    frontend_app_dir: str = "frontend_app"
 
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
@@ -163,6 +164,7 @@ class GeneratedArtifactPaths:
     directory: str
     canonical_json: str
     runtime_snapshot_py: str
+    frontend_app_dir: str
 
     def to_dict(self) -> dict[str, str]:
         return asdict(self)

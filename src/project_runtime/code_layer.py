@@ -79,7 +79,30 @@ def _section_summaries(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _compile_frontend_app_spec(
     exact_export: dict[str, Any],
     *,
-    root_module_ids: dict[str, str],
+    domain_framework: str,
+    domain_module_id: str,
+    backend_module_id: str,
+) -> dict[str, Any]:
+    if domain_framework == "review_workbench":
+        return _compile_review_workbench_frontend_app_spec(
+            exact_export,
+            domain_module_id=domain_module_id,
+            backend_module_id=backend_module_id,
+        )
+    if domain_framework != "knowledge_base":
+        raise ValueError(f"unsupported frontend domain framework: {domain_framework}")
+    return _compile_knowledge_base_frontend_app_spec(
+        exact_export,
+        domain_module_id=domain_module_id,
+        backend_module_id=backend_module_id,
+    )
+
+
+def _compile_knowledge_base_frontend_app_spec(
+    exact_export: dict[str, Any],
+    *,
+    domain_module_id: str,
+    backend_module_id: str,
 ) -> dict[str, Any]:
     profile = load_knowledge_base_runtime_profile()
     surface = _require_boundary(exact_export, "SURFACE")
@@ -257,8 +280,8 @@ def _compile_frontend_app_spec(
                 "api_prefix": str(route["api_prefix"]),
             },
             "extend_slots": [
-                {"slot_id": "domain_workbench", "module_id": root_module_ids["knowledge_base"]},
-                {"slot_id": "backend_contract", "module_id": root_module_ids["backend"]},
+                {"slot_id": "domain_workbench", "module_id": domain_module_id},
+                {"slot_id": "backend_contract", "module_id": backend_module_id},
             ],
             "component_variants": {
                 "conversation_list": str(extend["conversation_list_variant"]),
@@ -266,6 +289,110 @@ def _compile_frontend_app_spec(
                 "chat_bubble": str(surface["chat_bubble_variant"]),
                 "chat_composer": str(surface["chat_composer_variant"]),
                 "citation_summary": str(surface["citation_card_variant"]),
+            },
+        },
+    }
+
+
+def _compile_review_workbench_frontend_app_spec(
+    exact_export: dict[str, Any],
+    *,
+    domain_module_id: str,
+    backend_module_id: str,
+) -> dict[str, Any]:
+    surface = _require_boundary(exact_export, "SURFACE")
+    visual = _require_boundary(exact_export, "VISUAL")
+    interact = _require_boundary(exact_export, "INTERACT")
+    route = _require_boundary(exact_export, "ROUTE")
+    a11y = _require_boundary(exact_export, "A11Y")
+    state = _require_boundary(exact_export, "STATE")
+    implementation = _overlay(exact_export, "frontend", default={})
+    return {
+        "ui": {
+            "shell": {
+                "id": str(surface["shell"]),
+                "layout_variant": str(surface["layout_variant"]),
+                "preview_mode": str(surface["preview_mode"]),
+            },
+            "visual": {
+                "tokens": {
+                    "brand": str(visual["brand"]),
+                    "accent": str(visual["accent"]),
+                    "surface_preset": str(visual["surface_preset"]),
+                    "radius_scale": str(visual["radius_scale"]),
+                    "shadow_level": str(visual["shadow_level"]),
+                    "font_scale": str(visual["font_scale"]),
+                    "sidebar_width": str(surface["sidebar_width"]),
+                    "density": str(surface["density"]),
+                }
+            },
+            "implementation": {
+                "frontend_renderer": str(implementation["frontend_renderer"]),
+                "framework": str(implementation.get("framework", "react")),
+                "bundler": str(implementation.get("bundler", "vite")),
+                "styling": str(implementation.get("styling", "tailwindcss")),
+                "language": str(implementation.get("language", "typescript")),
+                "typescript_strict": bool(implementation.get("typescript_strict", True)),
+                "package_manager": str(implementation.get("package_manager", "pnpm")),
+                "icon_library": str(implementation.get("icon_library", "lucide-react")),
+            },
+            "components": {
+                "platform_sidebar": {
+                    "title": str(interact["platform_title"]),
+                    "scene_switch_label": str(interact["scene_switch_label"]),
+                    "current_scope_label": str(interact["current_scope_label"]),
+                },
+                "workspace_header": {
+                    "title": str(interact["workspace_title"]),
+                    "subtitle": str(state["ready_text"]),
+                    "refresh_label": str(interact["refresh_label"]),
+                },
+                "scene_summary": {
+                    "empty_state_title": str(state["empty_state_title"]),
+                    "empty_state_copy": str(state["empty_state_copy"]),
+                    "loading_text": str(state["loading_text"]),
+                    "ready_text": str(state["ready_text"]),
+                },
+                "action_band": {
+                    "open_processing_label": str(interact["open_processing_label"]),
+                    "view_source_label": str(interact["view_source_label"]),
+                },
+            },
+            "pages": {
+                "workbench": {
+                    "path": str(route["workbench"]),
+                    "title": str(interact["workspace_title"]),
+                }
+            },
+        },
+        "contract": {
+            "shell": str(surface["shell"]),
+            "layout_variant": str(surface["layout_variant"]),
+            "surface_config": {
+                "sidebar_width": str(surface["sidebar_width"]),
+                "preview_mode": str(surface["preview_mode"]),
+                "density": str(surface["density"]),
+            },
+            "surface_regions": list(surface["surface_regions"]),
+            "interaction_actions": [
+                {"action_id": "switch_scene"},
+                {"action_id": "refresh_scope"},
+                {"action_id": "open_processing_tab"},
+                {"action_id": "open_source_trace"},
+            ],
+            "a11y": dict(a11y),
+            "route_contract": {
+                "home": str(route["home"]),
+                "workbench": str(route["workbench"]),
+                "api_prefix": str(route["api_prefix"]),
+            },
+            "extend_slots": [
+                {"slot_id": "domain_workbench", "module_id": domain_module_id},
+                {"slot_id": "backend_contract", "module_id": backend_module_id},
+            ],
+            "component_variants": {
+                "platform_shell": str(surface["layout_variant"]),
+                "workspace_density": str(surface["density"]),
             },
         },
     }
@@ -331,7 +458,45 @@ def _compile_knowledge_base_domain_spec(
     }
 
 
+def _compile_review_workbench_domain_spec(exact_export: dict[str, Any]) -> dict[str, Any]:
+    workbench = _overlay(exact_export, "review_workbench", default={})
+    if not isinstance(workbench, dict):
+        raise ValueError("review_workbench exact overlay must be a dict")
+    platform = workbench.get("platform")
+    if not isinstance(platform, dict):
+        raise ValueError("exact.review_workbench.platform must be a dict")
+    raw_scene_ids = platform.get("scene_ids")
+    if not isinstance(raw_scene_ids, list) or not raw_scene_ids:
+        raise ValueError("exact.review_workbench.platform.scene_ids must be a non-empty list")
+    scenes: list[dict[str, Any]] = []
+    for scene_id in raw_scene_ids:
+        scene_key = str(scene_id)
+        scene = workbench.get(scene_key)
+        if not isinstance(scene, dict):
+            raise ValueError(f"exact.review_workbench.{scene_key} must be a dict")
+        scenes.append(dict(scene))
+    return {
+        "platform": dict(platform),
+        "workbench": {
+            "default_scene_id": str(platform["default_scene_id"]),
+            "scene_ids": [str(item) for item in raw_scene_ids],
+            "scenes": scenes,
+        },
+    }
+
+
 def _compile_backend_service_spec(
+    exact_export: dict[str, Any],
+    *,
+    route_contract: dict[str, Any],
+) -> dict[str, Any]:
+    backend_overlay = _overlay(exact_export, "review_workbench_backend", default=None)
+    if isinstance(backend_overlay, dict):
+        return _compile_review_workbench_backend_service_spec(exact_export, route_contract=route_contract)
+    return _compile_knowledge_base_backend_service_spec(exact_export, route_contract=route_contract)
+
+
+def _compile_knowledge_base_backend_service_spec(
     exact_export: dict[str, Any],
     *,
     route_contract: dict[str, Any],
@@ -396,13 +561,46 @@ def _compile_backend_service_spec(
     }
 
 
+def _compile_review_workbench_backend_service_spec(
+    exact_export: dict[str, Any],
+    *,
+    route_contract: dict[str, Any],
+) -> dict[str, Any]:
+    backend_overlay = _overlay(exact_export, "review_workbench_backend", default={})
+    if not isinstance(backend_overlay, dict):
+        raise ValueError("review_workbench_backend exact overlay must be a dict")
+    contract = backend_overlay.get("contract")
+    if not isinstance(contract, dict):
+        raise ValueError("exact.review_workbench_backend.contract must be a dict")
+    contract_exports = {
+        str(key).removesuffix("_contract"): str(value)
+        for key, value in contract.items()
+        if isinstance(key, str) and key.endswith("_contract")
+    }
+    return {
+        "transport": {
+            "mode": str(contract["transport_mode"]),
+            "api_prefix": str(contract["api_prefix"]),
+            "project_config_endpoint": str(contract["project_config_endpoint"]),
+        },
+        "contracts": contract_exports,
+        "routes": {
+            "workbench": str(route_contract["workbench"]),
+        },
+    }
+
+
 def _module_compile_symbol(module_id: str, root_module_ids: dict[str, str]) -> str:
     if module_id == root_module_ids.get("frontend"):
         return "project_runtime.code_layer:_compile_frontend_app_spec"
     if module_id == root_module_ids.get("knowledge_base"):
         return "project_runtime.code_layer:_compile_knowledge_base_domain_spec"
+    if module_id == root_module_ids.get("review_workbench"):
+        return "project_runtime.code_layer:_compile_review_workbench_domain_spec"
     if module_id == root_module_ids.get("backend"):
         return "project_runtime.code_layer:_compile_backend_service_spec"
+    if module_id == root_module_ids.get("review_workbench_backend"):
+        return "project_runtime.code_layer:_compile_review_workbench_backend_service_spec"
     return "project_runtime.code_layer:build_code_modules"
 
 
@@ -454,6 +652,17 @@ def _module_runtime_slot_map(module_id: str, root_module_ids: dict[str, str]) ->
                 "knowledge_base_domain_spec.workbench.citation_return",
             ),
         }
+    if module_id == root_module_ids.get("review_workbench"):
+        return {
+            "ENTRY_SCOPE": (
+                "review_workbench_domain_spec.platform",
+                "review_workbench_domain_spec.workbench.default_scene_id",
+            ),
+            "SCENE_INSTANCE_SCOPE": (
+                "review_workbench_domain_spec.workbench.scene_ids",
+                "review_workbench_domain_spec.workbench.scenes",
+            ),
+        }
     if module_id == root_module_ids.get("backend"):
         return {
             "LIBRARY": ("backend_service_spec.knowledge_base",),
@@ -470,7 +679,27 @@ def _module_runtime_slot_map(module_id: str, root_module_ids: dict[str, str]) ->
             "AUTH": ("backend_service_spec.write_policy",),
             "TRACE": ("backend_service_spec.retrieval",),
         }
+    if module_id == root_module_ids.get("review_workbench_backend"):
+        return {
+            "REQUEST_CONTEXT_SCOPE": ("backend_service_spec.contracts",),
+            "TARGET_SCOPE": ("backend_service_spec.contracts",),
+            "RESULT_STATUS_SCOPE": ("backend_service_spec.transport",),
+            "EFFECTS_SCOPE": ("backend_service_spec.routes",),
+        }
     return {}
+
+
+def _selected_root_binding(
+    config_modules: tuple[ConfigModuleBinding, ...],
+    root_module_ids: dict[str, str],
+    *,
+    frameworks: set[str],
+) -> ConfigModuleBinding | None:
+    selected_root_ids = set(root_module_ids.values())
+    for binding in config_modules:
+        if binding.framework_module.module_id in selected_root_ids and binding.framework_module.framework in frameworks:
+            return binding
+    return None
 
 
 def _build_implementation_slots(
@@ -567,35 +796,49 @@ def build_code_modules(
         binding.framework_module.module_id: binding
         for binding in config_modules
     }
-    frontend_root = binding_by_module_id.get(root_module_ids.get("frontend", ""))
-    knowledge_root = binding_by_module_id.get(root_module_ids.get("knowledge_base", ""))
-    backend_root = binding_by_module_id.get(root_module_ids.get("backend", ""))
-    if frontend_root is None or knowledge_root is None or backend_root is None:
-        raise ValueError("frontend, knowledge_base, and backend root modules are required")
-    frontend_app_spec = _compile_frontend_app_spec(frontend_root.config_module.exact_export, root_module_ids=root_module_ids)
-    route_contract = frontend_app_spec["contract"]["route_contract"]
-    runtime_documents = _compile_runtime_documents(knowledge_root.config_module.exact_export)
-    knowledge_base_domain_spec = _compile_knowledge_base_domain_spec(
-        knowledge_root.config_module.exact_export,
-        runtime_documents=runtime_documents,
+    frontend_root = _selected_root_binding(config_modules, root_module_ids, frameworks={"frontend"})
+    domain_root = _selected_root_binding(config_modules, root_module_ids, frameworks={"knowledge_base", "review_workbench"})
+    backend_root = _selected_root_binding(config_modules, root_module_ids, frameworks={"backend", "review_workbench_backend"})
+    if frontend_root is None or domain_root is None or backend_root is None:
+        raise ValueError("frontend, domain, and backend root modules are required")
+    frontend_app_spec = _compile_frontend_app_spec(
+        frontend_root.config_module.exact_export,
+        domain_framework=domain_root.framework_module.framework,
+        domain_module_id=domain_root.framework_module.module_id,
+        backend_module_id=backend_root.framework_module.module_id,
     )
+    route_contract = frontend_app_spec["contract"]["route_contract"]
+    runtime_documents: list[dict[str, Any]] = []
+    if domain_root.framework_module.framework == "knowledge_base":
+        runtime_documents = _compile_runtime_documents(domain_root.config_module.exact_export)
+        knowledge_base_domain_spec = _compile_knowledge_base_domain_spec(
+            domain_root.config_module.exact_export,
+            runtime_documents=runtime_documents,
+        )
+        runtime_exports["knowledge_base_domain_spec"] = knowledge_base_domain_spec
+        runtime_exports["runtime_documents"] = runtime_documents
+    elif domain_root.framework_module.framework == "review_workbench":
+        review_workbench_domain_spec = _compile_review_workbench_domain_spec(domain_root.config_module.exact_export)
+        runtime_exports["review_workbench_domain_spec"] = review_workbench_domain_spec
+    else:
+        raise ValueError(f"unsupported domain framework: {domain_root.framework_module.framework}")
     backend_service_spec = _compile_backend_service_spec(
         backend_root.config_module.exact_export,
         route_contract=route_contract,
     )
     runtime_exports["frontend_app_spec"] = frontend_app_spec
-    runtime_exports["knowledge_base_domain_spec"] = knowledge_base_domain_spec
-    runtime_exports["runtime_documents"] = runtime_documents
     runtime_exports["backend_service_spec"] = backend_service_spec
     for binding in config_modules:
         exact_export = binding.config_module.exact_export
         code_exports: dict[str, Any] = {}
         if binding.framework_module.module_id == root_module_ids.get("frontend"):
             code_exports["frontend_app_spec"] = frontend_app_spec
-        if binding.framework_module.module_id == root_module_ids.get("knowledge_base"):
+        if binding.framework_module.module_id == domain_root.framework_module.module_id and domain_root.framework_module.framework == "knowledge_base":
             code_exports["knowledge_base_domain_spec"] = knowledge_base_domain_spec
             code_exports["runtime_documents"] = runtime_documents
-        if binding.framework_module.module_id == root_module_ids.get("backend"):
+        if binding.framework_module.module_id == domain_root.framework_module.module_id and domain_root.framework_module.framework == "review_workbench":
+            code_exports["review_workbench_domain_spec"] = review_workbench_domain_spec
+        if binding.framework_module.module_id == backend_root.framework_module.module_id:
             code_exports["backend_service_spec"] = backend_service_spec
         class_name = binding.framework_module.__name__.replace("FrameworkModule", "CodeModule")
         implementation_slots = _build_implementation_slots(binding, root_module_ids=root_module_ids)

@@ -524,8 +524,12 @@ def _module_exact_overlay_paths(module: ParsedFrameworkModule) -> tuple[str, ...
         return ("exact.code.frontend",)
     if module.framework == "knowledge_base":
         return ("exact.knowledge_base.documents",)
+    if module.framework == "review_workbench":
+        return ("exact.review_workbench",)
     if module.framework == "backend":
         return ("exact.code.backend",)
+    if module.framework == "review_workbench_backend":
+        return ("exact.review_workbench_backend",)
     return tuple()
 
 
