@@ -81,7 +81,8 @@ const FRAMEWORK_RULE_HINTS = {
   FWL007: "最小结构基条目格式必须合法",
   FWL008: "规则条目格式必须合法",
   FWL009: "验证条目格式必须合法",
-  FWL010: "章节内必须至少存在一个可解析条目"
+  FWL010: "章节内必须至少存在一个可解析条目",
+  FWL011: "规则引用的符号必须先在本模块中定义"
 };
 
 function resetStatusToIdle(status) {
