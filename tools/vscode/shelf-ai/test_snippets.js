@@ -212,6 +212,10 @@ function main() {
     "extension.js must clear stale shelf diagnostics when watched documents are edited"
   );
   assert(
+    extensionSource.includes('openTreeView("framework", { reveal: false })'),
+    "extension.js must refresh framework tree in background on save without auto-revealing the panel"
+  );
+  assert(
     extensionSource.includes('$(close) Shelf 失败'),
     "extension.js must expose a visible cross icon for failing Shelf status"
   );

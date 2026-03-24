@@ -16,7 +16,8 @@ Authoring-term note:
 - Treats the repository mainline as:
   `Framework -> Config -> Code -> Evidence`.
 - Treats `projects/*/generated/canonical.json` as the only machine truth.
-- Treats framework tree and evidence tree as canonical-derived views.
+- Treats framework tree as an author-source runtime projection from `framework/**`.
+- Treats evidence tree as a canonical-derived workspace evidence view.
 - Supports framework-markdown navigation for `B/C/R/V`, parameters, module refs, and rule refs.
 - Maps framework parameters back to `projects/*/project.toml` sections such as `[exact.knowledge_base.chat]` and `[exact.frontend.surface]`.
 - Auto-materializes affected projects when `framework/*.md` or `projects/*/project.toml` changes.
@@ -112,6 +113,7 @@ Framework tree behavior settings:
 
 - `shelf.frameworkTreeAutoRefreshOnSave = true`:
   after framework markdown is saved, Shelf runs save-time change validation/materialization first, then refreshes an open framework tree.
+  save-time refresh is background-only and will not auto-pop or force-focus the framework tree panel.
   when full materialization fails and the materialize command uses `scripts/materialize_project.py`, Shelf enables `--allow-framework-only-fallback` to refresh `canonical.framework` snapshot first.
 - `shelf.statusBarClickAction = openFrameworkTree`:
   clicking Shelf status bar opens the framework tree panel (floating/dockable/resizable webview tab).
@@ -167,7 +169,9 @@ The evidence tree is the canonical-derived workspace evidence view.
 No persisted tree artifact is used for these views; both trees are runtime projections.
 Both tree views render as interactive webview graphs (dagre layout + d3-zoom runtime interaction), and framework nodes stay layer-fixed with layout-engine auto sorting.
 Tree interactions include search, upstream/downstream focus, keyboard navigation (arrow keys + Enter), and viewport/selection state persistence.
-The framework tree is canonical-projected; framework markdown saves should materialize canonical before tree refresh.
+The framework tree is parsed directly from `framework/**` modules and their `B*` / `R*` declarations, and does not depend on project config selection.
+Framework module arrows are derived from upstream module refs in base definitions (for example `L0.M0[...]`), while base-composition edges are derived from rule participant bases.
+Framework markdown saves should trigger canonical refresh in background so machine-mainline artifacts remain up-to-date, but framework tree rendering itself does not wait for canonical.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
 Framework-only fallback snapshots are marked as degraded materialization state, so evidence tree remains blocked until the next full materialization succeeds.
 

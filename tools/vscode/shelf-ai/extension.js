@@ -684,7 +684,7 @@ function activate(context) {
     }
     refreshSidebarHome();
     if (refreshTree && treePanel) {
-      await openTreeView(treePanelKind);
+      await openTreeView(treePanelKind, { reveal: false });
     }
   };
 
@@ -1519,7 +1519,8 @@ function activate(context) {
     ? "Shelf · Evidence Tree"
     : "Shelf · Framework Tree";
 
-  const ensureTreePanel = (kind) => {
+  const ensureTreePanel = (kind, options = {}) => {
+    const reveal = options.reveal !== false;
     if (!treePanel) {
       treePanel = vscode.window.createWebviewPanel(
         "shelfTreeView",
@@ -1546,7 +1547,7 @@ function activate(context) {
           Number(message.line || 1)
         );
       });
-    } else {
+    } else if (reveal) {
       treePanel.reveal(vscode.ViewColumn.Active, true);
     }
     treePanelKind = kind;
@@ -1554,7 +1555,8 @@ function activate(context) {
     return treePanel;
   };
 
-  const openTreeView = async (kind) => {
+  const openTreeView = async (kind, options = {}) => {
+    const reveal = options.reveal !== false;
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
       showShelfWarningMessage("Shelf：当前未打开工作区。");
@@ -1567,7 +1569,7 @@ function activate(context) {
 
     if (kind === "evidence" && freshnessState.hasBlocking) {
       const freshnessDetail = describeCanonicalFreshness(freshnessState);
-      const panel = ensureTreePanel(kind);
+      const panel = ensureTreePanel(kind, { reveal });
       panel.webview.html = buildTreeFallbackHtml(
         freshnessDetail
           ? `canonical 未 fresh，证据树不可用。${freshnessDetail}`
@@ -1583,7 +1585,7 @@ function activate(context) {
       return;
     }
 
-    const panel = ensureTreePanel(kind);
+    const panel = ensureTreePanel(kind, { reveal });
     try {
       const scriptPath = path.join(context.extensionPath, "media", "tree_view_bundle.js");
       const stylePath = path.join(context.extensionPath, "media", "tree_view.css");
@@ -1626,11 +1628,11 @@ function activate(context) {
   };
 
   const openFrameworkTree = async () => {
-    await openTreeView("framework");
+    await openTreeView("framework", { reveal: true });
   };
 
   const openEvidenceTree = async () => {
-    await openTreeView("evidence");
+    await openTreeView("evidence", { reveal: true });
   };
 
   const maybeRefreshFrameworkTreeForSavedDocument = async (document) => {
@@ -1649,7 +1651,7 @@ function activate(context) {
     if (!frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)) {
       return;
     }
-    await openFrameworkTree();
+    await openTreeView("framework", { reveal: false });
   };
 
   const clearShelfDiagnosticsForUri = (uri) => {
