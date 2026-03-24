@@ -531,7 +531,7 @@ function activate(context) {
   const readTreeViewSettings = () => {
     const config = getShelfConfig();
     const zoomMinScale = clampNumber(config.get("treeZoomMinScale"), 0.2, 3, 0.68);
-    const zoomMaxScale = clampNumber(config.get("treeZoomMaxScale"), zoomMinScale, 5, 1.55);
+    const zoomMaxScale = clampNumber(config.get("treeZoomMaxScale"), zoomMinScale, 5, 2.4);
     return {
       zoomMinScale,
       zoomMaxScale,

@@ -87,7 +87,7 @@ Local workspace overlay file:
 - `shelf.frameworkTreeAutoRefreshOnSave = true`
 - `shelf.statusBarClickAction = openFrameworkTree`
 - `shelf.treeZoomMinScale = 0.68`
-- `shelf.treeZoomMaxScale = 1.55`
+- `shelf.treeZoomMaxScale = 2.4`
 - `shelf.treeWheelSensitivity = 1`
 - `shelf.treeInspectorWidth = 338`
 - `shelf.treeInspectorRailWidth = 42`
@@ -170,7 +170,7 @@ No persisted tree artifact is used for these views; both trees are runtime proje
 Both tree views render as interactive webview graphs (dagre layout + d3-zoom runtime interaction), and framework nodes stay layer-fixed with layout-engine auto sorting.
 Tree interactions include search, upstream/downstream focus, keyboard navigation (arrow keys + Enter), and viewport/selection state persistence.
 The framework tree is parsed directly from `framework/**` modules and their `B*` / `R*` declarations, and does not depend on project config selection.
-Framework module arrows are derived from upstream module refs in base definitions (for example `L0.M0[...]`), while base-composition edges are derived from rule participant bases.
+The canvas renders a module-only author graph: `B*` and rule participation stay available in hover/inspection, while module arrows are collapsed from upstream module refs in base definitions (for example `L0.M0[...]`).
 Framework markdown saves should trigger canonical refresh in background so machine-mainline artifacts remain up-to-date, but framework tree rendering itself does not wait for canonical.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
 Framework-only fallback snapshots are marked as degraded materialization state, so evidence tree remains blocked until the next full materialization succeeds.

@@ -6,8 +6,6 @@ const workspaceGuard = require("./guarding");
 
 const MODULE_ID_PATTERN = /^(?<framework>[A-Za-z][A-Za-z0-9_]*)\.L(?<level>\d+)\.M(?<module>\d+)$/;
 const MODULE_FILE_PATTERN = /^L(?<level>\d+)-M(?<module>\d+)-/;
-const BASE_TOKEN_PATTERN = /\b(B\d+)\b/g;
-const RULE_TOKEN_PATTERN = /\b(R\d+(?:\.\d+)?)\b/g;
 const MODULE_REF_PATTERN = /\bL(?<level>\d+)\.M(?<module>\d+)\b/g;
 
 /**
@@ -159,47 +157,6 @@ function firstMarkdownHeading(filePath) {
 }
 
 /**
- * @param {string} moduleId
- * @param {string} baseId
- * @returns {string}
- */
-function baseNodeId(moduleId, baseId) {
-  return `${moduleId}.base.${baseId}`;
-}
-
-/**
- * @param {string} value
- * @returns {Set<string>}
- */
-function extractBaseTokens(value) {
-  const tokens = new Set();
-  const text = asText(value);
-  for (const match of text.matchAll(BASE_TOKEN_PATTERN)) {
-    const token = asText(match[1]).toUpperCase();
-    if (token) {
-      tokens.add(token);
-    }
-  }
-  return tokens;
-}
-
-/**
- * @param {string} value
- * @returns {Set<string>}
- */
-function extractRuleTokens(value) {
-  const tokens = new Set();
-  const text = asText(value);
-  for (const match of text.matchAll(RULE_TOKEN_PATTERN)) {
-    const token = asText(match[1]).toUpperCase();
-    if (token) {
-      tokens.add(token);
-    }
-  }
-  return tokens;
-}
-
-/**
  * @param {string} text
  * @param {string} frameworkName
  * @returns {string[]}
@@ -230,16 +187,11 @@ function readMarkdownLines(filePath) {
 /**
  * @param {string[]} lines
  * @param {string} frameworkName
- * @returns {{
- *   bases: Array<{ baseId: string, detail: string, line: number, upstreamModuleIds: string[] }>,
- *   ruleBaseRefs: Map<string, Set<string>>,
- * }}
+ * @returns {Array<{ baseId: string, detail: string, line: number, upstreamModuleIds: string[] }>}
  */
-function parseAuthorFrameworkBasesAndRules(lines, frameworkName) {
+function parseAuthorFrameworkBases(lines, frameworkName) {
   /** @type {Array<{ baseId: string, detail: string, line: number, upstreamModuleIds: string[] }>} */
   const bases = [];
-  /** @type {Map<string, Set<string>>} */
-  const ruleBaseRefs = new Map();
 
   for (let index = 0; index < lines.length; index += 1) {
     const lineText = String(lines[index] || "");
@@ -255,34 +207,9 @@ function parseAuthorFrameworkBasesAndRules(lines, frameworkName) {
         upstreamModuleIds: extractModuleRefsFromText(lineText, frameworkName),
       });
     }
-
-    const ruleTokens = extractRuleTokens(lineText);
-    if (!ruleTokens.size) {
-      continue;
-    }
-    const baseTokens = extractBaseTokens(lineText);
-    if (!baseTokens.size) {
-      continue;
-    }
-    for (const ruleToken of ruleTokens) {
-      const topLevelRuleId = asText(ruleToken.split(".")[0]).toUpperCase();
-      if (!topLevelRuleId) {
-        continue;
-      }
-      if (!ruleBaseRefs.has(topLevelRuleId)) {
-        ruleBaseRefs.set(topLevelRuleId, new Set());
-      }
-      const usedBases = ruleBaseRefs.get(topLevelRuleId);
-      for (const baseToken of baseTokens) {
-        usedBases?.add(baseToken);
-      }
-    }
   }
 
-  return {
-    bases,
-    ruleBaseRefs,
-  };
+  return bases;
 }
 
 /**
@@ -290,20 +217,12 @@ function parseAuthorFrameworkBasesAndRules(lines, frameworkName) {
  * @returns {Record<number, string>}
  */
 function authorLevelLabelsFor(values) {
-  const pairs = [];
-  const seen = new Set();
-  for (const depth of values) {
-    const normalizedDepth = Math.max(0, Math.floor(Number(depth) || 0));
-    if (seen.has(normalizedDepth)) {
-      continue;
-    }
-    seen.add(normalizedDepth);
-    const level = Math.floor(normalizedDepth / 2);
-    const suffix = normalizedDepth % 2 === 0 ? "模块层" : "基层";
-    pairs.push([normalizedDepth, `L${level} ${suffix}`]);
-  }
-  pairs.sort((left, right) => Number(left[0]) - Number(right[0]));
-  return Object.fromEntries(pairs);
+  return Object.fromEntries(
+    [...new Set(values)]
+      .map((value) => Math.max(0, Math.floor(Number(value) || 0)))
+      .sort((left, right) => left - right)
+      .map((depth) => [depth, `L${depth} 模块层`])
+  );
 }
 
 /**
@@ -778,8 +697,6 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
   /** @type {Map<string, Map<number, number>>} */
   const frameworkCounts = new Map();
   const relationCounts = {
-    module_contains_base: 0,
-    base_composition: 0,
     framework_module_growth: 0,
   };
   const edgeIds = new Set();
@@ -811,10 +728,9 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
       const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, absPath));
       const heading = firstMarkdownHeading(absPath);
       const lines = readMarkdownLines(absPath);
-      const parsedParts = parseAuthorFrameworkBasesAndRules(lines, frameworkDir.name);
+      const bases = parseAuthorFrameworkBases(lines, frameworkDir.name);
 
-      const moduleDepth = Math.max(0, parsed.level * 2);
-      const baseDepth = moduleDepth + 1;
+      const moduleDepth = Math.max(0, parsed.level);
       levelCounts?.set(moduleDepth, (levelCounts?.get(moduleDepth) || 0) + 1);
       const moduleId = `${frameworkDir.name}.L${parsed.level}.M${parsed.module}`;
       nodes.push({
@@ -834,92 +750,38 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
         docLine: heading.line,
         hoverKicker: "Framework Module (Author Source)",
         capabilityItems: [],
-        baseItems: [],
+        baseItems: bases.map((base) => ({
+          token: asText(base.baseId).toUpperCase(),
+          text: base.detail || asText(base.baseId).toUpperCase(),
+        })),
       });
 
-      const baseById = new Map();
-      for (const base of parsedParts.bases) {
-        const normalizedBaseId = asText(base.baseId).toUpperCase();
-        if (!normalizedBaseId) {
+      /** @type {Map<string, { baseIds: Set<string>, line: number }>} */
+      const upstreamBasesByModuleId = new Map();
+      for (const base of bases) {
+        const baseId = asText(base.baseId).toUpperCase();
+        if (!baseId) {
           continue;
         }
-        const numericMatch = /B(\d+)/.exec(normalizedBaseId);
-        const baseOrder = numericMatch ? asPositiveInt(numericMatch[1], 1) : 1;
-        const baseId = baseNodeId(moduleId, normalizedBaseId);
-        levelCounts?.set(baseDepth, (levelCounts?.get(baseDepth) || 0) + 1);
-        baseById.set(normalizedBaseId, {
-          nodeId: baseId,
-          upstreamModuleIds: base.upstreamModuleIds,
-          line: base.line,
-        });
-        nodes.push({
-          id: baseId,
-          label: `${frameworkDir.name}.L${parsed.level}.M${parsed.module}.${normalizedBaseId}`,
-          detail: base.detail || normalizedBaseId,
-          file: relPath,
-          line: base.line,
-          depth: baseDepth,
-          kind: "framework_base",
-          group: frameworkDir.name,
-          order: parsed.module * 100 + baseOrder,
-          title: normalizedBaseId,
-          moduleName: frameworkDir.name,
-          moduleRef: `L${parsed.level}.M${parsed.module}`,
-          sourceLine: base.line,
-          docLine: base.line,
-          hoverKicker: "Framework Base",
-          capabilityItems: [],
-          baseItems: [],
-        });
-
-        const containEdgeId = `${moduleId}->${baseId}`;
-        if (!edgeIds.has(containEdgeId)) {
-          edgeIds.add(containEdgeId);
-          edges.push({
-            id: containEdgeId,
-            from: moduleId,
-            to: baseId,
-            relation: "module_contains_base",
-            file: relPath,
-            line: base.line,
-            terms: normalizedBaseId,
-          });
-          relationCounts.module_contains_base += 1;
-        }
-      }
-
-      for (const [ruleId, baseIds] of parsedParts.ruleBaseRefs.entries()) {
-        const resolved = [...new Set(
-          [...baseIds]
-            .map((baseId) => baseById.get(asText(baseId).toUpperCase())?.nodeId || "")
-            .filter(Boolean)
-        )].sort();
-        for (let left = 0; left < resolved.length; left += 1) {
-          for (let right = left + 1; right < resolved.length; right += 1) {
-            const from = resolved[left];
-            const to = resolved[right];
-            const ruleEdgeId = `${moduleId}:${ruleId}:${from}->${to}`;
-            if (edgeIds.has(ruleEdgeId)) {
-              continue;
-            }
-            edgeIds.add(ruleEdgeId);
-            edges.push({
-              id: ruleEdgeId,
-              from,
-              to,
-              relation: "base_composition",
-              rules: ruleId,
-              terms: `${from} + ${to}`,
-              file: relPath,
-              line: 1,
+        for (const upstreamModuleId of base.upstreamModuleIds) {
+          if (!upstreamBasesByModuleId.has(upstreamModuleId)) {
+            upstreamBasesByModuleId.set(upstreamModuleId, {
+              baseIds: new Set(),
+              line: base.line || 1,
             });
-            relationCounts.base_composition += 1;
           }
+          upstreamBasesByModuleId.get(upstreamModuleId)?.baseIds.add(baseId);
         }
       }
 
-      for (const [baseId, baseInfo] of baseById.entries()) {
-        for (const upstreamModuleId of baseInfo.upstreamModuleIds) {
+      for (const [upstreamModuleId, edgeInfo] of upstreamBasesByModuleId.entries()) {
+        if (!upstreamModuleId) {
+          continue;
+        }
+        const terms = [...edgeInfo.baseIds].sort().join(", ");
+        if (!terms) {
+          continue;
+        }
           const growthEdgeId = `${upstreamModuleId}=>${moduleId}`;
           if (edgeIds.has(growthEdgeId)) {
             continue;
@@ -930,12 +792,11 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
             from: upstreamModuleId,
             to: moduleId,
             relation: "framework_module_growth",
-            terms: baseId,
+            terms,
             file: relPath,
-            line: baseInfo.line || 1,
+            line: edgeInfo.line || 1,
           });
           relationCounts.framework_module_growth += 1;
-        }
       }
     }
   }
@@ -948,9 +809,9 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
 
   const descriptionParts = [
     "Author graph projection from framework markdown.",
-    "Only module/base definitions and base-composition rules are used; no project config selection is required.",
+    "Only module definitions and upstream module refs declared in base definitions are rendered; no project config selection is required.",
   ];
-  descriptionParts.push("Module nodes, base nodes, and rule-level base composition edges are rendered from author source.");
+  descriptionParts.push("B* and R* stay as module-internal author detail in hover/inspection, while the canvas renders module-only relations.");
 
   return {
     title: "Shelf Framework Tree",
@@ -958,7 +819,7 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
     kind: "framework",
     nodes,
     edges: filteredEdges,
-    footText: "Author graph: module -> base containment, base composition, and upstream module references declared in base definitions.",
+    footText: "Author graph: module-only view; module arrows are collapsed from upstream module refs declared in base definitions.",
     layoutMode: "framework_columns",
     levelLabels: authorLevelLabelsFor(nodes.map((node) => node.depth)),
     frameworkGroups: frameworkGroupsFromCounts(frameworkCounts),

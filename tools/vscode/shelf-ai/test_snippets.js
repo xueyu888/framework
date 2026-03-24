@@ -132,6 +132,11 @@ function main() {
     true,
     "package.json must enable popup messages by default"
   );
+  assert.strictEqual(
+    configuration["shelf.treeZoomMaxScale"]?.default,
+    2.4,
+    "package.json must allow framework tree zooming beyond the old 155% cap by default"
+  );
   assert(
     (configuration["shelf.statusBarClickAction"]?.enum || []).includes("quickPick"),
     "package.json must support quickPick status bar click action"

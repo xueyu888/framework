@@ -169,16 +169,14 @@ function main() {
       "framework model should include framework groups"
     );
     const moduleNodes = frameworkModel.nodes.filter((node) => node.kind === "framework_module");
-    const baseNodes = frameworkModel.nodes.filter((node) => node.kind === "framework_base");
     assert(moduleNodes.length >= 2, "framework model should include module nodes from framework files");
-    assert(baseNodes.length >= 3, "framework model should include base nodes from module B* declarations");
     assert(
-      frameworkModel.edges.some((edge) => edge.relation === "module_contains_base"),
-      "framework model should include module->base containment edges"
+      frameworkModel.nodes.every((node) => node.kind !== "framework_base"),
+      "framework model should no longer render framework base nodes on the canvas"
     );
     assert(
-      frameworkModel.edges.some((edge) => edge.relation === "base_composition"),
-      "framework model should include base composition edges from R*.1 participant bases"
+      frameworkModel.edges.every((edge) => edge.relation !== "module_contains_base" && edge.relation !== "base_composition"),
+      "framework model should no longer render base-level edges on the canvas"
     );
     assert(
       frameworkModel.edges.some((edge) =>
@@ -193,8 +191,15 @@ function main() {
       "framework model description should explicitly state no project config dependency"
     );
     assert(
-      frameworkModel.levelLabels && Object.values(frameworkModel.levelLabels).some((label) => label.includes("基层")),
-      "framework model should expose author labels for base rows"
+      moduleNodes.some((node) =>
+        Array.isArray(node.baseItems)
+        && node.baseItems.some((item) => item.token === "B1")
+      ),
+      "framework module hover data should still expose B* details after bases leave the canvas"
+    );
+    assert(
+      frameworkModel.levelLabels && Object.values(frameworkModel.levelLabels).every((label) => label.includes("模块层")),
+      "framework model should expose module-only author level labels"
     );
 
     const evidenceModel = buildRuntimeEvidenceTreeModel(authorFixtureRoot);
@@ -223,8 +228,8 @@ function main() {
       "framework-only fixture should still render module nodes without project config/canonical"
     );
     assert(
-      frameworkModel.nodes.some((node) => node.kind === "framework_base"),
-      "framework-only fixture should still render base nodes without project config/canonical"
+      frameworkModel.nodes.every((node) => node.kind === "framework_module"),
+      "framework-only fixture should render module-only nodes without project config/canonical"
     );
   } finally {
     fs.rmSync(frameworkOnlyFixture, { recursive: true, force: true });
