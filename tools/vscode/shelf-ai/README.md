@@ -12,6 +12,7 @@ Authoring-term note:
 - 当前 canonical / runtime 为兼容既有主链，仍保留 `boundary_id`、`boundary projection` 等历史机器字段名
 
 - Opens the framework tree and workspace evidence tree from the sidebar.
+- Clicks on the Shelf status bar item can open the framework tree directly (configurable).
 - Treats the repository mainline as:
   `Framework -> Config -> Code -> Evidence`.
 - Treats `projects/*/generated/canonical.json` as the only machine truth.
@@ -71,6 +72,7 @@ Local workspace overlay file:
 - `.shelf/settings.jsonc` can use JSONC comments and is intended for repository-visible local tuning.
 
 - `shelf.guardMode = strict`
+- `shelf.showMessagePopups = true`
 - `shelf.intentGateEnabled = true`
 - `shelf.intentGateRequireMappingEcho = true`
 - `shelf.intentGateRunChangeValidationBeforeGrant = true`
@@ -81,6 +83,9 @@ Local workspace overlay file:
 - `shelf.intentGateTemporaryBypasses = []`
 - `shelf.frameworkTreeNodeHorizontalGap = 8`
 - `shelf.frameworkTreeLevelVerticalGap = 80`
+- `shelf.frameworkTreeSourceMode = author_source`
+- `shelf.frameworkTreeAutoRefreshOnSave = true`
+- `shelf.statusBarClickAction = openFrameworkTree`
 - `shelf.treeZoomMinScale = 0.68`
 - `shelf.treeZoomMaxScale = 1.55`
 - `shelf.treeWheelSensitivity = 1`
@@ -98,6 +103,24 @@ Local workspace overlay file:
 - `shelf.frameworkQuickFixEnabled = true`
 
 Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload. Framework lint/completion/quick-fix settings take effect immediately for currently opened framework markdown files.
+
+Notification popup behavior:
+
+- `shelf.showMessagePopups = true`: keep Shelf right-corner popup messages enabled.
+- `shelf.showMessagePopups = false`: suppress popup interruptions while keeping Output logs, status-bar state, and Problems signals available.
+
+Framework tree behavior settings:
+
+- `shelf.frameworkTreeSourceMode = author_source`:
+  force author-source tree from `framework/**` for real-time framework editing.
+- `shelf.frameworkTreeSourceMode = auto`:
+  canonical-first framework tree projection (fallback to author-source when canonical is unavailable).
+- `shelf.frameworkTreeAutoRefreshOnSave = true`:
+  auto-refresh an open framework tree when a framework markdown file is saved.
+- `shelf.statusBarClickAction = openFrameworkTree`:
+  clicking Shelf status bar opens the framework tree panel (floating/dockable/resizable webview tab).
+- `shelf.statusBarClickAction = quickPick`:
+  clicking Shelf status bar first shows two explicit choices: open framework tree or show issues.
 
 Intent-gate temporary bypass supports multi-option configuration:
 
@@ -148,6 +171,7 @@ The evidence tree is the canonical-derived workspace evidence view.
 No persisted tree artifact is used for these views; both trees are runtime projections.
 Both tree views render as interactive webview graphs (dagre layout + d3-zoom runtime interaction), and framework nodes stay layer-fixed with layout-engine auto sorting.
 Tree interactions include search, upstream/downstream focus, keyboard navigation (arrow keys + Enter), and viewport/selection state persistence.
+The framework tree can run in author-source mode (`shelf.frameworkTreeSourceMode = author_source`) for real-time framework file updates without waiting for canonical materialization.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
 
 ## Project Config Navigation

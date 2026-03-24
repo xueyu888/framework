@@ -362,7 +362,7 @@ function activate(context) {
   const frameworkLintDiagnostics = vscode.languages.createDiagnosticCollection("shelf-framework-lint");
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   resetStatusToIdle(status);
-  status.command = "shelf.showIssues";
+  status.command = "shelf.openFrameworkTree";
   status.show();
 
   context.subscriptions.push(output, diagnostics, frameworkLintDiagnostics, status);
@@ -401,11 +401,14 @@ function activate(context) {
   const TREE_WEBVIEW_SETTING_KEYS = [
     "shelf.frameworkTreeNodeHorizontalGap",
     "shelf.frameworkTreeLevelVerticalGap",
+    "shelf.frameworkTreeSourceMode",
+    "shelf.frameworkTreeAutoRefreshOnSave",
     "shelf.treeZoomMinScale",
     "shelf.treeZoomMaxScale",
     "shelf.treeWheelSensitivity",
     "shelf.treeInspectorWidth",
     "shelf.treeInspectorRailWidth",
+    "shelf.statusBarClickAction",
   ];
   const INTENT_GATE_SETTING_KEYS = [
     "shelf.intentGateEnabled",
@@ -451,6 +454,53 @@ function activate(context) {
     };
   };
 
+  const shouldShowMessagePopups = () => {
+    const config = getShelfConfig();
+    return Boolean(config.get("showMessagePopups", true));
+  };
+
+  const describeNotificationActions = (items) => {
+    const labels = (items || [])
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        if (item && typeof item === "object" && typeof item.title === "string") {
+          return item.title;
+        }
+        return "";
+      })
+      .filter(Boolean);
+    return labels.length ? ` actions=${labels.join(" | ")}` : "";
+  };
+
+  const showShelfInformationMessage = (message, ...items) => {
+    const text = String(message ?? "");
+    if (!shouldShowMessagePopups()) {
+      output.appendLine(`[notify:info:suppressed] ${text}${describeNotificationActions(items)}`);
+      return Promise.resolve(undefined);
+    }
+    return vscode.window.showInformationMessage(text, ...items);
+  };
+
+  const showShelfWarningMessage = (message, ...items) => {
+    const text = String(message ?? "");
+    if (!shouldShowMessagePopups()) {
+      output.appendLine(`[notify:warning:suppressed] ${text}${describeNotificationActions(items)}`);
+      return Promise.resolve(undefined);
+    }
+    return vscode.window.showWarningMessage(text, ...items);
+  };
+
+  const showShelfErrorMessage = (message, ...items) => {
+    const text = String(message ?? "");
+    if (!shouldShowMessagePopups()) {
+      output.appendLine(`[notify:error:suppressed] ${text}${describeNotificationActions(items)}`);
+      return Promise.resolve(undefined);
+    }
+    return vscode.window.showErrorMessage(text, ...items);
+  };
+
   const reloadLocalShelfSettings = (repoRoot, { notifyOnError = false } = {}) => {
     const snapshot = localSettings.readLocalShelfSettings(repoRoot);
     localShelfSettingValues = snapshot.values;
@@ -460,7 +510,7 @@ function activate(context) {
         output.appendLine(`[settings] ${nextError}`);
       }
       if (notifyOnError) {
-        void vscode.window.showWarningMessage(
+        void showShelfWarningMessage(
           `Shelf 已忽略 ${localSettings.LOCAL_SETTINGS_REL_PATH}：${nextError}`
         );
       }
@@ -489,6 +539,32 @@ function activate(context) {
       wheelSensitivity: clampNumber(config.get("treeWheelSensitivity"), 0.25, 3, 1),
       inspectorWidth: clampInt(config.get("treeInspectorWidth"), 240, 520, 338),
       inspectorRailWidth: clampInt(config.get("treeInspectorRailWidth"), 32, 72, 42),
+    };
+  };
+
+  const normalizeFrameworkTreeSourceMode = (value) => (
+    String(value || "").trim().toLowerCase() === "author_source"
+      ? "author_source"
+      : "auto"
+  );
+
+  const normalizeStatusBarClickAction = (value) => {
+    const action = String(value || "").trim();
+    if (action === "showIssues") {
+      return "showIssues";
+    }
+    if (action === "quickPick") {
+      return "quickPick";
+    }
+    return "openFrameworkTree";
+  };
+
+  const readTreeBehaviorSettings = () => {
+    const config = getShelfConfig();
+    return {
+      frameworkSourceMode: normalizeFrameworkTreeSourceMode(config.get("frameworkTreeSourceMode", "author_source")),
+      frameworkAutoRefreshOnSave: Boolean(config.get("frameworkTreeAutoRefreshOnSave", true)),
+      statusBarClickAction: normalizeStatusBarClickAction(config.get("statusBarClickAction", "openFrameworkTree")),
     };
   };
 
@@ -619,6 +695,20 @@ function activate(context) {
       await openTreeView(treePanelKind);
     }
   };
+
+  const applyStatusBarClickAction = () => {
+    const behavior = readTreeBehaviorSettings();
+    if (behavior.statusBarClickAction === "showIssues") {
+      status.command = "shelf.showIssues";
+      return;
+    }
+    if (behavior.statusBarClickAction === "quickPick") {
+      status.command = "shelf.statusBarActionMenu";
+      return;
+    }
+    status.command = "shelf.openFrameworkTree";
+  };
+  applyStatusBarClickAction();
 
   const statusController = createStatusController({
     status,
@@ -988,7 +1078,7 @@ function activate(context) {
     }
 
     gitHooksPrompted = true;
-    const action = await vscode.window.showInformationMessage(
+    const action = await showShelfInformationMessage(
       "Shelf 建议启用仓库 Git Hooks，避免 pre-push 校验被跳过。",
       "安装 Hooks",
       "稍后"
@@ -1001,7 +1091,7 @@ function activate(context) {
   const runCodegenPreflight = async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
     const repoRoot = folder.uri.fsPath;
@@ -1038,7 +1128,7 @@ function activate(context) {
       applyDiagnostics({ passed: false, errors: materializeResult.errors }, diagnostics, repoRoot, null);
       statusController.refresh();
       refreshSidebarHome();
-      const action = await vscode.window.showErrorMessage(
+      const action = await showShelfErrorMessage(
         "Shelf 生成前预检在物化阶段失败。",
         "打开问题列表",
         "打开日志"
@@ -1056,7 +1146,7 @@ function activate(context) {
     }
     await runValidation({ mode: "full", triggerUris: [], notifyOnFail: true, source: "manual" });
     if (lastValidationPassed) {
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         "Shelf 生成前预检通过。Framework -> Config -> Code -> Evidence 主链一致。"
       );
     }
@@ -1357,7 +1447,7 @@ function activate(context) {
       const shouldNotify = task.notifyOnFail || config.get("notifyOnAutoFail");
       if (shouldNotify && shouldNotifyFailure(combined.errors, lastFailureSignature)) {
         lastFailureSignature = signature(combined.errors);
-        const action = await vscode.window.showErrorMessage(
+        const action = await showShelfErrorMessage(
           `Shelf 守卫失败（${combined.errors.length} 个问题）。`,
           "打开问题列表",
           "打开日志"
@@ -1410,7 +1500,7 @@ function activate(context) {
     const normalizedRel = relFile.replace(/\\/g, "/").replace(/^\/+/, "");
     const absPath = path.resolve(repoRoot, normalizedRel);
     if (!fs.existsSync(absPath)) {
-      vscode.window.showWarningMessage(`Shelf：未找到源文件：${normalizedRel}`);
+      showShelfWarningMessage(`Shelf：未找到源文件：${normalizedRel}`);
       return;
     }
 
@@ -1464,7 +1554,7 @@ function activate(context) {
   const openTreeView = async (kind) => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
 
@@ -1482,7 +1572,7 @@ function activate(context) {
         "Shelf：执行生成前预检",
         treeTitleForKind(kind)
       );
-      vscode.window.showWarningMessage(
+      showShelfWarningMessage(
         freshnessDetail
           ? `Shelf：canonical 未 fresh 前证据树不可用。${freshnessDetail}`
           : "Shelf：canonical 未 fresh 前证据树不可用。"
@@ -1511,7 +1601,10 @@ function activate(context) {
         return;
       }
 
-      const model = treeRuntimeModels.buildRuntimeTreeModel(repoRoot, kind);
+      const behavior = readTreeBehaviorSettings();
+      const model = treeRuntimeModels.buildRuntimeTreeModel(repoRoot, kind, {
+        frameworkSourceMode: behavior.frameworkSourceMode,
+      });
       const scriptUri = panel.webview.asWebviewUri(vscode.Uri.file(scriptPath)).toString();
       const styleUri = panel.webview.asWebviewUri(vscode.Uri.file(stylePath)).toString();
       panel.webview.html = treeWebviewBridge.buildRuntimeTreeHtml({
@@ -1538,6 +1631,25 @@ function activate(context) {
 
   const openEvidenceTree = async () => {
     await openTreeView("evidence");
+  };
+
+  const maybeRefreshFrameworkTreeForSavedDocument = async (document) => {
+    if (!treePanel || treePanelKind !== "framework") {
+      return;
+    }
+    const behavior = readTreeBehaviorSettings();
+    if (!behavior.frameworkAutoRefreshOnSave) {
+      return;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) {
+      return;
+    }
+    const repoRoot = folder.uri.fsPath;
+    if (!frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)) {
+      return;
+    }
+    await openFrameworkTree();
   };
 
   const clearShelfDiagnosticsForUri = (uri) => {
@@ -2672,7 +2784,9 @@ function activate(context) {
         if (message.type === "shelf.sidebar.openIssue") {
           const index = Number(message.index);
           if (Number.isInteger(index) && index >= 0 && index < lastRunIssues.length && lastRepoRoot) {
-            await revealIssue(lastRunIssues[index], lastRepoRoot);
+            await revealIssue(lastRunIssues[index], lastRepoRoot, {
+              notifyWarning: showShelfWarningMessage,
+            });
           }
         }
       });
@@ -2898,13 +3012,13 @@ function activate(context) {
     async () => {
       const folder = vscode.workspace.workspaceFolders?.[0];
       if (!folder) {
-        vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+        showShelfWarningMessage("Shelf：当前未打开工作区。");
         return;
       }
 
       const settings = readIntentGateSettings();
       if (!settings.enabled) {
-        vscode.window.showWarningMessage("Shelf：对话意图门禁已关闭，请先启用 `shelf.intentGateEnabled`。");
+        showShelfWarningMessage("Shelf：对话意图门禁已关闭，请先启用 `shelf.intentGateEnabled`。");
         return;
       }
 
@@ -2923,14 +3037,14 @@ function activate(context) {
         intentText,
       });
       if (!result.passed) {
-        vscode.window.showErrorMessage(`Shelf 对话意图门禁拒绝授权：${result.message}`);
+        showShelfErrorMessage(`Shelf 对话意图门禁拒绝授权：${result.message}`);
         return;
       }
 
       const preview = result.analysis.mappings.slice(0, 2)
         .map((item) => `${item.moduleId}/${item.boundaryId}`)
         .join(" | ");
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         `Shelf 受控任务已授权（${result.analysis.mappings.length} 条映射）：${preview}`
       );
     }
@@ -2942,7 +3056,7 @@ function activate(context) {
       const settings = readIntentGateSettings();
       const session = ensureIntentGateSession(settings);
       if (!session) {
-        vscode.window.showInformationMessage("Shelf：当前没有已授权的受控任务会话。");
+        showShelfInformationMessage("Shelf：当前没有已授权的受控任务会话。");
         return;
       }
       output.appendLine("[intent-gate] active session");
@@ -2962,7 +3076,7 @@ function activate(context) {
     async () => {
       clearIntentGateSession("manual clear");
       refreshSidebarHome();
-      vscode.window.showInformationMessage("Shelf：受控任务会话已清空。");
+      showShelfInformationMessage("Shelf：受控任务会话已清空。");
     }
   );
 
@@ -2979,7 +3093,7 @@ function activate(context) {
     async () => {
       const activeDraft = activeFrameworkDraftFile();
       if (!activeDraft) {
-        vscode.window.showWarningMessage(
+        showShelfWarningMessage(
           "Shelf：发布前请先打开 `framework_drafts/<framework>/` 下的 Markdown 文件。"
         );
         return;
@@ -2998,7 +3112,7 @@ function activate(context) {
         )
       );
       if (!result.passed) {
-        const action = await vscode.window.showErrorMessage(
+        const action = await showShelfErrorMessage(
           "Shelf：发布当前 framework 草稿失败。",
           "打开日志"
         );
@@ -3016,7 +3130,7 @@ function activate(context) {
         notifyOnFail: true,
         source: "manual"
       });
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         `Shelf：已发布 ${workspaceGuard.normalizeRelPath(activeDraft.publishedRelPath)}`
       );
     }
@@ -3025,7 +3139,7 @@ function activate(context) {
   const installGitHooksDisposable = vscode.commands.registerCommand("shelf.installGitHooks", async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
 
@@ -3044,9 +3158,9 @@ function activate(context) {
     );
 
     if (result.passed) {
-      vscode.window.showInformationMessage("Shelf：仓库 Git Hooks 已安装。");
+      showShelfInformationMessage("Shelf：仓库 Git Hooks 已安装。");
     } else {
-      const action = await vscode.window.showErrorMessage(
+      const action = await showShelfErrorMessage(
         "Shelf：安装仓库 Git Hooks 失败。",
         "打开日志"
       );
@@ -3062,12 +3176,12 @@ function activate(context) {
     async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
-        vscode.window.showWarningMessage("Shelf：当前没有可用于插入模板的活动编辑器。");
+        showShelfWarningMessage("Shelf：当前没有可用于插入模板的活动编辑器。");
         return;
       }
 
       if (editor.document.languageId !== "markdown") {
-        vscode.window.showWarningMessage("Shelf：framework 模块模板只能插入到 Markdown 文件。");
+        showShelfWarningMessage("Shelf：framework 模块模板只能插入到 Markdown 文件。");
         return;
       }
 
@@ -3077,7 +3191,7 @@ function activate(context) {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         output.appendLine(`[template] ${message}`);
-        vscode.window.showErrorMessage("Shelf：加载 @framework 模块模板失败。");
+        showShelfErrorMessage("Shelf：加载 @framework 模块模板失败。");
         return;
       }
 
@@ -3086,14 +3200,14 @@ function activate(context) {
         editor.selections
       );
       if (!inserted) {
-        vscode.window.showWarningMessage("Shelf：framework 模块模板插入已取消。");
+        showShelfWarningMessage("Shelf：framework 模块模板插入已取消。");
       }
     }
   );
 
   const showIssuesDisposable = vscode.commands.registerCommand("shelf.showIssues", async () => {
     if (!validationActive && lastRepoRoot) {
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         `Shelf 校验守卫已停用：当前工作区缺少 ${STANDARDS_TREE_FILE}。`
       );
       return;
@@ -3105,7 +3219,9 @@ function activate(context) {
     }
 
     if (lastRunIssues.length === 1 && lastRepoRoot) {
-      await revealIssue(lastRunIssues[0], lastRepoRoot);
+      await revealIssue(lastRunIssues[0], lastRepoRoot, {
+        notifyWarning: showShelfWarningMessage,
+      });
       return;
     }
 
@@ -3128,9 +3244,44 @@ function activate(context) {
     });
 
     if (selected && lastRepoRoot) {
-      await revealIssue(selected.issue, lastRepoRoot);
+      await revealIssue(selected.issue, lastRepoRoot, {
+        notifyWarning: showShelfWarningMessage,
+      });
     }
   });
+
+  const statusBarActionMenuDisposable = vscode.commands.registerCommand(
+    "shelf.statusBarActionMenu",
+    async () => {
+      const selected = await vscode.window.showQuickPick(
+        [
+          {
+            label: "Open Framework Tree (Recommended)",
+            description: "打开可拖动/可关闭/可调整大小的框架树图窗口。",
+            action: "openFrameworkTree",
+          },
+          {
+            label: "Show Issues",
+            description: "打开 Shelf 问题列表与定位入口。",
+            action: "showIssues",
+          },
+        ],
+        {
+          title: "Shelf Status Action",
+          placeHolder: "选择点击状态栏后的执行动作",
+          canPickMany: false,
+        }
+      );
+      if (!selected) {
+        return;
+      }
+      if (selected.action === "showIssues") {
+        await vscode.commands.executeCommand("shelf.showIssues");
+        return;
+      }
+      await vscode.commands.executeCommand("shelf.openFrameworkTree");
+    }
+  );
 
   const openFrameworkTreeDisposable = vscode.commands.registerCommand("shelf.openFrameworkTree", async () => {
     await openFrameworkTree();
@@ -3139,11 +3290,11 @@ function activate(context) {
   const refreshFrameworkTreeDisposable = vscode.commands.registerCommand("shelf.refreshFrameworkTree", async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
     await openFrameworkTree();
-    vscode.window.showInformationMessage("Shelf：框架树运行时投影已刷新。");
+    showShelfInformationMessage("Shelf：框架树运行时投影已刷新。");
   });
 
   const openEvidenceTreeDisposable = vscode.commands.registerCommand("shelf.openEvidenceTree", async () => {
@@ -3153,7 +3304,7 @@ function activate(context) {
   const refreshEvidenceTreeDisposable = vscode.commands.registerCommand("shelf.refreshEvidenceTree", async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
 
@@ -3170,7 +3321,7 @@ function activate(context) {
         "Shelf：执行生成前预检",
         treeTitleForKind("evidence")
       );
-      vscode.window.showWarningMessage(
+      showShelfWarningMessage(
         freshnessDetail
           ? `Shelf：canonical 未 fresh，证据树刷新已阻断。${freshnessDetail}`
           : "Shelf：canonical 未 fresh，证据树刷新已阻断。"
@@ -3179,7 +3330,7 @@ function activate(context) {
     }
 
     await openEvidenceTree();
-    vscode.window.showInformationMessage("Shelf：证据树运行时投影已刷新。");
+    showShelfInformationMessage("Shelf：证据树运行时投影已刷新。");
   });
 
   const configurationDisposable = vscode.workspace.onDidChangeConfiguration(async (event) => {
@@ -3195,6 +3346,9 @@ function activate(context) {
         refreshTree: affectsTreeView
       });
     }
+    if (affectsTreeView) {
+      applyStatusBarClickAction();
+    }
     if (affectsFrameworkLint) {
       refreshFrameworkLintForOpenDocuments({ immediate: true });
     }
@@ -3202,6 +3356,7 @@ function activate(context) {
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (doc) => {
     scheduleFrameworkLintForDocument(doc, { immediate: true });
+    await maybeRefreshFrameworkTreeForSavedDocument(doc);
     const config = getShelfConfig();
     if (!config.get("enableOnSave") || !shouldRunValidationTrigger("save")) {
       return;
@@ -3365,6 +3520,7 @@ function activate(context) {
     publishFrameworkDraftDisposable,
     installGitHooksDisposable,
     showIssuesDisposable,
+    statusBarActionMenuDisposable,
     openFrameworkTreeDisposable,
     refreshFrameworkTreeDisposable,
     openEvidenceTreeDisposable,
@@ -4385,14 +4541,17 @@ function buildSidebarHomeHtml(model) {
 </html>`;
 }
 
-async function revealIssue(issue, repoRoot) {
+async function revealIssue(issue, repoRoot, options = {}) {
+  const notifyWarning = typeof options.notifyWarning === "function"
+    ? options.notifyWarning
+    : (message) => vscode.window.showWarningMessage(message);
   const candidate = resolveIssueFile(issue.file, repoRoot);
   const fallbackTarget = resolveValidationFallbackFile(repoRoot);
   const target = (candidate && fs.existsSync(candidate))
     ? candidate
     : fallbackTarget;
   if (!target || !fs.existsSync(target)) {
-    vscode.window.showWarningMessage("Shelf 无可用定位文件：当前工作区未发现可打开的项目配置或规范文档。");
+    await notifyWarning("Shelf 无可用定位文件：当前工作区未发现可打开的项目配置或规范文档。");
     return;
   }
   const uri = vscode.Uri.file(target);

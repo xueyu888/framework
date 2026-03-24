@@ -6,6 +6,8 @@ const workspaceGuard = require("./guarding");
 
 const MODULE_ID_PATTERN = /^(?<framework>[A-Za-z][A-Za-z0-9_]*)\.L(?<level>\d+)\.M(?<module>\d+)$/;
 const MODULE_FILE_PATTERN = /^L(?<level>\d+)-M(?<module>\d+)-/;
+const FRAMEWORK_TREE_SOURCE_MODE_AUTO = "auto";
+const FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE = "author_source";
 
 /**
  * @typedef {Object} HoverItem
@@ -219,6 +221,18 @@ function levelLabelsFor(levels) {
       .sort((left, right) => left - right)
       .map((level) => [level, `L${level} 标准层`])
   );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {"auto"|"author_source"}
+ */
+function normalizeFrameworkTreeSourceMode(value) {
+  const mode = asText(value).toLowerCase();
+  if (mode === FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE) {
+    return FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE;
+  }
+  return FRAMEWORK_TREE_SOURCE_MODE_AUTO;
 }
 
 /**
@@ -628,9 +642,20 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
 
 /**
  * @param {string} repoRoot
+ * @param {{ frameworkSourceMode?: "auto"|"author_source" }} [options]
  * @returns {RuntimeTreeModel}
  */
-function buildRuntimeFrameworkTreeModel(repoRoot) {
+function buildRuntimeFrameworkTreeModel(repoRoot, options = {}) {
+  const sourceMode = normalizeFrameworkTreeSourceMode(options.frameworkSourceMode);
+  if (sourceMode === FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE) {
+    const authorModel = buildAuthorFallbackFrameworkTreeModel(repoRoot);
+    authorModel.description = [
+      "Author-source mode is enabled by `shelf.frameworkTreeSourceMode=author_source`.",
+      "Framework tree follows `framework/**` files directly for real-time authoring feedback.",
+    ].join(" ");
+    authorModel.footText = "Author-source mode keeps framework columns and local Lx bands; canonical edges are intentionally omitted.";
+    return authorModel;
+  }
   return buildCanonicalFrameworkTreeModel(repoRoot) || buildAuthorFallbackFrameworkTreeModel(repoRoot);
 }
 
@@ -708,12 +733,13 @@ function buildRuntimeEvidenceTreeModel(repoRoot) {
 /**
  * @param {string} repoRoot
  * @param {"framework"|"evidence"} kind
+ * @param {{ frameworkSourceMode?: "auto"|"author_source" }} [options]
  * @returns {RuntimeTreeModel}
  */
-function buildRuntimeTreeModel(repoRoot, kind) {
+function buildRuntimeTreeModel(repoRoot, kind, options = {}) {
   return kind === "evidence"
     ? buildRuntimeEvidenceTreeModel(repoRoot)
-    : buildRuntimeFrameworkTreeModel(repoRoot);
+    : buildRuntimeFrameworkTreeModel(repoRoot, options);
 }
 
 module.exports = {
