@@ -73,6 +73,7 @@ function main() {
   const configuration = packageJson.contributes?.configuration?.properties || {};
   for (const key of [
     "shelf.guardMode",
+    "shelf.showMessagePopups",
     "shelf.autoMaterialize",
     "shelf.runMypyOnPythonChanges",
     "shelf.protectGeneratedFiles",
@@ -115,6 +116,30 @@ function main() {
   assert(
     configuration["shelf.frameworkQuickFixEnabled"]?.default === true,
     "package.json must enable framework lint quick fixes by default"
+  );
+  assert.strictEqual(
+    configuration["shelf.frameworkTreeSourceMode"]?.default,
+    "author_source",
+    "package.json must default framework tree source mode to author_source"
+  );
+  assert.strictEqual(
+    configuration["shelf.frameworkTreeAutoRefreshOnSave"]?.default,
+    true,
+    "package.json must auto-refresh framework tree on save by default"
+  );
+  assert.strictEqual(
+    configuration["shelf.statusBarClickAction"]?.default,
+    "openFrameworkTree",
+    "package.json must default status bar click action to open framework tree"
+  );
+  assert.strictEqual(
+    configuration["shelf.showMessagePopups"]?.default,
+    true,
+    "package.json must enable popup messages by default"
+  );
+  assert(
+    (configuration["shelf.statusBarClickAction"]?.enum || []).includes("quickPick"),
+    "package.json must support quickPick status bar click action"
   );
   assert(
     !Object.prototype.hasOwnProperty.call(configuration, "shelf.intentGateEnforcementMode"),
@@ -168,6 +193,10 @@ function main() {
     "extension.js must register the framework tree open command"
   );
   assert(
+    /registerCommand\s*\(\s*"shelf\.statusBarActionMenu"/.test(extensionSource),
+    "extension.js must register the status bar action menu command"
+  );
+  assert(
     /registerCommand\s*\(\s*"shelf\.openEvidenceTree"/.test(extensionSource),
     "extension.js must register the evidence tree open command"
   );
@@ -204,6 +233,18 @@ function main() {
     "README must document the framework tree open command"
   );
   assert(
+    readme.includes("shelf.statusBarClickAction = openFrameworkTree"),
+    "README must document status bar click action setting"
+  );
+  assert(
+    readme.includes("shelf.statusBarClickAction = quickPick"),
+    "README must document quickPick status bar action mode"
+  );
+  assert(
+    readme.includes("shelf.frameworkTreeSourceMode = author_source"),
+    "README must document framework author-source tree mode"
+  );
+  assert(
     readme.includes("Shelf: Refresh Framework Tree"),
     "README must document the framework tree refresh command"
   );
@@ -218,6 +259,10 @@ function main() {
   assert(
     readme.includes("shelf.guardMode = strict"),
     "README must document strict guard mode"
+  );
+  assert(
+    readme.includes("shelf.showMessagePopups = true"),
+    "README must document the popup notification toggle setting"
   );
   assert(
     readme.includes(".shelf/settings.jsonc"),

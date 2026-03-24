@@ -353,6 +353,30 @@ function main() {
     const evidenceViaDispatcher = buildRuntimeTreeModel(freshFixtureRoot, "evidence");
     assert.strictEqual(frameworkViaDispatcher.kind, "framework");
     assert.strictEqual(evidenceViaDispatcher.kind, "evidence");
+
+    const authorSourceModeModel = buildRuntimeFrameworkTreeModel(freshFixtureRoot, {
+      frameworkSourceMode: "author_source",
+    });
+    assert.strictEqual(authorSourceModeModel.kind, "framework");
+    assert.strictEqual(
+      authorSourceModeModel.edges.length,
+      0,
+      "author-source mode should prefer direct framework files and skip canonical growth edges"
+    );
+    assert(
+      authorSourceModeModel.description.includes("Author-source mode is enabled"),
+      "author-source mode should be explicit in framework tree description"
+    );
+    assert(
+      authorSourceModeModel.nodes.every((node) => node.id.startsWith("framework-source:")),
+      "author-source mode should build nodes from framework author files"
+    );
+
+    const authorSourceViaDispatcher = buildRuntimeTreeModel(freshFixtureRoot, "framework", {
+      frameworkSourceMode: "author_source",
+    });
+    assert.strictEqual(authorSourceViaDispatcher.kind, "framework");
+    assert.strictEqual(authorSourceViaDispatcher.edges.length, 0);
   } finally {
     fs.rmSync(freshFixtureRoot, { recursive: true, force: true });
   }

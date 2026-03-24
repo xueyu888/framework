@@ -65,6 +65,18 @@ function main() {
     missingIssues.some((issue) => issue.code === "FWL003"),
     "missing required section should be reported"
   );
+
+  const missingCapabilityRefText = VALID_FRAMEWORK_TEXT.replace(
+    "  - `R1.3` 输出能力：`C1`。",
+    "  - `R1.3` 输出能力：`C1 + C2`。"
+  );
+  const missingCapabilityRefIssues = runLint(missingCapabilityRefText);
+  assert(
+    missingCapabilityRefIssues.some(
+      (issue) => issue.code === "FWL011" && String(issue.message || "").includes("`C2`")
+    ),
+    "undefined capability reference should be reported"
+  );
 }
 
 main();
