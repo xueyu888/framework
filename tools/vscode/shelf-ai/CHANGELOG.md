@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.23 - 2026-03-24
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.22..shelf-ai-v0.1.23`.
+- Flattened framework capability authoring so `N*` non-responsibility items can be written directly after `C*` items without introducing a dedicated third-level heading.
+- Relaxed realtime framework lint to treat `###` lines as neutral separators instead of structural errors, while keeping second-level section order and list-entry syntax checks strict.
+- Synced framework completion, snippet template, and quick-fix behavior with the flat `C* / N*` authoring style.
+- Revalidated the extension and repository checks, then repackaged the VSIX from the clean release baseline.
+
 ## 0.1.22 - 2026-03-24
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.21..shelf-ai-v0.1.22`.
