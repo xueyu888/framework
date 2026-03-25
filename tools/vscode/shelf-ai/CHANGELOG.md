@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.23 - 2026-03-25
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.22..shelf-ai-v0.1.23`.
+- Flattened framework non-responsibility authoring so `N*` declarations are now authored as first-class flat items instead of nested/indented patterns.
+- Kept the release scoped to authoring-structure polish with no new runtime behavior added to Shelf AI.
+
+## 0.1.22 - 2026-03-24
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.21..shelf-ai-v0.1.22`.
+- Switched the framework tree to author-source rendering and avoided automatic save-time popups when the tree can continue serving author-side structure directly.
+- Added real-time author-source / canonical freshness split behavior in the framework tree and related status-bar actions, so stale canonical no longer blocks author-side graph reading.
+- Added validation for unresolved framework references plus undefined-symbol navigation fallback, and fully localized correspondence diagnostics to Chinese.
+- Synced runtime support so framework saves refresh canonical framework snapshots earlier for tree/navigation consumers.
+
 ## 0.1.21 - 2026-03-21
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.20..shelf-ai-v0.1.21`.
