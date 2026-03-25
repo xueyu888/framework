@@ -50,10 +50,20 @@ function main() {
 
   const validWithGoalText = VALID_FRAMEWORK_TEXT.replace(
     "## 1. 能力声明（Capability Statement）",
-    "## 0. 目标\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
+    "## 0. 目标 (Goal)\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
   );
   const validWithGoalIssues = runLint(validWithGoalText);
-  assert.strictEqual(validWithGoalIssues.length, 0, "optional ## 0 goal section should remain valid");
+  assert.strictEqual(validWithGoalIssues.length, 0, "optional ## 0 goal (Goal) section should remain valid");
+
+  const invalidGoalWithoutEnglishText = VALID_FRAMEWORK_TEXT.replace(
+    "## 1. 能力声明（Capability Statement）",
+    "## 0. 目标\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
+  );
+  const invalidGoalWithoutEnglishIssues = runLint(invalidGoalWithoutEnglishText);
+  assert(
+    invalidGoalWithoutEnglishIssues.some((issue) => issue.code === "FWL012"),
+    "## 0. 目标 without (Goal) should be rejected by heading-order lint"
+  );
 
   const starText = VALID_FRAMEWORK_TEXT.replace(
     "- `C1` 单元定位能力：支持通过定位键唯一定位文本单元。",
