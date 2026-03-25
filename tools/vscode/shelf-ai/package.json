@@ -2,7 +2,7 @@
   "name": "shelf-ai",
   "displayName": "Shelf AI",
   "description": "Shelf AI: canonical-first navigation for the Framework -> Config -> Code -> Evidence chain.",
-  "version": "0.1.21",
+  "version": "0.1.23",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
@@ -350,15 +350,6 @@
           "maximum": 180,
           "description": "%configuration.shelf.frameworkTreeLevelVerticalGap.description%"
         },
-        "shelf.frameworkTreeSourceMode": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "author_source"
-          ],
-          "default": "author_source",
-          "description": "%configuration.shelf.frameworkTreeSourceMode.description%"
-        },
         "shelf.frameworkTreeAutoRefreshOnSave": {
           "type": "boolean",
           "default": true,
@@ -383,7 +374,7 @@
         },
         "shelf.treeZoomMaxScale": {
           "type": "number",
-          "default": 1.55,
+          "default": 2.4,
           "minimum": 0.2,
           "maximum": 5,
           "description": "%configuration.shelf.treeZoomMaxScale.description%"

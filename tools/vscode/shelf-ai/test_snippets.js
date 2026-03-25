@@ -118,11 +118,6 @@ function main() {
     "package.json must enable framework lint quick fixes by default"
   );
   assert.strictEqual(
-    configuration["shelf.frameworkTreeSourceMode"]?.default,
-    "author_source",
-    "package.json must default framework tree source mode to author_source"
-  );
-  assert.strictEqual(
     configuration["shelf.frameworkTreeAutoRefreshOnSave"]?.default,
     true,
     "package.json must auto-refresh framework tree on save by default"
@@ -136,6 +131,11 @@ function main() {
     configuration["shelf.showMessagePopups"]?.default,
     true,
     "package.json must enable popup messages by default"
+  );
+  assert.strictEqual(
+    configuration["shelf.treeZoomMaxScale"]?.default,
+    2.4,
+    "package.json must allow framework tree zooming beyond the old 155% cap by default"
   );
   assert(
     (configuration["shelf.statusBarClickAction"]?.enum || []).includes("quickPick"),
@@ -179,6 +179,10 @@ function main() {
     frameworkSnippet.body.includes("## 5. 验证（Verification）"),
     "@framework snippet must include verification section"
   );
+  assert(
+    !frameworkSnippet.body.some((line) => String(line || "").startsWith("### ")),
+    "@framework snippet should not include third-level headings"
+  );
 
   assert(
     /registerCommand\s*\(\s*"shelf\.insertFrameworkModuleTemplate"/.test(extensionSource),
@@ -217,6 +221,10 @@ function main() {
     "extension.js must clear stale shelf diagnostics when watched documents are edited"
   );
   assert(
+    extensionSource.includes('openTreeView("framework", { reveal: false })'),
+    "extension.js must refresh framework tree in background on save without auto-revealing the panel"
+  );
+  assert(
     extensionSource.includes('$(close) Shelf 失败'),
     "extension.js must expose a visible cross icon for failing Shelf status"
   );
@@ -239,10 +247,6 @@ function main() {
   assert(
     readme.includes("shelf.statusBarClickAction = quickPick"),
     "README must document quickPick status bar action mode"
-  );
-  assert(
-    readme.includes("shelf.frameworkTreeSourceMode = author_source"),
-    "README must document framework author-source tree mode"
   );
   assert(
     readme.includes("Shelf: Refresh Framework Tree"),
@@ -351,6 +355,11 @@ function main() {
   assert(
     capabilityEntries.some((entry) => entry.label === "N 条目"),
     "capability section completion must include non-responsibility entry"
+  );
+  const templateText = frameworkCompletion.getFrameworkTemplateSnippetText();
+  assert(
+    !templateText.includes("### 非职责声明（Non-Responsibility Statement）"),
+    "framework template text should place N entries directly after C entries"
   );
 
   const baseEntries = frameworkCompletion.getFrameworkCompletionEntries("- `B", "B", true, {

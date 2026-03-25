@@ -76,13 +76,14 @@ const FRAMEWORK_RULE_HINTS = {
   FWL002: "@framework 必须为无参数单行",
   FWL003: "必须包含 1~5 标准章节",
   FWL004: "列表项必须使用 -",
-  FWL005: "能力声明条目格式必须合法",
+  FWL005: "能力章节条目格式必须合法（C*/N*）",
   FWL006: "边界定义条目格式必须合法",
   FWL007: "最小结构基条目格式必须合法",
   FWL008: "规则条目格式必须合法",
   FWL009: "验证条目格式必须合法",
   FWL010: "章节内必须至少存在一个可解析条目",
-  FWL011: "规则引用的符号必须先在本模块中定义"
+  FWL011: "规则引用的符号必须先在本模块中定义",
+  FWL012: "标准二级标题内容与顺序必须合法"
 };
 
 function resetStatusToIdle(status) {
@@ -401,7 +402,6 @@ function activate(context) {
   const TREE_WEBVIEW_SETTING_KEYS = [
     "shelf.frameworkTreeNodeHorizontalGap",
     "shelf.frameworkTreeLevelVerticalGap",
-    "shelf.frameworkTreeSourceMode",
     "shelf.frameworkTreeAutoRefreshOnSave",
     "shelf.treeZoomMinScale",
     "shelf.treeZoomMaxScale",
@@ -532,7 +532,7 @@ function activate(context) {
   const readTreeViewSettings = () => {
     const config = getShelfConfig();
     const zoomMinScale = clampNumber(config.get("treeZoomMinScale"), 0.2, 3, 0.68);
-    const zoomMaxScale = clampNumber(config.get("treeZoomMaxScale"), zoomMinScale, 5, 1.55);
+    const zoomMaxScale = clampNumber(config.get("treeZoomMaxScale"), zoomMinScale, 5, 2.4);
     return {
       zoomMinScale,
       zoomMaxScale,
@@ -541,12 +541,6 @@ function activate(context) {
       inspectorRailWidth: clampInt(config.get("treeInspectorRailWidth"), 32, 72, 42),
     };
   };
-
-  const normalizeFrameworkTreeSourceMode = (value) => (
-    String(value || "").trim().toLowerCase() === "author_source"
-      ? "author_source"
-      : "auto"
-  );
 
   const normalizeStatusBarClickAction = (value) => {
     const action = String(value || "").trim();
@@ -562,7 +556,6 @@ function activate(context) {
   const readTreeBehaviorSettings = () => {
     const config = getShelfConfig();
     return {
-      frameworkSourceMode: normalizeFrameworkTreeSourceMode(config.get("frameworkTreeSourceMode", "author_source")),
       frameworkAutoRefreshOnSave: Boolean(config.get("frameworkTreeAutoRefreshOnSave", true)),
       statusBarClickAction: normalizeStatusBarClickAction(config.get("statusBarClickAction", "openFrameworkTree")),
     };
@@ -692,7 +685,7 @@ function activate(context) {
     }
     refreshSidebarHome();
     if (refreshTree && treePanel) {
-      await openTreeView(treePanelKind);
+      await openTreeView(treePanelKind, { reveal: false });
     }
   };
 
@@ -1283,8 +1276,19 @@ function activate(context) {
       return { issues, materializedProjects };
     }
 
+    const hasFrameworkChanges = (changePlan.relPaths || [])
+      .some((relPath) => String(relPath || "").startsWith("framework/"));
+    const configuredMaterializeCommand = String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND);
+    const effectiveMaterializeCommand = hasFrameworkChanges
+      ? enableFrameworkOnlyFallbackForMaterializeCommand(configuredMaterializeCommand)
+      : configuredMaterializeCommand;
+    if (hasFrameworkChanges && effectiveMaterializeCommand !== configuredMaterializeCommand) {
+      output.appendLine(
+        "[materialize] framework change detected; enabling --allow-framework-only-fallback for canonical framework snapshot continuity."
+      );
+    }
     const materializeCommand = buildMaterializeCommand(
-      String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND),
+      effectiveMaterializeCommand,
       pendingMaterializeProjects
     );
     const materializeResult = await runParsedCommand(
@@ -1516,7 +1520,8 @@ function activate(context) {
     ? "Shelf · Evidence Tree"
     : "Shelf · Framework Tree";
 
-  const ensureTreePanel = (kind) => {
+  const ensureTreePanel = (kind, options = {}) => {
+    const reveal = options.reveal !== false;
     if (!treePanel) {
       treePanel = vscode.window.createWebviewPanel(
         "shelfTreeView",
@@ -1543,7 +1548,7 @@ function activate(context) {
           Number(message.line || 1)
         );
       });
-    } else {
+    } else if (reveal) {
       treePanel.reveal(vscode.ViewColumn.Active, true);
     }
     treePanelKind = kind;
@@ -1551,7 +1556,8 @@ function activate(context) {
     return treePanel;
   };
 
-  const openTreeView = async (kind) => {
+  const openTreeView = async (kind, options = {}) => {
+    const reveal = options.reveal !== false;
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
       showShelfWarningMessage("Shelf：当前未打开工作区。");
@@ -1564,7 +1570,7 @@ function activate(context) {
 
     if (kind === "evidence" && freshnessState.hasBlocking) {
       const freshnessDetail = describeCanonicalFreshness(freshnessState);
-      const panel = ensureTreePanel(kind);
+      const panel = ensureTreePanel(kind, { reveal });
       panel.webview.html = buildTreeFallbackHtml(
         freshnessDetail
           ? `canonical 未 fresh，证据树不可用。${freshnessDetail}`
@@ -1580,7 +1586,7 @@ function activate(context) {
       return;
     }
 
-    const panel = ensureTreePanel(kind);
+    const panel = ensureTreePanel(kind, { reveal });
     try {
       const scriptPath = path.join(context.extensionPath, "media", "tree_view_bundle.js");
       const stylePath = path.join(context.extensionPath, "media", "tree_view.css");
@@ -1601,10 +1607,7 @@ function activate(context) {
         return;
       }
 
-      const behavior = readTreeBehaviorSettings();
-      const model = treeRuntimeModels.buildRuntimeTreeModel(repoRoot, kind, {
-        frameworkSourceMode: behavior.frameworkSourceMode,
-      });
+      const model = treeRuntimeModels.buildRuntimeTreeModel(repoRoot, kind);
       const scriptUri = panel.webview.asWebviewUri(vscode.Uri.file(scriptPath)).toString();
       const styleUri = panel.webview.asWebviewUri(vscode.Uri.file(stylePath)).toString();
       panel.webview.html = treeWebviewBridge.buildRuntimeTreeHtml({
@@ -1626,11 +1629,11 @@ function activate(context) {
   };
 
   const openFrameworkTree = async () => {
-    await openTreeView("framework");
+    await openTreeView("framework", { reveal: true });
   };
 
   const openEvidenceTree = async () => {
-    await openTreeView("evidence");
+    await openTreeView("evidence", { reveal: true });
   };
 
   const maybeRefreshFrameworkTreeForSavedDocument = async (document) => {
@@ -1649,7 +1652,7 @@ function activate(context) {
     if (!frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)) {
       return;
     }
-    await openFrameworkTree();
+    await openTreeView("framework", { reveal: false });
   };
 
   const clearShelfDiagnosticsForUri = (uri) => {
@@ -2007,18 +2010,25 @@ function activate(context) {
     }
 
     if (code === "FWL005") {
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "C")
-        || nextFrameworkSymbolNumber(documentText, "C");
+      const normalizedLineText = String(lineText || "");
+      const preferNonResponsibility = /`N\d*(?:\.\d+)?`/.test(normalizedLineText)
+        || normalizedLineText.includes("非职责");
+      const symbol = preferNonResponsibility ? "N" : "C";
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, symbol)
+        || nextFrameworkSymbolNumber(documentText, symbol);
+      const replacement = preferNonResponsibility
+        ? `- \`N${inferred}\` 非职责声明：待补充非职责范围。\n`
+        : `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`;
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准 C 条目",
+          `替换为标准 ${symbol} 条目`,
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`
+              replacement
             );
             return true;
           }
@@ -3356,11 +3366,6 @@ function activate(context) {
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (doc) => {
     scheduleFrameworkLintForDocument(doc, { immediate: true });
-    await maybeRefreshFrameworkTreeForSavedDocument(doc);
-    const config = getShelfConfig();
-    if (!config.get("enableOnSave") || !shouldRunValidationTrigger("save")) {
-      return;
-    }
 
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
@@ -3371,9 +3376,18 @@ function activate(context) {
     if (!workspaceGuard.isWatchedPath(rel) || isSuppressedGeneratedPath(rel)) {
       return;
     }
+    const isFrameworkDoc = frameworkNavigation.isFrameworkMarkdownFile(doc.uri.fsPath, folder.uri.fsPath);
+    const config = getShelfConfig();
 
     dirtyWatchedFiles.delete(doc.uri.fsPath);
-    scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+    if (config.get("enableOnSave") && shouldRunValidationTrigger("save")) {
+      if (isFrameworkDoc) {
+        await runValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+      } else {
+        scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+      }
+    }
+    await maybeRefreshFrameworkTreeForSavedDocument(doc);
   });
 
   const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -3557,6 +3571,20 @@ function shellQuote(value) {
     return text;
   }
   return `'${text.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function enableFrameworkOnlyFallbackForMaterializeCommand(baseCommand) {
+  const command = String(baseCommand || DEFAULT_MATERIALIZE_COMMAND).trim();
+  if (!command) {
+    return DEFAULT_MATERIALIZE_COMMAND;
+  }
+  if (!/\bmaterialize_project\.py\b/.test(command)) {
+    return command;
+  }
+  if (/\s--allow-framework-only-fallback(?:\s|$)/.test(command)) {
+    return command;
+  }
+  return `${command} --allow-framework-only-fallback`;
 }
 
 function buildMaterializeCommand(baseCommand, projectFiles) {

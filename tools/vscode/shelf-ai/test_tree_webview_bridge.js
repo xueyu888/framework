@@ -88,7 +88,7 @@ function main() {
     },
     viewSettings: {
       zoomMinScale: 0.68,
-      zoomMaxScale: 1.55,
+      zoomMaxScale: 2.4,
       wheelSensitivity: 1,
       inspectorWidth: 338,
       inspectorRailWidth: 42,

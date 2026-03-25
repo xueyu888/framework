@@ -6,8 +6,7 @@ const workspaceGuard = require("./guarding");
 
 const MODULE_ID_PATTERN = /^(?<framework>[A-Za-z][A-Za-z0-9_]*)\.L(?<level>\d+)\.M(?<module>\d+)$/;
 const MODULE_FILE_PATTERN = /^L(?<level>\d+)-M(?<module>\d+)-/;
-const FRAMEWORK_TREE_SOURCE_MODE_AUTO = "auto";
-const FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE = "author_source";
+const MODULE_REF_PATTERN = /\bL(?<level>\d+)\.M(?<module>\d+)\b/g;
 
 /**
  * @typedef {Object} HoverItem
@@ -158,6 +157,75 @@ function firstMarkdownHeading(filePath) {
 }
 
 /**
+ * @param {string} text
+ * @param {string} frameworkName
+ * @returns {string[]}
+ */
+function extractModuleRefsFromText(text, frameworkName) {
+  const refs = new Set();
+  const source = String(text || "");
+  for (const match of source.matchAll(MODULE_REF_PATTERN)) {
+    const level = asPositiveInt(match.groups?.level, 0);
+    const module = asPositiveInt(match.groups?.module, 0);
+    refs.add(`${frameworkName}.L${level}.M${module}`);
+  }
+  return [...refs];
+}
+
+/**
+ * @param {string} filePath
+ * @returns {string[]}
+ */
+function readMarkdownLines(filePath) {
+  try {
+    return fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param {string[]} lines
+ * @param {string} frameworkName
+ * @returns {Array<{ baseId: string, detail: string, line: number, upstreamModuleIds: string[] }>}
+ */
+function parseAuthorFrameworkBases(lines, frameworkName) {
+  /** @type {Array<{ baseId: string, detail: string, line: number, upstreamModuleIds: string[] }>} */
+  const bases = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineText = String(lines[index] || "");
+
+    const baseMatch = /^\s*-\s*`(B\d+)`\s*(.*)$/.exec(lineText);
+    if (baseMatch) {
+      const baseId = asText(baseMatch[1]).toUpperCase();
+      const detail = asText(baseMatch[2]).replace(/^[:：]\s*/, "");
+      bases.push({
+        baseId,
+        detail,
+        line: index + 1,
+        upstreamModuleIds: extractModuleRefsFromText(lineText, frameworkName),
+      });
+    }
+  }
+
+  return bases;
+}
+
+/**
+ * @param {number[]} values
+ * @returns {Record<number, string>}
+ */
+function authorLevelLabelsFor(values) {
+  return Object.fromEntries(
+    [...new Set(values)]
+      .map((value) => Math.max(0, Math.floor(Number(value) || 0)))
+      .sort((left, right) => left - right)
+      .map((depth) => [depth, `L${depth} 模块层`])
+  );
+}
+
+/**
  * @param {unknown} sourceRef
  * @returns {{ filePath: string, line: number }}
  */
@@ -221,18 +289,6 @@ function levelLabelsFor(levels) {
       .sort((left, right) => left - right)
       .map((level) => [level, `L${level} 标准层`])
   );
-}
-
-/**
- * @param {unknown} value
- * @returns {"auto"|"author_source"}
- */
-function normalizeFrameworkTreeSourceMode(value) {
-  const mode = asText(value).toLowerCase();
-  if (mode === FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE) {
-    return FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE;
-  }
-  return FRAMEWORK_TREE_SOURCE_MODE_AUTO;
 }
 
 /**
@@ -561,6 +617,71 @@ function buildCanonicalFrameworkTreeModel(repoRoot) {
 
 /**
  * @param {string} repoRoot
+ * @returns {{
+ *   edges: RuntimeTreeEdge[],
+ *   hasCanonicalModules: boolean,
+ *   staleProjectIds: string[],
+ *   excludedProjectIds: string[],
+ * }}
+ */
+function collectCanonicalGrowthEdges(repoRoot) {
+  const collected = collectCanonicalFrameworkModulesForTree(repoRoot);
+  /** @type {RuntimeTreeEdge[]} */
+  const edges = [];
+  const seenEdgeIds = new Set();
+
+  for (const rawModule of collected.modules) {
+    if (!rawModule || typeof rawModule !== "object") {
+      continue;
+    }
+    const moduleId = asText(rawModule.module_id);
+    if (!moduleId) {
+      continue;
+    }
+    const exportSurface = rawModule.export_surface && typeof rawModule.export_surface === "object"
+      ? rawModule.export_surface
+      : {};
+    const upstreamIds = Array.isArray(exportSurface.upstream_module_ids)
+      ? exportSurface.upstream_module_ids.map((value) => asText(value)).filter(Boolean)
+      : [];
+    if (!upstreamIds.length) {
+      continue;
+    }
+    const sourceInfo = sourceRefInfo(exportSurface.source_ref);
+    const sourceFile = sourceInfo.filePath || workspaceGuard.normalizeRelPath(asText(rawModule.framework_file));
+    const sourceLine = sourceInfo.line || 1;
+    const ruleIds = Array.isArray(exportSurface.rule_ids)
+      ? exportSurface.rule_ids.map((value) => asText(value)).filter(Boolean)
+      : [];
+    for (const upstreamId of upstreamIds) {
+      const edgeId = `${upstreamId}=>${moduleId}`;
+      if (seenEdgeIds.has(edgeId)) {
+        continue;
+      }
+      seenEdgeIds.add(edgeId);
+      edges.push({
+        id: edgeId,
+        from: upstreamId,
+        to: moduleId,
+        relation: "framework_module_growth",
+        rules: ruleIds.join(", "),
+        terms: upstreamId,
+        file: sourceFile,
+        line: sourceLine,
+      });
+    }
+  }
+
+  return {
+    edges,
+    hasCanonicalModules: collected.modules.length > 0,
+    staleProjectIds: collected.staleProjectIds,
+    excludedProjectIds: collected.excludedProjectIds,
+  };
+}
+
+/**
+ * @param {string} repoRoot
  * @returns {RuntimeTreeModel}
  */
 function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
@@ -571,8 +692,14 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
 
   /** @type {RuntimeTreeNode[]} */
   const nodes = [];
+  /** @type {RuntimeTreeEdge[]} */
+  const edges = [];
   /** @type {Map<string, Map<number, number>>} */
   const frameworkCounts = new Map();
+  const relationCounts = {
+    framework_module_growth: 0,
+  };
+  const edgeIds = new Set();
 
   const frameworkDirs = fs.readdirSync(frameworkRoot)
     .map((entry) => ({
@@ -600,14 +727,19 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
       const absPath = path.join(frameworkDir.absPath, fileName);
       const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, absPath));
       const heading = firstMarkdownHeading(absPath);
-      levelCounts?.set(parsed.level, (levelCounts?.get(parsed.level) || 0) + 1);
+      const lines = readMarkdownLines(absPath);
+      const bases = parseAuthorFrameworkBases(lines, frameworkDir.name);
+
+      const moduleDepth = Math.max(0, parsed.level);
+      levelCounts?.set(moduleDepth, (levelCounts?.get(moduleDepth) || 0) + 1);
+      const moduleId = `${frameworkDir.name}.L${parsed.level}.M${parsed.module}`;
       nodes.push({
-        id: `framework-source:${relPath}`,
+        id: moduleId,
         label: `L${parsed.level}.${frameworkDir.name}.M${parsed.module}`,
         detail: heading.title || fileName,
         file: relPath,
         line: heading.line,
-        depth: parsed.level,
+        depth: moduleDepth,
         kind: "framework_module",
         group: frameworkDir.name,
         order: parsed.module,
@@ -618,45 +750,89 @@ function buildAuthorFallbackFrameworkTreeModel(repoRoot) {
         docLine: heading.line,
         hoverKicker: "Framework Module (Author Source)",
         capabilityItems: [],
-        baseItems: [],
+        baseItems: bases.map((base) => ({
+          token: asText(base.baseId).toUpperCase(),
+          text: base.detail || asText(base.baseId).toUpperCase(),
+        })),
       });
+
+      /** @type {Map<string, { baseIds: Set<string>, line: number }>} */
+      const upstreamBasesByModuleId = new Map();
+      for (const base of bases) {
+        const baseId = asText(base.baseId).toUpperCase();
+        if (!baseId) {
+          continue;
+        }
+        for (const upstreamModuleId of base.upstreamModuleIds) {
+          if (!upstreamBasesByModuleId.has(upstreamModuleId)) {
+            upstreamBasesByModuleId.set(upstreamModuleId, {
+              baseIds: new Set(),
+              line: base.line || 1,
+            });
+          }
+          upstreamBasesByModuleId.get(upstreamModuleId)?.baseIds.add(baseId);
+        }
+      }
+
+      for (const [upstreamModuleId, edgeInfo] of upstreamBasesByModuleId.entries()) {
+        if (!upstreamModuleId) {
+          continue;
+        }
+        const terms = [...edgeInfo.baseIds].sort().join(", ");
+        if (!terms) {
+          continue;
+        }
+          const growthEdgeId = `${upstreamModuleId}=>${moduleId}`;
+          if (edgeIds.has(growthEdgeId)) {
+            continue;
+          }
+          edgeIds.add(growthEdgeId);
+          edges.push({
+            id: growthEdgeId,
+            from: upstreamModuleId,
+            to: moduleId,
+            relation: "framework_module_growth",
+            terms,
+            file: relPath,
+            line: edgeInfo.line || 1,
+          });
+          relationCounts.framework_module_growth += 1;
+      }
     }
   }
 
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const filteredEdges = edges.filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to));
+  const compactRelationCounts = Object.fromEntries(
+    Object.entries(relationCounts).filter(([, count]) => count > 0)
+  );
+
+  const descriptionParts = [
+    "Author graph projection from framework markdown.",
+    "Only module definitions and upstream module refs declared in base definitions are rendered; no project config selection is required.",
+  ];
+  descriptionParts.push("B* and R* stay as module-internal author detail in hover/inspection, while the canvas renders module-only relations.");
+
   return {
     title: "Shelf Framework Tree",
-    description: [
-      "Author-source fallback view.",
-      "Canonical is not fresh, so cross-module growth edges and rich hover metadata are unavailable.",
-    ].join(" "),
+    description: descriptionParts.join(" "),
     kind: "framework",
     nodes,
-    edges: [],
-    footText: "Fallback mode keeps framework columns and local Lx bands, but does not infer missing machine relationships.",
+    edges: filteredEdges,
+    footText: "Author graph: module-only view; module arrows are collapsed from upstream module refs declared in base definitions.",
     layoutMode: "framework_columns",
-    levelLabels: levelLabelsFor(nodes.map((node) => node.depth)),
+    levelLabels: authorLevelLabelsFor(nodes.map((node) => node.depth)),
     frameworkGroups: frameworkGroupsFromCounts(frameworkCounts),
-    relationCounts: {},
+    relationCounts: compactRelationCounts,
   };
 }
 
 /**
  * @param {string} repoRoot
- * @param {{ frameworkSourceMode?: "auto"|"author_source" }} [options]
  * @returns {RuntimeTreeModel}
  */
-function buildRuntimeFrameworkTreeModel(repoRoot, options = {}) {
-  const sourceMode = normalizeFrameworkTreeSourceMode(options.frameworkSourceMode);
-  if (sourceMode === FRAMEWORK_TREE_SOURCE_MODE_AUTHOR_SOURCE) {
-    const authorModel = buildAuthorFallbackFrameworkTreeModel(repoRoot);
-    authorModel.description = [
-      "Author-source mode is enabled by `shelf.frameworkTreeSourceMode=author_source`.",
-      "Framework tree follows `framework/**` files directly for real-time authoring feedback.",
-    ].join(" ");
-    authorModel.footText = "Author-source mode keeps framework columns and local Lx bands; canonical edges are intentionally omitted.";
-    return authorModel;
-  }
-  return buildCanonicalFrameworkTreeModel(repoRoot) || buildAuthorFallbackFrameworkTreeModel(repoRoot);
+function buildRuntimeFrameworkTreeModel(repoRoot) {
+  return buildAuthorFallbackFrameworkTreeModel(repoRoot);
 }
 
 /**
@@ -733,13 +909,12 @@ function buildRuntimeEvidenceTreeModel(repoRoot) {
 /**
  * @param {string} repoRoot
  * @param {"framework"|"evidence"} kind
- * @param {{ frameworkSourceMode?: "auto"|"author_source" }} [options]
  * @returns {RuntimeTreeModel}
  */
-function buildRuntimeTreeModel(repoRoot, kind, options = {}) {
+function buildRuntimeTreeModel(repoRoot, kind) {
   return kind === "evidence"
     ? buildRuntimeEvidenceTreeModel(repoRoot)
-    : buildRuntimeFrameworkTreeModel(repoRoot, options);
+    : buildRuntimeFrameworkTreeModel(repoRoot);
 }
 
 module.exports = {
