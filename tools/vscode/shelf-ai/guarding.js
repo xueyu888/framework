@@ -120,6 +120,19 @@ function addSourceRefPaths(target, items) {
   }
 }
 
+function readCanonicalMaterializationState(canonical) {
+  const payload = canonical && typeof canonical === "object"
+    ? canonical.materialization
+    : null;
+  if (!payload || typeof payload !== "object") {
+    return { mode: "", degraded: false };
+  }
+  return {
+    mode: String(payload.mode || "").trim(),
+    degraded: payload.degraded === true,
+  };
+}
+
 function collectCanonicalSourceRelPaths(repoRoot, projectFilePath, projectConfigText, canonical) {
   const relPaths = new Set([
     normalizeRelPath(path.relative(repoRoot, projectFilePath)),
@@ -196,6 +209,7 @@ function getProjectCanonicalFreshness(repoRoot, projectFilePath) {
   }
 
   const canonicalStat = fs.statSync(canonicalPath);
+  const materializationState = readCanonicalMaterializationState(canonicalRead.canonical);
   const authoritativeSourceRelPaths = collectCanonicalSourceRelPaths(
     repoRoot,
     resolvedProjectFile,
@@ -217,9 +231,14 @@ function getProjectCanonicalFreshness(repoRoot, projectFilePath) {
     }
   }
 
-  const status = newerSourceRelPaths.length || missingSourceRelPaths.length
+  const staleBySources = newerSourceRelPaths.length || missingSourceRelPaths.length;
+  const staleByMaterialization = materializationState.degraded || materializationState.mode === "framework_only";
+  const status = staleBySources || staleByMaterialization
     ? "stale"
     : "fresh";
+  const reason = staleByMaterialization
+    ? "canonical.json is a framework-only snapshot; run full materialization to restore full-chain truth"
+    : (status === "fresh" ? "" : "canonical.json is older than its authoritative sources");
 
   return {
     projectId,
@@ -227,7 +246,7 @@ function getProjectCanonicalFreshness(repoRoot, projectFilePath) {
     canonicalPath,
     canonicalRelPath,
     status,
-    reason: status === "fresh" ? "" : "canonical.json is older than its authoritative sources",
+    reason,
     authoritativeSourceRelPaths,
     newerSourceRelPaths,
     missingSourceRelPaths,

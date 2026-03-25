@@ -73,6 +73,7 @@ function main() {
   const configuration = packageJson.contributes?.configuration?.properties || {};
   for (const key of [
     "shelf.guardMode",
+    "shelf.showMessagePopups",
     "shelf.autoMaterialize",
     "shelf.runMypyOnPythonChanges",
     "shelf.protectGeneratedFiles",
@@ -116,6 +117,30 @@ function main() {
     configuration["shelf.frameworkQuickFixEnabled"]?.default === true,
     "package.json must enable framework lint quick fixes by default"
   );
+  assert.strictEqual(
+    configuration["shelf.frameworkTreeAutoRefreshOnSave"]?.default,
+    true,
+    "package.json must auto-refresh framework tree on save by default"
+  );
+  assert.strictEqual(
+    configuration["shelf.statusBarClickAction"]?.default,
+    "openFrameworkTree",
+    "package.json must default status bar click action to open framework tree"
+  );
+  assert.strictEqual(
+    configuration["shelf.showMessagePopups"]?.default,
+    true,
+    "package.json must enable popup messages by default"
+  );
+  assert.strictEqual(
+    configuration["shelf.treeZoomMaxScale"]?.default,
+    2.4,
+    "package.json must allow framework tree zooming beyond the old 155% cap by default"
+  );
+  assert(
+    (configuration["shelf.statusBarClickAction"]?.enum || []).includes("quickPick"),
+    "package.json must support quickPick status bar click action"
+  );
   assert(
     !Object.prototype.hasOwnProperty.call(configuration, "shelf.intentGateEnforcementMode"),
     "package.json should not expose save-time intent gate enforcement mode"
@@ -154,6 +179,10 @@ function main() {
     frameworkSnippet.body.includes("## 5. 验证（Verification）"),
     "@framework snippet must include verification section"
   );
+  assert(
+    !frameworkSnippet.body.some((line) => String(line || "").startsWith("### ")),
+    "@framework snippet should not include third-level headings"
+  );
 
   assert(
     /registerCommand\s*\(\s*"shelf\.insertFrameworkModuleTemplate"/.test(extensionSource),
@@ -166,6 +195,10 @@ function main() {
   assert(
     /registerCommand\s*\(\s*"shelf\.openFrameworkTree"/.test(extensionSource),
     "extension.js must register the framework tree open command"
+  );
+  assert(
+    /registerCommand\s*\(\s*"shelf\.statusBarActionMenu"/.test(extensionSource),
+    "extension.js must register the status bar action menu command"
   );
   assert(
     /registerCommand\s*\(\s*"shelf\.openEvidenceTree"/.test(extensionSource),
@@ -188,6 +221,10 @@ function main() {
     "extension.js must clear stale shelf diagnostics when watched documents are edited"
   );
   assert(
+    extensionSource.includes('openTreeView("framework", { reveal: false })'),
+    "extension.js must refresh framework tree in background on save without auto-revealing the panel"
+  );
+  assert(
     extensionSource.includes('$(close) Shelf 失败'),
     "extension.js must expose a visible cross icon for failing Shelf status"
   );
@@ -204,6 +241,14 @@ function main() {
     "README must document the framework tree open command"
   );
   assert(
+    readme.includes("shelf.statusBarClickAction = openFrameworkTree"),
+    "README must document status bar click action setting"
+  );
+  assert(
+    readme.includes("shelf.statusBarClickAction = quickPick"),
+    "README must document quickPick status bar action mode"
+  );
+  assert(
     readme.includes("Shelf: Refresh Framework Tree"),
     "README must document the framework tree refresh command"
   );
@@ -218,6 +263,10 @@ function main() {
   assert(
     readme.includes("shelf.guardMode = strict"),
     "README must document strict guard mode"
+  );
+  assert(
+    readme.includes("shelf.showMessagePopups = true"),
+    "README must document the popup notification toggle setting"
   );
   assert(
     readme.includes(".shelf/settings.jsonc"),
@@ -306,6 +355,11 @@ function main() {
   assert(
     capabilityEntries.some((entry) => entry.label === "N 条目"),
     "capability section completion must include non-responsibility entry"
+  );
+  const templateText = frameworkCompletion.getFrameworkTemplateSnippetText();
+  assert(
+    !templateText.includes("### 非职责声明（Non-Responsibility Statement）"),
+    "framework template text should place N entries directly after C entries"
   );
 
   const baseEntries = frameworkCompletion.getFrameworkCompletionEntries("- `B", "B", true, {

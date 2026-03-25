@@ -22,6 +22,13 @@ const SECTION_PREFIXES = [
   ["## 4. 基组合原则", "rule"],
   ["## 5. 验证", "verification"],
 ];
+const SECTION_DISPLAY_NAMES = {
+  capability: "能力声明（Capability Statement）",
+  boundary: "边界定义（Boundary / Parameter 参数）",
+  base: "最小结构基（Minimal Structural Bases）",
+  rule: "基组合原则（Base Combination Principles）",
+  verification: "验证（Verification）",
+};
 
 function uniqueSections(sections) {
   const ordered = [];
@@ -684,6 +691,46 @@ function resolveLocalSymbol(index, token) {
   return null;
 }
 
+function resolveUndefinedSymbolSection(token, lineText) {
+  const safeToken = String(token || "").trim();
+  if (!safeToken) {
+    return "";
+  }
+  if (/^C\d+$/.test(safeToken)) {
+    return "capability";
+  }
+  if (/^B\d+$/.test(safeToken)) {
+    return "base";
+  }
+  if (/^V\d+$/.test(safeToken)) {
+    return "verification";
+  }
+  if (/^R\d+(?:\.\d+)?$/.test(safeToken)) {
+    return "rule";
+  }
+  if (/^[A-Z][A-Z0-9_]+$/.test(safeToken) && /(参数绑定|边界绑定)/.test(String(lineText || ""))) {
+    return "boundary";
+  }
+  return "";
+}
+
+function resolveUndefinedSymbolFallbackTarget(index, token, lineText) {
+  const section = resolveUndefinedSymbolSection(token, lineText);
+  if (!section) {
+    return null;
+  }
+  const anchor = index.sectionHeaders[section] || index.header;
+  if (!anchor) {
+    return null;
+  }
+  return {
+    line: anchor.line,
+    character: anchor.character,
+    length: anchor.length,
+    section,
+  };
+}
+
 function resolveModuleTarget(index) {
   if (index.bases.length > 0) {
     const firstBase = index.bases[0];
@@ -858,6 +905,22 @@ function buildSymbolHoverMarkdown(moduleInfo, index, token, repoRoot, allowCanon
   return parts.join("\n");
 }
 
+function buildUndefinedSymbolHoverMarkdown(moduleInfo, index, token, lineText) {
+  const fallback = resolveUndefinedSymbolFallbackTarget(index, token, lineText);
+  if (!fallback) {
+    return null;
+  }
+  const sectionName = SECTION_DISPLAY_NAMES[fallback.section] || fallback.section;
+  const parts = [
+    `**${buildModuleLabel(moduleInfo)} · \`${token}\`**`,
+    "当前文件未定义该符号。",
+    "",
+    `建议：先在“${sectionName}”章节补充定义，然后回到当前引用位置。`,
+    "可执行：按 `F12` 跳转到建议章节。",
+  ];
+  return parts.join("\n");
+}
+
 function resolveDefinitionTarget({ repoRoot, filePath, text, line, character, allowCanonicalProjection = true }) {
   const documentInfo = getFrameworkDocumentInfo(filePath, repoRoot);
   if (!documentInfo) {
@@ -912,7 +975,16 @@ function resolveDefinitionTarget({ repoRoot, filePath, text, line, character, al
   const index = buildDefinitionIndex(text);
   const resolvedLocal = resolveLocalSymbol(index, tokenContext.token);
   if (!resolvedLocal) {
-    return null;
+    const fallbackTarget = resolveUndefinedSymbolFallbackTarget(index, tokenContext.token, lineText);
+    if (!fallbackTarget) {
+      return null;
+    }
+    return {
+      filePath,
+      line: fallbackTarget.line,
+      character: fallbackTarget.character,
+      length: fallbackTarget.length,
+    };
   }
   const localItem = getItemForToken(index, tokenContext.token);
   if (
@@ -990,14 +1062,20 @@ function resolveHoverTarget({ repoRoot, filePath, text, line, character, allowCa
     repoRoot,
     allowCanonicalProjection
   );
-  if (!markdown) {
+  const fallbackMarkdown = markdown || buildUndefinedSymbolHoverMarkdown(
+    documentInfo,
+    currentIndex,
+    tokenContext.token,
+    lineText
+  );
+  if (!fallbackMarkdown) {
     return null;
   }
 
   return {
     start: tokenContext.start,
     end: tokenContext.end,
-    markdown,
+    markdown: fallbackMarkdown,
   };
 }
 
@@ -1056,6 +1134,16 @@ function resolveReferenceTargets({ repoRoot, filePath, text, line, character, al
       character: resolvedLocal.character,
       length: resolvedLocal.length,
     });
+  } else {
+    const fallbackTarget = resolveUndefinedSymbolFallbackTarget(index, tokenContext.token, lineText);
+    if (fallbackTarget) {
+      targets.push({
+        filePath,
+        line: fallbackTarget.line,
+        character: fallbackTarget.character,
+        length: fallbackTarget.length,
+      });
+    }
   }
 
   const localItem = getItemForToken(index, tokenContext.token);
