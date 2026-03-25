@@ -66,7 +66,7 @@ function normalizeViewSettings(candidate: unknown): RuntimeTreeViewSettings {
     ? candidate as Partial<RuntimeTreeViewSettings>
     : {};
   const zoomMinScale = clampNumber(raw.zoomMinScale, 0.2, 3, 0.68);
-  const zoomMaxScale = clampNumber(raw.zoomMaxScale, zoomMinScale, 5, 1.55);
+  const zoomMaxScale = clampNumber(raw.zoomMaxScale, zoomMinScale, 5, 2.4);
   return {
     zoomMinScale,
     zoomMaxScale,

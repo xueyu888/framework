@@ -56,24 +56,16 @@ function detectFrameworkAuthoringState(documentText, lineNumber = 0) {
   const lines = splitLines(documentText);
   const safeLineNumber = Math.max(0, Math.min(Number(lineNumber || 0), Math.max(0, lines.length - 1)));
   let sectionId = "";
-  let inNonResponsibility = false;
 
   for (let index = 0; index <= safeLineNumber; index += 1) {
     const trimmed = lines[index].trim();
     if (trimmed.startsWith("## ")) {
       sectionId = detectSectionIdFromHeading(trimmed);
-      inNonResponsibility = false;
-      continue;
-    }
-    if (trimmed.startsWith("### ")) {
-      const lower = trimmed.toLowerCase();
-      inNonResponsibility = sectionId === "capability" && lower.includes("非职责声明");
     }
   }
 
   return {
     sectionId,
-    inNonResponsibility,
     lineCount: lines.length,
   };
 }
@@ -219,7 +211,6 @@ function createCompletionDefinitions(dynamic = {}) {
         "non-responsibility-symbol",
         "framework-file-empty",
         "section-capability",
-        "section-non-responsibility",
       ],
     },
     {
@@ -348,9 +339,6 @@ function detectFrameworkCompletionContexts(linePrefix, wordPrefix, isFrameworkFi
   if (sectionId) {
     contexts.add(`section-${sectionId}`);
   }
-  if (authoringState.inNonResponsibility) {
-    contexts.add("section-non-responsibility");
-  }
 
   return contexts;
 }
@@ -365,8 +353,7 @@ function getFrameworkCompletionEntries(linePrefix, wordPrefix, isFrameworkFile, 
   if (contexts.size === 0) {
     return [];
   }
-  const activeSectionContext = [...contexts].find((item) => item.startsWith("section-") && item !== "section-non-responsibility")
-    || "";
+  const activeSectionContext = [...contexts].find((item) => item.startsWith("section-")) || "";
   const symbolContexts = new Set(
     [...contexts].filter((item) =>
       item.endsWith("-symbol") || item === "rule-child"

@@ -9,6 +9,7 @@ const VERIFY_LINE_PATTERN = /^-\s+`(?<id>V\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<b
 const RULE_TOP_PATTERN = /^-\s+`(?<id>R\d+)`\s+(?<name>.+)$/;
 const RULE_CHILD_PATTERN = /^\s*-\s+`(?<id>R\d+\.\d+)`\s+(?<body>.+)$/;
 
+const SECTION_GOAL_TITLE = "## 0. 目标";
 const SECTION_CAPABILITY_TITLES = ["## 1. 能力声明（Capability Statement）"];
 const SECTION_PARAMETER_TITLES = [
   "## 2. 边界定义（Boundary / Parameter 参数）",
@@ -16,6 +17,8 @@ const SECTION_PARAMETER_TITLES = [
 const SECTION_BASE_TITLES = ["## 3. 最小结构基（Minimal Structural Bases）"];
 const SECTION_RULE_TITLES = ["## 4. 基组合原则（Base Combination Principles）"];
 const SECTION_VERIFICATION_TITLES = ["## 5. 验证（Verification）"];
+const RULE_BOUNDARY_BINDING_PREFIXES = ["参数绑定", "边界绑定"];
+const RULE_OUTPUT_PREFIXES = ["输出能力", "失效结论"];
 
 function normalizeSlashes(value) {
   return String(value || "").replace(/\\/g, "/");
@@ -104,6 +107,106 @@ function markerColumn(rawLine) {
   return firstChar >= 0 ? firstChar + 1 : 1;
 }
 
+function headingColumn(rawLine) {
+  const firstChar = String(rawLine || "").search(/\S/);
+  return firstChar >= 0 ? firstChar + 1 : 1;
+}
+
+function frameworkRequiredSectionTitles() {
+  return [
+    SECTION_CAPABILITY_TITLES[0],
+    SECTION_PARAMETER_TITLES[0],
+    SECTION_BASE_TITLES[0],
+    SECTION_RULE_TITLES[0],
+    SECTION_VERIFICATION_TITLES[0],
+  ];
+}
+
+function validateSectionHeadingSequence({ lines, file, issues, sectionBlocks }) {
+  const actualHeadings = sectionBlocks.map((block) => ({
+    title: block.title,
+    line: block.line,
+    text: String(lines[block.line - 1] || block.title),
+  }));
+  const requiredTitles = frameworkRequiredSectionTitles();
+  const expectedTitles = actualHeadings.some((heading) => heading.title === SECTION_GOAL_TITLE)
+    ? [SECTION_GOAL_TITLE, ...requiredTitles]
+    : requiredTitles;
+
+  let actualIndex = 0;
+  let expectedIndex = 0;
+
+  while (actualIndex < actualHeadings.length && expectedIndex < expectedTitles.length) {
+    const actual = actualHeadings[actualIndex];
+    const expected = expectedTitles[expectedIndex];
+    if (actual.title === expected) {
+      actualIndex += 1;
+      expectedIndex += 1;
+      continue;
+    }
+    const matchedElsewhereIndex = expectedTitles.indexOf(actual.title);
+    if (matchedElsewhereIndex > expectedIndex) {
+      for (let missingIndex = expectedIndex; missingIndex < matchedElsewhereIndex; missingIndex += 1) {
+        issues.push(
+          createIssue({
+            file,
+            line: actual.line,
+            column: headingColumn(actual.text),
+            code: "FWL003",
+            message: `缺少必需章节：${expectedTitles[missingIndex]}`,
+          })
+        );
+      }
+      expectedIndex = matchedElsewhereIndex;
+      continue;
+    }
+
+    issues.push(
+      createIssue({
+        file,
+        line: actual.line,
+        column: headingColumn(actual.text),
+        code: "FWL012",
+        message: matchedElsewhereIndex >= 0
+          ? `标准二级标题顺序错误：这里应为“${expected}”，实际是“${actual.title}”。`
+          : `标准二级标题错误：这里应为“${expected}”，实际是“${actual.title}”。`,
+      })
+    );
+    actualIndex += 1;
+    if (matchedElsewhereIndex < 0) {
+      expectedIndex += 1;
+    }
+  }
+
+  for (let index = actualIndex; index < actualHeadings.length; index += 1) {
+    const actual = actualHeadings[index];
+    issues.push(
+      createIssue({
+        file,
+        line: actual.line,
+        column: headingColumn(actual.text),
+        code: "FWL012",
+        message: `发现非标准二级标题“${actual.title}”。`,
+      })
+    );
+  }
+
+  const missingAnchorLine = actualHeadings.length
+    ? actualHeadings[actualHeadings.length - 1].line
+    : 1;
+  for (let index = expectedIndex; index < expectedTitles.length; index += 1) {
+    issues.push(
+      createIssue({
+        file,
+        line: missingAnchorLine,
+        column: 1,
+        code: "FWL003",
+        message: `缺少必需章节：${expectedTitles[index]}`,
+      })
+    );
+  }
+}
+
 function lintFlatListSection({
   block,
   file,
@@ -112,7 +215,6 @@ function lintFlatListSection({
   allowPatterns = [],
   invalidCode,
   invalidMessage,
-  allowHeading = false,
 }) {
   let matchCount = 0;
 
@@ -120,7 +222,7 @@ function lintFlatListSection({
     if (!row.trimmed || row.trimmed === "---") {
       continue;
     }
-    if (allowHeading && row.trimmed.startsWith("### ")) {
+    if (row.trimmed.startsWith("### ")) {
       continue;
     }
     if (!/^[-*]\s+/.test(row.trimmed)) {
@@ -178,6 +280,9 @@ function lintRuleSection({ block, file, issues }) {
     if (!row.trimmed || row.trimmed === "---") {
       continue;
     }
+    if (row.trimmed.startsWith("### ")) {
+      continue;
+    }
     if (!/^\s*[-*]\s+/.test(row.text)) {
       continue;
     }
@@ -223,6 +328,269 @@ function lintRuleSection({ block, file, issues }) {
         message: `章节“${block.title}”没有可解析的条目。`,
       })
     );
+  }
+}
+
+function collectSectionTokenSet(block, pattern) {
+  const tokens = new Set();
+  if (!block) {
+    return tokens;
+  }
+  for (const row of block.entries) {
+    if (!row || !row.trimmed) {
+      continue;
+    }
+    const match = pattern.exec(row.trimmed);
+    if (!match || !match.groups || !match.groups.id) {
+      continue;
+    }
+    tokens.add(String(match.groups.id).trim());
+  }
+  return tokens;
+}
+
+function parseRuleChildClause(rowText) {
+  const childMatch = RULE_CHILD_PATTERN.exec(String(rowText || ""));
+  if (!childMatch || !childMatch.groups || !childMatch.groups.body) {
+    return null;
+  }
+  const body = String(childMatch.groups.body).trim().replace(/。$/, "");
+  const separatorIndex = body.search(/[：:]/);
+  if (separatorIndex < 0) {
+    return null;
+  }
+  const label = body.slice(0, separatorIndex).trim();
+  const expression = body.slice(separatorIndex + 1).trim();
+  if (!label || !expression) {
+    return null;
+  }
+  return {
+    label,
+    expression,
+  };
+}
+
+function extractSimpleTokens(expression, regex) {
+  const tokens = [];
+  for (const match of String(expression || "").matchAll(regex)) {
+    if (!match || !match[0]) {
+      continue;
+    }
+    tokens.push(match[0]);
+  }
+  return [...new Set(tokens)];
+}
+
+function extractBoundaryTokens(expression) {
+  const expr = String(expression || "");
+  const segments = [...expr.matchAll(/`([^`]+)`/g)].map((match) => String(match[1] || ""));
+  const sources = segments.length ? segments : [expr];
+  const tokens = [];
+  for (const source of sources) {
+    for (const match of source.matchAll(/\b[A-Z][A-Z0-9_]*\b/g)) {
+      if (!match || !match[0]) {
+        continue;
+      }
+      tokens.push(match[0]);
+    }
+  }
+  return [...new Set(tokens)];
+}
+
+function extractSourceExpression(text) {
+  const raw = String(text || "");
+  const match = /来源[：:]\s*(.+)$/.exec(raw);
+  return (match ? match[1] : raw).trim();
+}
+
+function isBoundaryLikeToken(token) {
+  const value = String(token || "").trim();
+  if (!value) {
+    return false;
+  }
+  if (/^P\d+$/.test(value)) {
+    return true;
+  }
+  if (!/^[A-Z][A-Z0-9_]+$/.test(value)) {
+    return false;
+  }
+  if (/^(?:L|M)\d+$/.test(value)) {
+    return false;
+  }
+  if (/^R\d+(?:\.\d+)?$/.test(value)) {
+    return false;
+  }
+  if (/^[CBV]\d+$/.test(value)) {
+    return false;
+  }
+  return true;
+}
+
+function unresolvedSymbolIssue({ file, row, token, message }) {
+  const text = String(row?.text || "");
+  const index = text.indexOf(token);
+  return createIssue({
+    file,
+    line: row.line,
+    column: index >= 0 ? index + 1 : markerColumn(text),
+    code: "FWL011",
+    message,
+  });
+}
+
+function lintRuleReferenceIntegrity({
+  block,
+  file,
+  issues,
+  capabilityIds,
+  boundaryIds,
+  baseIds,
+}) {
+  if (!block) {
+    return;
+  }
+  const canCheckCapability = capabilityIds.size > 0;
+  const canCheckBoundary = boundaryIds.size > 0;
+  const canCheckBase = baseIds.size > 0;
+
+  for (const row of block.entries) {
+    const clause = parseRuleChildClause(row.text);
+    if (!clause) {
+      continue;
+    }
+
+    if (canCheckBase && clause.label === "参与基") {
+      for (const token of extractSimpleTokens(clause.expression, /\bB\d+\b/g)) {
+        if (baseIds.has(token)) {
+          continue;
+        }
+        issues.push(
+          unresolvedSymbolIssue({
+            file,
+            row,
+            token,
+            message: `规则引用了未定义的结构基 \`${token}\`。请先在“## 3. 最小结构基（Minimal Structural Bases）”中定义。`,
+          })
+        );
+      }
+      continue;
+    }
+
+    if (canCheckCapability && RULE_OUTPUT_PREFIXES.includes(clause.label)) {
+      for (const token of extractSimpleTokens(clause.expression, /\bC\d+\b/g)) {
+        if (capabilityIds.has(token)) {
+          continue;
+        }
+        issues.push(
+          unresolvedSymbolIssue({
+            file,
+            row,
+            token,
+            message: `规则引用了未定义的能力 \`${token}\`。请先在“## 1. 能力声明（Capability Statement）”中定义。`,
+          })
+        );
+      }
+      continue;
+    }
+
+    if (canCheckBoundary && RULE_BOUNDARY_BINDING_PREFIXES.includes(clause.label)) {
+      for (const token of extractBoundaryTokens(clause.expression)) {
+        if (boundaryIds.has(token)) {
+          continue;
+        }
+        issues.push(
+          unresolvedSymbolIssue({
+            file,
+            row,
+            token,
+            message: `规则引用了未定义的参数 \`${token}\`。请先在“## 2. 边界定义（Boundary / Parameter 参数）”中定义。`,
+          })
+        );
+      }
+    }
+  }
+}
+
+function lintBoundaryReferenceIntegrity({
+  block,
+  file,
+  issues,
+  capabilityIds,
+}) {
+  if (!block || capabilityIds.size === 0) {
+    return;
+  }
+  for (const row of block.entries) {
+    const match = BOUNDARY_LINE_PATTERN.exec(row.trimmed);
+    if (!match || !match.groups || !match.groups.body) {
+      continue;
+    }
+    const sourceExpr = extractSourceExpression(match.groups.body);
+    for (const token of extractSimpleTokens(sourceExpr, /\bC\d+\b/g)) {
+      if (capabilityIds.has(token)) {
+        continue;
+      }
+      issues.push(
+        unresolvedSymbolIssue({
+          file,
+          row,
+          token,
+          message: `参数来源引用了未定义的能力 \`${token}\`。请先在“## 1. 能力声明（Capability Statement）”中定义。`,
+        })
+      );
+    }
+  }
+}
+
+function lintBaseReferenceIntegrity({
+  block,
+  file,
+  issues,
+  capabilityIds,
+  boundaryIds,
+}) {
+  if (!block) {
+    return;
+  }
+  const canCheckCapability = capabilityIds.size > 0;
+  const canCheckBoundary = boundaryIds.size > 0;
+
+  for (const row of block.entries) {
+    const match = BASE_LINE_PATTERN.exec(row.trimmed);
+    if (!match || !match.groups || !match.groups.body) {
+      continue;
+    }
+    const sourceExpr = extractSourceExpression(match.groups.body);
+    if (canCheckCapability) {
+      for (const token of extractSimpleTokens(sourceExpr, /\bC\d+\b/g)) {
+        if (capabilityIds.has(token)) {
+          continue;
+        }
+        issues.push(
+          unresolvedSymbolIssue({
+            file,
+            row,
+            token,
+            message: `结构基来源引用了未定义的能力 \`${token}\`。请先在“## 1. 能力声明（Capability Statement）”中定义。`,
+          })
+        );
+      }
+    }
+    if (canCheckBoundary) {
+      for (const token of extractBoundaryTokens(sourceExpr).filter(isBoundaryLikeToken)) {
+        if (boundaryIds.has(token)) {
+          continue;
+        }
+        issues.push(
+          unresolvedSymbolIssue({
+            file,
+            row,
+            token,
+            message: `结构基来源引用了未定义的参数 \`${token}\`。请先在“## 2. 边界定义（Boundary / Parameter 参数）”中定义。`,
+          })
+        );
+      }
+    }
   }
 }
 
@@ -294,28 +662,12 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
   }
 
   const sectionBlocks = splitSectionBlocks(lines);
-  const requiredSections = [
-    SECTION_CAPABILITY_TITLES,
-    SECTION_PARAMETER_TITLES,
-    SECTION_BASE_TITLES,
-    SECTION_RULE_TITLES,
-    SECTION_VERIFICATION_TITLES,
-  ];
-
-  for (const titles of requiredSections) {
-    if (findSectionBlock(sectionBlocks, titles)) {
-      continue;
-    }
-    issues.push(
-      createIssue({
-        file,
-        line: 1,
-        column: 1,
-        code: "FWL003",
-        message: `缺少必需章节：${titles.join(" / ")}`,
-      })
-    );
-  }
+  validateSectionHeadingSequence({
+    lines,
+    file,
+    issues,
+    sectionBlocks,
+  });
 
   const capabilitySection = findSectionBlock(sectionBlocks, SECTION_CAPABILITY_TITLES);
   if (capabilitySection) {
@@ -326,8 +678,7 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
       validPattern: CAPABILITY_LINE_PATTERN,
       allowPatterns: [NON_RESPONSIBILITY_LINE_PATTERN],
       invalidCode: "FWL005",
-      invalidMessage: "能力章节条目格式错误，必须匹配 `- `C*` 名称：描述。`。",
-      allowHeading: true,
+      invalidMessage: "能力章节条目格式错误，必须匹配 `- `C*` 名称：描述。` 或 `- `N*` 名称：描述。`。",
     });
   }
 
@@ -375,6 +726,34 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
       invalidMessage: "验证章节条目格式错误，必须匹配 `- `V*` 名称：描述。`。",
     });
   }
+
+  const capabilityIds = collectSectionTokenSet(capabilitySection, CAPABILITY_LINE_PATTERN);
+  const boundaryIds = collectSectionTokenSet(parameterSection, BOUNDARY_LINE_PATTERN);
+  const baseIds = collectSectionTokenSet(baseSection, BASE_LINE_PATTERN);
+
+  lintBoundaryReferenceIntegrity({
+    block: parameterSection,
+    file,
+    issues,
+    capabilityIds,
+  });
+
+  lintBaseReferenceIntegrity({
+    block: baseSection,
+    file,
+    issues,
+    capabilityIds,
+    boundaryIds,
+  });
+
+  lintRuleReferenceIntegrity({
+    block: ruleSection,
+    file,
+    issues,
+    capabilityIds,
+    boundaryIds,
+    baseIds,
+  });
 
   return issues;
 }
