@@ -16,7 +16,7 @@
 4. `ConfigModule` 只消费对应 `FrameworkModule` export；`CodeModule` 只消费对应 `ConfigModule.exact_export`；`EvidenceModule` 只消费对应 `CodeModule` export。
 5. 架构关系只允许用组合，不允许用继承。
 6. 项目由三部分决定：framework markdown、统一 project config、真实 code 实现。不要把项目做成手写特化分支。
-7. `communication` 只能承载结构化沟通要求；`exact` 只能承载 Code 层精确消费字段。
+7. `communication` 只能写结构化沟通要求；`exact` 只能写 Code 层精确消费字段。
 8. 自然语言说明只能做补充；机器判定必须依赖结构化字段。
 9. `generated/canonical.json` 是唯一机器真相源。其他 tree、report、evidence view 都只能是它的派生视图。
 10. 不要恢复旧的核心架构。不要保留并行真相源，不要把旧系统换个名字继续跑。
@@ -34,7 +34,7 @@
 8. 始终保持架构单一，不要创建 side channel
 
 ## 对话触发守卫（强制）
-- AGENTS 只认最终生效的 `shelf.*` 值作为门禁配置语义入口，不再维护独立目录常量；不再在 AGENTS 里区分配置来自哪个文件承载。
+- AGENTS 只认最终生效的 `shelf.*` 值作为门禁配置语义入口，不再维护独立目录常量；不再在 AGENTS 里区分配置最终写在哪个文件里。
 - 默认受检目录为：`framework/`、`framework_drafts/`、`projects/`、`src/project_runtime/`、`scripts/`。
 - 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中上述受检范围，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
 - bootstrap 例外：若 `--check-changes` 失败原因为“当前仓库不存在任何 `projects/*/project.toml`”，可进入 bootstrap 模式继续生成首个 `project.toml` 与对应代码/产物；生成后必须立刻恢复常规门禁并重新执行 `--check-changes`。
