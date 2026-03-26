@@ -48,6 +48,26 @@ function main() {
   const validIssues = runLint(VALID_FRAMEWORK_TEXT);
   assert.strictEqual(validIssues.length, 0, "valid framework text should not produce lint issues");
 
+  const snakeCaseBoundaryText = VALID_FRAMEWORK_TEXT
+    .replace(
+      "- `P1` 文档标识参数：用于限定文本单元所属文档。来源：`C1`。",
+      "- `query_in` 查询输入参数：用于限定本次检索的查询入口。来源：`C1`。"
+    )
+    .replace(
+      "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + P1`。",
+      "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + query_in`。"
+    )
+    .replace(
+      "  - `R1.4` 参数绑定：`P1`。",
+      "  - `R1.4` 参数绑定：`query_in`。"
+    );
+  const snakeCaseBoundaryIssues = runLint(snakeCaseBoundaryText);
+  assert.strictEqual(
+    snakeCaseBoundaryIssues.length,
+    0,
+    "snake_case parameter ids should be accepted by framework lint"
+  );
+
   const validWithGoalText = VALID_FRAMEWORK_TEXT.replace(
     "## 1. 能力声明（Capability Statement）",
     "## 0. 目标 (Goal)\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
