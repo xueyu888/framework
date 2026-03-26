@@ -181,6 +181,57 @@ framework_file = "framework/demo/L0-M0-示例模块.md"
     assert(fresh.authoritativeSourceRelPaths.includes("framework/demo/L0-M0-示例模块.md"));
     assert(fresh.authoritativeSourceRelPaths.includes("src/demo_runtime.js"));
 
+    writeFile(
+      tempCanonicalPath,
+      JSON.stringify(
+        {
+          framework: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                framework_file: "framework/demo/L0-M0-示例模块.md",
+              },
+            ],
+          },
+          config: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                source_ref: { file_path: "projects/demo/project.toml" },
+              },
+            ],
+          },
+          code: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                source_ref: { file_path: "src/demo_runtime.js" },
+              },
+            ],
+          },
+          evidence: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                source_ref: { file_path: "src/demo_evidence.js" },
+              },
+            ],
+          },
+          materialization: {
+            mode: "framework_only",
+            degraded: true,
+          },
+        },
+        null,
+        2
+      )
+    );
+    setMtime(tempCanonicalPath, baseTime + 20_000);
+    const degraded = getProjectCanonicalFreshness(tempRepoRoot, tempProjectPath);
+    assert.strictEqual(degraded.status, "stale");
+    assert(degraded.reason.includes("framework-only snapshot"));
+
+    setMtime(tempCanonicalPath, baseTime + 5_000);
     setMtime(tempFrameworkPath, baseTime + 10_000);
     const stale = getProjectCanonicalFreshness(tempRepoRoot, tempProjectPath);
     assert.strictEqual(stale.status, "stale");

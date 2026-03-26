@@ -12,10 +12,12 @@ Authoring-term note:
 - 当前 canonical / runtime 为兼容既有主链，仍保留 `boundary_id`、`boundary projection` 等历史机器字段名
 
 - Opens the framework tree and workspace evidence tree from the sidebar.
+- Clicks on the Shelf status bar item can open the framework tree directly (configurable).
 - Treats the repository mainline as:
   `Framework -> Config -> Code -> Evidence`.
 - Treats `projects/*/generated/canonical.json` as the only machine truth.
-- Treats framework tree and evidence tree as canonical-derived views.
+- Treats framework tree as an author-source runtime projection from `framework/**`.
+- Treats evidence tree as a canonical-derived workspace evidence view.
 - Supports framework-markdown navigation for `B/C/R/V`, parameters, module refs, and rule refs.
 - Maps framework parameters back to `projects/*/project.toml` sections such as `[exact.knowledge_base.chat]` and `[exact.frontend.surface]`.
 - Auto-materializes affected projects when `framework/*.md` or `projects/*/project.toml` changes.
@@ -71,6 +73,7 @@ Local workspace overlay file:
 - `.shelf/settings.jsonc` can use JSONC comments and is intended for repository-visible local tuning.
 
 - `shelf.guardMode = strict`
+- `shelf.showMessagePopups = true`
 - `shelf.intentGateEnabled = true`
 - `shelf.intentGateRequireMappingEcho = true`
 - `shelf.intentGateRunChangeValidationBeforeGrant = true`
@@ -81,8 +84,10 @@ Local workspace overlay file:
 - `shelf.intentGateTemporaryBypasses = []`
 - `shelf.frameworkTreeNodeHorizontalGap = 8`
 - `shelf.frameworkTreeLevelVerticalGap = 80`
+- `shelf.frameworkTreeAutoRefreshOnSave = true`
+- `shelf.statusBarClickAction = openFrameworkTree`
 - `shelf.treeZoomMinScale = 0.68`
-- `shelf.treeZoomMaxScale = 1.55`
+- `shelf.treeZoomMaxScale = 2.4`
 - `shelf.treeWheelSensitivity = 1`
 - `shelf.treeInspectorWidth = 338`
 - `shelf.treeInspectorRailWidth = 42`
@@ -98,6 +103,22 @@ Local workspace overlay file:
 - `shelf.frameworkQuickFixEnabled = true`
 
 Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload. Framework lint/completion/quick-fix settings take effect immediately for currently opened framework markdown files.
+
+Notification popup behavior:
+
+- `shelf.showMessagePopups = true`: keep Shelf right-corner popup messages enabled.
+- `shelf.showMessagePopups = false`: suppress popup interruptions while keeping Output logs, status-bar state, and Problems signals available.
+
+Framework tree behavior settings:
+
+- `shelf.frameworkTreeAutoRefreshOnSave = true`:
+  after framework markdown is saved, Shelf runs save-time change validation/materialization first, then refreshes an open framework tree.
+  save-time refresh is background-only and will not auto-pop or force-focus the framework tree panel.
+  when full materialization fails and the materialize command uses `scripts/materialize_project.py`, Shelf enables `--allow-framework-only-fallback` to refresh `canonical.framework` snapshot first.
+- `shelf.statusBarClickAction = openFrameworkTree`:
+  clicking Shelf status bar opens the framework tree panel (floating/dockable/resizable webview tab).
+- `shelf.statusBarClickAction = quickPick`:
+  clicking Shelf status bar first shows two explicit choices: open framework tree or show issues.
 
 Intent-gate temporary bypass supports multi-option configuration:
 
@@ -148,7 +169,11 @@ The evidence tree is the canonical-derived workspace evidence view.
 No persisted tree artifact is used for these views; both trees are runtime projections.
 Both tree views render as interactive webview graphs (dagre layout + d3-zoom runtime interaction), and framework nodes stay layer-fixed with layout-engine auto sorting.
 Tree interactions include search, upstream/downstream focus, keyboard navigation (arrow keys + Enter), and viewport/selection state persistence.
+The framework tree is parsed directly from `framework/**` modules and their `B*` / `R*` declarations, and does not depend on project config selection.
+The canvas renders a module-only author graph: `B*` and rule participation stay available in hover/inspection, while module arrows are collapsed from upstream module refs in base definitions (for example `L0.M0[...]`).
+Framework markdown saves should trigger canonical refresh in background so machine-mainline artifacts remain up-to-date, but framework tree rendering itself does not wait for canonical.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
+Framework-only fallback snapshots are marked as degraded materialization state, so evidence tree remains blocked until the next full materialization succeeds.
 
 ## Project Config Navigation
 
@@ -168,4 +193,4 @@ The extension no longer treats the removed dual-track config files as live autho
 Public release notes live at:
 
 - `tools/vscode/shelf-ai/CHANGELOG.md`
-- `tools/vscode/shelf-ai/release-notes/0.1.20.md`
+- `tools/vscode/shelf-ai/release-notes/0.1.23.md`
