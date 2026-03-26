@@ -9,7 +9,7 @@ const VERIFY_LINE_PATTERN = /^-\s+`(?<id>V\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<b
 const RULE_TOP_PATTERN = /^-\s+`(?<id>R\d+)`\s+(?<name>.+)$/;
 const RULE_CHILD_PATTERN = /^\s*-\s+`(?<id>R\d+\.\d+)`\s+(?<body>.+)$/;
 
-const SECTION_GOAL_TITLE = "## 0. 目标";
+const SECTION_GOAL_TITLE = "## 0. 目标 (Goal)";
 const SECTION_CAPABILITY_TITLES = ["## 1. 能力声明（Capability Statement）"];
 const SECTION_PARAMETER_TITLES = [
   "## 2. 边界定义（Boundary / Parameter 参数）",
