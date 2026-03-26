@@ -2,7 +2,7 @@
   "name": "shelf-ai",
   "displayName": "Shelf AI",
   "description": "Shelf AI: canonical-first navigation for the Framework -> Config -> Code -> Evidence chain.",
-  "version": "0.1.21",
+  "version": "0.1.23",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
@@ -227,6 +227,11 @@
           "default": true,
           "description": "%configuration.shelf.notifyOnAutoFail.description%"
         },
+        "shelf.showMessagePopups": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.showMessagePopups.description%"
+        },
         "shelf.guardMode": {
           "type": "string",
           "enum": [
@@ -345,6 +350,21 @@
           "maximum": 180,
           "description": "%configuration.shelf.frameworkTreeLevelVerticalGap.description%"
         },
+        "shelf.frameworkTreeAutoRefreshOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.frameworkTreeAutoRefreshOnSave.description%"
+        },
+        "shelf.statusBarClickAction": {
+          "type": "string",
+          "enum": [
+            "openFrameworkTree",
+            "showIssues",
+            "quickPick"
+          ],
+          "default": "openFrameworkTree",
+          "description": "%configuration.shelf.statusBarClickAction.description%"
+        },
         "shelf.treeZoomMinScale": {
           "type": "number",
           "default": 0.68,
@@ -354,7 +374,7 @@
         },
         "shelf.treeZoomMaxScale": {
           "type": "number",
-          "default": 1.55,
+          "default": 2.4,
           "minimum": 0.2,
           "maximum": 5,
           "description": "%configuration.shelf.treeZoomMaxScale.description%"
