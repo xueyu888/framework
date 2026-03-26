@@ -24,6 +24,7 @@ from project_runtime.static_modules.backend_l2_m0 import (
     BackendL2M0R4Rule,
     BackendL2M0StaticBoundaryParams,
 )
+import project_runtime.static_modules.chunk_tagging_contracts as chunk_tagging_contracts
 
 
 def _require_boundary_dict(payload: dict[str, dict[str, Any]], boundary_id: str) -> dict[str, Any]:
@@ -5558,6 +5559,131 @@ STATIC_MODULE_CONTRACTS: dict[str, StaticModuleContractBundle] = {
         rule_types=(BackendL2M0R1Rule, BackendL2M0R2Rule, BackendL2M0R3Rule, BackendL2M0R4Rule),
     ),
 }
+
+STATIC_MODULE_CONTRACTS.update(
+    {
+        "Chunk_Tagging.L0.M0": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL0M0Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL0M0StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL0M0RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL0M0B1Base,
+                chunk_tagging_contracts.ChunkTaggingL0M0B2Base,
+                chunk_tagging_contracts.ChunkTaggingL0M0B3Base,
+                chunk_tagging_contracts.ChunkTaggingL0M0B4Base,
+                chunk_tagging_contracts.ChunkTaggingL0M0B5Base,
+                chunk_tagging_contracts.ChunkTaggingL0M0B6Base,
+                chunk_tagging_contracts.ChunkTaggingL0M0B7Base,
+            ),
+            rule_types=(chunk_tagging_contracts.ChunkTaggingL0M0R1Rule,),
+        ),
+        "Chunk_Tagging.L1.M0": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL1M0Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL1M0StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL1M0RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL1M0B1Base,
+                chunk_tagging_contracts.ChunkTaggingL1M0B2Base,
+                chunk_tagging_contracts.ChunkTaggingL1M0B3Base,
+            ),
+            rule_types=(chunk_tagging_contracts.ChunkTaggingL1M0R1Rule,),
+        ),
+        "Chunk_Tagging.L1.M1": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL1M1Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL1M1StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL1M1RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL1M1B1Base,
+                chunk_tagging_contracts.ChunkTaggingL1M1B2Base,
+                chunk_tagging_contracts.ChunkTaggingL1M1B3Base,
+                chunk_tagging_contracts.ChunkTaggingL1M1B4Base,
+                chunk_tagging_contracts.ChunkTaggingL1M1B5Base,
+                chunk_tagging_contracts.ChunkTaggingL1M1B6Base,
+            ),
+            rule_types=(
+                chunk_tagging_contracts.ChunkTaggingL1M1R1Rule,
+                chunk_tagging_contracts.ChunkTaggingL1M1R2Rule,
+                chunk_tagging_contracts.ChunkTaggingL1M1R3Rule,
+                chunk_tagging_contracts.ChunkTaggingL1M1R4Rule,
+                chunk_tagging_contracts.ChunkTaggingL1M1R5Rule,
+            ),
+        ),
+        "Chunk_Tagging.L1.M2": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL1M2Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL1M2StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL1M2RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL1M2B1Base,
+                chunk_tagging_contracts.ChunkTaggingL1M2B2Base,
+                chunk_tagging_contracts.ChunkTaggingL1M2B3Base,
+                chunk_tagging_contracts.ChunkTaggingL1M2B4Base,
+                chunk_tagging_contracts.ChunkTaggingL1M2B5Base,
+                chunk_tagging_contracts.ChunkTaggingL1M2B6Base,
+                chunk_tagging_contracts.ChunkTaggingL1M2B7Base,
+            ),
+            rule_types=(chunk_tagging_contracts.ChunkTaggingL1M2R1Rule,),
+        ),
+        "Chunk_Tagging.L2.M0": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL2M0Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL2M0StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL2M0RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL2M0B1Base,
+                chunk_tagging_contracts.ChunkTaggingL2M0B2Base,
+                chunk_tagging_contracts.ChunkTaggingL2M0B3Base,
+                chunk_tagging_contracts.ChunkTaggingL2M0B4Base,
+                chunk_tagging_contracts.ChunkTaggingL2M0B5Base,
+                chunk_tagging_contracts.ChunkTaggingL2M0B6Base,
+            ),
+            rule_types=(
+                chunk_tagging_contracts.ChunkTaggingL2M0R1Rule,
+                chunk_tagging_contracts.ChunkTaggingL2M0R2Rule,
+                chunk_tagging_contracts.ChunkTaggingL2M0R3Rule,
+            ),
+        ),
+        "Chunk_Tagging.L2.M1": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL2M1Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL2M1StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL2M1RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL2M1B1Base,
+                chunk_tagging_contracts.ChunkTaggingL2M1B2Base,
+                chunk_tagging_contracts.ChunkTaggingL2M1B3Base,
+                chunk_tagging_contracts.ChunkTaggingL2M1B4Base,
+            ),
+            rule_types=(chunk_tagging_contracts.ChunkTaggingL2M1R1Rule,),
+        ),
+        "Chunk_Tagging.L2.M2": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL2M2Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL2M2StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL2M2RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL2M2B1Base,
+                chunk_tagging_contracts.ChunkTaggingL2M2B2Base,
+            ),
+            rule_types=(
+                chunk_tagging_contracts.ChunkTaggingL2M2R1Rule,
+                chunk_tagging_contracts.ChunkTaggingL2M2R2Rule,
+            ),
+        ),
+        "Chunk_Tagging.L3.M0": StaticModuleContractBundle(
+            module_type=chunk_tagging_contracts.ChunkTaggingL3M0Module,
+            static_params_type=chunk_tagging_contracts.ChunkTaggingL3M0StaticBoundaryParams,
+            runtime_params_type=chunk_tagging_contracts.ChunkTaggingL3M0RuntimeBoundaryParams,
+            base_types=(
+                chunk_tagging_contracts.ChunkTaggingL3M0B1Base,
+                chunk_tagging_contracts.ChunkTaggingL3M0B2Base,
+                chunk_tagging_contracts.ChunkTaggingL3M0B3Base,
+                chunk_tagging_contracts.ChunkTaggingL3M0B4Base,
+            ),
+            rule_types=(
+                chunk_tagging_contracts.ChunkTaggingL3M0R1Rule,
+                chunk_tagging_contracts.ChunkTaggingL3M0R2Rule,
+                chunk_tagging_contracts.ChunkTaggingL3M0R3Rule,
+            ),
+        ),
+    }
+)
 
 
 def get_static_module_contract_bundle(module_id: str) -> StaticModuleContractBundle | None:

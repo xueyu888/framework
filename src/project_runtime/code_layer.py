@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import importlib
+import inspect
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,9 @@ from project_runtime.static_modules.backend_l2_m0 import (
     BackendL2M0StaticBoundaryParams,
 )
 from project_runtime.static_modules import all_module_contracts as static_module_contracts
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class CodeModuleClass:
@@ -85,6 +89,28 @@ def _find_code_line(needle: str, *, fallback: int = 1) -> int:
 
 def _class_symbol(class_type: type[Any]) -> str:
     return f"{class_type.__module__}:{class_type.__name__}"
+
+
+def _class_source_ref(class_type: type[Any], *, token: str, fallback: dict[str, Any]) -> dict[str, Any]:
+    try:
+        source_file = inspect.getsourcefile(class_type) or inspect.getfile(class_type)
+        _, line_no = inspect.getsourcelines(class_type)
+    except (OSError, TypeError):
+        return fallback
+    if not source_file:
+        return fallback
+    resolved_path = Path(source_file).resolve()
+    try:
+        relative_file = resolved_path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        relative_file = resolved_path.as_posix()
+    return {
+        "file_path": relative_file,
+        "line": line_no,
+        "section": resolved_path.stem,
+        "anchor": f"class {class_type.__name__}",
+        "token": token,
+    }
 
 
 @lru_cache(maxsize=1)
@@ -1811,22 +1837,12 @@ def build_code_modules(
             "anchor": module_id,
             "token": module_id,
         }
-        if module_type.__module__ == "project_runtime.static_modules.all_module_contracts":
-            source_ref = {
-                "file_path": "src/project_runtime/static_modules/all_module_contracts.py",
-                "line": _find_all_module_contract_line(f"class {module_type.__name__}(", fallback=1),
-                "section": "all_module_contracts",
-                "anchor": f"class {module_type.__name__}",
-                "token": module_id,
-            }
-        elif module_id == BACKEND_L2_M0_MODULE_ID:
-            source_ref = {
-                "file_path": "src/project_runtime/static_modules/backend_l2_m0.py",
-                "line": _find_backend_l2_m0_line("class BackendL2M0Module(", fallback=1),
-                "section": "backend_l2_m0_module",
-                "anchor": "class BackendL2M0Module",
-                "token": module_id,
-            }
+        if module_type.__module__.startswith("project_runtime.static_modules."):
+            source_ref = _class_source_ref(
+                module_type,
+                token=module_id,
+                fallback=source_ref,
+            )
         code_module = type(
             class_name,
             (CodeModuleClass,),

@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from pathlib import Path
 import sys
 
 import uvicorn
 
-from project_runtime.document_chunking import (
-    DEFAULT_DOCUMENT_CHUNKING_PRODUCT_SPEC_FILE,
-    load_document_chunking_project,
-    run_document_chunking_file,
-)
 from project_runtime import DEFAULT_PROJECT_FILE, materialize_project_runtime
 from project_runtime.app_factory import PROJECT_FILE_ENV, build_project_app
 
@@ -20,7 +14,7 @@ SRC_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SRC_DIR.parent
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
-KNOWN_COMMANDS = {"serve", "document-chunking-run"}
+KNOWN_COMMANDS = {"serve"}
 RELOAD_DIRS = [
     SRC_DIR,
     REPO_ROOT / "framework",
@@ -69,26 +63,6 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="enable uvicorn reload mode and pre-materialize generated artifacts",
     )
-    chunking_parser = subparsers.add_parser(
-        "document-chunking-run",
-        help="run the document chunking pipeline against one markdown file and print the structured result",
-    )
-    chunking_parser.add_argument(
-        "--product-spec-file",
-        default=str(DEFAULT_DOCUMENT_CHUNKING_PRODUCT_SPEC_FILE.relative_to(REPO_ROOT)),
-        help=(
-            "path to the document chunking product spec. Defaults to "
-            "projects/document_chunking_basic/product_spec.toml."
-        ),
-    )
-    chunking_parser.add_argument(
-        "--input-file",
-        help="markdown file to chunk. Defaults to the template's configured validation input.",
-    )
-    chunking_parser.add_argument(
-        "--output-file",
-        help="optional markdown file path for writing the chunked output. Defaults to the implementation config value.",
-    )
     return parser
 
 
@@ -122,16 +96,6 @@ def _serve_project(project_file: str | Path | None, *, host: str, port: int, rel
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(_normalize_argv(list(sys.argv[1:] if argv is None else argv)))
-    if args.command == "document-chunking-run":
-        project = load_document_chunking_project(args.product_spec_file)
-        input_file = args.input_file or project.implementation.evidence.default_validation_input
-        result = run_document_chunking_file(
-            product_spec_file=args.product_spec_file,
-            input_file=input_file,
-            output_file=args.output_file,
-        )
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 0
     if args.command == "serve":
         _serve_project(args.project_file, host=args.host, port=args.port, reload=args.reload)
         return 0
