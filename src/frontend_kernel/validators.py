@@ -148,7 +148,7 @@ def validate_frontend_rules(project: "ProjectRuntimeAssembly") -> tuple[RuleVali
     return (
         _outcome(
             "R1",
-            "通用承载面收敛",
+            "通用界面分区收敛",
             not r1_reasons,
             r1_reasons,
             {
