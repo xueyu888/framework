@@ -35,21 +35,21 @@
 
 ## 对话触发守卫（强制）
 - AGENTS 只认最终生效的 `shelf.*` 值作为门禁配置语义入口，不再维护独立目录常量；不再在 AGENTS 里区分配置来自哪个文件承载。
-- 门禁范围只看：`shelf.intentGateGuardedPathPrefixes` 与 `shelf.intentGateIgnoredPathPrefixes`。若未显式覆盖，插件默认受检目录为：`framework/`、`framework_drafts/`、`projects/`、`src/project_runtime/`、`scripts/`。
-- 检查开关只看：`shelf.intentGateEnabled`、`shelf.intentGateRunChangeValidationBeforeGrant`、`shelf.intentGateTemporaryBypasses`。当 `intentGateEnabled = false`，或 `intentGateRunChangeValidationBeforeGrant = false`，或 `intentGateTemporaryBypasses` 包含 `grant_pre_validation` / `*` 时，可临时关闭“改前 check-changes 检查”。
-- 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中“门禁作用范围”且未命中上述关闭条件，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
+- 默认受检目录为：`framework/`、`framework_drafts/`、`projects/`、`src/project_runtime/`、`scripts/`。
+- 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中上述受检范围，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
 - bootstrap 例外：若 `--check-changes` 失败原因为“当前仓库不存在任何 `projects/*/project.toml`”，可进入 bootstrap 模式继续生成首个 `project.toml` 与对应代码/产物；生成后必须立刻恢复常规门禁并重新执行 `--check-changes`。
 - 若上述命令失败，或输出包含 `FRAMEWORK_VIOLATION`，AI 必须拒绝继续修改命中门禁范围的文件，并明确提示“先由人修改 framework，再继续实现层变更”。
-- AI 完成命中门禁范围的修改后，提交前必须再次执行：`uv run python scripts/validate_canonical.py --check-changes`，除非命中上述临时关闭条件；未关闭时必须确保未引入新的 framework 语义越权。
+- AI 完成命中门禁范围的修改后，提交前必须再次执行：`uv run python scripts/validate_canonical.py --check-changes`，并确保未引入新的 framework 语义越权。
 - 该守卫属于“对话级自动触发”，不得要求用户手工复制临时 `project.toml` 才触发。
-- 当用户把 `intentGateGuardedPathPrefixes` 配置为仅 `framework/` 时，门禁只对 `framework/**` 生效。
 
 ### 对话意图到框架映射门禁（强制）
 - 用户提出“新增/调整功能”时，AI 必须先完成“需求 -> framework 显式映射”再动实现层文件。
 - 映射结果至少应包含：`module_id`、对应 `boundary_id`（或明确的 Rule/Base 约束）、以及落点 `exact.*` 路径。
 - 若 AI 不能给出上述映射，或映射结果无法在当前 framework 中找到对应约束，AI 必须拒绝修改命中门禁范围的实现文件，并提示“该需求尚未进入 framework，请先由人修改 framework”。
 - 在“映射失败”场景中，AI 不得通过“直接改 config 或 code”规避框架前置；不得创建平行真相路径。
-- `framework/**` 是人类作者源；AI 对 framework 默认只读。需要新增框架能力时，AI 只能给出修改建议，不得直接落盘 framework 文件。
+- `framework/**` 是人类作者源；AI 对 framework 绝对只读。不得因为“用户点名某个 framework 文件”“只是试写一版”“先改再恢复”或“先给人看效果”而直接落盘 framework 文件。
+- AI 需要给出候选稿时，必须按语义选择落点：正式 framework 作者稿候选写到 `framework_drafts/**`；集合论 / TLA / schema / 验证 / 讨论等外部形式化稿写到 `docs/formal-framework/**`。
+- AI 不得直接执行 `framework_drafts/** -> framework/**` 的发布动作；正式 framework 作者源落盘必须由人类确认并单独触发。
 
 ## 工程执行规范（强制）
 

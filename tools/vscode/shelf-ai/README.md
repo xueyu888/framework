@@ -27,9 +27,7 @@ Authoring-term note:
 - Adds project-independent framework markdown syntax diagnostics (Problems 波浪线) while typing/saving.
 - Adds context-aware framework markdown completion (section-aware + auto-number defaults) and lint Quick Fix actions.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
-- Adds a governed-task intent gate: map request text to canonical framework paths (`module_id / boundary_id / exact.*`) before implementation.
-- Enforces one-to-one parameter mapping for governed-task sessions: if any canonical parameter still projects to multiple related paths, session grant is rejected until framework is clarified.
-- Save-time blocking is disabled; repository-side validation/hook checks remain the enforcement boundary.
+- Keeps ordinary implementation saves unblocked; repository-side validation/hook checks remain the main enforcement boundary.
 
 ## Contract
 
@@ -52,9 +50,6 @@ Authoring-term note:
 
 - `Shelf: Insert Framework Module Template`
 - `Shelf: Install Git Hooks`
-- `Shelf: Start Governed Task`
-- `Shelf: Show Governed Task Session`
-- `Shelf: Clear Governed Task Session`
 - `Shelf: Validate Canonical Now`
 - `Shelf: Run Codegen Preflight`
 - `Shelf: Publish Current Framework Draft`
@@ -74,14 +69,6 @@ Local workspace overlay file:
 
 - `shelf.guardMode = strict`
 - `shelf.showMessagePopups = true`
-- `shelf.intentGateEnabled = true`
-- `shelf.intentGateRequireMappingEcho = true`
-- `shelf.intentGateRunChangeValidationBeforeGrant = true`
-- `shelf.intentGateAutoOpenOutput = true`
-- `shelf.intentGateMinimumScore = 4`
-- `shelf.intentGateMaxMatches = 8`
-- `shelf.intentGateSessionTtlMinutes = 120`
-- `shelf.intentGateTemporaryBypasses = []`
 - `shelf.frameworkTreeNodeHorizontalGap = 8`
 - `shelf.frameworkTreeLevelVerticalGap = 80`
 - `shelf.frameworkTreeAutoRefreshOnSave = true`
@@ -120,30 +107,6 @@ Framework tree behavior settings:
 - `shelf.statusBarClickAction = quickPick`:
   clicking Shelf status bar first shows two explicit choices: open framework tree or show issues.
 
-Intent-gate temporary bypass supports multi-option configuration:
-
-- Keep strict mode: `[]`
-- Bypass specific checks: for example `["grant_pre_validation", "mapping_echo"]`
-- Bypass all listed checks: `["*"]`
-
-Available bypass items:
-
-- `grant_pre_validation`: skip `validate_canonical.py --check-changes` before session grant.
-- `mapping_echo`: skip QuickPick mapping confirmation before session grant.
-- `one_to_one_check`: allow governed-task session mapping even when canonical boundary projection is not one-to-one.
-
-`one_to_one_check` only affects local plugin session grant behavior; repository-level `validate_canonical.py` one-to-one checks still apply.
-
-## Governed Task Flow
-
-1. Run `Shelf: Start Governed Task`.
-2. Enter the requested change text.
-3. Shelf runs `validate_canonical.py --check-changes` (configurable), computes canonical-backed mapping candidates, and asks for confirmation.
-   If canonical boundary projection is not one-to-one, Shelf blocks the session and asks a human to update framework first (unless `one_to_one_check` temporary bypass is enabled).
-   You can temporarily bypass specific gate steps with `shelf.intentGateTemporaryBypasses`, but default remains strict.
-4. Once granted, the session remains available until it expires or is cleared.
-5. Save-time blocking is disabled; guard enforcement relies on repository validation and git hooks at commit/push boundaries.
-
 ## Validation
 
 Default commands:
@@ -153,7 +116,7 @@ Default commands:
 - `uv run python scripts/materialize_project.py`
 - `uv run mypy`
 
-`validate_canonical.py` now enforces one-to-one boundary projection at repository guard level. If any boundary still maps to multiple related paths, validation fails with `FRAMEWORK_VIOLATION` and asks for framework updates first.
+`validate_canonical.py` enforces one-to-one boundary projection at repository guard level. If any boundary still maps to multiple related paths, validation fails with `FRAMEWORK_VIOLATION` and asks for framework updates first.
 
 `Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation.
 
