@@ -1874,6 +1874,13 @@ function activate(context) {
     return action;
   };
 
+  const inferExpectedHeadingFromFwl012Message = (rawMessage) => {
+    const message = String(rawMessage || "");
+    const match = message.match(/这里应为[“"](?<expected>##\s+[^”"]+)[”"]/u);
+    const expected = match?.groups?.expected;
+    return typeof expected === "string" ? expected.trim() : "";
+  };
+
   const buildFrameworkLintQuickFixes = (document, diagnostic) => {
     const code = String(diagnostic?.code || "").trim().toUpperCase();
     if (!code.startsWith("FWL")) {
@@ -2150,6 +2157,23 @@ function activate(context) {
             (edit) => {
               const insertionPoint = new vscode.Position(lineIndex, document.lineAt(lineIndex).text.length);
               edit.insert(document.uri, insertionPoint, `\n${template}`);
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL012") {
+      const expectedHeading = inferExpectedHeadingFromFwl012Message(diagnostic?.message);
+      if (expectedHeading) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "替换为期望的标准二级标题",
+            (edit) => {
+              edit.replace(document.uri, currentLine.range, expectedHeading);
               return true;
             }
           )

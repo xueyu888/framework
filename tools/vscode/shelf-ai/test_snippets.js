@@ -213,6 +213,10 @@ function main() {
     "extension.js must register framework markdown quick-fix provider"
   );
   assert(
+    extensionSource.includes('if (code === "FWL012")'),
+    "extension.js must provide a heading-order quick fix for FWL012 diagnostics"
+  );
+  assert(
     extensionSource.includes("editor.action.triggerSuggest"),
     "extension.js must trigger framework suggestion popup while typing"
   );
