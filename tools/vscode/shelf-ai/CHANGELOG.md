@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.24 - 2026-03-26
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.23..shelf-ai-v0.1.24`.
+- Removed the governed-task session / intent-gate flow from Shelf AI, including its dedicated commands, settings, tests, and extension-side grant state; repository validation and git hooks remain the enforcement boundary.
+- Added a direct Quick Fix path for framework heading-order lint so authors can repair standard second-level headings faster from Problems.
+- Relaxed framework parameter-id parsing so author-source `boundary_id` tokens can use `snake_case` or mixed case while config/code mapping continues to normalize those ids to lowercase sections and field names.
+- Synced the backend framework authoring baseline in the same range, including orchestration-module wording cleanup and current backend module restructuring, so the author-source inputs consumed by Shelf AI stay aligned with the repository.
+- Revalidated the extension and repository checks, then repackaged and reinstalled the VSIX from the validated release baseline.
+
 ## 0.1.23 - 2026-03-24
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.22..shelf-ai-v0.1.23`.
