@@ -16,7 +16,31 @@ from rule_validation_models import ValidationReports
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PROJECT_FILE = REPO_ROOT / "projects" / "knowledge_base_basic" / "project.toml"
+FRAMEWORK_ONLY_FALLBACK_NOTE = (
+    "full materialization failed; canonical keeps framework snapshot only until next full materialization"
+)
+
+
+def _discover_default_project_file() -> Path | None:
+    candidates = sorted((REPO_ROOT / "projects").glob("*/project.toml"))
+    if candidates:
+        return candidates[0]
+    return None
+
+
+DEFAULT_PROJECT_FILE = _discover_default_project_file()
+
+
+def _resolve_project_file(project_file: str | Path | None) -> Path:
+    if project_file is not None:
+        return normalize_project_path(project_file)
+    discovered = _discover_default_project_file()
+    if discovered is None:
+        raise FileNotFoundError(
+            "no projects/*/project.toml found; "
+            "specify --project-file or create a project config first"
+        )
+    return discovered
 
 
 def _artifact_paths(project_file: Path, canonical_name: str) -> GeneratedArtifactPaths:
@@ -25,6 +49,36 @@ def _artifact_paths(project_file: Path, canonical_name: str) -> GeneratedArtifac
         directory=relative_path(output_dir),
         canonical_json=relative_path(output_dir / canonical_name),
     )
+
+
+def _read_root_role_dependencies(exact_config: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    evidence_config = exact_config.get("evidence")
+    if not isinstance(evidence_config, dict):
+        return {}
+    raw_dependencies = evidence_config.get("root_role_dependencies")
+    if raw_dependencies is None:
+        return {}
+    if not isinstance(raw_dependencies, dict):
+        raise ValueError("exact.evidence.root_role_dependencies must be a table")
+    dependencies: dict[str, tuple[str, ...]] = {}
+    for raw_role, raw_values in raw_dependencies.items():
+        role = str(raw_role).strip()
+        if not role:
+            continue
+        if not isinstance(raw_values, list):
+            raise ValueError(
+                "exact.evidence.root_role_dependencies."
+                f"{role} must be an array"
+            )
+        values: list[str] = []
+        for item in raw_values:
+            dep_role = str(item).strip()
+            if not dep_role or dep_role == role or dep_role in values:
+                continue
+            values.append(dep_role)
+        if values:
+            dependencies[role] = tuple(values)
+    return dependencies
 
 
 def _build_links(
@@ -186,6 +240,144 @@ def _build_links(
     }
 
 
+def _default_links_payload() -> dict[str, Any]:
+    return _build_links(tuple(), tuple(), tuple(), tuple())
+
+
+def _materialization_payload(*, mode: str, degraded: bool, note: str = "") -> dict[str, Any]:
+    return {
+        "mode": mode,
+        "degraded": degraded,
+        "note": note,
+    }
+
+
+def _safe_read_existing_canonical(canonical_path: Path) -> dict[str, Any]:
+    if not canonical_path.is_file():
+        return {}
+    try:
+        payload = json.loads(canonical_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
+def _ensure_degraded_canonical_shape(
+    project_config: Any,
+    canonical: dict[str, Any],
+) -> dict[str, Any]:
+    canonical_payload = dict(canonical)
+    config_layer = canonical_payload.get("config")
+    if not isinstance(config_layer, dict):
+        config_layer = {}
+    config_layer = {
+        "project_file": project_config.project_file,
+        "communication": project_config.communication,
+        "exact": project_config.exact,
+        "modules": (
+            config_layer.get("modules")
+            if isinstance(config_layer.get("modules"), list)
+            else []
+        ),
+    }
+    code_layer = canonical_payload.get("code")
+    if not isinstance(code_layer, dict):
+        code_layer = {}
+    code_layer = {
+        "modules": code_layer.get("modules") if isinstance(code_layer.get("modules"), list) else [],
+        "runtime_exports": (
+            code_layer.get("runtime_exports")
+            if isinstance(code_layer.get("runtime_exports"), dict)
+            else {}
+        ),
+    }
+    evidence_layer = canonical_payload.get("evidence")
+    if not isinstance(evidence_layer, dict):
+        evidence_layer = {}
+    evidence_layer = {
+        "modules": (
+            evidence_layer.get("modules")
+            if isinstance(evidence_layer.get("modules"), list)
+            else []
+        ),
+        "exports": evidence_layer.get("exports") if isinstance(evidence_layer.get("exports"), dict) else {},
+        "validation_reports": (
+            evidence_layer.get("validation_reports")
+            if isinstance(evidence_layer.get("validation_reports"), dict)
+            else ValidationReports.empty().to_dict()
+        ),
+    }
+    links_layer = canonical_payload.get("links")
+    if not isinstance(links_layer, dict):
+        links_layer = _default_links_payload()
+
+    canonical_payload["config"] = config_layer
+    canonical_payload["code"] = code_layer
+    canonical_payload["evidence"] = evidence_layer
+    canonical_payload["links"] = links_layer
+    canonical_payload.pop("correspondence", None)
+    return canonical_payload
+
+
+def _build_framework_only_canonical(
+    *,
+    project_config: Any,
+    root_module_ids: dict[str, str],
+    framework_modules: tuple[type[Any], ...],
+    existing_canonical: dict[str, Any],
+    note: str,
+) -> dict[str, Any]:
+    canonical_payload = _ensure_degraded_canonical_shape(project_config, existing_canonical)
+    canonical_payload["schema_version"] = "four-layer-canonical/v2"
+    canonical_payload["project"] = project_config.metadata.to_dict()
+    canonical_payload["framework"] = {
+        "selected_modules": [item.to_dict() for item in project_config.framework_modules],
+        "root_module_ids": dict(root_module_ids),
+        "modules": [item.to_dict() for item in framework_modules],
+    }
+    canonical_payload["materialization"] = _materialization_payload(
+        mode="framework_only",
+        degraded=True,
+        note=note,
+    )
+    return canonical_payload
+
+
+def _compile_framework_only_snapshot_runtime(
+    project_file: Path,
+    *,
+    note: str,
+) -> ProjectRuntimeAssembly:
+    project_config = load_project_config(project_file)
+    framework_modules, root_module_ids = resolve_selected_framework_modules(project_config.framework_modules)
+    artifacts = _artifact_paths(project_file, project_config.artifacts.canonical_json)
+    canonical_path = project_file.parent / "generated" / project_config.artifacts.canonical_json
+    existing_canonical = _safe_read_existing_canonical(canonical_path)
+    runtime_exports = {}
+    code_layer = existing_canonical.get("code")
+    if isinstance(code_layer, dict) and isinstance(code_layer.get("runtime_exports"), dict):
+        runtime_exports = dict(code_layer["runtime_exports"])
+    canonical = _build_framework_only_canonical(
+        project_config=project_config,
+        root_module_ids=root_module_ids,
+        framework_modules=framework_modules,
+        existing_canonical=existing_canonical,
+        note=note,
+    )
+    return ProjectRuntimeAssembly(
+        project_file=relative_path(project_file),
+        metadata=project_config.metadata,
+        config=project_config,
+        root_module_ids=root_module_ids,
+        runtime_exports=runtime_exports,
+        validation_reports=ValidationReports.empty(),
+        generated_artifacts=artifacts,
+        canonical=canonical,
+    )
+
+
 def _build_canonical(
     assembly: ProjectRuntimeAssembly,
     framework_modules: tuple[type[Any], ...],
@@ -198,7 +390,6 @@ def _build_canonical(
         "schema_version": "four-layer-canonical/v2",
         "project": assembly.metadata.to_dict(),
         "framework": {
-            "author_source": "framework/*.md",
             "selected_modules": [item.to_dict() for item in assembly.config.framework_modules],
             "root_module_ids": dict(assembly.root_module_ids),
             "modules": [item.to_dict() for item in framework_modules],
@@ -223,17 +414,23 @@ def _build_canonical(
             "validation_reports": assembly.validation_reports.to_dict(),
         },
         "links": _build_links(framework_modules, config_modules, code_modules, evidence_modules),
+        "materialization": _materialization_payload(mode="full", degraded=False),
     }
     canonical["correspondence"] = build_correspondence_view(canonical)
     return canonical
 
 
-def compile_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> ProjectRuntimeAssembly:
-    resolved_project_file = normalize_project_path(project_file)
+def compile_project_runtime(project_file: str | Path | None = None) -> ProjectRuntimeAssembly:
+    resolved_project_file = _resolve_project_file(project_file)
     project_config = load_project_config(resolved_project_file)
     framework_modules, root_module_ids = resolve_selected_framework_modules(project_config.framework_modules)
     config_modules = build_config_modules(project_config, framework_modules)
-    code_modules, code_exports = build_code_modules(config_modules, root_module_ids=root_module_ids)
+    root_role_dependencies = _read_root_role_dependencies(project_config.exact)
+    code_modules, code_exports = build_code_modules(
+        config_modules,
+        root_module_ids=root_module_ids,
+        root_role_dependencies=root_role_dependencies,
+    )
     draft_assembly = ProjectRuntimeAssembly(
         project_file=relative_path(resolved_project_file),
         metadata=project_config.metadata,
@@ -248,7 +445,9 @@ def compile_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> 
     )
     evidence_modules, evidence_exports, validation_reports = build_evidence_modules(draft_assembly, code_modules)
     runtime_exports = dict(code_exports)
-    runtime_exports["runtime_blueprint"] = evidence_exports["runtime_blueprint"]
+    runtime_blueprint = evidence_exports.get("runtime_blueprint")
+    if runtime_blueprint is not None:
+        runtime_exports["runtime_blueprint"] = runtime_blueprint
     assembly = ProjectRuntimeAssembly(
         project_file=draft_assembly.project_file,
         metadata=draft_assembly.metadata,
@@ -279,13 +478,25 @@ def compile_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> 
 
 
 @lru_cache(maxsize=4)
-def load_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> ProjectRuntimeAssembly:
+def load_project_runtime(project_file: str | Path | None = None) -> ProjectRuntimeAssembly:
     return compile_project_runtime(project_file)
 
 
-def materialize_project_runtime(project_file: str | Path = DEFAULT_PROJECT_FILE) -> ProjectRuntimeAssembly:
-    resolved_project_file = normalize_project_path(project_file)
-    assembly = compile_project_runtime(resolved_project_file)
+def materialize_project_runtime(
+    project_file: str | Path | None = None,
+    *,
+    allow_framework_only_fallback: bool = False,
+) -> ProjectRuntimeAssembly:
+    resolved_project_file = _resolve_project_file(project_file)
+    try:
+        assembly = compile_project_runtime(resolved_project_file)
+    except Exception as compile_error:
+        if not allow_framework_only_fallback:
+            raise
+        assembly = _compile_framework_only_snapshot_runtime(
+            resolved_project_file,
+            note=FRAMEWORK_ONLY_FALLBACK_NOTE,
+        )
     generated = resolved_project_file.parent / "generated"
     generated.mkdir(parents=True, exist_ok=True)
     expected = {

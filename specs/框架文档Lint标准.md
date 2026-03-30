@@ -17,10 +17,12 @@
 - 每个文件必须保留 plain `@framework` 起手入口。
 - 每个文件必须包含以下主 section：
   - `## 1. 能力声明`
-  - `## 2. 边界定义`
-  - `## 3. 最小可行基`
+  - `## 2. 边界定义（Boundary / Parameter 参数）`
+  - `## 3. 最小结构基（Minimal Structural Bases）`
   - `## 4. 基组合原则`
   - `## 5. 验证`
+- 当前作者语法统一使用 `边界定义 / 参数绑定`。
+- 参数项 `boundary_id` 允许使用 `snake_case`、兼容既有全大写/混合大小写 token；下游 section / field 名统一按小写归一化，大小写本身不表达额外语义。
 - `C* / N* / B* / R* / V*` 编号必须稳定、唯一、可解析。
 - `B*` 的上游模块引用必须写在主句中，不得使用 `上游模块：...`。
 - framework 模块正文不得直接写入 `project.toml` 路径、已删除的双轨配置文件名、已删除的旧映射清单名或旧配置 section 语法。
@@ -29,7 +31,7 @@
 
 - framework 文档只能描述结构语义，不得直接写入项目实例值。
 - 项目配置唯一入口是 `projects/<project_id>/project.toml`。
-- 边界跳转或实例落点必须回到 `project.toml` 的显式 section，例如：
+- 参数跳转或实例落点必须回到 `project.toml` 的显式 section，例如：
   - `[communication.frontend.surface]`
   - `[communication.knowledge_base.chat]`
   - `[exact.frontend.surface]`
@@ -55,6 +57,10 @@
 
 - framework Markdown 结构完整性
 - Framework / Base / Rule class 物化完整性
+- 每个 `B*` 至少绑定一个参数边界（由规则参数绑定闭包计算）
+- 每个 `B*` 至少参与一条 `R*` 组合规则
+- 每条 `R*` 至少声明一种结果：输出能力或失效结论
+- 禁止伪拆分：同模块内两个 `B*` 若边界集合、规则参与集合、下游影响集合完全一致则判定违规
 - `project.toml` 可解析性
 - contract 切片与四层 compile 结果一致性
 - canonical 可重新物化

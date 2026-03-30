@@ -1,5 +1,85 @@
 # Changelog
 
+## 0.1.24 - 2026-03-26
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.23..shelf-ai-v0.1.24`.
+- Removed the governed-task session / intent-gate flow from Shelf AI, including its dedicated commands, settings, tests, and extension-side grant state; repository validation and git hooks remain the enforcement boundary.
+- Added a direct Quick Fix path for framework heading-order lint so authors can repair standard second-level headings faster from Problems.
+- Relaxed framework parameter-id parsing so author-source `boundary_id` tokens can use `snake_case` or mixed case while config/code mapping continues to normalize those ids to lowercase sections and field names.
+- Synced the backend framework authoring baseline in the same range, including orchestration-module wording cleanup and current backend module restructuring, so the author-source inputs consumed by Shelf AI stay aligned with the repository.
+- Revalidated the extension and repository checks, then repackaged and reinstalled the VSIX from the validated release baseline.
+
+## 0.1.23 - 2026-03-24
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.22..shelf-ai-v0.1.23`.
+- Flattened framework capability authoring so `N*` non-responsibility items can be written directly after `C*` items without introducing a dedicated third-level heading.
+- Relaxed realtime framework lint to treat `###` lines as neutral separators instead of structural errors, while keeping second-level section order and list-entry syntax checks strict.
+- Synced framework completion, snippet template, and quick-fix behavior with the flat `C* / N*` authoring style.
+- Revalidated the extension and repository checks, then repackaged the VSIX from the clean release baseline.
+
+## 0.1.22 - 2026-03-24
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.21..shelf-ai-v0.1.22`.
+- Tightened the Shelf AI release pipeline so tagged releases must carry bilingual full-range notes and a matching `.vsix` asset.
+- Localized correspondence diagnostics to Chinese and added unresolved-symbol framework lint plus undefined-symbol navigation fallback.
+- Reworked the framework tree into an author-source runtime view with status-bar quick-pick entry, save-time background refresh, framework-only canonical snapshot fallback, and a cleaner module-level author graph.
+
+## 0.1.21 - 2026-03-21
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.20..shelf-ai-v0.1.21`.
+- Added real-time framework markdown lint diagnostics and quick fixes, with grant-stage intent-gate behavior alignment.
+- Unified authoring section naming to `## 2. 边界定义（Boundary / Parameter 参数）` and `## 3. 最小结构基（Minimal Structural Bases）` across parser/lint/completion/navigation/snippets/tests/framework docs.
+- Added Boundary-section dash auto-expansion (`-` -> parameter item template) with inferred `P` numbering.
+- Rebuilt and revalidated Shelf AI assets before packaging and installation.
+
+## 0.1.20 - 2026-03-20
+
+- Switched Shelf AI Problems diagnostics to Chinese by default instead of leaking English validation text from generated-artifact guards and correspondence summaries.
+- Added correspondence-side reason localization so common audit drift messages land in Chinese even when the underlying runtime emits English reason strings.
+- Repacked and reinstalled the local VSIX after the diagnostics localization fix so the shipped release matches the current validated workspace.
+
+## 0.1.19 - 2026-03-20
+
+- Removed fixed default-project assumptions in runtime and scripts: project resolution now supports discovery from `projects/*/project.toml` or explicit input instead of `projects/project.toml` fallback.
+- Hardened no-project handling in CLI/validation/materialization paths with explicit messages and bootstrap-aware checks.
+- Synced repository docs and guards to the current `message_queue_basic` baseline and canonical path conventions.
+
+## 0.1.18 - 2026-03-20
+
+- Replaced hard-coded per-module `if module_id == ...` export assignment branches in runtime/evidence layers with mapping-driven export injection.
+- Removed fixed `frontend/knowledge_base/backend` overlay branching in framework projection and switched to framework-name-driven overlay path generation.
+- Added repository-level hardcode regression guard (`tests/test_no_hardcode_guard.py`) and enforced anti-hardcode execution requirements in `AGENTS.md`.
+
+## 0.1.17 - 2026-03-20
+
+- Removed hard-coded root-role coupling checks in `project_runtime.code_layer` and switched consistency validation to framework-upstream-derived dependencies plus explicit config overrides.
+- Added configurable root-role dependency overrides at `exact.evidence.root_role_dependencies`, so projects can declare extra root coupling without patching runtime code.
+- Enabled queue-only project materialization/validation flow (`message_queue` roots without mandatory frontend/knowledge_base/backend triple), while keeping per-module export injection strict to selected roots only.
+
+## 0.1.16 - 2026-03-20
+
+- Removed hard dependency on `projects/knowledge_base_basic/project.toml` as the extension fallback project file and switched to generic `projects/*/project.toml` discovery.
+- Updated issue reveal fallback behavior so Shelf can still open a valid workspace file (project file first, then standards doc) when no canonical issue file is available.
+- Synced framework/correspondence navigation default project preference to the generic workspace fallback path.
+
+## 0.1.15 - 2026-03-20
+
+- Updated framework design standards to remove the mandatory base-to-capability direct mapping constraint and keep capability derivation at the rule-combination layer.
+- Added correspondence guard enforcement that every base must declare at least one boundary and that declared base boundaries must belong to the owner module.
+- Synced Shelf AI framework lint hint `FW022` wording with the new base-boundary constraint semantics.
+
+## 0.1.14 - 2026-03-19
+
+- Removed extension-side normalization that silently stripped stale `--json` from validation commands; Shelf now executes the configured validation command as-is.
+- Hardened tree webview HTML escaping for both text nodes and attribute values (`"`, `'`, `<`, `>`, `&`) and added regression tests for attribute-injection payloads.
+- Added `check:webview-types` and extension test execution to the `Publish Shelf AI` workflow before VSIX packaging.
+
+## 0.1.13 - 2026-03-19
+
+- Renamed the framework authoring term from `Boundary` to `Parameter` across current framework docs, Shelf AI snippets, completion entries, and author-facing plugin documentation.
+- Kept parser and navigation compatibility for legacy framework files by accepting both the new `参数定义 / 参数绑定` syntax and the previous `边界定义 / 边界绑定` wording during the transition.
+- Revalidated the repository, reran plugin tests, and repackaged the local VSIX so the shipped extension matches the current validated workspace and terminology baseline.
+
 ## 0.1.12 - 2026-03-17
 
 - Refined the dedicated monochrome Activity Bar duck glyph so the icon now fills the sidebar slot more decisively while keeping thinner, cleaner inner lines.

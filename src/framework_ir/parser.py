@@ -24,7 +24,7 @@ FRAMEWORK_FILE_PATTERN = re.compile(r"^L(?P<level>\d+)-M(?P<module>\d+)-.+\.md$"
 TITLE_PATTERN = re.compile(r"^#\s+(?P<cn>[^:]+):(?P<en>.+)$", re.MULTILINE)
 CAPABILITY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>C\d+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
 NON_RESPONSIBILITY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>N\d+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
-BOUNDARY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>[A-Z0-9_]+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
+BOUNDARY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>[A-Za-z0-9_]+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
 BASE_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>B\d+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
 VERIFY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>V\d+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
 RULE_TOP_PATTERN = re.compile(r"^-\s+`(?P<id>R\d+)`\s+(?P<name>.+)$")
@@ -33,6 +33,10 @@ SOURCE_EXPR_PATTERN = re.compile(r"来源[：:]\s*`(?P<expr>[^`]+)`")
 INLINE_REF_PATTERN = re.compile(
     r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.M(?P<module>\d+)(?:\[(?P<rules>[^\]]*)\])?$"
 )
+PARAMETER_SECTION_TITLES = (
+    "## 2. 边界定义（Boundary / Parameter 参数）",
+)
+RULE_PARAMETER_BINDING_PREFIXES = ("参数绑定：", "边界绑定：")
 
 
 def _split_sections(text: str) -> dict[str, list[tuple[int, str]]]:
@@ -305,10 +309,21 @@ def _parse_rules(
             outputs = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
         elif body.startswith("失效结论："):
             invalids = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
-        elif body.startswith("边界绑定："):
+        elif any(body.startswith(prefix) for prefix in RULE_PARAMETER_BINDING_PREFIXES):
             bindings = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
     flush()
     return tuple(items)
+
+
+def _section_lines(
+    sections: dict[str, list[tuple[int, str]]],
+    *titles: str,
+) -> list[tuple[int, str]]:
+    for title in titles:
+        lines = sections.get(title)
+        if lines is not None:
+            return lines
+    return []
 
 
 def _parse_verifications(
@@ -376,11 +391,11 @@ def parse_framework_module(path: str | Path) -> FrameworkModule:
             relative_file=relative_file,
         ),
         boundaries=_parse_boundaries(
-            sections.get("## 2. 边界定义（Boundary / 参数）", []),
+            _section_lines(sections, *PARAMETER_SECTION_TITLES),
             relative_file=relative_file,
         ),
         bases=_parse_bases(
-            sections.get("## 3. 最小可行基（Minimum Viable Bases）", []),
+            sections.get("## 3. 最小结构基（Minimal Structural Bases）", []),
             framework,
             relative_file=relative_file,
         ),

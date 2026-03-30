@@ -9,159 +9,230 @@ const {
   buildRuntimeTreeModel,
 } = require("./tree_runtime_models");
 
-const repoRoot = path.resolve(__dirname, "..", "..", "..");
-
 function writeFile(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, "utf8");
 }
 
-function createStaleFrameworkRepoFixture() {
-  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "shelf-tree-runtime-"));
+function createFrameworkAuthorGraphFixture() {
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "shelf-tree-runtime-author-"));
   const frameworkL0 = path.join(fixtureRoot, "framework", "demo", "L0-M0-source.md");
   const frameworkL1 = path.join(fixtureRoot, "framework", "demo", "L1-M0-aggregate.md");
   const projectFile = path.join(fixtureRoot, "projects", "demo", "project.toml");
   const canonicalPath = path.join(fixtureRoot, "projects", "demo", "generated", "canonical.json");
+  const codeLayerPath = path.join(fixtureRoot, "src", "project_runtime", "code_layer.py");
+  const evidenceLayerPath = path.join(fixtureRoot, "src", "project_runtime", "evidence_layer.py");
 
-  writeFile(frameworkL0, "# L0-M0 Source Module\n");
-  writeFile(frameworkL1, "# L1-M0 Aggregate Module\n");
+  writeFile(
+    frameworkL0,
+    [
+      "# L0-M0 Source Module",
+      "",
+      "## 3. 最小结构基（Minimal Structural Bases）",
+      "- `B1` 输入载荷基：消息内容。",
+      "",
+      "## 4. 基组合原则（Base Combination Principles）",
+      "- `R1` 最小组合",
+      "  - `R1.1` 参与基：`B1`。",
+      "",
+    ].join("\n")
+  );
+  writeFile(
+    frameworkL1,
+    [
+      "# L1-M0 Aggregate Module",
+      "",
+      "## 3. 最小结构基（Minimal Structural Bases）",
+      "- `B1` 上游聚合基：L0.M0[R1]。",
+      "- `B2` 输出结构基：聚合后的输出。",
+      "",
+      "## 4. 基组合原则（Base Combination Principles）",
+      "- `R2` 聚合组合",
+      "  - `R2.1` 参与基：`B1 + B2`。",
+      "",
+    ].join("\n")
+  );
   writeFile(
     projectFile,
     [
       "[project]",
       "project_id = \"demo\"",
       "",
-      "[[framework]]",
-      "framework_file = \"framework/demo/L0-M0-source.md\"",
+      "[framework]",
       "",
-      "[[framework]]",
+      "[[framework.modules]]",
+      "role = \"demo\"",
       "framework_file = \"framework/demo/L1-M0-aggregate.md\"",
       "",
     ].join("\n")
   );
+  writeFile(codeLayerPath, "def demo():\n    return 'ok'\n");
+  writeFile(evidenceLayerPath, "def evidence():\n    return 'ok'\n");
   writeFile(
     canonicalPath,
     JSON.stringify(
       {
+        project: {
+          project_id: "demo",
+          display_name: "demo",
+          version: "0.0.1",
+          description: "demo fixture",
+        },
         framework: {
           modules: [
             {
               module_id: "demo.L0.M0",
               framework_file: "framework/demo/L0-M0-source.md",
-              title_cn: "source module",
-              source_ref: { file_path: "framework/demo/L0-M0-source.md", line: 1 },
-              export_surface: {
-                source_ref: { file_path: "framework/demo/L0-M0-source.md", line: 1 },
-                upstream_module_ids: [],
-                rule_ids: [],
-              },
             },
             {
               module_id: "demo.L1.M0",
               framework_file: "framework/demo/L1-M0-aggregate.md",
-              title_cn: "aggregate module",
-              source_ref: { file_path: "framework/demo/L1-M0-aggregate.md", line: 1 },
-              export_surface: {
-                source_ref: { file_path: "framework/demo/L1-M0-aggregate.md", line: 1 },
-                upstream_module_ids: ["demo.L0.M0"],
-                rule_ids: ["demo.L1.M0.R1"],
-              },
             },
           ],
         },
-        config: { modules: [] },
-        code: { modules: [] },
-        evidence: { modules: [] },
+        config: {
+          modules: [
+            {
+              module_id: "demo.L0.M0",
+              source_ref: { file_path: "projects/demo/project.toml", line: 1 },
+            },
+            {
+              module_id: "demo.L1.M0",
+              source_ref: { file_path: "projects/demo/project.toml", line: 1 },
+            },
+          ],
+        },
+        code: {
+          modules: [
+            {
+              module_id: "demo.L0.M0",
+              source_ref: { file_path: "src/project_runtime/code_layer.py", line: 1 },
+            },
+            {
+              module_id: "demo.L1.M0",
+              source_ref: { file_path: "src/project_runtime/code_layer.py", line: 1 },
+            },
+          ],
+        },
+        evidence: {
+          modules: [
+            {
+              module_id: "demo.L0.M0",
+              source_ref: { file_path: "src/project_runtime/evidence_layer.py", line: 1 },
+            },
+            {
+              module_id: "demo.L1.M0",
+              source_ref: { file_path: "src/project_runtime/evidence_layer.py", line: 1 },
+            },
+          ],
+        },
       },
       null,
       2
     )
   );
 
-  const canonicalMtime = fs.statSync(canonicalPath).mtimeMs;
-  const staleTime = new Date(canonicalMtime + 5000);
-  fs.utimesSync(frameworkL1, staleTime, staleTime);
+  return fixtureRoot;
+}
 
+function createFrameworkOnlyFixtureWithoutProjects() {
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "shelf-tree-runtime-fw-only-"));
+  const frameworkL0 = path.join(fixtureRoot, "framework", "demo", "L0-M0-source.md");
+  writeFile(
+    frameworkL0,
+    [
+      "# L0-M0 Source Module",
+      "",
+      "## 3. 最小结构基（Minimal Structural Bases）",
+      "- `B1` 输入基。",
+      "",
+      "## 4. 基组合原则（Base Combination Principles）",
+      "- `R1` 最小组合",
+      "  - `R1.1` 参与基：`B1`。",
+      "",
+    ].join("\n")
+  );
   return fixtureRoot;
 }
 
 function main() {
-  const frameworkModel = buildRuntimeFrameworkTreeModel(repoRoot);
-  assert.strictEqual(frameworkModel.kind, "framework");
-  assert(frameworkModel.nodes.length > 0, "framework model should have nodes");
-  assert(
-    frameworkModel.layoutMode === "framework_columns",
-    "framework model should use framework_columns layout"
-  );
-  assert(
-    Array.isArray(frameworkModel.frameworkGroups) && frameworkModel.frameworkGroups.length > 0,
-    "framework model should include framework groups"
-  );
-  assert(
-    frameworkModel.nodes.some((node) => node.kind === "framework_module" && node.file.endsWith(".md") && node.group),
-    "framework model should include module nodes with source file path and framework group"
-  );
-  assert(
-    frameworkModel.nodes.some((node) => Array.isArray(node.capabilityItems) && Array.isArray(node.baseItems)),
-    "framework model should expose hover metadata arrays"
-  );
-  assert(
-    frameworkModel.objectIndex && typeof frameworkModel.objectIndex === "object",
-    "framework model should expose correspondence object index"
-  );
-  assert(
-    frameworkModel.validationSummary && typeof frameworkModel.validationSummary === "object",
-    "framework model should expose correspondence validation summary"
-  );
-  const workbenchNode = frameworkModel.nodes.find((node) => node.id === "knowledge_base.L2.M0");
-  assert(workbenchNode, "framework model should include knowledge_base.L2.M0 module node");
-  assert.strictEqual(workbenchNode.objectId, "knowledge_base.L2.M0");
-  assert(workbenchNode.defaultTarget, "module node should expose a primary navigation target");
-  assert.strictEqual(
-    workbenchNode.defaultTarget.target_kind,
-    frameworkModel.objectIndex["knowledge_base.L2.M0"].primary_nav_target_kind,
-    "tree node open target should follow correspondence primary_nav_target_kind"
-  );
-  assert(
-    Array.isArray(workbenchNode.relatedObjectIds) && workbenchNode.relatedObjectIds.includes("knowledge_base.L2.M0.R1"),
-    "module node should expose correspondence-related objects for the existing inspector"
-  );
-  assert(
-    frameworkModel.edges.length > 0 || frameworkModel.description.includes("fallback"),
-    "framework model should either include canonical edges or clearly mark fallback mode"
-  );
-
-  const evidenceModel = buildRuntimeEvidenceTreeModel(repoRoot);
-  assert.strictEqual(evidenceModel.kind, "evidence");
-  assert(evidenceModel.nodes.length > 0, "evidence model should have nodes");
-  assert(evidenceModel.layoutMode === "global_levels", "evidence model should keep global layout");
-  assert(
-    evidenceModel.edges.every((edge) => edge.relation === "tree_child"),
-    "evidence edges should stay in tree_child relation"
-  );
-
-  const frameworkViaDispatcher = buildRuntimeTreeModel(repoRoot, "framework");
-  const evidenceViaDispatcher = buildRuntimeTreeModel(repoRoot, "evidence");
-  assert.strictEqual(frameworkViaDispatcher.kind, "framework");
-  assert.strictEqual(evidenceViaDispatcher.kind, "evidence");
-
-  const staleFixtureRoot = createStaleFrameworkRepoFixture();
+  const authorFixtureRoot = createFrameworkAuthorGraphFixture();
   try {
-    const staleFrameworkModel = buildRuntimeFrameworkTreeModel(staleFixtureRoot);
+    const frameworkModel = buildRuntimeFrameworkTreeModel(authorFixtureRoot);
+    assert.strictEqual(frameworkModel.kind, "framework");
     assert(
-      staleFrameworkModel.edges.length > 0,
-      "stale canonical should still keep framework module edges for authoring view"
+      frameworkModel.layoutMode === "framework_columns",
+      "framework model should use framework_columns layout"
     );
     assert(
-      staleFrameworkModel.description.includes("Stale canonical topology is shown"),
-      "stale canonical mode should be explicitly visible in description"
+      Array.isArray(frameworkModel.frameworkGroups) && frameworkModel.frameworkGroups.length > 0,
+      "framework model should include framework groups"
+    );
+    const moduleNodes = frameworkModel.nodes.filter((node) => node.kind === "framework_module");
+    assert(moduleNodes.length >= 2, "framework model should include module nodes from framework files");
+    assert(
+      frameworkModel.nodes.every((node) => node.kind !== "framework_base"),
+      "framework model should no longer render framework base nodes on the canvas"
     );
     assert(
-      !staleFrameworkModel.objectIndex,
-      "stale canonical should not expose correspondence projection as formal navigation source"
+      frameworkModel.edges.every((edge) => edge.relation !== "module_contains_base" && edge.relation !== "base_composition"),
+      "framework model should no longer render base-level edges on the canvas"
+    );
+    assert(
+      frameworkModel.edges.some((edge) =>
+        edge.relation === "framework_module_growth"
+        && edge.from === "demo.L0.M0"
+        && edge.to === "demo.L1.M0"
+      ),
+      "framework model should include upstream module growth edges from base references like L0.M0[...]"
+    );
+    assert(
+      frameworkModel.description.includes("no project config selection is required"),
+      "framework model description should explicitly state no project config dependency"
+    );
+    assert(
+      moduleNodes.some((node) =>
+        Array.isArray(node.baseItems)
+        && node.baseItems.some((item) => item.token === "B1")
+      ),
+      "framework module hover data should still expose B* details after bases leave the canvas"
+    );
+    assert(
+      frameworkModel.levelLabels && Object.values(frameworkModel.levelLabels).every((label) => label.includes("模块层")),
+      "framework model should expose module-only author level labels"
+    );
+
+    const evidenceModel = buildRuntimeEvidenceTreeModel(authorFixtureRoot);
+    assert.strictEqual(evidenceModel.kind, "evidence");
+    assert(evidenceModel.nodes.length > 0, "evidence model should have nodes");
+    assert(evidenceModel.layoutMode === "global_levels", "evidence model should keep global layout");
+    assert(
+      evidenceModel.edges.every((edge) => edge.relation === "tree_child"),
+      "evidence edges should stay in tree_child relation"
+    );
+
+    const frameworkViaDispatcher = buildRuntimeTreeModel(authorFixtureRoot, "framework");
+    const evidenceViaDispatcher = buildRuntimeTreeModel(authorFixtureRoot, "evidence");
+    assert.strictEqual(frameworkViaDispatcher.kind, "framework");
+    assert.strictEqual(evidenceViaDispatcher.kind, "evidence");
+  } finally {
+    fs.rmSync(authorFixtureRoot, { recursive: true, force: true });
+  }
+
+  const frameworkOnlyFixture = createFrameworkOnlyFixtureWithoutProjects();
+  try {
+    const frameworkModel = buildRuntimeFrameworkTreeModel(frameworkOnlyFixture);
+    assert.strictEqual(frameworkModel.kind, "framework");
+    assert(
+      frameworkModel.nodes.some((node) => node.kind === "framework_module"),
+      "framework-only fixture should still render module nodes without project config/canonical"
+    );
+    assert(
+      frameworkModel.nodes.every((node) => node.kind === "framework_module"),
+      "framework-only fixture should render module-only nodes without project config/canonical"
     );
   } finally {
-    fs.rmSync(staleFixtureRoot, { recursive: true, force: true });
+    fs.rmSync(frameworkOnlyFixture, { recursive: true, force: true });
   }
 }
 

@@ -29,15 +29,22 @@ function setMtime(filePath, timeMs) {
 }
 
 function main() {
-  assert(isWatchedPath("projects/knowledge_base_basic/project.toml"));
+  const projectFiles = discoverProjectFiles(repoRoot);
+  assert(projectFiles.length >= 1);
+  const firstProjectFile = projectFiles[0];
+  const firstProjectId = path.basename(path.dirname(firstProjectFile));
+  const firstProjectRelPath = `projects/${firstProjectId}/project.toml`;
+  const firstProjectCanonicalRelPath = `projects/${firstProjectId}/generated/canonical.json`;
+
+  assert(isWatchedPath(firstProjectRelPath));
   assert(isWatchedPath("scripts/validate_canonical.py"));
   assert(isWatchedPath("tools/vscode/shelf-ai/extension.js"));
   assert(!isWatchedPath("../outside.txt"));
 
-  assert(isProtectedGeneratedPath("projects/knowledge_base_basic/generated/canonical.json"));
+  assert(isProtectedGeneratedPath(firstProjectCanonicalRelPath));
   assert(!isProtectedGeneratedPath("docs/hierarchy/shelf_framework_tree.json"));
   assert(!isProtectedGeneratedPath("docs/hierarchy/shelf_evidence_tree.json"));
-  assert(!isProtectedGeneratedPath("projects/knowledge_base_basic/project.toml"));
+  assert(!isProtectedGeneratedPath(firstProjectRelPath));
 
   assert(shouldRunMypyForRelPath("src/project_runtime/compiler.py"));
   assert(shouldRunMypyForRelPath("scripts/materialize_project.py"));
@@ -45,16 +52,13 @@ function main() {
   assert(!shouldRunMypyForRelPath("tools/vscode/shelf-ai/extension.js"));
 
   assert.strictEqual(
-    resolveProjectFilePath(repoRoot, "projects/knowledge_base_basic/project.toml"),
-    path.join(repoRoot, "projects", "knowledge_base_basic", "project.toml")
+    resolveProjectFilePath(repoRoot, firstProjectRelPath),
+    firstProjectFile
   );
   assert.strictEqual(
-    resolveProjectFilePath(repoRoot, "projects/knowledge_base_basic/generated/canonical.json"),
-    path.join(repoRoot, "projects", "knowledge_base_basic", "project.toml")
+    resolveProjectFilePath(repoRoot, firstProjectCanonicalRelPath),
+    firstProjectFile
   );
-
-  const projectFiles = discoverProjectFiles(repoRoot);
-  assert(projectFiles.some((item) => item.endsWith("projects/knowledge_base_basic/project.toml")));
 
   const frameworks = inferConfiguredFrameworks(`
 [[framework.modules]]
@@ -73,19 +77,28 @@ framework_file = "framework/backend/L2-M0-知识库接口框架标准模块.md"
   assert(frameworks.has("knowledge_base"));
   assert(frameworks.has("backend"));
 
-  const projectPlan = classifyWorkspaceChanges(repoRoot, ["projects/knowledge_base_basic/project.toml"]);
+  const projectPlan = classifyWorkspaceChanges(repoRoot, [firstProjectRelPath]);
   assert(projectPlan.shouldMaterialize, "project config changes should trigger materialization");
   assert.strictEqual(projectPlan.materializeProjects.length, 1);
-  assert(projectPlan.materializeProjects[0].endsWith("projects/knowledge_base_basic/project.toml"));
+  assert.strictEqual(projectPlan.materializeProjects[0], firstProjectFile);
 
-  const frameworkPlan = classifyWorkspaceChanges(repoRoot, ["framework/knowledge_base/L1-M0-知识库界面骨架模块.md"]);
+  const configuredFrameworks = inferConfiguredFrameworks(fs.readFileSync(firstProjectFile, "utf8"));
+  assert(configuredFrameworks.size >= 1, "project should configure at least one framework");
+  const configuredFrameworkName = [...configuredFrameworks][0];
+  const frameworkPlan = classifyWorkspaceChanges(
+    repoRoot,
+    [`framework/${configuredFrameworkName}/L0-M0-示例模块.md`]
+  );
   assert(frameworkPlan.shouldMaterialize, "framework changes should trigger materialization");
   assert(
-    frameworkPlan.materializeProjects.some((item) => item.endsWith("projects/knowledge_base_basic/project.toml")),
-    "knowledge_base framework changes should materialize the matching project"
+    frameworkPlan.materializeProjects.some((item) => item === firstProjectFile),
+    "changed framework should materialize at least one matching project"
   );
 
-  const generatedPlan = classifyWorkspaceChanges(repoRoot, ["projects/knowledge_base_basic/generated/canonical.json"]);
+  const generatedPlan = classifyWorkspaceChanges(
+    repoRoot,
+    [`projects/${firstProjectId}/generated/canonical.json`]
+  );
   assert.strictEqual(generatedPlan.protectedGeneratedPaths.length, 1);
   assert.strictEqual(generatedPlan.materializeProjects.length, 0);
   assert.strictEqual(generatedPlan.protectedProjectFiles.length, 1);
@@ -168,6 +181,57 @@ framework_file = "framework/demo/L0-M0-示例模块.md"
     assert(fresh.authoritativeSourceRelPaths.includes("framework/demo/L0-M0-示例模块.md"));
     assert(fresh.authoritativeSourceRelPaths.includes("src/demo_runtime.js"));
 
+    writeFile(
+      tempCanonicalPath,
+      JSON.stringify(
+        {
+          framework: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                framework_file: "framework/demo/L0-M0-示例模块.md",
+              },
+            ],
+          },
+          config: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                source_ref: { file_path: "projects/demo/project.toml" },
+              },
+            ],
+          },
+          code: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                source_ref: { file_path: "src/demo_runtime.js" },
+              },
+            ],
+          },
+          evidence: {
+            modules: [
+              {
+                module_id: "demo.L0.M0",
+                source_ref: { file_path: "src/demo_evidence.js" },
+              },
+            ],
+          },
+          materialization: {
+            mode: "framework_only",
+            degraded: true,
+          },
+        },
+        null,
+        2
+      )
+    );
+    setMtime(tempCanonicalPath, baseTime + 20_000);
+    const degraded = getProjectCanonicalFreshness(tempRepoRoot, tempProjectPath);
+    assert.strictEqual(degraded.status, "stale");
+    assert(degraded.reason.includes("framework-only snapshot"));
+
+    setMtime(tempCanonicalPath, baseTime + 5_000);
     setMtime(tempFrameworkPath, baseTime + 10_000);
     const stale = getProjectCanonicalFreshness(tempRepoRoot, tempProjectPath);
     assert.strictEqual(stale.status, "stale");

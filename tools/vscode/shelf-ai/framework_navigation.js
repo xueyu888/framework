@@ -13,15 +13,21 @@ const UPPER_SYMBOL_PATTERN = /[A-Z][A-Z0-9_]+/g;
 const BACKTICK_SEGMENT_PATTERN = /`([^`]+)`/g;
 const SYMBOL_TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
 const TOML_SECTION_PATTERN = /^\s*\[([A-Za-z0-9_.-]+)\]\s*$/;
-const DEFAULT_PROJECT_FILE = path.join("projects", "knowledge_base_basic", "project.toml");
 
 const SECTION_PREFIXES = [
   ["## 1. 能力声明", "capability"],
   ["## 2. 边界定义", "boundary"],
-  ["## 3. 最小可行基", "base"],
+  ["## 3. 最小结构基", "base"],
   ["## 4. 基组合原则", "rule"],
   ["## 5. 验证", "verification"],
 ];
+const SECTION_DISPLAY_NAMES = {
+  capability: "能力声明（Capability Statement）",
+  boundary: "边界定义（Boundary / Parameter 参数）",
+  base: "最小结构基（Minimal Structural Bases）",
+  rule: "基组合原则（Base Combination Principles）",
+  verification: "验证（Verification）",
+};
 
 function uniqueSections(sections) {
   const ordered = [];
@@ -620,11 +626,11 @@ function inferConfiguredFrameworks(projectText) {
 
 function resolvePreferredProjectFile(repoRoot, frameworkName) {
   const candidates = discoverProjectFiles(repoRoot);
-  const preferredDefault = path.join(repoRoot, DEFAULT_PROJECT_FILE);
+  const preferredDefault = candidates.length > 0 ? candidates[0] : null;
   let bestFile = null;
   let bestScore = -1;
   for (const filePath of candidates) {
-    let score = filePath === preferredDefault ? 1 : 0;
+    let score = preferredDefault && filePath === preferredDefault ? 1 : 0;
     try {
       const frameworks = inferConfiguredFrameworks(fs.readFileSync(filePath, "utf8"));
       if (frameworks.has(frameworkName)) {
@@ -640,9 +646,6 @@ function resolvePreferredProjectFile(repoRoot, frameworkName) {
   }
   if (bestFile) {
     return bestFile;
-  }
-  if (fs.existsSync(preferredDefault) && fs.statSync(preferredDefault).isFile()) {
-    return preferredDefault;
   }
   return null;
 }
@@ -685,6 +688,46 @@ function resolveLocalSymbol(index, token) {
     return index.symbols.get(token.split(".", 1)[0]) || null;
   }
   return null;
+}
+
+function resolveUndefinedSymbolSection(token, lineText) {
+  const safeToken = String(token || "").trim();
+  if (!safeToken) {
+    return "";
+  }
+  if (/^C\d+$/.test(safeToken)) {
+    return "capability";
+  }
+  if (/^B\d+$/.test(safeToken)) {
+    return "base";
+  }
+  if (/^V\d+$/.test(safeToken)) {
+    return "verification";
+  }
+  if (/^R\d+(?:\.\d+)?$/.test(safeToken)) {
+    return "rule";
+  }
+  if (/^[A-Z][A-Z0-9_]+$/.test(safeToken) && /(参数绑定|边界绑定)/.test(String(lineText || ""))) {
+    return "boundary";
+  }
+  return "";
+}
+
+function resolveUndefinedSymbolFallbackTarget(index, token, lineText) {
+  const section = resolveUndefinedSymbolSection(token, lineText);
+  if (!section) {
+    return null;
+  }
+  const anchor = index.sectionHeaders[section] || index.header;
+  if (!anchor) {
+    return null;
+  }
+  return {
+    line: anchor.line,
+    character: anchor.character,
+    length: anchor.length,
+    section,
+  };
 }
 
 function resolveModuleTarget(index) {
@@ -737,7 +780,7 @@ function pushRuleSummary(parts, rule) {
     parts.push(`  输出能力：${rule.output}`);
   }
   if (rule.boundary) {
-    parts.push(`  边界绑定：${rule.boundary}`);
+    parts.push(`  参数绑定：${rule.boundary}`);
   }
 }
 
@@ -750,7 +793,7 @@ function buildModuleHoverMarkdown(moduleInfo, index) {
   }
 
   pushItemSection(parts, "能力声明", index.capabilities);
-  pushItemSection(parts, "最小可行基", index.bases);
+  pushItemSection(parts, "最小结构基", index.bases);
 
   if (index.rules.length > 0) {
     parts.push("", "基组合原则");
@@ -789,7 +832,7 @@ function buildRuleHoverMarkdown(moduleInfo, rule) {
     parts.push(`输出能力：${rule.output}`);
   }
   if (rule.boundary) {
-    parts.push(`边界绑定：${rule.boundary}`);
+    parts.push(`参数绑定：${rule.boundary}`);
   }
 
   return parts.join("\n");
@@ -861,6 +904,22 @@ function buildSymbolHoverMarkdown(moduleInfo, index, token, repoRoot, allowCanon
   return parts.join("\n");
 }
 
+function buildUndefinedSymbolHoverMarkdown(moduleInfo, index, token, lineText) {
+  const fallback = resolveUndefinedSymbolFallbackTarget(index, token, lineText);
+  if (!fallback) {
+    return null;
+  }
+  const sectionName = SECTION_DISPLAY_NAMES[fallback.section] || fallback.section;
+  const parts = [
+    `**${buildModuleLabel(moduleInfo)} · \`${token}\`**`,
+    "当前文件未定义该符号。",
+    "",
+    `建议：先在“${sectionName}”章节补充定义，然后回到当前引用位置。`,
+    "可执行：按 `F12` 跳转到建议章节。",
+  ];
+  return parts.join("\n");
+}
+
 function resolveDefinitionTarget({ repoRoot, filePath, text, line, character, allowCanonicalProjection = true }) {
   const documentInfo = getFrameworkDocumentInfo(filePath, repoRoot);
   if (!documentInfo) {
@@ -915,7 +974,16 @@ function resolveDefinitionTarget({ repoRoot, filePath, text, line, character, al
   const index = buildDefinitionIndex(text);
   const resolvedLocal = resolveLocalSymbol(index, tokenContext.token);
   if (!resolvedLocal) {
-    return null;
+    const fallbackTarget = resolveUndefinedSymbolFallbackTarget(index, tokenContext.token, lineText);
+    if (!fallbackTarget) {
+      return null;
+    }
+    return {
+      filePath,
+      line: fallbackTarget.line,
+      character: fallbackTarget.character,
+      length: fallbackTarget.length,
+    };
   }
   const localItem = getItemForToken(index, tokenContext.token);
   if (
@@ -993,14 +1061,20 @@ function resolveHoverTarget({ repoRoot, filePath, text, line, character, allowCa
     repoRoot,
     allowCanonicalProjection
   );
-  if (!markdown) {
+  const fallbackMarkdown = markdown || buildUndefinedSymbolHoverMarkdown(
+    documentInfo,
+    currentIndex,
+    tokenContext.token,
+    lineText
+  );
+  if (!fallbackMarkdown) {
     return null;
   }
 
   return {
     start: tokenContext.start,
     end: tokenContext.end,
-    markdown,
+    markdown: fallbackMarkdown,
   };
 }
 
@@ -1059,6 +1133,16 @@ function resolveReferenceTargets({ repoRoot, filePath, text, line, character, al
       character: resolvedLocal.character,
       length: resolvedLocal.length,
     });
+  } else {
+    const fallbackTarget = resolveUndefinedSymbolFallbackTarget(index, tokenContext.token, lineText);
+    if (fallbackTarget) {
+      targets.push({
+        filePath,
+        line: fallbackTarget.line,
+        character: fallbackTarget.character,
+        length: fallbackTarget.length,
+      });
+    }
   }
 
   const localItem = getItemForToken(index, tokenContext.token);
