@@ -27,15 +27,15 @@
 
 ## 3. 最小可行基（Minimum Viable Bases）
 
-- `B1` 入出站消息总线：接收入站事件、排队出站事件，能根据渠道发布和 agent 回写输出下一条待处理入站事件或待发送出站事件。来源：`C1 + C2 + SESSIONKEY + CHANNELSET`。
-- `B2` 渠道适配管理器：负责已启用渠道的初始化、启动、停止与发送路由，能根据渠道名把出站结果投递到唯一渠道。来源：`C1 + C2 + CHANNELSET`。
-- `B3` 会话记录存取器：维护会话键、JSONL 消息历史、会话元数据与整理游标，能根据 `SESSIONKEY` 读取和持久化当前会话记录。来源：`C1 + C5 + SESSIONKEY + MEMWINDOW`。
-- `B4` 提示上下文装配器：加载身份说明、引导文件、长期记忆、技能摘要与运行时元数据，能根据当前会话历史输出稳定 system prompt 和调用消息列表。来源：`C3 + WORKROOT + CTXSET`。
-- `B5` Provider 注册表与选择器：登记 provider 注册元数据、模型前缀规则与 API 入口绑定，能根据 model 或 provider 配置定位唯一 LLM 调用入口。来源：`C4 + PROVIDERSET`。
-- `B6` 工具注册表与执行器：登记可用工具 schema、工具名与执行入口，能根据 tool call 名称和参数校验并执行工具，输出工具结果文本。来源：`C4 + ITERMAX + WORKROOT`。
-- `B7` Agent 主循环调度器：驱动当前消息序列、迭代状态与工具回填结果的推进，能根据模型响应输出下一轮调用或最终回复文本。来源：`C2 + C4 + ITERMAX`。
-- `B8` 记忆与历史记录器：写入 `MEMORY.md`、`HISTORY.md` 与整理结果，能根据 `MEMWINDOW` 和旧消息输出更新后的长期记忆与历史记录。来源：`C5 + WORKROOT + MEMWINDOW`。
-- `B9` 后台任务调度器：维护子代理任务、cron 任务、heartbeat 决策与回投目标，能根据 `TASKSET` 触发新的 agent 处理并在可路由时投递结果。来源：`C6 + CHANNELSET + TASKSET`。
+- `B1` 入出站消息总线：L1.M0[R1,R3]：接收入站事件、排队出站事件，能根据渠道发布和 agent 回写输出下一条待处理入站事件或待发送出站事件。来源：`C1 + C2 + SESSIONKEY + CHANNELSET`。
+- `B2` 渠道适配管理器：L1.M0[R1,R3]：负责已启用渠道的初始化、启动、停止与发送路由，能根据渠道名把出站结果投递到唯一渠道。来源：`C1 + C2 + CHANNELSET`。
+- `B3` 会话记录存取器：L1.M0[R2]：维护会话键、JSONL 消息历史、会话元数据与整理游标，能根据 `SESSIONKEY` 读取和持久化当前会话记录。来源：`C1 + C5 + SESSIONKEY + MEMWINDOW`。
+- `B4` 提示上下文装配器：L1.M1[R1]：加载身份说明、引导文件、长期记忆、技能摘要与运行时元数据，能根据当前会话历史输出稳定 system prompt 和调用消息列表。来源：`C3 + WORKROOT + CTXSET`。
+- `B5` Provider 注册表与选择器：L1.M1[R2]：登记 provider 注册元数据、模型前缀规则与 API 入口绑定，能根据 model 或 provider 配置定位唯一 LLM 调用入口。来源：`C4 + PROVIDERSET`。
+- `B6` 工具注册表与执行器：L1.M1[R3]：登记可用工具 schema、工具名与执行入口，能根据 tool call 名称和参数校验并执行工具，输出工具结果文本。来源：`C4 + ITERMAX + WORKROOT`。
+- `B7` Agent 主循环调度器：L1.M1[R4]：驱动当前消息序列、迭代状态与工具回填结果的推进，能根据模型响应输出下一轮调用或最终回复文本。来源：`C2 + C4 + ITERMAX`。
+- `B8` 记忆与历史记录器：L1.M2[R1]：写入 `MEMORY.md`、`HISTORY.md` 与整理结果，能根据 `MEMWINDOW` 和旧消息输出更新后的长期记忆与历史记录。来源：`C5 + WORKROOT + MEMWINDOW`。
+- `B9` 后台任务调度器：L1.M2[R2]：维护子代理任务、cron 任务、heartbeat 决策与回投目标，能根据 `TASKSET` 触发新的 agent 处理并在可路由时投递结果。来源：`C6 + CHANNELSET + TASKSET`。
 
 ## 4. 基组合原则（Base Combination Principles）
 
