@@ -51,8 +51,8 @@ Framework -> Config -> Code -> Evidence
 ### 2.2 语义要求
 
 - `M` 必须是模块装配入口，持有并装配自己的 `BaseTypes/RuleTypes`，并负责参数合成。
-- `B` 必须是结构单元承载类，具备 `framework_base_id` 与 `owner_module_id`。
-- `R` 必须是规则承载类，具备 `framework_rule_id`、`owner_module_id`、`base_ids`、`boundary_ids`。
+- `B` 必须是结构单元类，具备 `framework_base_id` 与 `owner_module_id`。
+- `R` 必须是规则类，具备 `framework_rule_id`、`owner_module_id`、`base_ids`、`boundary_ids`。
 - `D` 不作为独立装配对象；静态与动态参数必须通过两个参数类承接，再由 `M` 合并后下发。
 
 ## 3. Contracts（代码合同）
@@ -164,7 +164,7 @@ Framework -> Config -> Code -> Evidence
 验收必须同时满足：
 
 - canonical 中存在 `M/B/R/D` 对应绑定
-- config 仍只承载静态值，且每个 parameter 可映射到 module-scoped static params
+- config 仍只写静态值，且每个 parameter 可映射到 module-scoped static params
 - code 中每个 module 具备 module/static/runtime/base/rule 的 class 挂接
 - correspondence validator 能对“缺失/错挂/伪挂接”给出失败结果
 
