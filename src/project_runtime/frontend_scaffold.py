@@ -4,6 +4,7 @@ import json
 import os
 import stat
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import Any
@@ -14,6 +15,38 @@ from project_runtime.models import ProjectRuntimeAssembly
 SUPPORTED_REVIEW_WORKBENCH_RENDERERS = {
     "review_workbench_react_vite_tailwind_ts_strict_v1",
 }
+
+
+@dataclass(frozen=True)
+class FrontendImplementationProfile:
+    frontend_renderer: str
+    framework: str
+    bundler: str
+    styling: str
+    language: str
+    typescript_strict: bool
+    package_manager: str
+    icon_library: str
+    component_library: str
+    component_mapping_profile: str
+    primitive_strategy: str
+
+    @classmethod
+    def from_frontend_spec(cls, frontend_spec: dict[str, Any]) -> "FrontendImplementationProfile":
+        implementation = frontend_spec["ui"]["implementation"]
+        return cls(
+            frontend_renderer=str(implementation["frontend_renderer"]),
+            framework=str(implementation.get("framework", "react")),
+            bundler=str(implementation.get("bundler", "vite")),
+            styling=str(implementation.get("styling", "tailwindcss")),
+            language=str(implementation.get("language", "typescript")),
+            typescript_strict=bool(implementation.get("typescript_strict", True)),
+            package_manager=str(implementation.get("package_manager", "pnpm")),
+            icon_library=str(implementation.get("icon_library", "lucide-react")),
+            component_library=str(implementation.get("component_library", "plain_html")),
+            component_mapping_profile=str(implementation.get("component_mapping_profile", "default")),
+            primitive_strategy=str(implementation.get("primitive_strategy", "semantic_adapter")),
+        )
 
 
 def materialize_frontend_scaffold(assembly: ProjectRuntimeAssembly, output_dir: Path) -> None:
@@ -31,9 +64,22 @@ def materialize_frontend_scaffold(assembly: ProjectRuntimeAssembly, output_dir: 
 
 def _materialize_review_workbench_react_app(assembly: ProjectRuntimeAssembly, output_dir: Path) -> None:
     frontend_spec = assembly.require_runtime_export("frontend_app_spec")
+    implementation = FrontendImplementationProfile.from_frontend_spec(frontend_spec)
+
+    if implementation.component_library == "shadcn_ui":
+        _materialize_review_workbench_react_shadcn_app(assembly, output_dir, implementation)
+        return
+    _materialize_review_workbench_react_plain_app(assembly, output_dir, implementation)
+
+
+def _materialize_review_workbench_react_plain_app(
+    assembly: ProjectRuntimeAssembly,
+    output_dir: Path,
+    implementation: FrontendImplementationProfile,
+) -> None:
+    frontend_spec = assembly.require_runtime_export("frontend_app_spec")
     review_workbench = assembly.require_runtime_export("review_workbench_domain_spec")
     backend_spec = assembly.require_runtime_export("backend_service_spec")
-    implementation = frontend_spec["ui"]["implementation"]
     visual = frontend_spec["ui"]["visual"]["tokens"]
     route_contract = frontend_spec["contract"]["route_contract"]
 
@@ -58,8 +104,9 @@ def _materialize_review_workbench_react_app(assembly: ProjectRuntimeAssembly, ou
     files = {
         "package.json": _package_json(
             assembly.metadata.project_id,
-            package_manager=str(implementation.get("package_manager", "pnpm")),
-            icon_library=str(implementation.get("icon_library", "lucide-react")),
+            package_manager=implementation.package_manager,
+            icon_library=implementation.icon_library,
+            component_library=implementation.component_library,
         ),
         "tsconfig.json": _tsconfig_json(),
         "tsconfig.node.json": _tsconfig_node_json(),
@@ -73,9 +120,9 @@ def _materialize_review_workbench_react_app(assembly: ProjectRuntimeAssembly, ou
             brand=str(visual["brand"]),
         ),
         "src/vite-env.d.ts": "/// <reference types=\"vite/client\" />\n",
-        "src/App.tsx": _app_tsx(route_contract["workbench"], icon_library=str(implementation.get("icon_library", "lucide-react"))),
+        "src/App.tsx": _app_tsx_plain(route_contract["workbench"], icon_library=implementation.icon_library),
         "src/types.ts": _types_ts(),
-        "README.md": _frontend_app_readme(package_manager=str(implementation.get("package_manager", "pnpm"))),
+        "README.md": _frontend_app_readme(package_manager=implementation.package_manager),
     }
     for relative_path, content in files.items():
         path = output_dir / relative_path
@@ -84,7 +131,77 @@ def _materialize_review_workbench_react_app(assembly: ProjectRuntimeAssembly, ou
     _validate_generated_frontend_app(output_dir)
 
 
-def _package_json(project_id: str, *, package_manager: str, icon_library: str) -> str:
+def _materialize_review_workbench_react_shadcn_app(
+    assembly: ProjectRuntimeAssembly,
+    output_dir: Path,
+    implementation: FrontendImplementationProfile,
+) -> None:
+    frontend_spec = assembly.require_runtime_export("frontend_app_spec")
+    review_workbench = assembly.require_runtime_export("review_workbench_domain_spec")
+    backend_spec = assembly.require_runtime_export("backend_service_spec")
+    visual = frontend_spec["ui"]["visual"]["tokens"]
+    route_contract = frontend_spec["contract"]["route_contract"]
+
+    if output_dir.exists():
+        _clear_managed_frontend_outputs(output_dir)
+    src_dir = output_dir / "src"
+    generated_dir = src_dir / "generated"
+    src_dir.mkdir(parents=True, exist_ok=True)
+    generated_dir.mkdir(parents=True, exist_ok=True)
+
+    runtime_data = {
+        "project": assembly.metadata.to_dict(),
+        "frontend_app_spec": frontend_spec,
+        "review_workbench_domain_spec": review_workbench,
+        "backend_service_spec": backend_spec,
+    }
+    (generated_dir / "runtime-data.json").write_text(
+        json.dumps(runtime_data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    files = {
+        "package.json": _package_json(
+            assembly.metadata.project_id,
+            package_manager=implementation.package_manager,
+            icon_library=implementation.icon_library,
+            component_library=implementation.component_library,
+        ),
+        "tsconfig.json": _tsconfig_json(),
+        "tsconfig.node.json": _tsconfig_node_json(),
+        "vite.config.ts": _vite_config_ts(),
+        "tailwind.config.ts": _tailwind_config_ts(),
+        "postcss.config.js": _postcss_config_js(),
+        "index.html": _index_html(frontend_spec["ui"]["components"]["platform_sidebar"]["title"]),
+        "src/main.tsx": _main_tsx(),
+        "src/styles.css": _styles_css(
+            accent=str(visual["accent"]),
+            brand=str(visual["brand"]),
+        ),
+        "src/vite-env.d.ts": "/// <reference types=\"vite/client\" />\n",
+        "src/App.tsx": _app_tsx_shadcn_v3(route_contract["workbench"], icon_library=implementation.icon_library),
+        "src/types.ts": _types_ts(),
+        "src/components/ui/input.tsx": _ui_input_tsx(),
+        "src/components/ui/select.tsx": _ui_select_tsx(),
+        "src/components/semantic/select.tsx": _semantic_select_tsx(),
+        "src/components/semantic/tabs.tsx": _semantic_tabs_tsx(),
+        "README.md": _frontend_app_readme(package_manager=implementation.package_manager),
+    }
+    for relative_path, content in files.items():
+        path = output_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    _validate_generated_frontend_app(output_dir)
+
+
+def _package_json(project_id: str, *, package_manager: str, icon_library: str, component_library: str) -> str:
+    dependencies = {
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        icon_library: "^0.542.0",
+    }
+    if component_library == "shadcn_ui":
+        dependencies["@radix-ui/react-select"] = "^2.2.6"
     payload = {
         "name": f"{project_id}-frontend",
         "private": True,
@@ -96,11 +213,7 @@ def _package_json(project_id: str, *, package_manager: str, icon_library: str) -
             "build": "tsc -b && vite build",
             "preview": "vite preview",
         },
-        "dependencies": {
-            "react": "^19.1.0",
-            "react-dom": "^19.1.0",
-            icon_library: "^0.542.0",
-        },
+        "dependencies": dependencies,
         "devDependencies": {
             "@types/react": "^19.1.2",
             "@types/react-dom": "^19.1.2",
@@ -197,6 +310,17 @@ def _index_html(title: str) -> str:
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
+    <script>
+      (() => {{
+        const storageKey = 'review-workbench-theme';
+        const storedTheme = window.localStorage.getItem(storageKey);
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolvedTheme = storedTheme === 'dark' || storedTheme === 'light'
+          ? storedTheme
+          : (prefersDark ? 'dark' : 'light');
+        document.documentElement.dataset.theme = resolvedTheme;
+      }})();
+    </script>
   </head>
   <body>
     <div id="root"></div>
@@ -248,6 +372,11 @@ export type FilterField = {
   label: string;
   value: string;
   placeholder: string;
+};
+
+export type SemanticSelectOption = {
+  label: string;
+  value: string;
 };
 
 export type SampleItem = {
@@ -335,10 +464,10 @@ export type RuntimeData = {
 """
 
 
-def _app_tsx(workbench_path: str, *, icon_library: str) -> str:
+def _app_tsx_plain(workbench_path: str, *, icon_library: str) -> str:
     if icon_library != "lucide-react":
         raise ValueError(f"unsupported review_workbench icon library: {icon_library}")
-    return """import { useEffect, useMemo, useState } from 'react';
+    return """import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   FileText,
@@ -346,6 +475,7 @@ import {
   GitBranch,
   History,
   Maximize2,
+  Minimize2,
   Moon,
   RefreshCw,
   Search,
@@ -359,6 +489,12 @@ import runtimeData from './generated/runtime-data.json';
 import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField } from './types';
 
 const data = runtimeData as RuntimeData;
+const themeStorageKey = 'review-workbench-theme';
+const sidebarDirectoryMinHeight = 156;
+const sidebarOverviewMinHeight = 188;
+const sidebarMinWidth = 220;
+const workspaceMinWidth = 720;
+const shellDividerSize = 8;
 const selectLikeFieldIds = new Set(['vendor', 'category', 'is_classified', 'status']);
 const optionMap: Record<string, string[]> = {
   vendor: ['全部', 'TI', 'MPS', 'ADI'],
@@ -374,6 +510,46 @@ function asBool(value: boolean | string | undefined): boolean {
 function sceneById(sceneId: string): SceneSpec {
   const scene = data.review_workbench_domain_spec.workbench.scenes.find((item) => item.scene_id === sceneId);
   return scene ?? data.review_workbench_domain_spec.workbench.scenes[0];
+}
+
+function isFullscreenSupported(): boolean {
+  return typeof document.fullscreenEnabled === 'boolean'
+    ? document.fullscreenEnabled
+    : typeof document.documentElement.requestFullscreen === 'function';
+}
+
+type InspectionBlock = {
+  block_id: string;
+  title: string;
+  summary: string;
+  detail: string;
+  status: 'ready' | 'focus' | 'pending';
+};
+
+function buildInspectionBlocks(item: { title: string; status: string; note: string }): InspectionBlock[] {
+  return [
+    {
+      block_id: 'overview',
+      title: '文件概览',
+      summary: `${item.title} 当前处于 ${item.status} 状态`,
+      detail: item.note,
+      status: 'focus',
+    },
+    {
+      block_id: 'classification',
+      title: '分类检查',
+      summary: '核对分类名称、型号映射与归档位置是否一致',
+      detail: '用于检查分类、型号、目录路径和结构字段是否已经满足归档与审核要求。',
+      status: item.status === '已分类' ? 'ready' : 'pending',
+    },
+    {
+      block_id: 'trace',
+      title: '来源回看',
+      summary: '校验来源路径、历史动作与处理记录',
+      detail: '用于确认来源回看路径、历史动作回执和当前工作页签之间的对应关系。',
+      status: 'ready',
+    },
+  ];
 }
 
 function StatList({ items }: { items: StatItem[] }) {
@@ -500,11 +676,177 @@ function EmptyTable({ columns, title, copy }: { columns: string[]; title: string
   );
 }
 
+function LibraryWorkspaceHeader({
+  filterFields,
+  filterValues,
+  onChangeFilter,
+  scopeLabel,
+  onClearFilters,
+}: {
+  filterFields: FilterField[];
+  filterValues: Record<string, string>;
+  onChangeFilter: (fieldId: string, value: string) => void;
+  scopeLabel: string;
+  onClearFilters: () => void;
+}) {
+  return (
+    <div className="filter-panel">
+      <FilterGrid fields={filterFields} values={filterValues} onChange={onChangeFilter} />
+      <div className="scope-summary-row">
+        <span className="scope-summary-text">{`范围: ${scopeLabel}`}</span>
+        <button className="link-button" type="button" onClick={onClearFilters}>清空筛选</button>
+      </div>
+    </div>
+  );
+}
+
+function InspectionWorkspaceHeader({ item }: { item: { title: string; status: string; note: string } }) {
+  return (
+    <section className="inspection-header">
+      <div className="inspection-title-row">
+        <h2 className="inspection-title">{item.title}</h2>
+        <span className="inspection-status">{item.status}</span>
+      </div>
+      <p className="inspection-note">{item.note}</p>
+    </section>
+  );
+}
+
+function LibraryTopbarMain({
+  searchText,
+  onSearchChange,
+  placeholder,
+}: {
+  searchText: string;
+  onSearchChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="topbar-search-wrap">
+      <label className="topbar-search">
+        <Search className="topbar-search-icon" strokeWidth={1.8} />
+        <input
+          className="topbar-search-input"
+          type="text"
+          value={searchText}
+          placeholder={placeholder}
+          onChange={(event) => onSearchChange(event.target.value)}
+        />
+      </label>
+    </div>
+  );
+}
+
+function InspectionTopbarMain({
+  searchText,
+  onSearchChange,
+  placeholder,
+}: {
+  searchText: string;
+  onSearchChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return <LibraryTopbarMain searchText={searchText} onSearchChange={onSearchChange} placeholder={placeholder} />;
+}
+
+function LibraryWorkspace({
+  tabs,
+  activeTabId,
+  onActivateTab,
+  onCloseTab,
+  filterFields,
+  filterValues,
+  onChangeFilter,
+  scopeLabel,
+  onClearFilters,
+  tableColumns,
+  emptyTitle,
+  emptyCopy,
+}: {
+  tabs: OpenTab[];
+  activeTabId: string;
+  onActivateTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
+  filterFields: FilterField[];
+  filterValues: Record<string, string>;
+  onChangeFilter: (fieldId: string, value: string) => void;
+  scopeLabel: string;
+  onClearFilters: () => void;
+  tableColumns: string[];
+  emptyTitle: string;
+  emptyCopy: string;
+}) {
+  return (
+    <section className="workspace-card">
+      <TabBar tabs={tabs} activeTabId={activeTabId} onActivate={onActivateTab} onClose={onCloseTab} />
+
+      <LibraryWorkspaceHeader
+        filterFields={filterFields}
+        filterValues={filterValues}
+        onChangeFilter={onChangeFilter}
+        scopeLabel={scopeLabel}
+        onClearFilters={onClearFilters}
+      />
+
+      <div className="result-panel">
+        <EmptyTable columns={tableColumns} title={emptyTitle} copy={emptyCopy} />
+      </div>
+    </section>
+  );
+}
+
+function InspectionWorkspace({
+  tabs,
+  activeTabId,
+  onActivateTab,
+  onCloseTab,
+  item,
+  blocks,
+  activeBlockId,
+  onSelectBlock,
+  actions,
+  feedback,
+  onRunAction,
+}: {
+  tabs: OpenTab[];
+  activeTabId: string;
+  onActivateTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
+  item: { title: string; status: string; note: string };
+  blocks: InspectionBlock[];
+  activeBlockId: string;
+  onSelectBlock: (blockId: string) => void;
+  actions: string[];
+  feedback: string;
+  onRunAction: (actionId: string) => void;
+}) {
+  return (
+    <section className="workspace-card">
+      <TabBar tabs={tabs} activeTabId={activeTabId} onActivate={onActivateTab} onClose={onCloseTab} />
+
+      <InspectionWorkspaceHeader item={item} />
+
+      <div className="result-panel">
+        <FileInspectionWorkbench
+          blocks={blocks}
+          activeBlockId={activeBlockId}
+          onSelectBlock={onSelectBlock}
+          actions={actions}
+          feedback={feedback}
+          onRunAction={onRunAction}
+        />
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const platform = data.review_workbench_domain_spec.platform;
   const activeScene = sceneById(platform.default_scene_id);
   const activeScope = activeScene.scope_tree.find((node) => asBool(node.active));
   const bottomStats = platform.platform_stats ?? activeScene.scope_stats;
+  const themeToggleEnabled = asBool(platform.theme_toggle_enabled);
+  const fullscreenActionEnabled = asBool(platform.fullscreen_action_enabled);
 
   const initialFilters = useMemo<Record<string, string>>(
     () => Object.fromEntries(activeScene.filter_fields.map((field) => [field.field_id, field.value ?? ''])),
@@ -521,13 +863,38 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string>(defaultActiveTabId);
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>(initialFilters);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => document.documentElement.dataset.theme === 'dark');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => Boolean(document.fullscreenElement));
+  const [canFullscreen, setCanFullscreen] = useState<boolean>(() => isFullscreenSupported());
+  const [directoryPanelHeight, setDirectoryPanelHeight] = useState<number | null>(null);
+  const [isSidebarDividerHovered, setIsSidebarDividerHovered] = useState(false);
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
+  const [isShellDividerHovered, setIsShellDividerHovered] = useState(false);
+  const [isShellResizing, setIsShellResizing] = useState(false);
+  const [isCompactLayout, setIsCompactLayout] = useState<boolean>(() => window.innerWidth <= 900);
+  const [activeInspectionBlockId, setActiveInspectionBlockId] = useState<string>('overview');
+  const [interactionFeedback, setInteractionFeedback] = useState<string>(activeScene.sample_feedback);
   const [refreshTick, setRefreshTick] = useState(0);
+  const hasMountedTheme = useRef(false);
+  const platformShellRef = useRef<HTMLDivElement | null>(null);
+  const sidebarPanelRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (hasMountedTheme.current) {
+      root.dataset.themeSwitching = 'true';
+    }
+    root.dataset.theme = darkMode ? 'dark' : 'light';
+    window.localStorage.setItem(themeStorageKey, darkMode ? 'dark' : 'light');
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        delete root.dataset.themeSwitching;
+      });
+    });
+    hasMountedTheme.current = true;
     return () => {
-      delete document.documentElement.dataset.theme;
+      window.cancelAnimationFrame(frame);
     };
   }, [darkMode]);
 
@@ -535,6 +902,158 @@ export default function App() {
     setOpenTabs(defaultTabs);
     setActiveTabId(defaultActiveTabId);
   }, [defaultActiveTabId, defaultTabs]);
+
+  useEffect(() => {
+    setActiveInspectionBlockId('overview');
+    setInteractionFeedback(activeScene.sample_feedback);
+  }, [activeScene.sample_feedback, activeTabId]);
+
+  useEffect(() => {
+    function syncFullscreenState() {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+      setCanFullscreen(isFullscreenSupported());
+    }
+
+    syncFullscreenState();
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState);
+    };
+  }, []);
+
+  useEffect(() => {
+    function syncCompactLayout() {
+      setIsCompactLayout(window.innerWidth <= 900);
+    }
+
+    syncCompactLayout();
+    window.addEventListener('resize', syncCompactLayout);
+    return () => {
+      window.removeEventListener('resize', syncCompactLayout);
+    };
+  }, []);
+
+  useEffect(() => {
+    function syncSidebarLayout() {
+      const panel = sidebarPanelRef.current;
+      if (!panel) {
+        return;
+      }
+      const availableHeight = panel.clientHeight;
+      const maxDirectoryHeight = Math.max(
+        sidebarDirectoryMinHeight,
+        availableHeight - sidebarOverviewMinHeight - 8,
+      );
+      setDirectoryPanelHeight((currentHeight) => {
+        if (currentHeight === null) {
+          const preferredHeight = Math.round(availableHeight * 0.68);
+          return Math.min(Math.max(preferredHeight, sidebarDirectoryMinHeight), maxDirectoryHeight);
+        }
+        return Math.min(Math.max(currentHeight, sidebarDirectoryMinHeight), maxDirectoryHeight);
+      });
+    }
+
+    syncSidebarLayout();
+    window.addEventListener('resize', syncSidebarLayout);
+    return () => {
+      window.removeEventListener('resize', syncSidebarLayout);
+    };
+  }, []);
+
+  useEffect(() => {
+    function syncShellLayout() {
+      const shell = platformShellRef.current;
+      if (!shell) {
+        return;
+      }
+      const availableWidth = shell.clientWidth;
+      const maxSidebarWidth = Math.max(
+        sidebarMinWidth,
+        availableWidth - workspaceMinWidth - shellDividerSize,
+      );
+      setSidebarWidth((currentWidth) => {
+        if (currentWidth === null) {
+          const preferredWidth = 274;
+          return Math.min(Math.max(preferredWidth, sidebarMinWidth), maxSidebarWidth);
+        }
+        return Math.min(Math.max(currentWidth, sidebarMinWidth), maxSidebarWidth);
+      });
+    }
+
+    syncShellLayout();
+    window.addEventListener('resize', syncShellLayout);
+    return () => {
+      window.removeEventListener('resize', syncShellLayout);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarResizing) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const panel = sidebarPanelRef.current;
+      if (!panel) {
+        return;
+      }
+      const bounds = panel.getBoundingClientRect();
+      const availableHeight = bounds.height;
+      const maxDirectoryHeight = Math.max(
+        sidebarDirectoryMinHeight,
+        availableHeight - sidebarOverviewMinHeight - 8,
+      );
+      const nextHeight = event.clientY - bounds.top;
+      setDirectoryPanelHeight(
+        Math.min(Math.max(nextHeight, sidebarDirectoryMinHeight), maxDirectoryHeight),
+      );
+    }
+
+    function handlePointerUp() {
+      setIsSidebarResizing(false);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isSidebarResizing]);
+
+  useEffect(() => {
+    if (!isShellResizing) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const shell = platformShellRef.current;
+      if (!shell) {
+        return;
+      }
+      const bounds = shell.getBoundingClientRect();
+      const availableWidth = bounds.width;
+      const maxSidebarWidth = Math.max(
+        sidebarMinWidth,
+        availableWidth - workspaceMinWidth - shellDividerSize,
+      );
+      const nextWidth = event.clientX - bounds.left;
+      setSidebarWidth(
+        Math.min(Math.max(nextWidth, sidebarMinWidth), maxSidebarWidth),
+      );
+    }
+
+    function handlePointerUp() {
+      setIsShellResizing(false);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isShellResizing]);
 
   function handleFilterChange(fieldId: string, value: string) {
     setFilters((current) => ({ ...current, [fieldId]: value }));
@@ -547,6 +1066,25 @@ export default function App() {
 
   function handleRefresh() {
     setRefreshTick((current) => current + 1);
+  }
+
+  function handleSidebarDividerPointerDown() {
+    setIsSidebarResizing(true);
+  }
+
+  function handleShellDividerPointerDown() {
+    setIsShellResizing(true);
+  }
+
+  async function handleToggleFullscreen(): Promise<void> {
+    if (!canFullscreen) {
+      return;
+    }
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+    await document.documentElement.requestFullscreen();
   }
 
   function handleCloseTab(tabId: string) {
@@ -567,9 +1105,87 @@ export default function App() {
     });
   }
 
+  function handleRunInspectionAction(actionId: string) {
+    const operation = activeScene.sample_operations.find((item) => item.action_id === actionId);
+    setInteractionFeedback(operation ? `${operation.result} ${operation.impact}` : `已触发 ${actionId} 操作。`);
+  }
+
+  const sidebarPanelStyle =
+    directoryPanelHeight === null
+      ? undefined
+      : {
+          gridTemplateRows: `${directoryPanelHeight}px 8px minmax(${sidebarOverviewMinHeight}px, 1fr)`,
+        };
+  const resolvedSidebarWidth = sidebarWidth ?? 274;
+  const platformShellStyle = isCompactLayout
+    ? undefined
+    : {
+        gridTemplateColumns: `${resolvedSidebarWidth}px ${shellDividerSize}px minmax(${workspaceMinWidth}px, 1fr)`,
+      };
+  const activeTab = openTabs.find((tab) => tab.tab_id === activeTabId) ?? openTabs[0];
+  const isLibraryTabActive = !activeTab?.item_id;
+  const activeWorkItem =
+    activeTab && activeTab.item_id
+      ? activeScene.sample_items.find((item) => item.item_id === activeTab.item_id) ?? null
+      : null;
+  const inspectionBlocks = activeWorkItem ? buildInspectionBlocks(activeWorkItem) : [];
+
   return (
     <div className="platform-app">
       <div className="platform-shell">
+        <header className="platform-topbar">
+          <div className="platform-topbar-brand">
+            <div className="sidebar-brand-mark" aria-hidden="true">
+              <span className="sidebar-brand-orbit" />
+              <span className="sidebar-brand-wave" />
+            </div>
+            <div className="sidebar-brand-copy">
+              <strong>{platform.platform_title}</strong>
+            </div>
+          </div>
+          <div className="platform-topbar-main">
+            {isLibraryTabActive ? (
+              <LibraryTopbarMain
+                searchText={searchText}
+                onSearchChange={setSearchText}
+                placeholder={platform.global_search_placeholder ?? '搜索文件...'}
+              />
+            ) : activeWorkItem ? (
+              <InspectionTopbarMain
+                searchText={searchText}
+                onSearchChange={setSearchText}
+                placeholder={platform.global_search_placeholder ?? '搜索文件...'}
+              />
+            ) : null}
+            <div className="topbar-tools">
+              {themeToggleEnabled ? (
+                <button className="toggle-pill" type="button" aria-label="Theme Toggle" onClick={() => setDarkMode((current) => !current)}>
+                  <span className="toggle-pill-track">
+                    <span className={`toggle-pill-thumb ${darkMode ? 'toggle-pill-thumb-active' : ''}`} />
+                  </span>
+                  {darkMode ? <Moon className="toggle-pill-icon" strokeWidth={1.8} /> : <Sun className="toggle-pill-icon" strokeWidth={1.8} />}
+                </button>
+              ) : null}
+              <button className="square-tool" type="button" aria-label="Refresh" onClick={handleRefresh}>
+                <RefreshCw className={`square-tool-icon ${refreshTick > 0 ? 'panel-icon-rotate' : ''}`} strokeWidth={1.8} />
+              </button>
+              {fullscreenActionEnabled && canFullscreen ? (
+                <button
+                  className="square-tool"
+                  type="button"
+                  aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  onClick={() => {
+                    void handleToggleFullscreen();
+                  }}
+                >
+                  {isFullscreen ? <Minimize2 className="square-tool-icon" strokeWidth={1.8} /> : <Maximize2 className="square-tool-icon" strokeWidth={1.8} />}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </header>
+
+        <div className="platform-body" ref={platformShellRef} style={platformShellStyle}>
         <aside className="sidebar-shell">
           <nav className="icon-rail" aria-label="Platform Tools">
             <button className={`rail-button ${activeRail === 'library' ? 'rail-button-active' : ''}`} type="button" aria-label="File Library" onClick={() => setActiveRail('library')}>
@@ -587,17 +1203,7 @@ export default function App() {
             </button>
           </nav>
 
-          <section className="sidebar-panel">
-            <div className="sidebar-brand">
-              <div className="sidebar-brand-mark" aria-hidden="true">
-                <span className="sidebar-brand-orbit" />
-                <span className="sidebar-brand-wave" />
-              </div>
-              <div className="sidebar-brand-copy">
-                <strong>{platform.platform_title}</strong>
-              </div>
-            </div>
-
+          <section className="sidebar-panel" ref={sidebarPanelRef} style={sidebarPanelStyle}>
             <div className="sidebar-directory">
               <div className="sidebar-directory-head">
                 <strong>{platform.sidebar_title ?? '文件目录'}</strong>
@@ -613,6 +1219,17 @@ export default function App() {
               <ScopeTree nodes={activeScene.scope_tree} />
             </div>
 
+            <button
+              aria-label="Resize sidebar sections"
+              className={`sidebar-divider ${isSidebarDividerHovered || isSidebarResizing ? 'sidebar-divider-active' : ''}`}
+              type="button"
+              onPointerDown={handleSidebarDividerPointerDown}
+              onMouseEnter={() => setIsSidebarDividerHovered(true)}
+              onMouseLeave={() => setIsSidebarDividerHovered(false)}
+            >
+              <span className="sidebar-divider-line" />
+            </button>
+
             <div className="sidebar-overview">
               <div className="overview-title">概览</div>
               <StatList items={bottomStats} />
@@ -620,43 +1237,51 @@ export default function App() {
           </section>
         </aside>
 
+        <button
+          aria-label="Resize navigation and workspace"
+          className={`shell-divider ${isShellDividerHovered || isShellResizing ? 'shell-divider-active' : ''}`}
+          type="button"
+          onPointerDown={handleShellDividerPointerDown}
+          onMouseEnter={() => setIsShellDividerHovered(true)}
+          onMouseLeave={() => setIsShellDividerHovered(false)}
+        >
+          <span className="shell-divider-line" />
+        </button>
+
         <main className="workspace-shell">
-          <header className="workspace-header">
-            <div className="topbar">
-              <label className="topbar-search">
-                <Search className="topbar-search-icon" strokeWidth={1.8} />
-                <input className="topbar-search-input" type="text" value={searchText} placeholder={platform.global_search_placeholder ?? '搜索文件...'} onChange={(event) => setSearchText(event.target.value)} />
-              </label>
-              <div className="topbar-tools">
-                <button className="toggle-pill" type="button" aria-label="Theme Toggle" onClick={() => setDarkMode((current) => !current)}>
-                  <span className="toggle-pill-track">
-                    <span className={`toggle-pill-thumb ${darkMode ? 'toggle-pill-thumb-active' : ''}`} />
-                  </span>
-                  {darkMode ? <Moon className="toggle-pill-icon" strokeWidth={1.8} /> : <Sun className="toggle-pill-icon" strokeWidth={1.8} />}
-                </button>
-                <button className="square-tool" type="button" aria-label="Fullscreen">
-                  <Maximize2 className="square-tool-icon" strokeWidth={1.8} />
-                </button>
-              </div>
-            </div>
-
-            <TabBar tabs={openTabs} activeTabId={activeTabId} onActivate={setActiveTabId} onClose={handleCloseTab} />
-          </header>
-
-          <section className="workspace-card">
-            <div className="filter-panel">
-              <FilterGrid fields={activeScene.filter_fields} values={filters} onChange={handleFilterChange} />
-              <div className="scope-summary-row">
-                <span className="scope-summary-text">{`范围: ${activeScope?.label ?? activeScene.current_scope_label}`}</span>
-                <button className="link-button" type="button" onClick={handleClearFilters}>清空筛选</button>
-              </div>
-            </div>
-
-            <div className="result-panel">
-              <EmptyTable columns={activeScene.table_columns} title={activeScene.empty_result_title} copy={activeScene.empty_result_copy} />
-            </div>
-          </section>
+          {isLibraryTabActive ? (
+            <LibraryWorkspace
+              tabs={openTabs}
+              activeTabId={activeTabId}
+              onActivateTab={setActiveTabId}
+              onCloseTab={handleCloseTab}
+              filterFields={activeScene.filter_fields}
+              filterValues={filters}
+              onChangeFilter={handleFilterChange}
+              scopeLabel={activeScope?.label ?? activeScene.current_scope_label}
+              onClearFilters={handleClearFilters}
+              tableColumns={activeScene.table_columns}
+              emptyTitle={activeScene.empty_result_title}
+              emptyCopy={activeScene.empty_result_copy}
+            />
+          ) : activeWorkItem ? (
+            <InspectionWorkspace
+              tabs={openTabs}
+              activeTabId={activeTabId}
+              onActivateTab={setActiveTabId}
+              onCloseTab={handleCloseTab}
+              item={activeWorkItem}
+              blocks={inspectionBlocks}
+              activeBlockId={activeInspectionBlockId}
+              onSelectBlock={setActiveInspectionBlockId}
+              actions={activeScene.mutation_actions}
+              feedback={interactionFeedback}
+              onRunAction={handleRunInspectionAction}
+            />
+          ) : null}
         </main>
+
+        </div>
 
         <footer className="platform-footer">
           <div className="workspace-footer">
@@ -673,7 +1298,424 @@ export default function App() {
     </div>
   );
 }
+
+function FileInspectionWorkbench({
+  blocks,
+  activeBlockId,
+  onSelectBlock,
+  actions,
+  feedback,
+  onRunAction,
+}: {
+  blocks: InspectionBlock[];
+  activeBlockId: string;
+  onSelectBlock: (blockId: string) => void;
+  actions: string[];
+  feedback: string;
+  onRunAction: (actionId: string) => void;
+}) {
+  const activeBlock = blocks.find((block) => block.block_id === activeBlockId) ?? blocks[0];
+  return (
+    <div className="inspection-shell">
+      <div className="inspection-body">
+        <aside className="inspection-block-list" aria-label="文件检查块">
+          {blocks.map((block) => (
+            <button
+              key={block.block_id}
+              className={`inspection-block ${block.block_id === activeBlock.block_id ? 'inspection-block-active' : ''}`}
+              type="button"
+              onClick={() => onSelectBlock(block.block_id)}
+            >
+              <span className={`inspection-block-indicator inspection-block-indicator-${block.status}`} />
+              <span className="inspection-block-copy">
+                <strong>{block.title}</strong>
+                <span>{block.summary}</span>
+              </span>
+            </button>
+          ))}
+        </aside>
+
+        <section className="inspection-detail">
+          <div className="inspection-detail-card">
+            <div className="inspection-detail-head">
+              <strong>{activeBlock.title}</strong>
+              <span>{activeBlock.summary}</span>
+            </div>
+            <p className="inspection-detail-copy">{activeBlock.detail}</p>
+          </div>
+
+          <div className="inspection-action-row">
+            {actions.map((actionId) => (
+              <button key={actionId} className="inspection-action-button" type="button" onClick={() => onRunAction(actionId)}>
+                {actionId}
+              </button>
+            ))}
+          </div>
+
+          <div className="inspection-feedback">
+            <strong>交互反馈</strong>
+            <p>{feedback}</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
 """
+
+def _app_tsx_shadcn(workbench_path: str, *, icon_library: str) -> str:
+    if icon_library != "lucide-react":
+        raise ValueError(f"unsupported review_workbench icon library: {icon_library}")
+    base = _app_tsx_plain(workbench_path, icon_library=icon_library)
+    base = base.replace(
+        "import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField } from './types';",
+        "import { Input } from './components/ui/input';\n"
+        "import { SemanticSelect } from './components/semantic/select';\n"
+        "import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField, SemanticSelectOption } from './types';",
+    )
+    old_filter = """function FilterGrid({ fields, values, onChange }: { fields: FilterField[]; values: Record<string, string>; onChange: (fieldId: string, value: string) => void }) {
+  return (
+    <div className="filter-grid">
+      {fields.map((field) => {
+        const value = values[field.field_id] ?? '';
+        const isSelect = selectLikeFieldIds.has(field.field_id);
+        return (
+          <label className="filter-field" key={field.field_id}>
+            <span className="filter-label">{field.label}</span>
+            {isSelect ? (
+              <div className="filter-select-wrap">
+                <select className="filter-control filter-select" value={value || '鍏ㄩ儴'} onChange={(event) => onChange(field.field_id, event.target.value)}>
+                  {(optionMap[field.field_id] ?? ['鍏ㄩ儴']).map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <input className="filter-control" type="text" value={value} placeholder={field.placeholder} onChange={(event) => onChange(field.field_id, event.target.value)} />
+            )}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+"""
+    new_filter = """function FilterGrid({ fields, values, onChange }: { fields: FilterField[]; values: Record<string, string>; onChange: (fieldId: string, value: string) => void }) {
+  return (
+    <div className="filter-grid">
+      {fields.map((field) => {
+        const value = values[field.field_id] ?? '';
+        const isSelect = selectLikeFieldIds.has(field.field_id);
+        if (isSelect) {
+          const options: SemanticSelectOption[] = (optionMap[field.field_id] ?? ['鍏ㄩ儴']).map((option) => ({
+            label: option,
+            value: option,
+          }));
+          return (
+            <SemanticSelect
+              key={field.field_id}
+              label={field.label}
+              value={value || '鍏ㄩ儴'}
+              placeholder={field.placeholder}
+              options={options}
+              onValueChange={(nextValue) => onChange(field.field_id, nextValue)}
+            />
+          );
+        }
+        return (
+          <label className="filter-field" key={field.field_id}>
+            <span className="filter-label">{field.label}</span>
+            <Input className="filter-control shadcn-input" type="text" value={value} placeholder={field.placeholder} onChange={(event) => onChange(field.field_id, event.target.value)} />
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+"""
+    return base.replace(old_filter, new_filter)
+
+
+def _app_tsx_shadcn_v2(workbench_path: str, *, icon_library: str) -> str:
+    if icon_library != "lucide-react":
+        raise ValueError(f"unsupported review_workbench icon library: {icon_library}")
+    base = _app_tsx_plain(workbench_path, icon_library=icon_library)
+    base = base.replace(
+        "import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField } from './types';",
+        "import { Input } from './components/ui/input';\n"
+        "import { SemanticSelect } from './components/semantic/select';\n"
+        "import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField, SemanticSelectOption } from './types';",
+    )
+    filter_start = base.index("function FilterGrid(")
+    filter_end = base.index("\n\nfunction EmptyTable(")
+    filter_block = """function FilterGrid({ fields, values, onChange }: { fields: FilterField[]; values: Record<string, string>; onChange: (fieldId: string, value: string) => void }) {
+  return (
+    <div className="filter-grid">
+      {fields.map((field) => {
+        const value = values[field.field_id] ?? '';
+        const isSelect = selectLikeFieldIds.has(field.field_id);
+        if (isSelect) {
+          const options: SemanticSelectOption[] = (optionMap[field.field_id] ?? ['鍏ㄩ儴']).map((option) => ({
+            label: option,
+            value: option,
+          }));
+          return (
+            <SemanticSelect
+              key={field.field_id}
+              label={field.label}
+              value={value || '鍏ㄩ儴'}
+              placeholder={field.placeholder}
+              options={options}
+              onValueChange={(nextValue) => onChange(field.field_id, nextValue)}
+            />
+          );
+        }
+        return (
+          <label className="filter-field" key={field.field_id}>
+            <span className="filter-label">{field.label}</span>
+            <Input className="filter-control shadcn-input" type="text" value={value} placeholder={field.placeholder} onChange={(event) => onChange(field.field_id, event.target.value)} />
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+"""
+    return base[:filter_start] + filter_block + base[filter_end:]
+
+
+def _app_tsx_shadcn_v3(workbench_path: str, *, icon_library: str) -> str:
+    if icon_library != "lucide-react":
+        raise ValueError(f"unsupported review_workbench icon library: {icon_library}")
+    base = _app_tsx_plain(workbench_path, icon_library=icon_library)
+    base = base.replace("  X,\r\n", "")
+    base = base.replace("  X,\n", "")
+    base = base.replace(
+        "import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField } from './types';",
+        "import { Input } from './components/ui/input';\n"
+        "import { SemanticSelect } from './components/semantic/select';\n"
+        "import { SemanticTabs } from './components/semantic/tabs';\n"
+        "import type { RuntimeData, SceneSpec, StatItem, ScopeNode, OpenTab, FilterField, SemanticSelectOption } from './types';",
+    )
+    tab_start = base.index("function TabBar(")
+    tab_end = base.index("\n\nfunction FilterGrid(")
+    tab_block = """function TabBar({
+  tabs,
+  activeTabId,
+  onActivate,
+  onClose,
+}: {
+  tabs: OpenTab[];
+  activeTabId: string;
+  onActivate: (tabId: string) => void;
+  onClose: (tabId: string) => void;
+}) {
+  return <SemanticTabs tabs={tabs} activeTabId={activeTabId} onActivate={onActivate} onClose={onClose} />;
+}
+"""
+    base = base[:tab_start] + tab_block + base[tab_end:]
+    filter_start = base.index("function FilterGrid(")
+    filter_end = base.index("\n\nfunction EmptyTable(")
+    filter_block = """function FilterGrid({ fields, values, onChange }: { fields: FilterField[]; values: Record<string, string>; onChange: (fieldId: string, value: string) => void }) {
+  return (
+    <div className="filter-grid">
+      {fields.map((field) => {
+        const value = values[field.field_id] ?? '';
+        const isSelect = selectLikeFieldIds.has(field.field_id);
+        if (isSelect) {
+          const options: SemanticSelectOption[] = (optionMap[field.field_id] ?? ['鍏ㄩ儴']).map((option) => ({
+            label: option,
+            value: option,
+          }));
+          return (
+            <SemanticSelect
+              key={field.field_id}
+              label={field.label}
+              value={value || '鍏ㄩ儴'}
+              placeholder={field.placeholder}
+              options={options}
+              onValueChange={(nextValue) => onChange(field.field_id, nextValue)}
+            />
+          );
+        }
+        return (
+          <label className="filter-field" key={field.field_id}>
+            <span className="filter-label">{field.label}</span>
+            <Input className="filter-control shadcn-input" type="text" value={value} placeholder={field.placeholder} onChange={(event) => onChange(field.field_id, event.target.value)} />
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+"""
+    base = base[:filter_start] + filter_block + base[filter_end:]
+    return base
+
+
+def _ui_input_tsx() -> str:
+    return """import * as React from 'react';
+
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
+  { className = '', type = 'text', ...props },
+  ref,
+) {
+  const classes = [className].filter(Boolean).join(' ');
+  return <input ref={ref} type={type} className={classes} {...props} />;
+});
+"""
+
+
+def _ui_select_tsx() -> str:
+    return """import * as SelectPrimitive from '@radix-ui/react-select';
+import { Check, ChevronDown } from 'lucide-react';
+
+export const Select = SelectPrimitive.Root;
+export const SelectValue = SelectPrimitive.Value;
+
+export function SelectTrigger({
+  className = '',
+  children,
+  ...props
+}: SelectPrimitive.SelectTriggerProps & { className?: string }) {
+  const classes = ['semantic-select-trigger', className].filter(Boolean).join(' ');
+  return (
+    <SelectPrimitive.Trigger className={classes} {...props}>
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="semantic-select-chevron" strokeWidth={1.8} />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+}
+
+export function SelectContent({
+  className = '',
+  children,
+  position = 'popper',
+  ...props
+}: SelectPrimitive.SelectContentProps & { className?: string }) {
+  const classes = ['semantic-select-content', className].filter(Boolean).join(' ');
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content className={classes} position={position} {...props}>
+        <SelectPrimitive.Viewport className="semantic-select-viewport">{children}</SelectPrimitive.Viewport>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  );
+}
+
+export function SelectItem({
+  className = '',
+  children,
+  ...props
+}: SelectPrimitive.SelectItemProps & { className?: string }) {
+  const classes = ['semantic-select-item', className].filter(Boolean).join(' ');
+  return (
+    <SelectPrimitive.Item className={classes} {...props}>
+      <span className="semantic-select-item-indicator">
+        <SelectPrimitive.ItemIndicator>
+          <Check className="semantic-select-check" strokeWidth={2} />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  );
+}
+"""
+
+
+def _semantic_select_tsx() -> str:
+    return """import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import type { SemanticSelectOption } from '../../types';
+
+type SemanticSelectProps = {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: SemanticSelectOption[];
+  onValueChange?: (value: string) => void;
+};
+
+export function SemanticSelect({
+  label,
+  value,
+  placeholder,
+  options,
+  onValueChange,
+}: SemanticSelectProps) {
+  return (
+    <label className="filter-field">
+      <span className="filter-label">{label}</span>
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger aria-label={label}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
+  );
+}
+"""
+
+
+def _semantic_tabs_tsx() -> str:
+    return """import { FileText, X } from 'lucide-react';
+import type { OpenTab } from '../../types';
+
+type SemanticTabsProps = {
+  tabs: OpenTab[];
+  activeTabId: string;
+  onActivate: (tabId: string) => void;
+  onClose: (tabId: string) => void;
+};
+
+export function SemanticTabs({
+  tabs,
+  activeTabId,
+  onActivate,
+  onClose,
+}: SemanticTabsProps) {
+  return (
+    <div className="tab-bar">
+      {tabs.map((tab) => {
+        const active = tab.tab_id === activeTabId;
+        const closable = Boolean(tab.item_id);
+        return (
+          <div className={`tab-chip ${active ? 'tab-chip-active' : ''}`} key={tab.tab_id}>
+            <button className="tab-chip-main" type="button" onClick={() => onActivate(tab.tab_id)}>
+              <FileText className="tab-chip-icon" strokeWidth={1.7} />
+              <span className="tab-chip-text">{tab.title}</span>
+            </button>
+            {closable ? (
+              <button
+                aria-label={`关闭 ${tab.title}`}
+                className="tab-chip-closer"
+                type="button"
+                onClick={() => onClose(tab.tab_id)}
+              >
+                <X className="tab-chip-close-icon" strokeWidth={1.9} />
+              </button>
+            ) : null}
+          </div>
+        );
+      })}
+      <div aria-hidden="true" className="tab-bar-spacer" />
+    </div>
+  );
+}
+"""
+
 
 def _styles_css(accent: str, brand: str) -> str:
     return """@tailwind base;
@@ -695,15 +1737,15 @@ def _styles_css(accent: str, brand: str) -> str:
 }
 
 :root[data-theme='dark'] {
-  --surface: #0f172a;
-  --panel: #111827;
-  --panel-soft: #1f2937;
-  --line: #334155;
-  --line-soft: #293548;
-  --text: #e5eef9;
-  --muted: #9fb0c5;
-  --muted-soft: #7b8ca5;
-  --shadow: 0 22px 54px rgba(2, 6, 23, 0.35);
+  --surface: #1e1e1e;
+  --panel: #252526;
+  --panel-soft: #2d2d30;
+  --line: #3b3b3b;
+  --line-soft: #333333;
+  --text: #e7edf5;
+  --muted: #a3adba;
+  --muted-soft: #7f8a98;
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
 }
 
 * {
@@ -715,6 +1757,8 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -724,7 +1768,7 @@ body {
 }
 
 :root[data-theme='dark'] body {
-  background: linear-gradient(180deg, #0b1220 0%, #101827 48%, #121b2c 100%);
+  background: #1e1e1e;
 }
 
 button,
@@ -733,20 +1777,36 @@ select {
   font: inherit;
 }
 
+html {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] html {
+  color-scheme: dark;
+}
+
+:root[data-theme-switching='true'] *,
+:root[data-theme-switching='true'] *::before,
+:root[data-theme-switching='true'] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 button {
   -webkit-tap-highlight-color: transparent;
 }
 
 .platform-app {
-  min-height: 100vh;
+  height: 100vh;
   padding: 8px;
+  overflow: hidden;
 }
 
 .platform-shell {
-  min-height: calc(100vh - 16px);
+  height: calc(100vh - 16px);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) 20px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 48px minmax(0, 1fr) 31px;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(221, 229, 239, 0.9);
   border-radius: 18px;
@@ -754,18 +1814,116 @@ button {
 }
 
 :root[data-theme='dark'] .platform-shell {
-  background: rgba(15, 23, 42, 0.84);
-  border-color: rgba(51, 65, 85, 0.88);
+  background: #232427;
+  border-color: #32353a;
 }
+
+.platform-topbar {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 274px minmax(0, 1fr);
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.96));
+}
+
+:root[data-theme='dark'] .platform-topbar {
+  border-bottom-color: #34383d;
+  background: linear-gradient(180deg, #24262a, #212327);
+}
+
+.platform-topbar-brand {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 14px 0 12px;
+}
+
+.platform-topbar-main {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 10px 0 14px;
+}
+
+.platform-body {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 274px 8px minmax(720px, 1fr);
+}
+
 
 .sidebar-shell {
   grid-column: 1;
   grid-row: 1;
-  width: 274px;
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
-  border-right: 1px solid var(--line);
+  min-height: 0;
+  overflow: hidden;
   background: var(--panel);
+}
+
+:root[data-theme='dark'] .sidebar-shell {
+  background: #242529;
+}
+
+.shell-divider {
+  grid-column: 2;
+  grid-row: 1;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: col-resize;
+  position: relative;
+  transition: background-color 140ms ease;
+}
+
+.shell-divider-line {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #dfe7f2;
+  transition: background-color 140ms ease, width 140ms ease;
+}
+
+.shell-divider:hover,
+.shell-divider-active {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.shell-divider:hover .shell-divider-line,
+.shell-divider-active .shell-divider-line {
+  width: 3px;
+  background: rgba(37, 99, 235, 0.56);
+}
+
+:root[data-theme='dark'] .shell-divider {
+  background: transparent;
+}
+
+:root[data-theme='dark'] .shell-divider-line {
+  background: #39424e;
+}
+
+:root[data-theme='dark'] .shell-divider:hover,
+:root[data-theme='dark'] .shell-divider-active {
+  background: rgba(96, 165, 250, 0.04);
+}
+
+:root[data-theme='dark'] .shell-divider:hover .shell-divider-line,
+:root[data-theme='dark'] .shell-divider-active .shell-divider-line {
+  background: rgba(96, 165, 250, 0.68);
 }
 
 .icon-rail {
@@ -779,7 +1937,7 @@ button {
 }
 
 :root[data-theme='dark'] .icon-rail {
-  background: rgba(15, 23, 42, 0.45);
+  background: #222428;
 }
 
 .rail-button,
@@ -801,6 +1959,14 @@ button {
   border-color: rgba(37, 99, 235, 0.18);
   background: rgba(37, 99, 235, 0.08);
   color: var(--accent);
+}
+
+:root[data-theme='dark'] .rail-button-active,
+:root[data-theme='dark'] .rail-button:hover,
+:root[data-theme='dark'] .rail-avatar:hover {
+  border-color: #4f93eb;
+  background: rgba(37, 99, 235, 0.22);
+  color: #8fc0ff;
 }
 
 .rail-icon,
@@ -828,10 +1994,18 @@ button {
   background: var(--panel);
 }
 
+:root[data-theme='dark'] .rail-avatar {
+  background: #252526;
+  border-color: #3f444c;
+}
+
 .sidebar-panel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  height: 100%;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  grid-template-rows: minmax(156px, 1fr) 8px minmax(188px, 1fr);
 }
 
 .sidebar-brand {
@@ -870,19 +2044,22 @@ button {
 }
 
 .sidebar-brand-copy strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #111827;
 }
 
+:root[data-theme='dark'] .sidebar-brand-copy strong {
+  color: #f4f7fb;
+}
+
 .sidebar-directory {
   flex: 1;
-  border-top: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
   padding: 8px 0 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar-directory-head {
@@ -892,6 +2069,10 @@ button {
   padding: 0 10px 8px;
   margin-bottom: 0;
   font-size: 14px;
+}
+
+:root[data-theme='dark'] .sidebar-directory-head {
+  color: #f3f6fb;
 }
 
 .sidebar-head-actions {
@@ -913,10 +2094,24 @@ button {
   padding: 0;
 }
 
+:root[data-theme='dark'] .panel-icon-button,
+:root[data-theme='dark'] .square-tool {
+  background: #2d2d30;
+  border-color: #45474d;
+  color: #acb6c3;
+}
+
 .panel-icon-button:hover,
 .square-tool:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+:root[data-theme='dark'] .panel-icon-button:hover,
+:root[data-theme='dark'] .square-tool:hover {
+  background: #33373d;
+  border-color: #5b95ee;
+  color: #8ab8ff;
 }
 
 .panel-icon-rotate {
@@ -935,7 +2130,7 @@ button {
   align-items: center;
   gap: 8px;
   color: #334155;
-  font-size: 12px;
+  font-size: 13px;
   padding: 7px 8px;
   border-radius: 7px;
   background: transparent;
@@ -945,9 +2140,18 @@ button {
   transition: background-color 120ms ease, color 120ms ease;
 }
 
+:root[data-theme='dark'] .scope-node {
+  color: #bcc6d3;
+}
+
 .scope-node:hover {
   background: rgba(37, 99, 235, 0.06);
   color: #1d4ed8;
+}
+
+:root[data-theme='dark'] .scope-node:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #86b6ff;
 }
 
 .scope-node-active {
@@ -956,21 +2160,80 @@ button {
   font-weight: 600;
 }
 
+:root[data-theme='dark'] .scope-node-active {
+  background: rgba(59, 130, 246, 0.18);
+  color: #98c2ff;
+  box-shadow: inset 0 0 0 1px rgba(125, 179, 255, 0.24);
+}
+
 .scope-node-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.sidebar-divider {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: row-resize;
+  position: relative;
+  transition: background-color 140ms ease;
+}
+
+.sidebar-divider-line {
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: #dfe7f2;
+  transition: background-color 140ms ease, height 140ms ease;
+}
+
+.sidebar-divider:hover,
+.sidebar-divider-active {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.sidebar-divider:hover .sidebar-divider-line,
+.sidebar-divider-active .sidebar-divider-line {
+  height: 3px;
+  background: rgba(37, 99, 235, 0.56);
+}
+
+:root[data-theme='dark'] .sidebar-divider {
+  background: transparent;
+}
+
+:root[data-theme='dark'] .sidebar-divider:hover,
+:root[data-theme='dark'] .sidebar-divider-active {
+  background: rgba(96, 165, 250, 0.04);
+}
+
+:root[data-theme='dark'] .sidebar-divider-line {
+  background: #39424e;
+}
+
+:root[data-theme='dark'] .sidebar-divider:hover .sidebar-divider-line,
+:root[data-theme='dark'] .sidebar-divider-active .sidebar-divider-line {
+  background: rgba(96, 165, 250, 0.68);
+}
+
 .sidebar-overview {
-  margin-top: auto;
   background: rgba(248, 250, 252, 0.74);
   padding: 12px 10px 14px;
-  border-top: 1px solid var(--line-soft);
+  min-height: 0;
+  overflow: auto;
+}
+
+:root[data-theme='dark'] .sidebar-overview {
+  background: #2a2a2c;
 }
 
 .overview-title {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
   margin-bottom: 8px;
@@ -986,7 +2249,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 3px 0;
-  font-size: 12px;
+  font-size: 13px;
   gap: 10px;
 }
 
@@ -1001,11 +2264,17 @@ button {
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1;
   background: #f8fafc;
   border: 1px solid #d9e2ec;
   color: #64748b;
+}
+
+:root[data-theme='dark'] .stat-value {
+  background: #232428;
+  border-color: #40444c;
+  color: #d5ddeb;
 }
 
 .stat-item[data-stat-kind='classified_files'] .stat-value,
@@ -1034,58 +2303,75 @@ button {
 }
 
 .workspace-shell {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #f7f9fc;
+  min-height: 0;
+  overflow: hidden;
+  background: #f5f7fb;
+}
+
+:root[data-theme='dark'] .workspace-shell {
+  background: #222427;
 }
 
 .platform-footer {
-  grid-column: 1 / span 2;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 3;
+  height: 31px;
   min-width: 0;
+  min-height: 31px;
   border-top: 1px solid rgba(219, 227, 239, 0.9);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.98));
+  background: #ffffff;
+  overflow: hidden;
 }
 
-.workspace-header,
+:root[data-theme='dark'] .platform-footer {
+  background: #252526;
+  border-top-color: #3a3a3a;
+}
+
 .workspace-card {
-  margin: 0 8px;
+  margin: 0;
 }
 
-.workspace-header {
-  display: grid;
-  gap: 0;
-  padding-top: 5px;
-}
-
-.topbar {
+.topbar-search-wrap {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: 3px;
+  justify-content: center;
+  min-width: 0;
 }
 
 .topbar-search {
-  flex: 1;
-  height: 31px;
+  width: min(100%, 640px);
+  height: 32px;
   border: 1px solid #d9e2ec;
-  border-radius: 7px;
+  border-radius: 8px;
   background: linear-gradient(180deg, #ffffff, #fcfdff);
-  padding: 0 10px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
   transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+:root[data-theme='dark'] .topbar-search {
+  border-color: #4a4a4a;
+  background: linear-gradient(180deg, #323236, #2c2c30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 0 rgba(0, 0, 0, 0.18);
 }
 
 .topbar-search:focus-within {
   border-color: #b8cbef;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+:root[data-theme='dark'] .topbar-search:focus-within {
+  border-color: #5b95ee;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
 }
 
 .topbar-search-input {
@@ -1094,7 +2380,7 @@ button {
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .topbar-search-input::placeholder {
@@ -1103,8 +2389,10 @@ button {
 
 .topbar-tools {
   display: flex;
-  gap: 5px;
+  justify-content: flex-end;
+  gap: 6px;
   align-items: center;
+  min-width: 0;
 }
 
 .toggle-pill {
@@ -1112,12 +2400,19 @@ button {
   background: var(--panel);
   border-radius: 999px;
   height: 24px;
-  padding: 0 4px;
+  min-width: 48px;
+  padding: 0 5px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 5px;
   transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+:root[data-theme='dark'] .toggle-pill {
+  background: #2d2d30;
+  border-color: #45474d;
 }
 
 .toggle-pill:hover {
@@ -1125,14 +2420,23 @@ button {
   background: #f8fbff;
 }
 
+:root[data-theme='dark'] .toggle-pill:hover {
+  border-color: #5b95ee;
+  background: #33373d;
+}
+
 .toggle-pill-track {
-  width: 30px;
+  width: 28px;
   height: 12px;
   display: flex;
   align-items: center;
   padding: 0 2px;
   border-radius: 999px;
   background: #eef2f7;
+}
+
+:root[data-theme='dark'] .toggle-pill-track {
+  background: #51555d;
 }
 
 .toggle-pill-thumb {
@@ -1143,49 +2447,117 @@ button {
   transition: transform 160ms ease;
 }
 
+:root[data-theme='dark'] .toggle-pill-thumb {
+  background: #d1d5db;
+}
+
 .toggle-pill-thumb-active {
-  transform: translateX(16px);
+  transform: translateX(14px);
   background: var(--accent);
 }
 
 .toggle-pill-icon {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   color: var(--muted);
 }
 
 .tab-bar {
   display: flex;
+  align-items: stretch;
   gap: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 0;
-  border-bottom: 1px solid var(--line);
+  min-height: 34px;
+  border: 0;
+  border-radius: 0;
   scrollbar-width: thin;
+  position: relative;
+  background: linear-gradient(180deg, #fbfcfe, #f7f9fc);
+  z-index: 2;
+}
+
+:root[data-theme='dark'] .tab-bar {
+  background: linear-gradient(180deg, #2b2e33, #282b30);
+}
+
+.tab-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.72);
+  pointer-events: none;
+}
+
+:root[data-theme='dark'] .tab-bar::before {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tab-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: #e4ebf5;
+  pointer-events: none;
+}
+
+:root[data-theme='dark'] .tab-bar::after {
+  background: #343940;
 }
 
 .tab-chip {
-  border: 1px solid var(--line);
-  border-bottom-color: #d6dee8;
-  background: #f9fbfd;
-  color: #475569;
-  border-radius: 6px 6px 0 0;
+  border: 0;
+  border-right: 1px solid #edf2f8;
+  background: transparent;
+  color: #5b6b80;
+  border-radius: 0;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 0;
   min-width: 0;
-  min-height: 34px;
-  margin-right: 2px;
+  min-height: 33px;
+  margin-right: 0;
   position: relative;
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  box-shadow: none;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+:root[data-theme='dark'] .tab-chip {
+  color: #b8c3d1;
+  border-right-color: #31363d;
+  min-height: 33px;
+}
+
+.tab-chip:first-child {
+  border-top-left-radius: 0;
+}
+
+.tab-bar > .tab-chip:last-of-type {
+  border-right: 0;
+}
+
+.tab-bar-spacer {
+  flex: 1 0 36px;
+  min-height: 33px;
+  background: transparent;
 }
 
 .tab-chip:hover {
-  background: #edf4ff;
+  background: rgba(255, 255, 255, 0.5);
   color: #1d4ed8;
-  border-color: #b8cbef;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.08);
-  transform: translateY(-1px);
+}
+
+:root[data-theme='dark'] .tab-chip:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: #eef5ff;
 }
 
 .tab-chip-main {
@@ -1197,31 +2569,88 @@ button {
   gap: 7px;
   min-width: 0;
   height: 100%;
-  padding: 7px 8px 6px 10px;
+  padding: 6px 10px 5px 12px;
   cursor: pointer;
   outline: none;
 }
 
+:root[data-theme='dark'] .tab-chip-main {
+  padding: 6px 10px 5px 12px;
+}
+
 .tab-chip-active {
-  background: var(--panel);
-  color: var(--accent);
-  border-bottom-color: var(--panel);
-  box-shadow: 0 1px 0 var(--panel);
-  z-index: 1;
+  background: rgba(255, 255, 255, 0.9);
+  color: #2563eb;
+  border-left: 1px solid #dfe7f3;
+  border-right: 1px solid #dfe7f3;
+  border-top: 0;
+  margin-left: -1px;
+  margin-top: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  z-index: 3;
+}
+
+:root[data-theme='dark'] .tab-chip-active {
+  background: #30343a;
+  color: #94c0ff;
+  border-left-color: #404851;
+  border-right-color: #404851;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.tab-chip:first-child.tab-chip-active {
+  margin-left: 0;
+  border-left: 0;
+}
+
+.tab-chip-active::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 0;
+  height: 2px;
+  border-radius: 0;
+  background: #2563eb;
+}
+
+:root[data-theme='dark'] .tab-chip-active::after {
+  background: #7eb6ff;
+}
+
+.tab-chip-active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  height: 3px;
+  background: #ffffff;
+}
+
+:root[data-theme='dark'] .tab-chip-active::before {
+  background: #2f3338;
 }
 
 .tab-chip-active:hover {
-  background: var(--panel);
-  border-color: #c8d6eb;
-  color: var(--accent);
-  box-shadow: 0 1px 0 var(--panel);
-  transform: none;
+  background: rgba(255, 255, 255, 0.94);
+  border-left-color: #d5e1f3;
+  border-right-color: #d5e1f3;
+  color: #2563eb;
+}
+
+:root[data-theme='dark'] .tab-chip-active:hover {
+  background: #32363d;
+  color: #a2c9ff;
+  border-left-color: #475362;
+  border-right-color: #475362;
 }
 
 .tab-chip-text {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 126px;
+  font-size: 13px;
 }
 
 .tab-chip-closer {
@@ -1240,9 +2669,14 @@ button {
 }
 
 .tab-chip-closer:hover {
-  background: rgba(37, 99, 235, 0.12);
+  background: rgba(37, 99, 235, 0.16);
   color: #1d4ed8;
   opacity: 1;
+}
+
+:root[data-theme='dark'] .tab-chip-closer:hover {
+  background: rgba(59, 130, 246, 0.24);
+  color: #a8cdff;
 }
 
 .tab-chip-close-icon {
@@ -1251,32 +2685,43 @@ button {
 }
 
 .workspace-card {
-  margin-top: 3px;
-  margin-bottom: 6px;
-  background: transparent;
+  background: #ffffff;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   padding: 0;
   display: grid;
-  gap: 8px;
-  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
   flex: 1;
+  overflow: hidden;
+}
+
+:root[data-theme='dark'] .workspace-card {
+  background: #2a2d32;
+  box-shadow: none;
 }
 
 .filter-panel {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  padding: 10px 9px 8px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+  border: 0;
+  border-bottom: 1px solid #e5ecf5;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 12px 6px;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .filter-panel {
+  background: transparent;
+  border-bottom-color: #343941;
+  box-shadow: none;
 }
 
 .filter-grid {
   display: grid;
   grid-template-columns: 1.12fr 1fr 1.12fr 1fr 1fr 1fr 1.16fr;
-  gap: 8px 9px;
+  gap: 5px 8px;
 }
 
 .filter-field {
@@ -1286,15 +2731,19 @@ button {
 
 .filter-label {
   color: #6b7280;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.2;
 }
 
+:root[data-theme='dark'] .filter-label {
+  color: #afb8c4;
+}
+
 .filter-control {
-  min-height: 30px;
+  min-height: 28px;
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 7px;
   background: linear-gradient(180deg, #ffffff, #fbfdff);
   padding: 0 8px;
   color: var(--text);
@@ -1302,13 +2751,141 @@ button {
   transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
+:root[data-theme='dark'] .filter-control {
+  background: linear-gradient(180deg, #31343a, #2d3035);
+  border-color: #3e434b;
+  color: #edf2f8;
+}
+
 .filter-control::placeholder {
   color: #9ca3af;
+}
+
+:root[data-theme='dark'] .filter-control::placeholder {
+  color: #8a94a2;
 }
 
 .filter-control:focus {
   border-color: rgba(37, 99, 235, 0.45);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+:root[data-theme='dark'] .filter-control:focus {
+  border-color: rgba(96, 165, 250, 0.82);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+
+.shadcn-input {
+  min-height: 28px;
+}
+
+.semantic-select-trigger {
+  min-height: 28px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
+  padding: 0 10px;
+  color: var(--text);
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+:root[data-theme='dark'] .semantic-select-trigger {
+  background: linear-gradient(180deg, #31343a, #2d3035);
+  border-color: #3e434b;
+  color: #edf2f8;
+}
+
+.semantic-select-trigger[data-placeholder] {
+  color: #9ca3af;
+}
+
+:root[data-theme='dark'] .semantic-select-trigger[data-placeholder] {
+  color: #8a94a2;
+}
+
+.semantic-select-trigger:focus-visible {
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+:root[data-theme='dark'] .semantic-select-trigger:focus-visible {
+  border-color: rgba(96, 165, 250, 0.82);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+
+.semantic-select-chevron {
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  flex: 0 0 auto;
+}
+
+:root[data-theme='dark'] .semantic-select-chevron {
+  color: #94a2b8;
+}
+
+.semantic-select-content {
+  z-index: 50;
+  min-width: var(--radix-select-trigger-width);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+}
+
+:root[data-theme='dark'] .semantic-select-content {
+  border-color: #4a4d53;
+  background: #2d2d30;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
+}
+
+.semantic-select-viewport {
+  padding: 6px;
+}
+
+.semantic-select-item {
+  position: relative;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 10px 0 32px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.semantic-select-item[data-highlighted] {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .semantic-select-item[data-highlighted] {
+  background: rgba(59, 130, 246, 0.2);
+  color: #9bc4ff;
+}
+
+.semantic-select-item-indicator {
+  position: absolute;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.semantic-select-check {
+  width: 14px;
+  height: 14px;
 }
 
 .filter-select-wrap {
@@ -1318,6 +2895,22 @@ button {
 .filter-select {
   appearance: none;
   padding-right: 28px;
+}
+
+.filter-select option,
+.filter-select optgroup {
+  background: #ffffff;
+  color: #1f2937;
+}
+
+:root[data-theme='dark'] .filter-select {
+  color-scheme: dark;
+}
+
+:root[data-theme='dark'] .filter-select option,
+:root[data-theme='dark'] .filter-select optgroup {
+  background: #2f3136;
+  color: #eef3fa;
 }
 
 .filter-select-wrap::after {
@@ -1333,14 +2926,24 @@ button {
   pointer-events: none;
 }
 
+:root[data-theme='dark'] .filter-select-wrap::after {
+  border-right-color: #8b95a3;
+  border-bottom-color: #8b95a3;
+}
+
 .scope-summary-row {
-  margin-top: 8px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   color: #64748b;
-  font-size: 12px;
-  min-height: 24px;
+  font-size: 13px;
+  min-height: 18px;
+}
+
+:root[data-theme='dark'] .scope-summary-row,
+:root[data-theme='dark'] .scope-summary-text {
+  color: #a7b0bc;
 }
 
 .scope-summary-text {
@@ -1348,38 +2951,57 @@ button {
 }
 
 .link-button {
-  border: 1px solid rgba(59, 130, 246, 0.22);
-  background: rgba(239, 246, 255, 0.92);
+  border: 0;
+  background: transparent;
   color: var(--accent);
   cursor: pointer;
-  padding: 0 9px;
-  min-height: 24px;
-  border-radius: 999px;
-  font-size: 10px;
+  padding: 0 2px;
+  min-height: 18px;
+  border-radius: 0;
+  font-size: 13px;
   transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
 }
 
+:root[data-theme='dark'] .link-button {
+  color: #7fb3ff;
+}
+
 .link-button:hover {
-  border-color: rgba(37, 99, 235, 0.32);
-  background: #eaf3ff;
+  background: transparent;
   color: #1d4ed8;
 }
 
+:root[data-theme='dark'] .link-button:hover {
+  background: transparent;
+  color: #9bc4ff;
+}
+
 .result-panel {
-  border: 1px solid rgba(219, 227, 239, 0.95);
-  border-radius: 12px;
-  background: var(--panel);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 9px 20px rgba(15, 23, 42, 0.03);
+  box-shadow: none;
+  padding: 8px 12px 12px;
+}
+
+:root[data-theme='dark'] .result-panel {
+  background: transparent;
+  box-shadow: none;
 }
 
 .table-shell {
   width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   flex: 1;
+  min-height: 0;
+  border: 1px solid #e3eaf4;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .result-table {
@@ -1389,13 +3011,24 @@ button {
 
 .result-table th {
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
   color: #64748b;
-  background: #f4f7fb;
-  padding: 7px 12px;
+  background: #f8fafc;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--line);
   font-weight: 600;
-  height: 34px;
+  height: 30px;
+}
+
+:root[data-theme='dark'] .result-table th {
+  color: #aeb7c2;
+  background: #31343a;
+  border-bottom-color: #3c424a;
+}
+
+:root[data-theme='dark'] .table-shell {
+  border-color: #353a42;
+  background: #2c2f34;
 }
 
 .result-table td {
@@ -1403,18 +3036,22 @@ button {
 }
 
 .empty-cell {
-  height: 560px;
+  height: auto;
   vertical-align: middle;
 }
 
 .empty-state {
-  min-height: 430px;
+  min-height: 300px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 8px;
+  gap: 6px;
   color: #64748b;
   text-align: center;
+}
+
+:root[data-theme='dark'] .empty-state {
+  color: #9da9b8;
 }
 
 .empty-icon {
@@ -1425,6 +3062,10 @@ button {
   display: grid;
   place-items: center;
   background: radial-gradient(circle at top, rgba(37, 99, 235, 0.16), rgba(37, 99, 235, 0.06));
+}
+
+:root[data-theme='dark'] .empty-icon {
+  background: radial-gradient(circle at top, rgba(59, 130, 246, 0.22), rgba(37, 99, 235, 0.08));
 }
 
 .empty-icon-file {
@@ -1449,11 +3090,266 @@ button {
   color: #334155;
 }
 
+:root[data-theme='dark'] .empty-state strong {
+  color: #e5edf8;
+}
+
 .empty-state p {
   max-width: 360px;
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.7;
+}
+
+:root[data-theme='dark'] .empty-state p {
+  color: #a7b3c0;
+}
+
+.inspection-shell {
+  display: grid;
+  gap: 14px;
+  min-height: 100%;
+}
+
+.inspection-header {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0 0;
+}
+
+.inspection-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inspection-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  color: #1f2937;
+}
+
+.inspection-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inspection-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.inspection-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 320px;
+}
+
+.inspection-block-list {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.inspection-block {
+  border: 1px solid #dfe7f2;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.inspection-block:hover {
+  border-color: rgba(37, 99, 235, 0.32);
+  background: #f8fbff;
+}
+
+.inspection-block-active {
+  border-color: rgba(37, 99, 235, 0.44);
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.inspection-block-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 4px;
+  flex: 0 0 auto;
+}
+
+.inspection-block-indicator-ready {
+  background: #10b981;
+}
+
+.inspection-block-indicator-focus {
+  background: #2563eb;
+}
+
+.inspection-block-indicator-pending {
+  background: #f59e0b;
+}
+
+.inspection-block-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.inspection-block-copy strong {
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.inspection-block-copy span {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.inspection-detail {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  gap: 12px;
+}
+
+.inspection-detail-card,
+.inspection-feedback {
+  border: 1px solid #e3eaf4;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 14px 16px;
+}
+
+.inspection-detail-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.inspection-detail-head strong,
+.inspection-feedback strong {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.inspection-detail-head span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.inspection-detail-copy,
+.inspection-feedback p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #475569;
+}
+
+.inspection-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inspection-action-button {
+  border: 1px solid #cfe0ff;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1d4ed8;
+  min-height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.inspection-action-button:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+:root[data-theme='dark'] .inspection-title {
+  color: #e5edf8;
+}
+
+:root[data-theme='dark'] .inspection-status {
+  background: rgba(59, 130, 246, 0.18);
+  color: #9bc4ff;
+}
+
+:root[data-theme='dark'] .inspection-note {
+  color: #a7b3c0;
+}
+
+:root[data-theme='dark'] .inspection-block {
+  border-color: #3b434c;
+  background: #2d3035;
+}
+
+:root[data-theme='dark'] .inspection-block:hover {
+  border-color: #4b6b95;
+  background: #30343a;
+}
+
+:root[data-theme='dark'] .inspection-block-active {
+  border-color: #53739e;
+  background: #313743;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.16);
+}
+
+:root[data-theme='dark'] .inspection-block-copy strong {
+  color: #e5edf8;
+}
+
+:root[data-theme='dark'] .inspection-block-copy span {
+  color: #a7b3c0;
+}
+
+:root[data-theme='dark'] .inspection-detail-card,
+:root[data-theme='dark'] .inspection-feedback {
+  border-color: #39414a;
+  background: #2c2f34;
+}
+
+:root[data-theme='dark'] .inspection-detail-head strong,
+:root[data-theme='dark'] .inspection-feedback strong {
+  color: #e5edf8;
+}
+
+:root[data-theme='dark'] .inspection-detail-head span {
+  color: #a7b3c0;
+}
+
+:root[data-theme='dark'] .inspection-detail-copy,
+:root[data-theme='dark'] .inspection-feedback p {
+  color: #c0cad6;
+}
+
+:root[data-theme='dark'] .inspection-action-button {
+  border-color: #42536b;
+  background: #2f3742;
+  color: #a7cbff;
+}
+
+:root[data-theme='dark'] .inspection-action-button:hover {
+  border-color: #5a7ca8;
+  background: #354153;
 }
 
 .workspace-footer {
@@ -1462,33 +3358,73 @@ button {
   align-items: center;
   gap: 10px;
   justify-content: flex-start;
-  min-height: 20px;
-  padding: 0 7px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 8px 1px;
   width: 100%;
   overflow: hidden;
-  color: #64748b;
-  font-size: 9px;
+  color: #71717a;
+  font-size: 12px;
+  line-height: 1;
+}
+
+:root[data-theme='dark'] .workspace-footer {
+  color: #a8b0bb;
+  background: #252526;
 }
 
 .footer-stat {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 1px;
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
 .footer-stat-label {
-  color: #64748b;
+  color: #71717a;
+  font-weight: 400;
+}
+
+:root[data-theme='dark'] .footer-stat-label {
+  color: #b4bcc7;
 }
 
 .footer-stat-separator {
-  color: #94a3b8;
+  color: #a1a1aa;
+}
+
+:root[data-theme='dark'] .footer-stat-separator {
+  color: #7d8691;
 }
 
 .footer-stat-value {
-  color: #64748b;
-  font-weight: 700;
+  color: #52525b;
+  font-weight: 600;
+}
+
+:root[data-theme='dark'] .footer-stat-value {
+  color: #eef3fa;
+}
+
+:root[data-theme='dark'] .footer-stat[data-stat-kind='classified_files'] .footer-stat-value {
+  color: #63d7a2;
+}
+
+:root[data-theme='dark'] .footer-stat[data-stat-kind='unclassified_files'] .footer-stat-value {
+  color: #9a8cff;
+}
+
+:root[data-theme='dark'] .footer-stat[data-stat-kind='pending_review'] .footer-stat-value {
+  color: #ffb454;
+}
+
+:root[data-theme='dark'] .footer-stat[data-stat-kind='reviewed'] .footer-stat-value {
+  color: #7cc7ff;
+}
+
+:root[data-theme='dark'] .footer-stat[data-stat-kind='unresolved'] .footer-stat-value {
+  color: #ff7aa2;
 }
 
 @keyframes icon-spin {
@@ -1516,11 +3452,21 @@ button {
 
   .sidebar-shell {
     grid-column: 1;
-    grid-row: 1;
+    grid-row: 2;
     width: 100%;
     grid-template-columns: 44px minmax(0, 1fr);
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .platform-body {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: 1fr;
+  }
+
+  .shell-divider {
+    display: none;
   }
 
   .workspace-shell {
@@ -1533,9 +3479,30 @@ button {
     grid-row: 3;
   }
 
-  .workspace-header,
+  .platform-topbar {
+    grid-column: 1;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .platform-topbar-brand {
+    display: none;
+  }
+
+  .platform-topbar-main {
+    grid-column: 1;
+    padding: 0 8px;
+  }
+
   .workspace-card {
-    margin: 0 8px;
+    margin: 0;
+  }
+
+  .topbar-search-wrap {
+    justify-content: flex-start;
+  }
+
+  .topbar-tools {
+    justify-content: flex-end;
   }
 
   .filter-grid {
@@ -1546,6 +3513,8 @@ button {
     margin: 0;
     flex-wrap: wrap;
     overflow: auto;
+    height: auto;
+    min-height: 30px;
   }
 }
 """.replace("__ACCENT__", accent).replace("__BRAND__", brand)
@@ -1564,6 +3533,10 @@ Regenerate it via:
 uv run python scripts/materialize_project.py --project-file <project.toml>
 ```
 
+If rematerialization changes `package.json`, stop any running dev server in this directory
+and reinstall dependencies before starting it again. Do not mix package managers in this
+generated directory.
+
 Then run it with Node tooling:
 
 ```bash
@@ -1578,6 +3551,7 @@ def _clear_managed_frontend_outputs(output_dir: Path) -> None:
         output_dir / "dist",
         output_dir / "index.html",
         output_dir / "package.json",
+        output_dir / "package-lock.json",
         output_dir / "pnpm-lock.yaml",
         output_dir / "postcss.config.js",
         output_dir / "README.md",

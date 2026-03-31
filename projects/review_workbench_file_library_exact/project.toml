@@ -267,6 +267,9 @@ language = "typescript"
 typescript_strict = true
 package_manager = "pnpm"
 icon_library = "lucide-react"
+component_library = "shadcn_ui"
+component_mapping_profile = "review_workbench_file_library_v1"
+primitive_strategy = "semantic_adapter"
 
 [exact.evidence.artifacts]
 canonical_json = "canonical.json"

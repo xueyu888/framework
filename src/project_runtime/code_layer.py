@@ -335,6 +335,9 @@ def _compile_review_workbench_frontend_app_spec(
                 "typescript_strict": bool(implementation.get("typescript_strict", True)),
                 "package_manager": str(implementation.get("package_manager", "pnpm")),
                 "icon_library": str(implementation.get("icon_library", "lucide-react")),
+                "component_library": str(implementation.get("component_library", "plain_html")),
+                "component_mapping_profile": str(implementation.get("component_mapping_profile", "default")),
+                "primitive_strategy": str(implementation.get("primitive_strategy", "semantic_adapter")),
             },
             "components": {
                 "platform_sidebar": {
