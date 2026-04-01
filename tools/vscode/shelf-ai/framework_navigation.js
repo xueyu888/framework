@@ -16,7 +16,6 @@ const TOML_SECTION_PATTERN = /^\s*\[([A-Za-z0-9_.-]+)\]\s*$/;
 
 const SECTION_PREFIXES = [
   ["## 1. 能力声明", "capability"],
-  ["## 2. 参数定义", "boundary"],
   ["## 2. 边界定义", "boundary"],
   ["## 3. 最小结构基", "base"],
   ["## 4. 基组合原则", "rule"],

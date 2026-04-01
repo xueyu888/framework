@@ -9,7 +9,6 @@ const evidenceTree = require("./evidence_tree");
 const correspondenceRuntime = require("./correspondence_runtime");
 const workspaceGuard = require("./guarding");
 const validationRuntime = require("./validation_runtime");
-const intentGate = require("./intent_gate");
 const treeRuntimeModels = require("./tree_runtime_models");
 const treeWebviewBridge = require("./tree_webview_bridge");
 const localSettings = require("./local_settings");
@@ -20,10 +19,6 @@ const DEFAULT_MATERIALIZE_COMMAND = "uv run python scripts/materialize_project.p
 const DEFAULT_PUBLISH_FRAMEWORK_DRAFT_COMMAND = "uv run python scripts/publish_framework_draft.py";
 const DEFAULT_TYPE_CHECK_COMMAND = "uv run mypy";
 const DEFAULT_INSTALL_GIT_HOOKS_COMMAND = "bash scripts/install_git_hooks.sh";
-const DEFAULT_CHANGE_VALIDATION_COMMAND = "uv run python scripts/validate_canonical.py --check-changes";
-const DEFAULT_INTENT_GATE_TTL_MINUTES = 120;
-const DEFAULT_INTENT_GATE_MINIMUM_SCORE = 4;
-const DEFAULT_INTENT_GATE_MAX_MATCHES = 8;
 const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze([
   "@",
   "#",
@@ -387,7 +382,6 @@ function activate(context) {
   let gitHooksReady = null;
   let gitHooksDetail = "Not checked in this session";
   let gitHooksPrompted = false;
-  let intentGateSession = null;
   let localShelfSettingValues = {};
   let localShelfSettingsError = "";
   const suppressedGeneratedDirectories = new Map();
@@ -409,16 +403,6 @@ function activate(context) {
     "shelf.treeInspectorWidth",
     "shelf.treeInspectorRailWidth",
     "shelf.statusBarClickAction",
-  ];
-  const INTENT_GATE_SETTING_KEYS = [
-    "shelf.intentGateEnabled",
-    "shelf.intentGateRequireMappingEcho",
-    "shelf.intentGateRunChangeValidationBeforeGrant",
-    "shelf.intentGateAutoOpenOutput",
-    "shelf.intentGateMinimumScore",
-    "shelf.intentGateMaxMatches",
-    "shelf.intentGateSessionTtlMinutes",
-    "shelf.intentGateTemporaryBypasses",
   ];
   const FRAMEWORK_LINT_SETTING_KEYS = [
     "shelf.frameworkLintEnabled",
@@ -605,84 +589,9 @@ function activate(context) {
     return triggerKind === "save";
   };
 
-  const readIntentGateSettings = () => {
-    const config = getShelfConfig();
-    return {
-      enabled: Boolean(config.get("intentGateEnabled")),
-      requireMappingEcho: Boolean(config.get("intentGateRequireMappingEcho")),
-      runValidationBeforeGrant: Boolean(config.get("intentGateRunChangeValidationBeforeGrant")),
-      autoOpenOutput: Boolean(config.get("intentGateAutoOpenOutput")),
-      minimumScore: clampInt(
-        config.get("intentGateMinimumScore"),
-        1,
-        20,
-        DEFAULT_INTENT_GATE_MINIMUM_SCORE
-      ),
-      maxMatches: clampInt(
-        config.get("intentGateMaxMatches"),
-        1,
-        20,
-        DEFAULT_INTENT_GATE_MAX_MATCHES
-      ),
-      ttlMinutes: clampInt(
-        config.get("intentGateSessionTtlMinutes"),
-        1,
-        1_440,
-        DEFAULT_INTENT_GATE_TTL_MINUTES
-      ),
-      temporaryBypasses: intentGate.normalizeTemporaryBypassScopes(
-        config.get("intentGateTemporaryBypasses")
-      ),
-    };
-  };
-
-  const isIntentGateTemporaryBypassEnabled = (settings, scope) => (
-    intentGate.isTemporaryBypassScopeEnabled(settings?.temporaryBypasses, scope)
-  );
-
-  const clearIntentGateSession = (reason = "") => {
-    if (intentGateSession && reason) {
-      output.appendLine(`[intent-gate] session cleared: ${reason}`);
-    }
-    intentGateSession = null;
-  };
-
-  const isIntentGateSessionExpired = (session, settings) => {
-    if (!session || !session.createdAt) {
-      return true;
-    }
-    const createdMs = new Date(session.createdAt).getTime();
-    if (!Number.isFinite(createdMs)) {
-      return true;
-    }
-    const ttlMs = settings.ttlMinutes * 60 * 1000;
-    return (Date.now() - createdMs) > ttlMs;
-  };
-
-  const ensureIntentGateSession = (settings) => {
-    if (!settings.enabled) {
-      return null;
-    }
-    if (!intentGateSession) {
-      return null;
-    }
-    if (isIntentGateSessionExpired(intentGateSession, settings)) {
-      clearIntentGateSession("session ttl exceeded");
-      return null;
-    }
-    return intentGateSession;
-  };
-
   const handleRuntimeSettingSourcesChanged = async ({
-    reason = "settings changed",
     refreshTree = false,
   } = {}) => {
-    const settings = readIntentGateSettings();
-    if (!settings.enabled) {
-      clearIntentGateSession(`intent gate disabled by ${reason}`);
-    } else {
-      ensureIntentGateSession(settings);
-    }
     refreshSidebarHome();
     if (refreshTree && treePanel) {
       await openTreeView(treePanelKind, { reveal: false });
@@ -870,136 +779,6 @@ function activate(context) {
       );
     }
     return parseFn(execResult.stdout, execResult.stderr, execResult.code);
-  };
-
-  const appendIntentGateAnalysisLog = (analysis, settings) => {
-    output.appendLine("[intent-gate] mapping summary");
-    output.appendLine(`- intent: ${analysis.intentText}`);
-    output.appendLine(`- query tokens: ${analysis.queryTokens.join(", ")}`);
-    output.appendLine(`- mappings: ${analysis.mappings.length}`);
-    output.appendLine(`- minimum score: ${settings.minimumScore}`);
-    output.appendLine(
-      `- temporary bypasses: ${settings.temporaryBypasses.length ? settings.temporaryBypasses.join(", ") : "none"}`
-    );
-    output.appendLine(intentGate.formatIntentMappingSummary(analysis));
-    if (analysis.errors.length) {
-      output.appendLine(`- canonical read warnings: ${analysis.errors.join(" | ")}`);
-    }
-  };
-
-  const runIntentGateGrantValidation = async (repoRoot, settings) => {
-    if (isIntentGateTemporaryBypassEnabled(settings, "grant_pre_validation")) {
-      output.appendLine("[intent-gate] temporary bypass active: skip grant pre-validation.");
-      return { passed: true, errors: [] };
-    }
-    if (!settings.runValidationBeforeGrant) {
-      return { passed: true, errors: [] };
-    }
-    const config = getShelfConfig();
-    const changeValidationCommand = String(
-      config.get("changeValidationCommand") || DEFAULT_CHANGE_VALIDATION_COMMAND
-    ).trim();
-    return runParsedCommand(
-      "intent-gate-validate",
-      changeValidationCommand,
-      repoRoot,
-      parseResult
-    );
-  };
-
-  const grantIntentGateSession = async ({ repoRoot, intentText }) => {
-    const settings = readIntentGateSettings();
-    const normalizedIntent = String(intentText || "").trim();
-    if (!settings.enabled) {
-      return { passed: false, message: "设置中已关闭 Shelf 对话意图门禁。" };
-    }
-    if (!normalizedIntent) {
-      return { passed: false, message: "意图描述为空。" };
-    }
-
-    const preValidation = await runIntentGateGrantValidation(repoRoot, settings);
-    if (!preValidation.passed) {
-      const firstMessage = preValidation.errors[0]?.message || "validate_canonical --check-changes 校验失败。";
-      return {
-        passed: false,
-        message: `门禁在映射前拦截：${firstMessage}`,
-      };
-    }
-
-    const analysis = intentGate.analyzeIntentMapping({
-      repoRoot,
-      intentText: normalizedIntent,
-      minimumScore: settings.minimumScore,
-      maxResults: settings.maxMatches,
-      allowNonOneToOneMapping: isIntentGateTemporaryBypassEnabled(settings, "one_to_one_check"),
-    });
-    if (isIntentGateTemporaryBypassEnabled(settings, "one_to_one_check")) {
-      output.appendLine("[intent-gate] temporary bypass active: allow non one-to-one boundary mapping.");
-    }
-    appendIntentGateAnalysisLog(analysis, settings);
-    if (settings.autoOpenOutput) {
-      output.show(true);
-    }
-
-    if (!analysis.passed) {
-      clearIntentGateSession("未找到可用映射");
-      const reason = String(analysis.reason || "").trim();
-      return {
-        passed: false,
-        analysis,
-        message: reason || "没有命中阈值的 framework 映射，请先由人更新 framework。",
-      };
-    }
-
-    const requireMappingEcho = settings.requireMappingEcho
-      && !isIntentGateTemporaryBypassEnabled(settings, "mapping_echo");
-    if (settings.requireMappingEcho && !requireMappingEcho) {
-      output.appendLine("[intent-gate] temporary bypass active: skip mapping echo confirmation.");
-    }
-    if (requireMappingEcho) {
-      const picks = analysis.mappings.slice(0, 6).map((item) => ({
-        label: `${item.moduleId} / ${item.boundaryId}`,
-        description: item.exactPaths.join(", "),
-        detail: `score=${item.score} · ${item.note || "projection from canonical"}`,
-      }));
-      const selected = await vscode.window.showQuickPick(
-        [
-          {
-            label: "Confirm Mapping (Recommended)",
-            description: "Grant this governed task session.",
-            detail: "Use the top canonical-backed mappings and continue implementation with clear scope.",
-            keepOpen: true,
-          },
-          ...picks,
-        ],
-        {
-          title: "Shelf Governed Task Mapping",
-          canPickMany: false,
-          placeHolder: "Confirm mapping, or cancel to continue without a governed session.",
-        }
-      );
-      if (!selected || !selected.keepOpen) {
-        return {
-          passed: false,
-          analysis,
-          message: "映射确认已取消。",
-        };
-      }
-    }
-
-    intentGateSession = {
-      id: `intent-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      repoRoot,
-      intentText: normalizedIntent,
-      analysis,
-      allowedExactPaths: analysis.allowedExactPaths,
-      allowedCommunicationPaths: analysis.allowedCommunicationPaths,
-      matchedModuleIds: analysis.matchedModuleIds,
-      lastTouchedAt: new Date().toISOString(),
-    };
-    refreshSidebarHome();
-    return { passed: true, analysis, message: "受控任务会话已授权。" };
   };
 
   const requestManualValidation = () => {
@@ -1874,6 +1653,13 @@ function activate(context) {
     return action;
   };
 
+  const inferExpectedHeadingFromFwl012Message = (rawMessage) => {
+    const message = String(rawMessage || "");
+    const match = message.match(/这里应为[“"](?<expected>##\s+[^”"]+)[”"]/u);
+    const expected = match?.groups?.expected;
+    return typeof expected === "string" ? expected.trim() : "";
+  };
+
   const buildFrameworkLintQuickFixes = (document, diagnostic) => {
     const code = String(diagnostic?.code || "").trim().toUpperCase();
     if (!code.startsWith("FWL")) {
@@ -2157,6 +1943,23 @@ function activate(context) {
       }
     }
 
+    if (code === "FWL012") {
+      const expectedHeading = inferExpectedHeadingFromFwl012Message(diagnostic?.message);
+      if (expectedHeading) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "替换为期望的标准二级标题",
+            (edit) => {
+              edit.replace(document.uri, currentLine.range, expectedHeading);
+              return true;
+            }
+          )
+        );
+      }
+    }
+
     return quickFixes.filter(Boolean);
   };
 
@@ -2235,24 +2038,6 @@ function activate(context) {
 
   const renderSidebarHome = () => {
     const defaultActionItems = [
-      {
-        action: "startGovernedTask",
-        label: "启动受控任务会话",
-        description: "先做需求到 framework 的显式映射，通过后再改实现层代码。",
-        tone: "primary"
-      },
-      {
-        action: "showGovernedTaskSession",
-        label: "查看当前门禁会话",
-        description: "查看当前会话的 module/boundary/exact 映射结果。",
-        tone: "ghost"
-      },
-      {
-        action: "clearGovernedTaskSession",
-        label: "清空门禁会话",
-        description: "清空当前授权会话；保存阶段不阻断，可随时重新授权。",
-        tone: "ghost"
-      },
       {
         action: "openTree",
         label: "打开框架树",
@@ -2355,12 +2140,6 @@ function activate(context) {
             note: "打开工作区后检查 .githooks 是否已启用。"
           },
           {
-            label: "会话门禁",
-            value: "未知",
-            tone: "unknown",
-            note: "打开工作区后读取 shelf.intentGate* 设置并展示会话状态。"
-          },
-          {
             label: "严格校验",
             value: "等待工作区",
             tone: "unknown",
@@ -2387,8 +2166,6 @@ function activate(context) {
 
     const repoRoot = folder.uri.fsPath;
     const config = getShelfConfig();
-    const intentGateSettings = readIntentGateSettings();
-    const activeIntentSession = ensureIntentGateSession(intentGateSettings);
     const validationTriggerMode = getValidationTriggerMode();
     const standardsExists = hasStandardsTree(repoRoot);
     const validationEnabled = standardsExists && validationActive;
@@ -2397,24 +2174,6 @@ function activate(context) {
     const frameworkTreeReady = fs.existsSync(path.join(repoRoot, "framework"));
     const evidenceTreeReady = !freshnessState.hasBlocking;
     const guardMode = config.get("guardMode") === "strict" ? "strict" : "normal";
-    const hasIntentGateTemporaryBypass = intentGateSettings.temporaryBypasses.length > 0;
-    const intentGateStatus = !intentGateSettings.enabled
-      ? "Disabled"
-      : (hasIntentGateTemporaryBypass ? "Bypass" : (activeIntentSession ? "Granted" : "Required"));
-    const intentGateTone = !intentGateSettings.enabled
-      ? "unknown"
-      : (hasIntentGateTemporaryBypass ? "unknown" : (activeIntentSession ? "ok" : "error"));
-    const intentGateNote = !intentGateSettings.enabled
-      ? "shelf.intentGateEnabled = false"
-      : (
-        hasIntentGateTemporaryBypass
-          ? `temporary bypass: ${intentGateSettings.temporaryBypasses.join(", ")}`
-          : (
-            activeIntentSession
-              ? `${activeIntentSession.analysis.mappings.length} mappings · ${new Date(activeIntentSession.createdAt).toLocaleString()}`
-              : "先执行“Shelf: 启动受控任务会话”，确认映射后再改实现层文件。"
-          )
-      );
     const issueLevels = countIssueLevels(lastRunIssues);
     const issueCount = issueLevels.totalCount;
     const errorIssueCount = issueLevels.errorCount;
@@ -2546,14 +2305,6 @@ function activate(context) {
         action: "installHooks",
         label: "安装 Git Hooks"
       };
-    } else if (intentGateSettings.enabled && !activeIntentSession) {
-      calloutTone = "warning";
-      calloutTitle = "建议先开启受控任务会话";
-      calloutBody = "保存不会被门禁阻断，但建议先完成“需求 -> framework 映射”，再进入实现阶段。";
-      calloutAction = {
-        action: "startGovernedTask",
-        label: "启动受控任务会话"
-      };
     }
 
     const healthItems = [
@@ -2602,12 +2353,6 @@ function activate(context) {
         note: gitHooksReady
           ? gitHooksDetail
           : `需要指向 .githooks。当前状态：${gitHooksDetail}`
-      },
-      {
-        label: "会话门禁",
-        value: intentGateStatus,
-        tone: intentGateTone,
-        note: intentGateNote
       },
       {
         label: "严格校验",
@@ -2734,18 +2479,6 @@ function activate(context) {
 
         if (message.type === "shelf.sidebar.openTree") {
           await openFrameworkTree();
-          return;
-        }
-        if (message.type === "shelf.sidebar.startGovernedTask") {
-          await vscode.commands.executeCommand("shelf.startGovernedTask");
-          return;
-        }
-        if (message.type === "shelf.sidebar.showGovernedTaskSession") {
-          await vscode.commands.executeCommand("shelf.showGovernedTaskSession");
-          return;
-        }
-        if (message.type === "shelf.sidebar.clearGovernedTaskSession") {
-          await vscode.commands.executeCommand("shelf.clearGovernedTaskSession");
           return;
         }
         if (message.type === "shelf.sidebar.refreshTree") {
@@ -3017,79 +2750,6 @@ function activate(context) {
     }
   );
 
-  const startGovernedTaskDisposable = vscode.commands.registerCommand(
-    "shelf.startGovernedTask",
-    async () => {
-      const folder = vscode.workspace.workspaceFolders?.[0];
-      if (!folder) {
-        showShelfWarningMessage("Shelf：当前未打开工作区。");
-        return;
-      }
-
-      const settings = readIntentGateSettings();
-      if (!settings.enabled) {
-        showShelfWarningMessage("Shelf：对话意图门禁已关闭，请先启用 `shelf.intentGateEnabled`。");
-        return;
-      }
-
-      const intentText = await vscode.window.showInputBox({
-        title: "Shelf 受控任务",
-        prompt: "请描述本次需求。Shelf 会先映射到 framework 路径，再允许改代码。",
-        placeHolder: "例如：给知识库聊天页增加 @ 文档引用，并新增动态图展示页",
-        ignoreFocusOut: true,
-      });
-      if (!intentText) {
-        return;
-      }
-
-      const result = await grantIntentGateSession({
-        repoRoot: folder.uri.fsPath,
-        intentText,
-      });
-      if (!result.passed) {
-        showShelfErrorMessage(`Shelf 对话意图门禁拒绝授权：${result.message}`);
-        return;
-      }
-
-      const preview = result.analysis.mappings.slice(0, 2)
-        .map((item) => `${item.moduleId}/${item.boundaryId}`)
-        .join(" | ");
-      showShelfInformationMessage(
-        `Shelf 受控任务已授权（${result.analysis.mappings.length} 条映射）：${preview}`
-      );
-    }
-  );
-
-  const showGovernedTaskSessionDisposable = vscode.commands.registerCommand(
-    "shelf.showGovernedTaskSession",
-    async () => {
-      const settings = readIntentGateSettings();
-      const session = ensureIntentGateSession(settings);
-      if (!session) {
-        showShelfInformationMessage("Shelf：当前没有已授权的受控任务会话。");
-        return;
-      }
-      output.appendLine("[intent-gate] active session");
-      output.appendLine(`- id: ${session.id}`);
-      output.appendLine(`- createdAt: ${session.createdAt}`);
-      output.appendLine(`- intent: ${session.intentText}`);
-      output.appendLine(
-        `- temporary bypasses: ${settings.temporaryBypasses.length ? settings.temporaryBypasses.join(", ") : "none"}`
-      );
-      output.appendLine(intentGate.formatIntentMappingSummary(session.analysis));
-      output.show(true);
-    }
-  );
-
-  const clearGovernedTaskSessionDisposable = vscode.commands.registerCommand(
-    "shelf.clearGovernedTaskSession",
-    async () => {
-      clearIntentGateSession("manual clear");
-      refreshSidebarHome();
-      showShelfInformationMessage("Shelf：受控任务会话已清空。");
-    }
-  );
-
   const validateNowDisposable = vscode.commands.registerCommand("shelf.validateNow", async () => {
     requestManualValidation();
   });
@@ -3344,15 +3004,13 @@ function activate(context) {
   });
 
   const configurationDisposable = vscode.workspace.onDidChangeConfiguration(async (event) => {
-    const affectsIntentGate = INTENT_GATE_SETTING_KEYS.some((key) => event.affectsConfiguration(key));
     const affectsTreeView = TREE_WEBVIEW_SETTING_KEYS.some((key) => event.affectsConfiguration(key));
     const affectsFrameworkLint = FRAMEWORK_LINT_SETTING_KEYS.some((key) => event.affectsConfiguration(key));
-    if (!affectsIntentGate && !affectsTreeView && !affectsFrameworkLint) {
+    if (!affectsTreeView && !affectsFrameworkLint) {
       return;
     }
-    if (affectsIntentGate || affectsTreeView) {
+    if (affectsTreeView) {
       await handleRuntimeSettingSourcesChanged({
-        reason: "VSCode shelf settings update",
         refreshTree: affectsTreeView
       });
     }
@@ -3526,9 +3184,6 @@ function activate(context) {
     frameworkCompletionDisposable,
     frameworkLintQuickFixDisposable,
     insertFrameworkTemplateDisposable,
-    startGovernedTaskDisposable,
-    showGovernedTaskSessionDisposable,
-    clearGovernedTaskSessionDisposable,
     validateNowDisposable,
     codegenPreflightDisposable,
     publishFrameworkDraftDisposable,

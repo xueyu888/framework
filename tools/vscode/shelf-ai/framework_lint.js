@@ -3,13 +3,13 @@ const path = require("path");
 const TITLE_PATTERN = /^#\s+(?<cn>[^:]+):(?<en>.+)$/;
 const CAPABILITY_LINE_PATTERN = /^-\s+`(?<id>C\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
 const NON_RESPONSIBILITY_LINE_PATTERN = /^-\s+`(?<id>N\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
-const BOUNDARY_LINE_PATTERN = /^-\s+`(?<id>[A-Z0-9_]+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
+const BOUNDARY_LINE_PATTERN = /^-\s+`(?<id>[A-Za-z0-9_]+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
 const BASE_LINE_PATTERN = /^-\s+`(?<id>B\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
 const VERIFY_LINE_PATTERN = /^-\s+`(?<id>V\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
 const RULE_TOP_PATTERN = /^-\s+`(?<id>R\d+)`\s+(?<name>.+)$/;
 const RULE_CHILD_PATTERN = /^\s*-\s+`(?<id>R\d+\.\d+)`\s+(?<body>.+)$/;
 
-const SECTION_GOAL_TITLE = "## 0. 目标";
+const SECTION_GOAL_TITLE = "## 0. 目标 (Goal)";
 const SECTION_CAPABILITY_TITLES = ["## 1. 能力声明（Capability Statement）"];
 const SECTION_PARAMETER_TITLES = [
   "## 2. 边界定义（Boundary / Parameter 参数）",
@@ -387,7 +387,7 @@ function extractBoundaryTokens(expression) {
   const sources = segments.length ? segments : [expr];
   const tokens = [];
   for (const source of sources) {
-    for (const match of source.matchAll(/\b[A-Z][A-Z0-9_]*\b/g)) {
+    for (const match of source.matchAll(/\b[A-Za-z][A-Za-z0-9_]*\b/g)) {
       if (!match || !match[0]) {
         continue;
       }
@@ -408,19 +408,19 @@ function isBoundaryLikeToken(token) {
   if (!value) {
     return false;
   }
-  if (/^P\d+$/.test(value)) {
+  if (/^P\d+$/i.test(value)) {
     return true;
   }
-  if (!/^[A-Z][A-Z0-9_]+$/.test(value)) {
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(value)) {
     return false;
   }
-  if (/^(?:L|M)\d+$/.test(value)) {
+  if (/^(?:L|M)\d+$/i.test(value)) {
     return false;
   }
-  if (/^R\d+(?:\.\d+)?$/.test(value)) {
+  if (/^R\d+(?:\.\d+)?$/i.test(value)) {
     return false;
   }
-  if (/^[CBV]\d+$/.test(value)) {
+  if (/^[CBV]\d+$/i.test(value)) {
     return false;
   }
   return true;
