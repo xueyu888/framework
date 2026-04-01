@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-import importlib
 import inspect
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 
@@ -22,16 +21,18 @@ from project_runtime.correspondence_contracts import (
 from project_runtime.documents import export_documents
 from project_runtime.framework_layer import FrameworkModuleClass
 from project_runtime.models import KnowledgeDocument, SeedDocumentSource
-from project_runtime.static_modules.backend_l2_m0 import (
+from project_runtime.static_modules import get_static_module_contract_bundle
+from project_runtime.static_modules import registry as static_module_registry
+from project_runtime.static_modules.modules.backend.l2_m0 import (
     BACKEND_L2_M0_MODULE_ID,
+    BackendL2M0B1Base,
+    BackendL2M0B2Base,
+    BackendL2M0B3Base,
     BackendL2M0DynamicBoundaryParams,
     BackendL2M0Module,
     BackendL2M0StaticBoundaryParams,
 )
-from project_runtime.static_modules import all_module_contracts as static_module_contracts
-
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from project_runtime.utils import relative_path
 
 
 class CodeModuleClass:
@@ -91,56 +92,32 @@ def _class_symbol(class_type: type[Any]) -> str:
     return f"{class_type.__module__}:{class_type.__name__}"
 
 
-def _class_source_ref(class_type: type[Any], *, token: str, fallback: dict[str, Any]) -> dict[str, Any]:
+def _source_ref_for_object(
+    obj: Any,
+    *,
+    section: str,
+    anchor: str,
+    token: str,
+    fallback_file_path: str,
+    fallback_line: int = 1,
+) -> dict[str, Any]:
+    file_path = fallback_file_path
+    line_no = fallback_line
     try:
-        source_file = inspect.getsourcefile(class_type) or inspect.getfile(class_type)
-        _, line_no = inspect.getsourcelines(class_type)
+        source_file = inspect.getsourcefile(obj)
+        _, source_line = inspect.getsourcelines(obj)
     except (OSError, TypeError):
-        return fallback
-    if not source_file:
-        return fallback
-    resolved_path = Path(source_file).resolve()
-    try:
-        relative_file = resolved_path.relative_to(REPO_ROOT).as_posix()
-    except ValueError:
-        relative_file = resolved_path.as_posix()
+        source_file = None
+    if source_file:
+        file_path = relative_path(Path(source_file).resolve())
+        line_no = int(source_line)
     return {
-        "file_path": relative_file,
+        "file_path": file_path,
         "line": line_no,
-        "section": resolved_path.stem,
-        "anchor": f"class {class_type.__name__}",
+        "section": section,
+        "anchor": anchor,
         "token": token,
     }
-
-
-@lru_cache(maxsize=1)
-def _backend_l2_m0_module_lines() -> tuple[str, ...]:
-    module_file = Path(__file__).resolve().parent / "static_modules" / "backend_l2_m0.py"
-    return tuple(module_file.read_text(encoding="utf-8").splitlines())
-
-
-def _find_backend_l2_m0_line(needle: str, *, fallback: int = 1) -> int:
-    if not needle:
-        return fallback
-    for index, line_text in enumerate(_backend_l2_m0_module_lines(), start=1):
-        if needle in line_text:
-            return index
-    return fallback
-
-
-@lru_cache(maxsize=1)
-def _all_module_contract_lines() -> tuple[str, ...]:
-    module_file = Path(__file__).resolve().parent / "static_modules" / "all_module_contracts.py"
-    return tuple(module_file.read_text(encoding="utf-8").splitlines())
-
-
-def _find_all_module_contract_line(needle: str, *, fallback: int = 1) -> int:
-    if not needle:
-        return fallback
-    for index, line_text in enumerate(_all_module_contract_lines(), start=1):
-        if needle in line_text:
-            return index
-    return fallback
 
 
 class CodeBoundaryStaticClass:
@@ -240,189 +217,6 @@ def _section_summaries(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for item in documents
     ]
-
-
-def _compile_kv_database_runtime_spec(
-    *,
-    boundary_context: dict[str, dict[str, Any]],
-    exact_export: dict[str, Any],
-) -> dict[str, Any]:
-    operation = _require_boundary_context_value(boundary_context, "OPERATION")
-    key = _require_boundary_context_value(boundary_context, "KEY")
-    value = _require_boundary_context_value(boundary_context, "VALUE")
-    is_snapshot_runtime = "SNAPSHOTPATH" in boundary_context
-
-    if not is_snapshot_runtime:
-        wal_path = _require_boundary_context_value(boundary_context, "PATH")
-        wal_log = _require_boundary_context_value(boundary_context, "LOG")
-        wal_directory = Path(str(wal_path["wal_directory"]))
-        wal_filename = str(wal_path["wal_filename"])
-        implementation = {
-            "database_class": "kv_database_runtime.store:MemoryKvDatabase",
-            "config_class": "kv_database_runtime.store:MemoryKvDatabaseConfig",
-            "log_class": "kv_database_runtime.store:WriteAheadLog",
-            "record_class": "kv_database_runtime.store:WalRecord",
-            "summary_factory": "kv_database_runtime.runtime_exports:project_runtime_public_summary",
-        }
-        return {
-            "contract": {
-                "operation": {
-                    "allowed_operations": list(operation["allowed_operations"]),
-                    "write_operations": list(operation["write_operations"]),
-                    "read_operation": str(operation["read_operation"]),
-                    "missing_key_policy": str(operation["missing_key_policy"]),
-                },
-                "key": {
-                    "python_type": str(key["python_type"]),
-                    "empty_key_allowed": bool(key["empty_key_allowed"]),
-                    "normalization": str(key["normalization"]),
-                },
-                "value": {
-                    "python_type": str(value["python_type"]),
-                    "serialization": str(value["serialization"]),
-                    "nullable": bool(value["nullable"]),
-                },
-            },
-            "wal": {
-                "directory": wal_directory.as_posix(),
-                "filename": wal_filename,
-                "path": (wal_directory / wal_filename).as_posix(),
-                "create_parent_on_boot": bool(wal_path["create_parent_on_boot"]),
-                "record_format": str(wal_log["record_format"]),
-                "field_order": list(wal_log["field_order"]),
-                "line_delimiter": str(wal_log["line_delimiter"]),
-                "replay_strategy": str(wal_log["replay_strategy"]),
-            },
-            "runtime": {
-                "config": {
-                    "allowed_operations": list(operation["allowed_operations"]),
-                    "read_operation": str(operation["read_operation"]),
-                    "write_operations": list(operation["write_operations"]),
-                    "missing_key_policy": str(operation["missing_key_policy"]),
-                    "key_python_type": str(key["python_type"]),
-                    "value_python_type": str(value["python_type"]),
-                    "value_serialization": str(value["serialization"]),
-                    "wal_directory": wal_directory.as_posix(),
-                    "wal_filename": wal_filename,
-                    "create_parent_on_boot": bool(wal_path["create_parent_on_boot"]),
-                    "record_format": str(wal_log["record_format"]),
-                    "field_order": list(wal_log["field_order"]),
-                    "line_delimiter": str(wal_log["line_delimiter"]),
-                    "replay_strategy": str(wal_log["replay_strategy"]),
-                },
-                "implementation": implementation,
-                "api": {
-                    "factory": "kv_database_runtime.store:MemoryKvDatabase.from_config",
-                    "methods": ["put", "get", "delete", "recover", "snapshot"],
-                },
-            },
-            "source_overlays": exact_export.get("overlays", {}),
-        }
-
-    count = _require_boundary_context_value(boundary_context, "COUNT")
-    log_path = _require_boundary_context_value(boundary_context, "LOGPATH")
-    log = _require_boundary_context_value(boundary_context, "LOG")
-    snapshot_path = _require_boundary_context_value(boundary_context, "SNAPSHOTPATH")
-    snapshot = _require_boundary_context_value(boundary_context, "SNAPSHOT")
-    record_timing = _require_boundary_context_value(boundary_context, "RECORDTIMING")
-    recover = _require_boundary_context_value(boundary_context, "RECOVER")
-    wal_directory = Path(str(log_path["wal_directory"]))
-    wal_filename = str(log_path["wal_filename"])
-    snapshot_directory = Path(str(snapshot_path["snapshot_directory"]))
-    snapshot_filename = str(snapshot_path["snapshot_filename"])
-    implementation = {
-        "database_class": "kv_database_s2_runtime.store:MemoryKvDatabaseS2",
-        "config_class": "kv_database_s2_runtime.store:MemoryKvDatabaseS2Config",
-        "log_class": "kv_database_s2_runtime.store:WriteAheadLog",
-        "snapshot_store_class": "kv_database_s2_runtime.store:SnapshotStore",
-        "record_class": "kv_database_s2_runtime.store:WalRecord",
-        "summary_factory": "kv_database_s2_runtime.runtime_exports:project_runtime_public_summary",
-    }
-    return {
-        "contract": {
-            "count": {
-                "max_items": int(count["max_items"]),
-                "overflow_policy": str(count["overflow_policy"]),
-            },
-            "operation": {
-                "allowed_operations": list(operation["allowed_operations"]),
-                "write_operations": list(operation["write_operations"]),
-                "read_operation": str(operation["read_operation"]),
-                "missing_key_policy": str(operation["missing_key_policy"]),
-            },
-            "key": {
-                "python_type": str(key["python_type"]),
-                "empty_key_allowed": bool(key["empty_key_allowed"]),
-                "normalization": str(key["normalization"]),
-            },
-            "value": {
-                "python_type": str(value["python_type"]),
-                "serialization": str(value["serialization"]),
-                "nullable": bool(value["nullable"]),
-            },
-            "recover": {
-                "strategy": str(recover["strategy"]),
-            },
-        },
-        "wal": {
-            "directory": wal_directory.as_posix(),
-            "filename": wal_filename,
-            "path": (wal_directory / wal_filename).as_posix(),
-            "create_parent_on_boot": bool(log_path["create_parent_on_boot"]),
-            "record_format": str(log["record_format"]),
-            "field_order": list(log["field_order"]),
-            "line_delimiter": str(log["line_delimiter"]),
-            "replay_strategy": str(log["replay_strategy"]),
-        },
-        "snapshot": {
-            "directory": snapshot_directory.as_posix(),
-            "filename": snapshot_filename,
-            "path": (snapshot_directory / snapshot_filename).as_posix(),
-            "create_parent_on_boot": bool(snapshot_path["create_parent_on_boot"]),
-            "record_format": str(snapshot["record_format"]),
-            "line_delimiter": str(snapshot["line_delimiter"]),
-            "compact_wal_on_checkpoint": bool(snapshot["compact_wal_on_checkpoint"]),
-        },
-        "checkpoint": {
-            "trigger": str(record_timing["trigger"]),
-            "every_write_operations": int(record_timing["every_write_operations"]),
-        },
-        "runtime": {
-            "config": {
-                "max_items": int(count["max_items"]),
-                "overflow_policy": str(count["overflow_policy"]),
-                "allowed_operations": list(operation["allowed_operations"]),
-                "read_operation": str(operation["read_operation"]),
-                "write_operations": list(operation["write_operations"]),
-                "missing_key_policy": str(operation["missing_key_policy"]),
-                "key_python_type": str(key["python_type"]),
-                "value_python_type": str(value["python_type"]),
-                "value_serialization": str(value["serialization"]),
-                "wal_directory": wal_directory.as_posix(),
-                "wal_filename": wal_filename,
-                "create_parent_on_boot": bool(log_path["create_parent_on_boot"]),
-                "record_format": str(log["record_format"]),
-                "field_order": list(log["field_order"]),
-                "line_delimiter": str(log["line_delimiter"]),
-                "replay_strategy": str(log["replay_strategy"]),
-                "snapshot_directory": snapshot_directory.as_posix(),
-                "snapshot_filename": snapshot_filename,
-                "snapshot_create_parent_on_boot": bool(snapshot_path["create_parent_on_boot"]),
-                "snapshot_record_format": str(snapshot["record_format"]),
-                "snapshot_line_delimiter": str(snapshot["line_delimiter"]),
-                "compact_wal_on_checkpoint": bool(snapshot["compact_wal_on_checkpoint"]),
-                "checkpoint_trigger": str(record_timing["trigger"]),
-                "checkpoint_every_write_operations": int(record_timing["every_write_operations"]),
-                "recovery_strategy": str(recover["strategy"]),
-            },
-            "implementation": implementation,
-            "api": {
-                "factory": "kv_database_s2_runtime.store:MemoryKvDatabaseS2.from_config",
-                "methods": ["put", "get", "delete", "recover", "snapshot", "checkpoint"],
-            },
-        },
-        "source_overlays": exact_export.get("overlays", {}),
-    }
 
 
 def _compile_frontend_app_spec(
@@ -832,7 +626,7 @@ def _build_module_contract_state(binding: ConfigModuleBinding) -> ModuleContract
     module_id = binding.framework_module.module_id
     module_key = module_key_from_id(module_id)
     field_bindings = tuple(_module_field_bindings(binding))
-    bundle = static_module_contracts.get_static_module_contract_bundle(module_id)
+    bundle = get_static_module_contract_bundle(module_id)
     if bundle is None:
         raise ValueError(f"missing static module contract bundle: {module_id}")
     static_params_type = bundle.static_params_type
@@ -891,19 +685,16 @@ def _build_module_contract_state(binding: ConfigModuleBinding) -> ModuleContract
 def _module_compile_symbol(
     module_id: str,
     *,
-    kv_database_module_id: str,
     frontend_module_id: str,
     knowledge_base_module_id: str,
     backend_module_id: str,
 ) -> str:
-    if module_id == kv_database_module_id:
-        return "project_runtime.code_layer:_compile_kv_database_runtime_spec"
     if module_id == frontend_module_id:
         return "project_runtime.code_layer:_compile_frontend_app_spec"
     if module_id == knowledge_base_module_id:
         return "project_runtime.code_layer:_compile_knowledge_base_domain_spec"
     if module_id == BACKEND_L2_M0_MODULE_ID:
-        return "project_runtime.static_modules.backend_l2_m0:BackendL2M0Module.export_service_spec"
+        return "project_runtime.static_modules.modules.backend.l2_m0:BackendL2M0Module.export_service_spec"
     if module_id == backend_module_id:
         return "project_runtime.code_layer:_compile_backend_service_spec"
     return "project_runtime.code_layer:build_code_modules"
@@ -912,46 +703,10 @@ def _module_compile_symbol(
 def _module_runtime_slot_map(
     module_id: str,
     *,
-    kv_database_module_id: str,
     frontend_module_id: str,
     knowledge_base_module_id: str,
     backend_module_id: str,
 ) -> dict[str, tuple[str, ...]]:
-    if module_id == kv_database_module_id:
-        return {
-            "COUNT": ("kv_database_runtime_spec.contract.count",),
-            "OPERATION": (
-                "kv_database_runtime_spec.contract.operation",
-                "kv_database_runtime_spec.runtime.api",
-            ),
-            "KEY": ("kv_database_runtime_spec.contract.key",),
-            "VALUE": (
-                "kv_database_runtime_spec.contract.value",
-                "kv_database_runtime_spec.runtime.config.value_serialization",
-            ),
-            "PATH": (
-                "kv_database_runtime_spec.wal.directory",
-                "kv_database_runtime_spec.wal.path",
-            ),
-            "LOGPATH": (
-                "kv_database_runtime_spec.wal.directory",
-                "kv_database_runtime_spec.wal.path",
-            ),
-            "LOG": (
-                "kv_database_runtime_spec.wal.record_format",
-                "kv_database_runtime_spec.wal.replay_strategy",
-            ),
-            "SNAPSHOTPATH": (
-                "kv_database_runtime_spec.snapshot.directory",
-                "kv_database_runtime_spec.snapshot.path",
-            ),
-            "SNAPSHOT": (
-                "kv_database_runtime_spec.snapshot.record_format",
-                "kv_database_runtime_spec.snapshot.compact_wal_on_checkpoint",
-            ),
-            "RECORDTIMING": ("kv_database_runtime_spec.checkpoint",),
-            "RECOVER": ("kv_database_runtime_spec.contract.recover",),
-        }
     if module_id == frontend_module_id:
         return {
             "SURFACE": (
@@ -1022,36 +777,32 @@ def _boundary_slot_source_ref(
     module_id: str,
     boundary_id: str,
     *,
-    kv_database_module_id: str,
     frontend_module_id: str,
     knowledge_base_module_id: str,
     backend_module_id: str,
 ) -> dict[str, Any]:
     if module_id == BACKEND_L2_M0_MODULE_ID:
-        needle_by_boundary = {
-            "LIBRARY": "def knowledge_base_payload(",
-            "PREVIEW": "def preview_retrieval_payload(",
-            "CHAT": "def answer_policy_payload(",
-            "RESULT": "def transport_payload(",
-            "AUTH": "def write_policy_payload(",
-            "TRACE": "def trace_retrieval_payload(",
+        source_by_boundary: dict[str, object] = {
+            "LIBRARY": BackendL2M0B1Base.knowledge_base_payload,
+            "PREVIEW": BackendL2M0B1Base.preview_retrieval_payload,
+            "CHAT": BackendL2M0B2Base.answer_policy_payload,
+            "RESULT": BackendL2M0B3Base.transport_payload,
+            "AUTH": BackendL2M0B3Base.write_policy_payload,
+            "TRACE": BackendL2M0B3Base.trace_retrieval_payload,
         }
-        fallback = _find_backend_l2_m0_line("class BackendL2M0Module(", fallback=1)
-        line = _find_backend_l2_m0_line(needle_by_boundary.get(boundary_id, ""), fallback=fallback)
-        return {
-            "file_path": "src/project_runtime/static_modules/backend_l2_m0.py",
-            "line": line,
-            "section": "backend_l2_m0_module",
-            "anchor": f"{module_id}:{boundary_id}",
-            "token": boundary_id,
-        }
+        source_obj = source_by_boundary.get(boundary_id, BackendL2M0Module)
+        return _source_ref_for_object(
+            source_obj,
+            section="backend_l2_m0_module",
+            anchor=f"{module_id}:{boundary_id}",
+            token=boundary_id,
+            fallback_file_path="src/project_runtime/code_layer.py",
+            fallback_line=1,
+        )
     fallback_line = _find_code_line("def _build_implementation_slots(", fallback=1)
     needle = ""
     section = "implementation_slots"
-    if module_id == kv_database_module_id:
-        needle = f'_require_boundary_context_value(boundary_context, "{boundary_id}")'
-        section = "compile_kv_database_runtime_spec"
-    elif module_id == frontend_module_id:
+    if module_id == frontend_module_id:
         needle = f'_require_boundary_context_value(boundary_context, "{boundary_id}")'
         section = "compile_frontend_app_spec"
     elif module_id == knowledge_base_module_id:
@@ -1076,24 +827,24 @@ def _runtime_slot_source_ref(
     anchor_path: str,
 ) -> dict[str, Any]:
     if module_id == BACKEND_L2_M0_MODULE_ID:
-        needle_by_anchor = {
-            "backend_service_spec.knowledge_base": "def knowledge_base_payload(",
-            "backend_service_spec.retrieval": "def export_service_spec(",
-            "backend_service_spec.answer_policy": "def answer_policy_payload(",
-            "backend_service_spec.return_policy": "def return_policy_payload(",
-            "backend_service_spec.transport": "def transport_payload(",
-            "backend_service_spec.interaction_copy": "def interaction_copy_payload(",
-            "backend_service_spec.write_policy": "def write_policy_payload(",
+        source_by_anchor: dict[str, object] = {
+            "backend_service_spec.knowledge_base": BackendL2M0B1Base.knowledge_base_payload,
+            "backend_service_spec.retrieval": BackendL2M0Module.export_service_spec,
+            "backend_service_spec.answer_policy": BackendL2M0B2Base.answer_policy_payload,
+            "backend_service_spec.return_policy": BackendL2M0B2Base.return_policy_payload,
+            "backend_service_spec.transport": BackendL2M0B3Base.transport_payload,
+            "backend_service_spec.interaction_copy": BackendL2M0B3Base.interaction_copy_payload,
+            "backend_service_spec.write_policy": BackendL2M0B3Base.write_policy_payload,
         }
-        fallback = _find_backend_l2_m0_line("def export_service_spec(", fallback=1)
-        line = _find_backend_l2_m0_line(needle_by_anchor.get(anchor_path, ""), fallback=fallback)
-        return {
-            "file_path": "src/project_runtime/static_modules/backend_l2_m0.py",
-            "line": line,
-            "section": "backend_l2_m0_module",
-            "anchor": f"{module_id}:{boundary_id}:{anchor_path}",
-            "token": boundary_id,
-        }
+        source_obj = source_by_anchor.get(anchor_path, BackendL2M0Module.export_service_spec)
+        return _source_ref_for_object(
+            source_obj,
+            section="backend_l2_m0_module",
+            anchor=f"{module_id}:{boundary_id}:{anchor_path}",
+            token=boundary_id,
+            fallback_file_path="src/project_runtime/code_layer.py",
+            fallback_line=1,
+        )
     fallback_line = _find_code_line("def _module_runtime_slot_map(", fallback=1)
     line = _find_code_line(f'"{anchor_path}"', fallback=fallback_line)
     return {
@@ -1108,7 +859,6 @@ def _runtime_slot_source_ref(
 def _build_implementation_slots(
     binding: ConfigModuleBinding,
     *,
-    kv_database_module_id: str,
     frontend_module_id: str,
     knowledge_base_module_id: str,
     backend_module_id: str,
@@ -1124,14 +874,12 @@ def _build_implementation_slots(
     slots: list[dict[str, Any]] = []
     runtime_slot_map = _module_runtime_slot_map(
         binding.framework_module.module_id,
-        kv_database_module_id=kv_database_module_id,
         frontend_module_id=frontend_module_id,
         knowledge_base_module_id=knowledge_base_module_id,
         backend_module_id=backend_module_id,
     )
     compile_symbol = _module_compile_symbol(
         binding.framework_module.module_id,
-        kv_database_module_id=kv_database_module_id,
         frontend_module_id=frontend_module_id,
         knowledge_base_module_id=knowledge_base_module_id,
         backend_module_id=backend_module_id,
@@ -1180,7 +928,6 @@ def _build_implementation_slots(
                 "source_ref": _boundary_slot_source_ref(
                     binding.framework_module.module_id,
                     boundary.boundary_id,
-                    kv_database_module_id=kv_database_module_id,
                     frontend_module_id=frontend_module_id,
                     knowledge_base_module_id=knowledge_base_module_id,
                     backend_module_id=backend_module_id,
@@ -1288,7 +1035,6 @@ def _base_binding_records(
     *,
     class_name: str,
     implementation_slots: list[dict[str, Any]],
-    kv_database_module_id: str,
     frontend_module_id: str,
     knowledge_base_module_id: str,
     backend_module_id: str,
@@ -1297,7 +1043,6 @@ def _base_binding_records(
     owner_id = f"code_owner::{binding.framework_module.module_id}"
     owner_source_symbol = _module_compile_symbol(
         binding.framework_module.module_id,
-        kv_database_module_id=kv_database_module_id,
         frontend_module_id=frontend_module_id,
         knowledge_base_module_id=knowledge_base_module_id,
         backend_module_id=backend_module_id,
@@ -1547,13 +1292,36 @@ def _append_module_code_exports(
         existing[key] = value
 
 
+def _module_custom_exports(
+    *,
+    state: ModuleContractState,
+    exact_export: dict[str, Any],
+) -> dict[str, Any]:
+    module_ctor = cast(Any, state.module_type)
+    module_instance = module_ctor(state.static_params, state.runtime_params)
+    exporter = getattr(module_instance, "export_module_spec", None)
+    if not callable(exporter):
+        return {}
+    signature = inspect.signature(exporter)
+    if "exact_export" in signature.parameters:
+        payload = exporter(exact_export=exact_export)
+    else:
+        payload = exporter()
+    if not isinstance(payload, dict):
+        raise ValueError(
+            "export_module_spec must return a dict payload: "
+            f"module_id={state.module_id} got={type(payload).__name__}"
+        )
+    return payload
+
+
 def build_code_modules(
     config_modules: tuple[ConfigModuleBinding, ...],
     *,
     root_module_ids: dict[str, str],
     root_role_dependencies: dict[str, Any] | None = None,
 ) -> tuple[tuple[CodeModuleBinding, ...], dict[str, Any]]:
-    importlib.reload(static_module_contracts)
+    static_module_registry.reload_static_module_contracts()
     bindings: list[CodeModuleBinding] = []
     runtime_exports: dict[str, Any] = {}
     contract_state_by_module = {
@@ -1595,7 +1363,6 @@ def build_code_modules(
         root_module_ids=root_module_ids,
         overlay_key="frontend",
     )
-    kv_database_root_id = str(root_module_ids.get("kv_database") or "").strip()
     knowledge_root_id = _resolve_root_module_id_by_overlay(
         binding_by_module_id=binding_by_module_id,
         root_module_ids=root_module_ids,
@@ -1606,7 +1373,6 @@ def build_code_modules(
         root_module_ids=root_module_ids,
         overlay_key="backend",
     )
-    kv_database_root = binding_by_module_id.get(kv_database_root_id)
     frontend_root = binding_by_module_id.get(frontend_root_id)
     knowledge_root = binding_by_module_id.get(knowledge_root_id)
     backend_root = binding_by_module_id.get(backend_root_id)
@@ -1674,22 +1440,7 @@ def build_code_modules(
         runtime_exports["runtime_documents"] = runtime_documents
     if backend_service_spec is not None:
         runtime_exports["backend_service_spec"] = backend_service_spec
-    if kv_database_root is not None and len(binding_by_module_id) == 1:
-        kv_database_state = contract_state_by_module[kv_database_root.framework_module.module_id]
-        runtime_exports["kv_database_runtime_spec"] = _compile_kv_database_runtime_spec(
-            boundary_context=kv_database_state.boundary_context,
-            exact_export=kv_database_root.config_module.exact_export,
-        )
     module_code_exports_by_id: dict[str, dict[str, Any]] = {}
-    _append_module_code_exports(
-        module_code_exports_by_id,
-        module_id=kv_database_root_id,
-        payload=(
-            {"kv_database_runtime_spec": runtime_exports["kv_database_runtime_spec"]}
-            if "kv_database_runtime_spec" in runtime_exports
-            else {}
-        ),
-    )
     _append_module_code_exports(
         module_code_exports_by_id,
         module_id=frontend_root_id,
@@ -1717,12 +1468,17 @@ def build_code_modules(
         state = contract_state_by_module[module_id]
         module_key = state.module_key
         exact_export = binding.config_module.exact_export
+        module_custom_exports = _module_custom_exports(state=state, exact_export=exact_export)
+        _append_module_code_exports(
+            module_code_exports_by_id,
+            module_id=module_id,
+            payload=module_custom_exports,
+        )
         code_exports = dict(module_code_exports_by_id.get(module_id, {}))
         module_name_fragment = state.module_name_fragment
         class_name = f"{module_name_fragment}CodeModule"
         implementation_slots = _build_implementation_slots(
             binding,
-            kv_database_module_id=kv_database_root_id,
             frontend_module_id=frontend_root_id,
             knowledge_base_module_id=knowledge_root_id,
             backend_module_id=backend_root_id,
@@ -1744,7 +1500,6 @@ def build_code_modules(
             binding,
             class_name=class_name,
             implementation_slots=implementation_slots,
-            kv_database_module_id=kv_database_root_id,
             frontend_module_id=frontend_root_id,
             knowledge_base_module_id=knowledge_root_id,
             backend_module_id=backend_root_id,
@@ -1831,18 +1586,14 @@ def build_code_modules(
             }
             for rule_type in rule_types
         ]
-        source_ref: dict[str, Any] = {
-            "file_path": "src/project_runtime/code_layer.py",
-            "section": "code_module",
-            "anchor": module_id,
-            "token": module_id,
-        }
-        if module_type.__module__.startswith("project_runtime.static_modules."):
-            source_ref = _class_source_ref(
-                module_type,
-                token=module_id,
-                fallback=source_ref,
-            )
+        source_ref = _source_ref_for_object(
+            module_type,
+            section="static_module_class",
+            anchor=f"class {module_type.__name__}",
+            token=module_id,
+            fallback_file_path="src/project_runtime/code_layer.py",
+            fallback_line=_find_code_line("def build_code_modules(", fallback=1),
+        )
         code_module = type(
             class_name,
             (CodeModuleClass,),
