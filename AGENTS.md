@@ -35,10 +35,12 @@
 
 ## 对话触发守卫（强制）
 - AGENTS 只认最终生效的 `shelf.*` 值作为门禁配置语义入口，不再维护独立目录常量；不再在 AGENTS 里区分配置最终写在哪个文件里。
-- 默认受检目录为：`framework/`、`framework_drafts/`、`projects/`、`src/project_runtime/`、`scripts/`。
+- 默认受检目录为：`framework/`
 - 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中上述受检范围，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
 - bootstrap 例外：若 `--check-changes` 失败原因为“当前仓库不存在任何 `projects/*/project.toml`”，可进入 bootstrap 模式继续生成首个 `project.toml` 与对应代码/产物；生成后必须立刻恢复常规门禁并重新执行 `--check-changes`。
-- 若上述命令失败，或输出包含 `FRAMEWORK_VIOLATION`，AI 必须拒绝继续修改命中门禁范围的文件，并明确提示“先由人修改 framework，再继续实现层变更”。
+- 若上述命令失败且输出包含 `FRAMEWORK_VIOLATION`，或“需求 -> framework 映射”无法成立，AI 必须拒绝继续修改命中门禁范围的文件，并明确提示“先由人修改 framework，再继续实现层变更”。
+- 若上述命令失败但原因属于实现层漂移（示例：`static module boundary map mismatch`、`CORRESPONDENCE_VIOLATION`、`codegen_consistency`），且该需求可在当前 framework 中完成显式映射，AI 应继续修改实现层文件（`projects/**`、`src/project_runtime/**`、`scripts/**`）以修复漂移；`framework/**` 仍保持只读。
+- `projects/<project_id>/project.toml` 是实现层配置入口；在映射成立前提下，AI 可以修改该文件以把 config/code 对齐到已存在的 framework 约束，无需额外等待人工先改 framework。
 - AI 完成命中门禁范围的修改后，提交前必须再次执行：`uv run python scripts/validate_canonical.py --check-changes`，并确保未引入新的 framework 语义越权。
 - 该守卫属于“对话级自动触发”，不得要求用户手工复制临时 `project.toml` 才触发。
 
@@ -48,7 +50,7 @@
 - 若 AI 不能给出上述映射，或映射结果无法在当前 framework 中找到对应约束，AI 必须拒绝修改命中门禁范围的实现文件，并提示“该需求尚未进入 framework，请先由人修改 framework”。
 - 在“映射失败”场景中，AI 不得通过“直接改 config 或 code”规避框架前置；不得创建平行真相路径。
 - `framework/**` 是人类作者源；AI 对 framework 绝对只读。不得因为“用户点名某个 framework 文件”“只是试写一版”“先改再恢复”或“先给人看效果”而直接落盘 framework 文件。
-- AI 需要给出候选稿时，必须按语义选择落点：正式 framework 作者稿候选写到 `framework_drafts/**`；集合论 / TLA / schema / 验证 / 讨论等外部形式化稿写到 `docs/formal-framework/**`。
+- AI 需要给出候选稿时，必须按语义选择落点：正式 framework 作者稿候选写到 `framework_drafts/**`
 - AI 不得直接执行 `framework_drafts/** -> framework/**` 的发布动作；正式 framework 作者源落盘必须由人类确认并单独触发。
 
 ## 工程执行规范（强制）
