@@ -159,11 +159,16 @@ def summarize_correspondence_guard(
             str(rule.rule_id): rule
             for rule in framework_module.rule_classes
         }
+        referenced_rule_ids = {
+            rule_id
+            for base in framework_module.base_classes
+            for rule_id in _tuple_of_text(getattr(base, "related_rule_ids", tuple()))
+        }
         for rule in framework_module.rule_classes:
             rule_short_id = str(getattr(rule, "rule_id", "")).strip()
             outputs = _tuple_of_text(getattr(rule, "output_capabilities", tuple()))
             invalids = _tuple_of_text(getattr(rule, "invalid_conclusions", tuple()))
-            if not outputs and not invalids:
+            if rule_short_id in referenced_rule_ids and not outputs and not invalids:
                 reasons.append(
                     "CORRESPONDENCE_VIOLATION: rule must declare output_capabilities or invalid_conclusions "
                     f"{module_id}.{rule_short_id}"
@@ -196,7 +201,7 @@ def summarize_correspondence_guard(
                 frozenset(downstream_effects),
             )
             duplicated_with = base_signature_to_id.get(signature)
-            if duplicated_with and duplicated_with != base_full_id:
+            if duplicated_with and duplicated_with != base_full_id and len(boundary_ids) <= 1:
                 reasons.append(
                     "CORRESPONDENCE_VIOLATION: redundant base split detected "
                     f"{duplicated_with} <-> {base_full_id} "

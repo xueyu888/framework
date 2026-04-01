@@ -1,0 +1,47 @@
+{
+  "name": "shelf-md-live",
+  "displayName": "Shelf Markdown Live",
+  "description": "Live rendered Markdown editor prototype for framework-style documents.",
+  "version": "0.0.1",
+  "publisher": "rdshr",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCustomEditor:shelfMdLive.editor",
+    "onCommand:shelfMdLive.reopenActiveAsLiveEditor"
+  ],
+  "main": "./extension.js",
+  "scripts": {
+    "check": "node --check extension.js && node --check webview/editor.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "shelfMdLive.reopenActiveAsLiveEditor",
+        "title": "Shelf Markdown Live: Reopen Active File"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "shelfMdLive.editor",
+        "displayName": "Shelf Markdown Live",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "dependencies": {
+    "katex": "^0.16.22",
+    "markdown-it": "^14.1.0"
+  }
+}
