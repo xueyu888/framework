@@ -4,11 +4,11 @@ const vscode = require("vscode");
 const frameworkNavigation = require("./framework_navigation");
 const configNavigation = require("./config_navigation");
 const frameworkCompletion = require("./framework_completion");
+const frameworkLint = require("./framework_lint");
 const evidenceTree = require("./evidence_tree");
 const correspondenceRuntime = require("./correspondence_runtime");
 const workspaceGuard = require("./guarding");
 const validationRuntime = require("./validation_runtime");
-const intentGate = require("./intent_gate");
 const treeRuntimeModels = require("./tree_runtime_models");
 const treeWebviewBridge = require("./tree_webview_bridge");
 const localSettings = require("./local_settings");
@@ -19,30 +19,33 @@ const DEFAULT_MATERIALIZE_COMMAND = "uv run python scripts/materialize_project.p
 const DEFAULT_PUBLISH_FRAMEWORK_DRAFT_COMMAND = "uv run python scripts/publish_framework_draft.py";
 const DEFAULT_TYPE_CHECK_COMMAND = "uv run mypy";
 const DEFAULT_INSTALL_GIT_HOOKS_COMMAND = "bash scripts/install_git_hooks.sh";
-const DEFAULT_CHANGE_VALIDATION_COMMAND = "uv run python scripts/validate_canonical.py --check-changes";
-const DEFAULT_INTENT_GATE_TTL_MINUTES = 120;
-const DEFAULT_INTENT_GATE_MINIMUM_SCORE = 4;
-const DEFAULT_INTENT_GATE_MAX_MATCHES = 8;
-const INTENT_GATE_GUARD_ALL_TOKEN = "*";
-const DEFAULT_INTENT_GATE_GUARDED_PREFIXES = [
-  "framework/",
-  "framework_drafts/",
-  "projects/",
-  "src/project_runtime/",
-  "scripts/",
-];
-const DEFAULT_INTENT_GATE_IGNORED_PREFIXES = [
-  ".git/",
-  ".github/",
-  ".venv/",
-  "node_modules/",
-  "dist/",
-  "build/",
-  "out/",
-  ".pytest_cache/",
-  ".mypy_cache/",
-  "__pycache__/",
-];
+const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze([
+  "@",
+  "#",
+  "-",
+  "`",
+  ".",
+  "C",
+  "P",
+  "B",
+  "R",
+  "V",
+  "N",
+  "c",
+  "p",
+  "b",
+  "r",
+  "v",
+  "n",
+]);
+const FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS = new Set(FRAMEWORK_COMPLETION_TRIGGER_CHARS);
+const FRAMEWORK_REQUIRED_SECTION_HEADINGS = Object.freeze([
+  "## 1. 能力声明（Capability Statement）",
+  "## 2. 边界定义（Boundary / Parameter 参数）",
+  "## 3. 最小结构基（Minimal Structural Bases）",
+  "## 4. 基组合原则（Base Combination Principles）",
+  "## 5. 验证（Verification）",
+]);
 const FRAMEWORK_RULE_HINTS = {
   FW002: "@framework 必须无参数",
   FW003: "标题必须为 中文名:EnglishName",
@@ -63,7 +66,19 @@ const FRAMEWORK_RULE_HINTS = {
   FW040: "R*/R*.* 编号必须合法并可追溯",
   FW041: "每个 R* 必须包含参与基/组合方式/输出能力/参数绑定",
   FW050: "R*.输出能力必须引用已定义 C*",
-  FW060: "新符号必须通过输出结构声明后才可在规则中使用"
+  FW060: "新符号必须通过输出结构声明后才可在规则中使用",
+  FWL001: "标题必须为 中文名:EnglishName",
+  FWL002: "@framework 必须为无参数单行",
+  FWL003: "必须包含 1~5 标准章节",
+  FWL004: "列表项必须使用 -",
+  FWL005: "能力章节条目格式必须合法（C*/N*）",
+  FWL006: "边界定义条目格式必须合法",
+  FWL007: "最小结构基条目格式必须合法",
+  FWL008: "规则条目格式必须合法",
+  FWL009: "验证条目格式必须合法",
+  FWL010: "章节内必须至少存在一个可解析条目",
+  FWL011: "规则引用的符号必须先在本模块中定义",
+  FWL012: "标准二级标题内容与顺序必须合法"
 };
 
 function resetStatusToIdle(status) {
@@ -107,14 +122,14 @@ function localizeIssueLine(rawLine) {
     /^declared boundary not effectively read by base:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (baseBoundaryMiss) {
-    return `基类声明的参数边界未被有效读取：${baseBoundaryMiss[1]} -> ${baseBoundaryMiss[2]}`;
+    return `基类声明的参数边界未被有效读取：${baseBoundaryMiss[2]}。建议：在对应 Base 实现中读取该参数；若确实不需要，请从来源声明移除。`;
   }
 
   const ruleBoundaryMiss = line.match(
     /^declared rule boundary not effectively read:\s*(.+?)\s*->\s*(.+)$/i
   );
   if (ruleBoundaryMiss) {
-    return `规则声明的参数边界未被有效读取：${ruleBoundaryMiss[1]} -> ${ruleBoundaryMiss[2]}`;
+    return `规则声明的参数边界未被有效读取：${ruleBoundaryMiss[2]}。建议：在规则实现中读取该参数，或调整规则参数绑定声明。`;
   }
 
   const exactScopeViolation = line.match(
@@ -153,6 +168,9 @@ function localizeIssueLine(rawLine) {
   }
   if (/^Shelf validation issue$/i.test(line)) {
     return DEFAULT_SHELF_ISSUE_MESSAGE;
+  }
+  if (/^[\x00-\x7F\s.,:;_()[\]{}<>=+\-*/\\'"`!?|]+$/.test(line) && /[A-Za-z]/.test(line)) {
+    return "未本地化的校验错误。请打开 Shelf 输出查看原始明细。";
   }
   return sourceLine;
 }
@@ -337,12 +355,13 @@ function createWorkspaceValidationWatchers({
 function activate(context) {
   const output = vscode.window.createOutputChannel("Shelf");
   const diagnostics = vscode.languages.createDiagnosticCollection("shelf-validation");
+  const frameworkLintDiagnostics = vscode.languages.createDiagnosticCollection("shelf-framework-lint");
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   resetStatusToIdle(status);
-  status.command = "shelf.showIssues";
+  status.command = "shelf.openFrameworkTree";
   status.show();
 
-  context.subscriptions.push(output, diagnostics, status);
+  context.subscriptions.push(output, diagnostics, frameworkLintDiagnostics, status);
 
   let running = false;
   let pending = null;
@@ -363,13 +382,11 @@ function activate(context) {
   let gitHooksReady = null;
   let gitHooksDetail = "Not checked in this session";
   let gitHooksPrompted = false;
-  let intentGateSession = null;
   let localShelfSettingValues = {};
   let localShelfSettingsError = "";
   const suppressedGeneratedDirectories = new Map();
   const dirtyWatchedFiles = new Set();
-  const guardedBaselineByPath = new Map();
-  const restoringGuardedFiles = new Set();
+  const frameworkLintTimers = new Map();
   const activeValidationCommand = validationRuntime.createActiveCommandTracker();
   const VALIDATION_SOURCE_PRIORITY = {
     auto: 1,
@@ -379,24 +396,21 @@ function activate(context) {
   const TREE_WEBVIEW_SETTING_KEYS = [
     "shelf.frameworkTreeNodeHorizontalGap",
     "shelf.frameworkTreeLevelVerticalGap",
+    "shelf.frameworkTreeAutoRefreshOnSave",
     "shelf.treeZoomMinScale",
     "shelf.treeZoomMaxScale",
     "shelf.treeWheelSensitivity",
     "shelf.treeInspectorWidth",
     "shelf.treeInspectorRailWidth",
+    "shelf.statusBarClickAction",
   ];
-  const INTENT_GATE_SETTING_KEYS = [
-    "shelf.intentGateEnabled",
-    "shelf.intentGateEnforcementMode",
-    "shelf.intentGateRequireMappingEcho",
-    "shelf.intentGateRunChangeValidationBeforeGrant",
-    "shelf.intentGateAutoOpenOutput",
-    "shelf.intentGateMinimumScore",
-    "shelf.intentGateMaxMatches",
-    "shelf.intentGateSessionTtlMinutes",
-    "shelf.intentGateGuardedPathPrefixes",
-    "shelf.intentGateIgnoredPathPrefixes",
-    "shelf.intentGateTemporaryBypasses",
+  const FRAMEWORK_LINT_SETTING_KEYS = [
+    "shelf.frameworkLintEnabled",
+    "shelf.frameworkLintOnType",
+    "shelf.frameworkLintDebounceMs",
+    "shelf.frameworkAutoCompleteEnabled",
+    "shelf.frameworkAutoTriggerSuggest",
+    "shelf.frameworkQuickFixEnabled",
   ];
 
   const clampInt = (value, minimum, maximum, fallback) => {
@@ -424,6 +438,53 @@ function activate(context) {
     };
   };
 
+  const shouldShowMessagePopups = () => {
+    const config = getShelfConfig();
+    return Boolean(config.get("showMessagePopups", true));
+  };
+
+  const describeNotificationActions = (items) => {
+    const labels = (items || [])
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        if (item && typeof item === "object" && typeof item.title === "string") {
+          return item.title;
+        }
+        return "";
+      })
+      .filter(Boolean);
+    return labels.length ? ` actions=${labels.join(" | ")}` : "";
+  };
+
+  const showShelfInformationMessage = (message, ...items) => {
+    const text = String(message ?? "");
+    if (!shouldShowMessagePopups()) {
+      output.appendLine(`[notify:info:suppressed] ${text}${describeNotificationActions(items)}`);
+      return Promise.resolve(undefined);
+    }
+    return vscode.window.showInformationMessage(text, ...items);
+  };
+
+  const showShelfWarningMessage = (message, ...items) => {
+    const text = String(message ?? "");
+    if (!shouldShowMessagePopups()) {
+      output.appendLine(`[notify:warning:suppressed] ${text}${describeNotificationActions(items)}`);
+      return Promise.resolve(undefined);
+    }
+    return vscode.window.showWarningMessage(text, ...items);
+  };
+
+  const showShelfErrorMessage = (message, ...items) => {
+    const text = String(message ?? "");
+    if (!shouldShowMessagePopups()) {
+      output.appendLine(`[notify:error:suppressed] ${text}${describeNotificationActions(items)}`);
+      return Promise.resolve(undefined);
+    }
+    return vscode.window.showErrorMessage(text, ...items);
+  };
+
   const reloadLocalShelfSettings = (repoRoot, { notifyOnError = false } = {}) => {
     const snapshot = localSettings.readLocalShelfSettings(repoRoot);
     localShelfSettingValues = snapshot.values;
@@ -433,7 +494,7 @@ function activate(context) {
         output.appendLine(`[settings] ${nextError}`);
       }
       if (notifyOnError) {
-        void vscode.window.showWarningMessage(
+        void showShelfWarningMessage(
           `Shelf 已忽略 ${localSettings.LOCAL_SETTINGS_REL_PATH}：${nextError}`
         );
       }
@@ -455,13 +516,32 @@ function activate(context) {
   const readTreeViewSettings = () => {
     const config = getShelfConfig();
     const zoomMinScale = clampNumber(config.get("treeZoomMinScale"), 0.2, 3, 0.68);
-    const zoomMaxScale = clampNumber(config.get("treeZoomMaxScale"), zoomMinScale, 5, 1.55);
+    const zoomMaxScale = clampNumber(config.get("treeZoomMaxScale"), zoomMinScale, 5, 2.4);
     return {
       zoomMinScale,
       zoomMaxScale,
       wheelSensitivity: clampNumber(config.get("treeWheelSensitivity"), 0.25, 3, 1),
       inspectorWidth: clampInt(config.get("treeInspectorWidth"), 240, 520, 338),
       inspectorRailWidth: clampInt(config.get("treeInspectorRailWidth"), 32, 72, 42),
+    };
+  };
+
+  const normalizeStatusBarClickAction = (value) => {
+    const action = String(value || "").trim();
+    if (action === "showIssues") {
+      return "showIssues";
+    }
+    if (action === "quickPick") {
+      return "quickPick";
+    }
+    return "openFrameworkTree";
+  };
+
+  const readTreeBehaviorSettings = () => {
+    const config = getShelfConfig();
+    return {
+      frameworkAutoRefreshOnSave: Boolean(config.get("frameworkTreeAutoRefreshOnSave", true)),
+      statusBarClickAction: normalizeStatusBarClickAction(config.get("statusBarClickAction", "openFrameworkTree")),
     };
   };
 
@@ -477,6 +557,18 @@ function activate(context) {
         15_000
       ),
       validationDebounceMs: clampInt(config.get("validationDebounceMs"), 0, 5_000, 250),
+    };
+  };
+
+  const readFrameworkLintSettings = () => {
+    const config = getShelfConfig();
+    return {
+      enabled: Boolean(config.get("frameworkLintEnabled", true)),
+      onType: Boolean(config.get("frameworkLintOnType", true)),
+      debounceMs: clampInt(config.get("frameworkLintDebounceMs", 300), 0, 5_000, 300),
+      autoCompleteEnabled: Boolean(config.get("frameworkAutoCompleteEnabled", true)),
+      autoTriggerSuggest: Boolean(config.get("frameworkAutoTriggerSuggest", true)),
+      quickFixEnabled: Boolean(config.get("frameworkQuickFixEnabled", true)),
     };
   };
 
@@ -497,140 +589,28 @@ function activate(context) {
     return triggerKind === "save";
   };
 
-  const normalizePrefixList = (value, fallback) => {
-    const source = Array.isArray(value) ? value : fallback;
-    const normalized = [];
-    const seen = new Set();
-    for (const item of source) {
-      const rawText = String(item || "").trim();
-      if (!rawText) {
-        continue;
-      }
-      if (rawText === INTENT_GATE_GUARD_ALL_TOKEN) {
-        return [INTENT_GATE_GUARD_ALL_TOKEN];
-      }
-      const text = workspaceGuard.normalizeRelPath(rawText);
-      if (!text || seen.has(text)) {
-        continue;
-      }
-      seen.add(text);
-      normalized.push(text.endsWith("/") ? text : `${text}/`);
-    }
-    return normalized.length ? normalized : fallback;
-  };
-
-  const readIntentGateSettings = () => {
-    const config = getShelfConfig();
-    const rawMode = String(config.get("intentGateEnforcementMode") || "block").trim().toLowerCase();
-    const mode = rawMode === "warn" ? "warn" : "block";
-    return {
-      enabled: Boolean(config.get("intentGateEnabled")),
-      mode,
-      requireMappingEcho: Boolean(config.get("intentGateRequireMappingEcho")),
-      runValidationBeforeGrant: Boolean(config.get("intentGateRunChangeValidationBeforeGrant")),
-      autoOpenOutput: Boolean(config.get("intentGateAutoOpenOutput")),
-      minimumScore: clampInt(
-        config.get("intentGateMinimumScore"),
-        1,
-        20,
-        DEFAULT_INTENT_GATE_MINIMUM_SCORE
-      ),
-      maxMatches: clampInt(
-        config.get("intentGateMaxMatches"),
-        1,
-        20,
-        DEFAULT_INTENT_GATE_MAX_MATCHES
-      ),
-      ttlMinutes: clampInt(
-        config.get("intentGateSessionTtlMinutes"),
-        1,
-        1_440,
-        DEFAULT_INTENT_GATE_TTL_MINUTES
-      ),
-      guardedPrefixes: normalizePrefixList(
-        config.get("intentGateGuardedPathPrefixes"),
-        DEFAULT_INTENT_GATE_GUARDED_PREFIXES
-      ),
-      ignoredPrefixes: normalizePrefixList(
-        config.get("intentGateIgnoredPathPrefixes"),
-        DEFAULT_INTENT_GATE_IGNORED_PREFIXES
-      ),
-      temporaryBypasses: intentGate.normalizeTemporaryBypassScopes(
-        config.get("intentGateTemporaryBypasses")
-      ),
-    };
-  };
-
-  const isIntentGateTemporaryBypassEnabled = (settings, scope) => (
-    intentGate.isTemporaryBypassScopeEnabled(settings?.temporaryBypasses, scope)
-  );
-
-  const clearIntentGateSession = (reason = "") => {
-    if (intentGateSession && reason) {
-      output.appendLine(`[intent-gate] session cleared: ${reason}`);
-    }
-    intentGateSession = null;
-  };
-
-  const pathMatchesPrefix = (relPath, prefix) => (
-    prefix === INTENT_GATE_GUARD_ALL_TOKEN || relPath === prefix || relPath.startsWith(prefix)
-  );
-
-  const isIntentGateGuardedPath = (repoRoot, fsPath, settings) => {
-    if (!repoRoot || !fsPath || !settings.enabled) {
-      return false;
-    }
-    const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, fsPath));
-    if (!relPath || relPath.startsWith("..")) {
-      return false;
-    }
-    if (settings.ignoredPrefixes.some((prefix) => pathMatchesPrefix(relPath, prefix))) {
-      return false;
-    }
-    return settings.guardedPrefixes.some((prefix) => pathMatchesPrefix(relPath, prefix));
-  };
-
-  const isIntentGateSessionExpired = (session, settings) => {
-    if (!session || !session.createdAt) {
-      return true;
-    }
-    const createdMs = new Date(session.createdAt).getTime();
-    if (!Number.isFinite(createdMs)) {
-      return true;
-    }
-    const ttlMs = settings.ttlMinutes * 60 * 1000;
-    return (Date.now() - createdMs) > ttlMs;
-  };
-
-  const ensureIntentGateSession = (settings) => {
-    if (!settings.enabled) {
-      return null;
-    }
-    if (!intentGateSession) {
-      return null;
-    }
-    if (isIntentGateSessionExpired(intentGateSession, settings)) {
-      clearIntentGateSession("session ttl exceeded");
-      return null;
-    }
-    return intentGateSession;
-  };
-
   const handleRuntimeSettingSourcesChanged = async ({
-    reason = "settings changed",
     refreshTree = false,
   } = {}) => {
-    const settings = readIntentGateSettings();
-    if (!settings.enabled) {
-      clearIntentGateSession(`intent gate disabled by ${reason}`);
-    } else {
-      ensureIntentGateSession(settings);
-    }
     refreshSidebarHome();
     if (refreshTree && treePanel) {
-      await openTreeView(treePanelKind);
+      await openTreeView(treePanelKind, { reveal: false });
     }
   };
+
+  const applyStatusBarClickAction = () => {
+    const behavior = readTreeBehaviorSettings();
+    if (behavior.statusBarClickAction === "showIssues") {
+      status.command = "shelf.showIssues";
+      return;
+    }
+    if (behavior.statusBarClickAction === "quickPick") {
+      status.command = "shelf.statusBarActionMenu";
+      return;
+    }
+    status.command = "shelf.openFrameworkTree";
+  };
+  applyStatusBarClickAction();
 
   const statusController = createStatusController({
     status,
@@ -801,230 +781,6 @@ function activate(context) {
     return parseFn(execResult.stdout, execResult.stderr, execResult.code);
   };
 
-  const appendIntentGateAnalysisLog = (analysis, settings) => {
-    output.appendLine("[intent-gate] mapping summary");
-    output.appendLine(`- intent: ${analysis.intentText}`);
-    output.appendLine(`- query tokens: ${analysis.queryTokens.join(", ")}`);
-    output.appendLine(`- mappings: ${analysis.mappings.length}`);
-    output.appendLine(`- minimum score: ${settings.minimumScore}`);
-    output.appendLine(`- guarded prefixes: ${settings.guardedPrefixes.join(", ")}`);
-    output.appendLine(`- ignored prefixes: ${settings.ignoredPrefixes.join(", ")}`);
-    output.appendLine(
-      `- temporary bypasses: ${settings.temporaryBypasses.length ? settings.temporaryBypasses.join(", ") : "none"}`
-    );
-    output.appendLine(intentGate.formatIntentMappingSummary(analysis));
-    if (analysis.errors.length) {
-      output.appendLine(`- canonical read warnings: ${analysis.errors.join(" | ")}`);
-    }
-  };
-
-  const runIntentGateGrantValidation = async (repoRoot, settings) => {
-    if (isIntentGateTemporaryBypassEnabled(settings, "grant_pre_validation")) {
-      output.appendLine("[intent-gate] temporary bypass active: skip grant pre-validation.");
-      return { passed: true, errors: [] };
-    }
-    if (!settings.runValidationBeforeGrant) {
-      return { passed: true, errors: [] };
-    }
-    const config = getShelfConfig();
-    const changeValidationCommand = String(
-      config.get("changeValidationCommand") || DEFAULT_CHANGE_VALIDATION_COMMAND
-    ).trim();
-    return runParsedCommand(
-      "intent-gate-validate",
-      changeValidationCommand,
-      repoRoot,
-      parseResult
-    );
-  };
-
-  const grantIntentGateSession = async ({ repoRoot, intentText }) => {
-    const settings = readIntentGateSettings();
-    const normalizedIntent = String(intentText || "").trim();
-    if (!settings.enabled) {
-      return { passed: false, message: "设置中已关闭 Shelf 对话意图门禁。" };
-    }
-    if (!normalizedIntent) {
-      return { passed: false, message: "意图描述为空。" };
-    }
-
-    const preValidation = await runIntentGateGrantValidation(repoRoot, settings);
-    if (!preValidation.passed) {
-      const firstMessage = preValidation.errors[0]?.message || "validate_canonical --check-changes 校验失败。";
-      return {
-        passed: false,
-        message: `门禁在映射前拦截：${firstMessage}`,
-      };
-    }
-
-    const analysis = intentGate.analyzeIntentMapping({
-      repoRoot,
-      intentText: normalizedIntent,
-      minimumScore: settings.minimumScore,
-      maxResults: settings.maxMatches,
-      allowNonOneToOneMapping: isIntentGateTemporaryBypassEnabled(settings, "one_to_one_check"),
-    });
-    if (isIntentGateTemporaryBypassEnabled(settings, "one_to_one_check")) {
-      output.appendLine("[intent-gate] temporary bypass active: allow non one-to-one boundary mapping.");
-    }
-    appendIntentGateAnalysisLog(analysis, settings);
-    if (settings.autoOpenOutput) {
-      output.show(true);
-    }
-
-    if (!analysis.passed) {
-      clearIntentGateSession("未找到可用映射");
-      const reason = String(analysis.reason || "").trim();
-      return {
-        passed: false,
-        analysis,
-        message: reason || "没有命中阈值的 framework 映射，请先由人更新 framework。",
-      };
-    }
-
-    const requireMappingEcho = settings.requireMappingEcho
-      && !isIntentGateTemporaryBypassEnabled(settings, "mapping_echo");
-    if (settings.requireMappingEcho && !requireMappingEcho) {
-      output.appendLine("[intent-gate] temporary bypass active: skip mapping echo confirmation.");
-    }
-    if (requireMappingEcho) {
-      const picks = analysis.mappings.slice(0, 6).map((item) => ({
-        label: `${item.moduleId} / ${item.boundaryId}`,
-        description: item.exactPaths.join(", "),
-        detail: `score=${item.score} · ${item.note || "projection from canonical"}`,
-      }));
-      const selected = await vscode.window.showQuickPick(
-        [
-          {
-            label: "Confirm Mapping (Recommended)",
-            description: "Grant this governed task session.",
-            detail: "Use the top canonical-backed mappings and unlock guarded saves.",
-            keepOpen: true,
-          },
-          ...picks,
-        ],
-        {
-          title: "Shelf Governed Task Mapping",
-          canPickMany: false,
-          placeHolder: "Confirm mapping, or cancel to keep implementation edits blocked.",
-        }
-      );
-      if (!selected || !selected.keepOpen) {
-        return {
-          passed: false,
-          analysis,
-          message: "映射确认已取消。",
-        };
-      }
-    }
-
-    intentGateSession = {
-      id: `intent-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      repoRoot,
-      intentText: normalizedIntent,
-      analysis,
-      allowedExactPaths: analysis.allowedExactPaths,
-      allowedCommunicationPaths: analysis.allowedCommunicationPaths,
-      matchedModuleIds: analysis.matchedModuleIds,
-      lastTouchedAt: new Date().toISOString(),
-    };
-    refreshSidebarHome();
-    return { passed: true, analysis, message: "受控任务会话已授权。" };
-  };
-
-  const restoreGuardedDocumentFromBaseline = async (doc, baselineText) => {
-    if (!doc || typeof baselineText !== "string") {
-      return false;
-    }
-    const targetPath = doc.uri?.fsPath || "";
-    if (!targetPath) {
-      return false;
-    }
-    restoringGuardedFiles.add(targetPath);
-    try {
-      const fullRange = new vscode.Range(
-        doc.positionAt(0),
-        doc.positionAt(doc.getText().length)
-      );
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(doc.uri, fullRange, baselineText);
-      const applied = await vscode.workspace.applyEdit(edit);
-      if (!applied) {
-        return false;
-      }
-      await doc.save();
-      return true;
-    } finally {
-      restoringGuardedFiles.delete(targetPath);
-    }
-  };
-
-  const enforceIntentGateOnSave = async (doc) => {
-    const settings = readIntentGateSettings();
-    if (!settings.enabled) {
-      return { allow: true };
-    }
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder || !doc?.uri?.fsPath) {
-      return { allow: true };
-    }
-    const repoRoot = folder.uri.fsPath;
-    const docPath = doc.uri.fsPath;
-
-    if (isIntentGateTemporaryBypassEnabled(settings, "save_guard")) {
-      guardedBaselineByPath.delete(docPath);
-      return { allow: true };
-    }
-
-    if (restoringGuardedFiles.has(docPath)) {
-      guardedBaselineByPath.delete(docPath);
-      return { allow: true };
-    }
-
-    if (!isIntentGateGuardedPath(repoRoot, docPath, settings)) {
-      guardedBaselineByPath.delete(docPath);
-      return { allow: true };
-    }
-
-    const session = ensureIntentGateSession(settings);
-    if (session && session.repoRoot === repoRoot) {
-      guardedBaselineByPath.delete(docPath);
-      session.lastTouchedAt = new Date().toISOString();
-      return { allow: true };
-    }
-
-    const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, docPath));
-    const blockedMessage = session && session.repoRoot !== repoRoot
-      ? "受保护保存已阻断：当前会话属于其他工作区。"
-      : "受保护保存已阻断：请先启动受控任务并确认 framework 映射。";
-
-    if (settings.mode === "warn") {
-      vscode.window.showWarningMessage(`Shelf 对话意图门禁警告（${relPath}）：${blockedMessage}`);
-      return { allow: true };
-    }
-
-    const baselineText = guardedBaselineByPath.get(docPath);
-    if (typeof baselineText !== "string") {
-      vscode.window.showErrorMessage(
-        `Shelf 对话意图门禁阻断了 ${relPath} 的保存，但没有可用于回滚的基线快照。`
-      );
-      return { allow: false };
-    }
-
-    const restored = await restoreGuardedDocumentFromBaseline(doc, baselineText);
-    if (restored) {
-      vscode.window.showErrorMessage(
-        `Shelf 对话意图门禁已阻断并回滚 ${relPath}。请先执行“Shelf: 启动受控任务会话”。`
-      );
-    } else {
-      vscode.window.showErrorMessage(
-        `Shelf 对话意图门禁已阻断 ${relPath}，但自动回滚失败。`
-      );
-    }
-    return { allow: false };
-  };
-
   const requestManualValidation = () => {
     if (running) {
       const restarted = activeValidationCommand.restartIfStale(
@@ -1094,7 +850,7 @@ function activate(context) {
     }
 
     gitHooksPrompted = true;
-    const action = await vscode.window.showInformationMessage(
+    const action = await showShelfInformationMessage(
       "Shelf 建议启用仓库 Git Hooks，避免 pre-push 校验被跳过。",
       "安装 Hooks",
       "稍后"
@@ -1107,7 +863,7 @@ function activate(context) {
   const runCodegenPreflight = async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
     const repoRoot = folder.uri.fsPath;
@@ -1144,7 +900,7 @@ function activate(context) {
       applyDiagnostics({ passed: false, errors: materializeResult.errors }, diagnostics, repoRoot, null);
       statusController.refresh();
       refreshSidebarHome();
-      const action = await vscode.window.showErrorMessage(
+      const action = await showShelfErrorMessage(
         "Shelf 生成前预检在物化阶段失败。",
         "打开问题列表",
         "打开日志"
@@ -1162,7 +918,7 @@ function activate(context) {
     }
     await runValidation({ mode: "full", triggerUris: [], notifyOnFail: true, source: "manual" });
     if (lastValidationPassed) {
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         "Shelf 生成前预检通过。Framework -> Config -> Code -> Evidence 主链一致。"
       );
     }
@@ -1299,8 +1055,19 @@ function activate(context) {
       return { issues, materializedProjects };
     }
 
+    const hasFrameworkChanges = (changePlan.relPaths || [])
+      .some((relPath) => String(relPath || "").startsWith("framework/"));
+    const configuredMaterializeCommand = String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND);
+    const effectiveMaterializeCommand = hasFrameworkChanges
+      ? enableFrameworkOnlyFallbackForMaterializeCommand(configuredMaterializeCommand)
+      : configuredMaterializeCommand;
+    if (hasFrameworkChanges && effectiveMaterializeCommand !== configuredMaterializeCommand) {
+      output.appendLine(
+        "[materialize] framework change detected; enabling --allow-framework-only-fallback for canonical framework snapshot continuity."
+      );
+    }
     const materializeCommand = buildMaterializeCommand(
-      String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND),
+      effectiveMaterializeCommand,
       pendingMaterializeProjects
     );
     const materializeResult = await runParsedCommand(
@@ -1463,7 +1230,7 @@ function activate(context) {
       const shouldNotify = task.notifyOnFail || config.get("notifyOnAutoFail");
       if (shouldNotify && shouldNotifyFailure(combined.errors, lastFailureSignature)) {
         lastFailureSignature = signature(combined.errors);
-        const action = await vscode.window.showErrorMessage(
+        const action = await showShelfErrorMessage(
           `Shelf 守卫失败（${combined.errors.length} 个问题）。`,
           "打开问题列表",
           "打开日志"
@@ -1516,7 +1283,7 @@ function activate(context) {
     const normalizedRel = relFile.replace(/\\/g, "/").replace(/^\/+/, "");
     const absPath = path.resolve(repoRoot, normalizedRel);
     if (!fs.existsSync(absPath)) {
-      vscode.window.showWarningMessage(`Shelf：未找到源文件：${normalizedRel}`);
+      showShelfWarningMessage(`Shelf：未找到源文件：${normalizedRel}`);
       return;
     }
 
@@ -1532,7 +1299,8 @@ function activate(context) {
     ? "Shelf · Evidence Tree"
     : "Shelf · Framework Tree";
 
-  const ensureTreePanel = (kind) => {
+  const ensureTreePanel = (kind, options = {}) => {
+    const reveal = options.reveal !== false;
     if (!treePanel) {
       treePanel = vscode.window.createWebviewPanel(
         "shelfTreeView",
@@ -1559,7 +1327,7 @@ function activate(context) {
           Number(message.line || 1)
         );
       });
-    } else {
+    } else if (reveal) {
       treePanel.reveal(vscode.ViewColumn.Active, true);
     }
     treePanelKind = kind;
@@ -1567,10 +1335,11 @@ function activate(context) {
     return treePanel;
   };
 
-  const openTreeView = async (kind) => {
+  const openTreeView = async (kind, options = {}) => {
+    const reveal = options.reveal !== false;
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
 
@@ -1580,7 +1349,7 @@ function activate(context) {
 
     if (kind === "evidence" && freshnessState.hasBlocking) {
       const freshnessDetail = describeCanonicalFreshness(freshnessState);
-      const panel = ensureTreePanel(kind);
+      const panel = ensureTreePanel(kind, { reveal });
       panel.webview.html = buildTreeFallbackHtml(
         freshnessDetail
           ? `canonical 未 fresh，证据树不可用。${freshnessDetail}`
@@ -1588,7 +1357,7 @@ function activate(context) {
         "Shelf：执行生成前预检",
         treeTitleForKind(kind)
       );
-      vscode.window.showWarningMessage(
+      showShelfWarningMessage(
         freshnessDetail
           ? `Shelf：canonical 未 fresh 前证据树不可用。${freshnessDetail}`
           : "Shelf：canonical 未 fresh 前证据树不可用。"
@@ -1596,7 +1365,7 @@ function activate(context) {
       return;
     }
 
-    const panel = ensureTreePanel(kind);
+    const panel = ensureTreePanel(kind, { reveal });
     try {
       const scriptPath = path.join(context.extensionPath, "media", "tree_view_bundle.js");
       const stylePath = path.join(context.extensionPath, "media", "tree_view.css");
@@ -1639,11 +1408,30 @@ function activate(context) {
   };
 
   const openFrameworkTree = async () => {
-    await openTreeView("framework");
+    await openTreeView("framework", { reveal: true });
   };
 
   const openEvidenceTree = async () => {
-    await openTreeView("evidence");
+    await openTreeView("evidence", { reveal: true });
+  };
+
+  const maybeRefreshFrameworkTreeForSavedDocument = async (document) => {
+    if (!treePanel || treePanelKind !== "framework") {
+      return;
+    }
+    const behavior = readTreeBehaviorSettings();
+    if (!behavior.frameworkAutoRefreshOnSave) {
+      return;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) {
+      return;
+    }
+    const repoRoot = folder.uri.fsPath;
+    if (!frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)) {
+      return;
+    }
+    await openTreeView("framework", { reveal: false });
   };
 
   const clearShelfDiagnosticsForUri = (uri) => {
@@ -1670,26 +1458,586 @@ function activate(context) {
     refreshSidebarHome();
   };
 
+  const isFrameworkLintDocument = (document) => {
+    if (!document || document.languageId !== "markdown" || document.uri.scheme !== "file") {
+      return false;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) {
+      return false;
+    }
+    return frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, folder.uri.fsPath);
+  };
+
+  const clearFrameworkLintTimer = (key) => {
+    const timerId = frameworkLintTimers.get(key);
+    if (timerId) {
+      clearTimeout(timerId);
+      frameworkLintTimers.delete(key);
+    }
+  };
+
+  const runFrameworkLintForDocument = (document) => {
+    if (!document || !document.uri || document.uri.scheme !== "file") {
+      return;
+    }
+    const key = document.uri.toString();
+    clearFrameworkLintTimer(key);
+
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.enabled || !isFrameworkLintDocument(document)) {
+      frameworkLintDiagnostics.delete(document.uri);
+      return;
+    }
+
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) {
+      frameworkLintDiagnostics.delete(document.uri);
+      return;
+    }
+
+    const lintIssues = frameworkLint
+      .lintFrameworkMarkdown({
+        repoRoot: folder.uri.fsPath,
+        filePath: document.uri.fsPath,
+        text: document.getText(),
+      })
+      .map((item) => normalizeIssue(item));
+
+    if (!lintIssues.length) {
+      frameworkLintDiagnostics.delete(document.uri);
+      return;
+    }
+
+    const payload = {
+      passed: false,
+      errors: lintIssues,
+    };
+    applyDiagnostics(payload, frameworkLintDiagnostics, folder.uri.fsPath, document.uri, {
+      clearExisting: false,
+    });
+  };
+
+  const scheduleFrameworkLintForDocument = (document, { immediate = false } = {}) => {
+    if (!document || !document.uri || document.uri.scheme !== "file") {
+      return;
+    }
+    const key = document.uri.toString();
+    clearFrameworkLintTimer(key);
+
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.enabled) {
+      frameworkLintDiagnostics.delete(document.uri);
+      return;
+    }
+    if (!isFrameworkLintDocument(document)) {
+      frameworkLintDiagnostics.delete(document.uri);
+      return;
+    }
+    if (!immediate && !lintSettings.onType) {
+      return;
+    }
+
+    const delayMs = immediate ? 0 : lintSettings.debounceMs;
+    frameworkLintTimers.set(
+      key,
+      setTimeout(() => {
+        frameworkLintTimers.delete(key);
+        runFrameworkLintForDocument(document);
+      }, delayMs)
+    );
+  };
+
+  const refreshFrameworkLintForOpenDocuments = ({ immediate = true } = {}) => {
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.enabled) {
+      for (const key of [...frameworkLintTimers.keys()]) {
+        clearFrameworkLintTimer(key);
+      }
+      frameworkLintDiagnostics.clear();
+      return;
+    }
+    for (const document of vscode.workspace.textDocuments) {
+      if (isFrameworkLintDocument(document)) {
+        scheduleFrameworkLintForDocument(document, { immediate });
+      } else if (document.uri?.scheme === "file") {
+        frameworkLintDiagnostics.delete(document.uri);
+      }
+    }
+  };
+
+  const inferFrameworkSymbolNumberFromLine = (lineText, symbol) => {
+    const safeSymbol = String(symbol || "").trim().toUpperCase();
+    if (!safeSymbol) {
+      return 0;
+    }
+    const escapedSymbol = safeSymbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = String(lineText || "").match(new RegExp(`\`${escapedSymbol}(\\d+)(?:\\.\\d+)?\``));
+    if (!match) {
+      return 0;
+    }
+    const parsed = Number(match[1] || 0);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  };
+
+  const nextFrameworkSymbolNumber = (documentText, symbol) => {
+    const safeSymbol = String(symbol || "").trim().toUpperCase();
+    if (!safeSymbol) {
+      return 1;
+    }
+    const escapedSymbol = safeSymbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`\`${escapedSymbol}(\\d+)(?:\\.\\d+)?\``, "g");
+    let max = 0;
+    for (const match of String(documentText || "").matchAll(pattern)) {
+      const parsed = Number(match[1] || 0);
+      if (Number.isInteger(parsed) && parsed > max) {
+        max = parsed;
+      }
+    }
+    return max + 1;
+  };
+
+  const detectFrameworkSectionAtLine = (document, lineNumber) => {
+    const safeLine = Math.max(0, Math.min(Number(lineNumber || 0), Math.max(0, document.lineCount - 1)));
+    let sectionId = "";
+    for (let index = 0; index <= safeLine; index += 1) {
+      const trimmed = document.lineAt(index).text.trim();
+      if (trimmed === "## 1. 能力声明（Capability Statement）") {
+        sectionId = "capability";
+        continue;
+      }
+      if (
+        trimmed === "## 2. 边界定义（Boundary / Parameter 参数）"
+      ) {
+        sectionId = "parameter";
+        continue;
+      }
+      if (trimmed === "## 3. 最小结构基（Minimal Structural Bases）") {
+        sectionId = "base";
+        continue;
+      }
+      if (trimmed === "## 4. 基组合原则（Base Combination Principles）") {
+        sectionId = "rule";
+        continue;
+      }
+      if (trimmed === "## 5. 验证（Verification）") {
+        sectionId = "verification";
+      }
+    }
+    return sectionId;
+  };
+
+  const inferNearestRuleNumber = (document, lineNumber) => {
+    const safeLine = Math.max(0, Math.min(Number(lineNumber || 0), Math.max(0, document.lineCount - 1)));
+    for (let index = safeLine; index >= 0; index -= 1) {
+      const trimmed = document.lineAt(index).text.trim();
+      if (index !== safeLine && trimmed.startsWith("## ")) {
+        break;
+      }
+      const match = /^-\s+`R(\d+)`\s+/.exec(trimmed);
+      if (match) {
+        return Number(match[1]);
+      }
+    }
+    return 0;
+  };
+
+  const createFrameworkQuickFix = (document, diagnostic, title, buildEdit) => {
+    const edit = new vscode.WorkspaceEdit();
+    if (!buildEdit(edit)) {
+      return null;
+    }
+    const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+    action.edit = edit;
+    action.diagnostics = [diagnostic];
+    return action;
+  };
+
+  const inferExpectedHeadingFromFwl012Message = (rawMessage) => {
+    const message = String(rawMessage || "");
+    const match = message.match(/这里应为[“"](?<expected>##\s+[^”"]+)[”"]/u);
+    const expected = match?.groups?.expected;
+    return typeof expected === "string" ? expected.trim() : "";
+  };
+
+  const buildFrameworkLintQuickFixes = (document, diagnostic) => {
+    const code = String(diagnostic?.code || "").trim().toUpperCase();
+    if (!code.startsWith("FWL")) {
+      return [];
+    }
+    const documentText = document.getText();
+    const lineIndex = diagnostic.range.start.line;
+    const currentLine = document.lineAt(lineIndex);
+    const lineText = currentLine.text;
+    const lineRange = currentLine.rangeIncludingLineBreak;
+    const quickFixes = [];
+
+    if (code === "FWL001") {
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准标题格式",
+          (edit) => {
+            let targetLine = 0;
+            for (let index = 0; index < document.lineCount; index += 1) {
+              if (document.lineAt(index).text.trim()) {
+                targetLine = index;
+                break;
+              }
+            }
+            const targetTextLine = document.lineAt(targetLine);
+            edit.replace(document.uri, targetTextLine.rangeIncludingLineBreak, "# 中文模块名:EnglishName\n");
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL002") {
+      const directiveLines = [];
+      for (let index = 0; index < document.lineCount; index += 1) {
+        const trimmed = document.lineAt(index).text.trim();
+        if (trimmed.startsWith("@framework")) {
+          directiveLines.push({ line: index, text: trimmed });
+        }
+      }
+      const invalidDirectiveLines = directiveLines.filter((item) => item.text !== "@framework");
+      if (invalidDirectiveLines.length) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "规范化 @framework 指令",
+            (edit) => {
+              for (const item of invalidDirectiveLines) {
+                const targetLine = document.lineAt(item.line);
+                edit.replace(document.uri, targetLine.rangeIncludingLineBreak, "@framework\n");
+              }
+              return true;
+            }
+          )
+        );
+      } else if (!directiveLines.length) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "插入 @framework 指令",
+            (edit) => {
+              let titleLine = -1;
+              for (let index = 0; index < document.lineCount; index += 1) {
+                if (document.lineAt(index).text.trim()) {
+                  titleLine = index;
+                  break;
+                }
+              }
+              if (titleLine < 0) {
+                edit.insert(document.uri, new vscode.Position(0, 0), "# 中文模块名:EnglishName\n\n@framework\n");
+                return true;
+              }
+              const titleEnd = new vscode.Position(titleLine, document.lineAt(titleLine).text.length);
+              edit.insert(document.uri, titleEnd, "\n\n@framework");
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL003") {
+      const existingHeadings = new Set();
+      for (let index = 0; index < document.lineCount; index += 1) {
+        existingHeadings.add(document.lineAt(index).text.trim());
+      }
+      const missingHeadings = FRAMEWORK_REQUIRED_SECTION_HEADINGS.filter((heading) => !existingHeadings.has(heading));
+      if (missingHeadings.length) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "补全标准章节（1~5）",
+            (edit) => {
+              const tailLine = Math.max(0, document.lineCount - 1);
+              const tailPos = new vscode.Position(tailLine, document.lineAt(tailLine).text.length);
+              const suffix = documentText.endsWith("\n") ? "" : "\n";
+              edit.insert(
+                document.uri,
+                tailPos,
+                `${suffix}\n${missingHeadings.join("\n\n")}\n`
+              );
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL004") {
+      const marker = /^(\s*)\*/.exec(lineText);
+      if (marker) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "将 `*` 列表改为 `-`",
+            (edit) => {
+              const column = marker[1].length;
+              edit.replace(
+                document.uri,
+                new vscode.Range(lineIndex, column, lineIndex, column + 1),
+                "-"
+              );
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL005") {
+      const normalizedLineText = String(lineText || "");
+      const preferNonResponsibility = /`N\d*(?:\.\d+)?`/.test(normalizedLineText)
+        || normalizedLineText.includes("非职责");
+      const symbol = preferNonResponsibility ? "N" : "C";
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, symbol)
+        || nextFrameworkSymbolNumber(documentText, symbol);
+      const replacement = preferNonResponsibility
+        ? `- \`N${inferred}\` 非职责声明：待补充非职责范围。\n`
+        : `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`;
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          `替换为标准 ${symbol} 条目`,
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              replacement
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL006") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "P")
+        || nextFrameworkSymbolNumber(documentText, "P");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准参数条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`P${inferred}\` 参数名：待定义参数约束。来源：\`C1\`。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL007") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "B")
+        || nextFrameworkSymbolNumber(documentText, "B");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 B 条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`B${inferred}\` 结构基名：待定义结构。来源：\`C1 + P1\`。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL008") {
+      const inferredRuleNumber = inferFrameworkSymbolNumberFromLine(lineText, "R")
+        || inferNearestRuleNumber(document, lineIndex)
+        || nextFrameworkSymbolNumber(documentText, "R");
+      const blockText = [
+        `- \`R${inferredRuleNumber}\` 规则名`,
+        `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
+        `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
+        `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
+        `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
+      ].join("\n");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 R 规则块",
+          (edit) => {
+            edit.replace(document.uri, lineRange, `${blockText}\n`);
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL009") {
+      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "V")
+        || nextFrameworkSymbolNumber(documentText, "V");
+      quickFixes.push(
+        createFrameworkQuickFix(
+          document,
+          diagnostic,
+          "替换为标准 V 条目",
+          (edit) => {
+            edit.replace(
+              document.uri,
+              lineRange,
+              `- \`V${inferred}\` 验证名：待补充验证要求。\n`
+            );
+            return true;
+          }
+        )
+      );
+    }
+
+    if (code === "FWL010") {
+      const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
+      let template = "";
+      if (sectionId === "capability") {
+        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
+      } else if (sectionId === "parameter") {
+        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。来源：\`C1\`。`;
+      } else if (sectionId === "base") {
+        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构。来源：\`C1 + P1\`。`;
+      } else if (sectionId === "rule") {
+        const inferredRuleNumber = nextFrameworkSymbolNumber(documentText, "R");
+        template = [
+          `- \`R${inferredRuleNumber}\` 规则名`,
+          `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
+          `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
+          `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
+          `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
+        ].join("\n");
+      } else if (sectionId === "verification") {
+        template = `- \`V${nextFrameworkSymbolNumber(documentText, "V")}\` 验证名：待补充验证要求。`;
+      }
+      if (template) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "插入章节标准条目模板",
+            (edit) => {
+              const insertionPoint = new vscode.Position(lineIndex, document.lineAt(lineIndex).text.length);
+              edit.insert(document.uri, insertionPoint, `\n${template}`);
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    if (code === "FWL012") {
+      const expectedHeading = inferExpectedHeadingFromFwl012Message(diagnostic?.message);
+      if (expectedHeading) {
+        quickFixes.push(
+          createFrameworkQuickFix(
+            document,
+            diagnostic,
+            "替换为期望的标准二级标题",
+            (edit) => {
+              edit.replace(document.uri, currentLine.range, expectedHeading);
+              return true;
+            }
+          )
+        );
+      }
+    }
+
+    return quickFixes.filter(Boolean);
+  };
+
+  const maybeAutoTriggerFrameworkSuggest = (event) => {
+    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+      return;
+    }
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.autoCompleteEnabled || !lintSettings.autoTriggerSuggest) {
+      return;
+    }
+    if (!Array.isArray(event.contentChanges) || event.contentChanges.length !== 1) {
+      return;
+    }
+    const change = event.contentChanges[0];
+    if (!change || typeof change.text !== "string" || change.text.length !== 1 || change.rangeLength !== 0) {
+      return;
+    }
+    if (!FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS.has(change.text)) {
+      return;
+    }
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || activeEditor.document.uri.toString() !== event.document.uri.toString()) {
+      return;
+    }
+    void vscode.commands.executeCommand("editor.action.triggerSuggest");
+  };
+
+  const maybeAutoExpandFrameworkDashEntry = (event) => {
+    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+      return false;
+    }
+    const lintSettings = readFrameworkLintSettings();
+    if (!lintSettings.autoCompleteEnabled) {
+      return false;
+    }
+    if (!Array.isArray(event.contentChanges) || event.contentChanges.length !== 1) {
+      return false;
+    }
+    const change = event.contentChanges[0];
+    if (!change || change.text !== "-" || change.rangeLength !== 0) {
+      return false;
+    }
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || activeEditor.document.uri.toString() !== event.document.uri.toString()) {
+      return false;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(event.document.uri);
+    const repoRoot = folder?.uri.fsPath || "";
+    if (!repoRoot || !frameworkNavigation.isFrameworkMarkdownFile(event.document.uri.fsPath, repoRoot)) {
+      return false;
+    }
+    const cursorPosition = new vscode.Position(change.range.start.line, change.range.start.character + 1);
+    const lineText = event.document.lineAt(cursorPosition.line).text;
+    if (lineText.slice(cursorPosition.character).trim() !== "") {
+      return false;
+    }
+    const linePrefix = lineText.slice(0, cursorPosition.character);
+    const autoExpansion = frameworkCompletion.getFrameworkDashAutoExpansion(
+      linePrefix,
+      true,
+      {
+        documentText: event.document.getText(),
+        lineNumber: cursorPosition.line,
+      }
+    );
+    if (!autoExpansion) {
+      return false;
+    }
+    void activeEditor.insertSnippet(
+      new vscode.SnippetString(autoExpansion.insertText),
+      new vscode.Range(cursorPosition, cursorPosition)
+    );
+    return true;
+  };
+
   const renderSidebarHome = () => {
     const defaultActionItems = [
-      {
-        action: "startGovernedTask",
-        label: "启动受控任务会话",
-        description: "先做需求到 framework 的显式映射，通过后再改实现层代码。",
-        tone: "primary"
-      },
-      {
-        action: "showGovernedTaskSession",
-        label: "查看当前门禁会话",
-        description: "查看当前会话的 module/boundary/exact 映射结果。",
-        tone: "ghost"
-      },
-      {
-        action: "clearGovernedTaskSession",
-        label: "清空门禁会话",
-        description: "清空当前授权会话，恢复到默认阻断状态。",
-        tone: "ghost"
-      },
       {
         action: "openTree",
         label: "打开框架树",
@@ -1792,12 +2140,6 @@ function activate(context) {
             note: "打开工作区后检查 .githooks 是否已启用。"
           },
           {
-            label: "会话门禁",
-            value: "未知",
-            tone: "unknown",
-            note: "打开工作区后读取 shelf.intentGate* 设置并展示会话状态。"
-          },
-          {
             label: "严格校验",
             value: "等待工作区",
             tone: "unknown",
@@ -1824,8 +2166,6 @@ function activate(context) {
 
     const repoRoot = folder.uri.fsPath;
     const config = getShelfConfig();
-    const intentGateSettings = readIntentGateSettings();
-    const activeIntentSession = ensureIntentGateSession(intentGateSettings);
     const validationTriggerMode = getValidationTriggerMode();
     const standardsExists = hasStandardsTree(repoRoot);
     const validationEnabled = standardsExists && validationActive;
@@ -1834,25 +2174,6 @@ function activate(context) {
     const frameworkTreeReady = fs.existsSync(path.join(repoRoot, "framework"));
     const evidenceTreeReady = !freshnessState.hasBlocking;
     const guardMode = config.get("guardMode") === "strict" ? "strict" : "normal";
-    const hasIntentGateTemporaryBypass = intentGateSettings.temporaryBypasses.length > 0;
-    const isSaveGuardBypassed = isIntentGateTemporaryBypassEnabled(intentGateSettings, "save_guard");
-    const intentGateStatus = !intentGateSettings.enabled
-      ? "Disabled"
-      : (hasIntentGateTemporaryBypass ? "Bypass" : (activeIntentSession ? "Granted" : "Required"));
-    const intentGateTone = !intentGateSettings.enabled
-      ? "unknown"
-      : (hasIntentGateTemporaryBypass ? "unknown" : (activeIntentSession ? "ok" : "error"));
-    const intentGateNote = !intentGateSettings.enabled
-      ? "shelf.intentGateEnabled = false"
-      : (
-        hasIntentGateTemporaryBypass
-          ? `temporary bypass: ${intentGateSettings.temporaryBypasses.join(", ")}`
-          : (
-            activeIntentSession
-              ? `${activeIntentSession.analysis.mappings.length} mappings · ${new Date(activeIntentSession.createdAt).toLocaleString()}`
-              : "先执行“Shelf: 启动受控任务会话”，确认映射后再改实现层文件。"
-          )
-      );
     const issueLevels = countIssueLevels(lastRunIssues);
     const issueCount = issueLevels.totalCount;
     const errorIssueCount = issueLevels.errorCount;
@@ -1984,14 +2305,6 @@ function activate(context) {
         action: "installHooks",
         label: "安装 Git Hooks"
       };
-    } else if (intentGateSettings.enabled && !isSaveGuardBypassed && !activeIntentSession) {
-      calloutTone = "error";
-      calloutTitle = "先开启受控任务会话";
-      calloutBody = "实现层修改前，先执行需求到 framework 映射门禁。未授权会话下，受保护路径保存会被阻断或回滚。";
-      calloutAction = {
-        action: "startGovernedTask",
-        label: "启动受控任务会话"
-      };
     }
 
     const healthItems = [
@@ -2040,12 +2353,6 @@ function activate(context) {
         note: gitHooksReady
           ? gitHooksDetail
           : `需要指向 .githooks。当前状态：${gitHooksDetail}`
-      },
-      {
-        label: "会话门禁",
-        value: intentGateStatus,
-        tone: intentGateTone,
-        note: intentGateNote
       },
       {
         label: "严格校验",
@@ -2174,18 +2481,6 @@ function activate(context) {
           await openFrameworkTree();
           return;
         }
-        if (message.type === "shelf.sidebar.startGovernedTask") {
-          await vscode.commands.executeCommand("shelf.startGovernedTask");
-          return;
-        }
-        if (message.type === "shelf.sidebar.showGovernedTaskSession") {
-          await vscode.commands.executeCommand("shelf.showGovernedTaskSession");
-          return;
-        }
-        if (message.type === "shelf.sidebar.clearGovernedTaskSession") {
-          await vscode.commands.executeCommand("shelf.clearGovernedTaskSession");
-          return;
-        }
         if (message.type === "shelf.sidebar.refreshTree") {
           await vscode.commands.executeCommand("shelf.refreshFrameworkTree");
           return;
@@ -2232,7 +2527,9 @@ function activate(context) {
         if (message.type === "shelf.sidebar.openIssue") {
           const index = Number(message.index);
           if (Number.isInteger(index) && index >= 0 && index < lastRunIssues.length && lastRepoRoot) {
-            await revealIssue(lastRunIssues[index], lastRepoRoot);
+            await revealIssue(lastRunIssues[index], lastRepoRoot, {
+              notifyWarning: showShelfWarningMessage,
+            });
           }
         }
       });
@@ -2382,6 +2679,10 @@ function activate(context) {
     { language: "markdown", scheme: "file" },
     {
       provideCompletionItems(document, position) {
+        const lintSettings = readFrameworkLintSettings();
+        if (!lintSettings.autoCompleteEnabled) {
+          return undefined;
+        }
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
         const repoRoot = folder?.uri.fsPath || "";
         const isFrameworkFile = repoRoot
@@ -2397,7 +2698,11 @@ function activate(context) {
         const entries = frameworkCompletion.getFrameworkCompletionEntries(
           linePrefix,
           wordPrefix,
-          isFrameworkFile
+          isFrameworkFile,
+          {
+            documentText: document.getText(),
+            lineNumber: position.line,
+          }
         );
         if (!entries.length) {
           return undefined;
@@ -2418,83 +2723,30 @@ function activate(context) {
         });
       }
     },
-    "@",
-    "#",
-    "-",
-    "`",
-    "."
+    ...FRAMEWORK_COMPLETION_TRIGGER_CHARS
   );
 
-  const startGovernedTaskDisposable = vscode.commands.registerCommand(
-    "shelf.startGovernedTask",
-    async () => {
-      const folder = vscode.workspace.workspaceFolders?.[0];
-      if (!folder) {
-        vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
-        return;
+  const frameworkLintQuickFixDisposable = vscode.languages.registerCodeActionsProvider(
+    { language: "markdown", scheme: "file" },
+    {
+      provideCodeActions(document, _range, context) {
+        if (!isFrameworkLintDocument(document)) {
+          return undefined;
+        }
+        const lintSettings = readFrameworkLintSettings();
+        if (!lintSettings.enabled || !lintSettings.quickFixEnabled) {
+          return undefined;
+        }
+        const diagnosticsList = Array.isArray(context?.diagnostics) ? context.diagnostics : [];
+        const actions = [];
+        for (const diagnostic of diagnosticsList) {
+          actions.push(...buildFrameworkLintQuickFixes(document, diagnostic));
+        }
+        return actions.length ? actions : undefined;
       }
-
-      const settings = readIntentGateSettings();
-      if (!settings.enabled) {
-        vscode.window.showWarningMessage("Shelf：对话意图门禁已关闭，请先启用 `shelf.intentGateEnabled`。");
-        return;
-      }
-
-      const intentText = await vscode.window.showInputBox({
-        title: "Shelf 受控任务",
-        prompt: "请描述本次需求。Shelf 会先映射到 framework 路径，再允许改代码。",
-        placeHolder: "例如：给知识库聊天页增加 @ 文档引用，并新增动态图展示页",
-        ignoreFocusOut: true,
-      });
-      if (!intentText) {
-        return;
-      }
-
-      const result = await grantIntentGateSession({
-        repoRoot: folder.uri.fsPath,
-        intentText,
-      });
-      if (!result.passed) {
-        vscode.window.showErrorMessage(`Shelf 对话意图门禁拒绝授权：${result.message}`);
-        return;
-      }
-
-      const preview = result.analysis.mappings.slice(0, 2)
-        .map((item) => `${item.moduleId}/${item.boundaryId}`)
-        .join(" | ");
-      vscode.window.showInformationMessage(
-        `Shelf 受控任务已授权（${result.analysis.mappings.length} 条映射）：${preview}`
-      );
-    }
-  );
-
-  const showGovernedTaskSessionDisposable = vscode.commands.registerCommand(
-    "shelf.showGovernedTaskSession",
-    async () => {
-      const settings = readIntentGateSettings();
-      const session = ensureIntentGateSession(settings);
-      if (!session) {
-        vscode.window.showInformationMessage("Shelf：当前没有已授权的受控任务会话。");
-        return;
-      }
-      output.appendLine("[intent-gate] active session");
-      output.appendLine(`- id: ${session.id}`);
-      output.appendLine(`- createdAt: ${session.createdAt}`);
-      output.appendLine(`- intent: ${session.intentText}`);
-      output.appendLine(
-        `- temporary bypasses: ${settings.temporaryBypasses.length ? settings.temporaryBypasses.join(", ") : "none"}`
-      );
-      output.appendLine(intentGate.formatIntentMappingSummary(session.analysis));
-      output.show(true);
-    }
-  );
-
-  const clearGovernedTaskSessionDisposable = vscode.commands.registerCommand(
-    "shelf.clearGovernedTaskSession",
-    async () => {
-      clearIntentGateSession("manual clear");
-      refreshSidebarHome();
-      vscode.window.showInformationMessage("Shelf：受控任务会话已清空。");
+    },
+    {
+      providedCodeActionKinds: [vscode.CodeActionKind.QuickFix],
     }
   );
 
@@ -2511,7 +2763,7 @@ function activate(context) {
     async () => {
       const activeDraft = activeFrameworkDraftFile();
       if (!activeDraft) {
-        vscode.window.showWarningMessage(
+        showShelfWarningMessage(
           "Shelf：发布前请先打开 `framework_drafts/<framework>/` 下的 Markdown 文件。"
         );
         return;
@@ -2530,7 +2782,7 @@ function activate(context) {
         )
       );
       if (!result.passed) {
-        const action = await vscode.window.showErrorMessage(
+        const action = await showShelfErrorMessage(
           "Shelf：发布当前 framework 草稿失败。",
           "打开日志"
         );
@@ -2548,7 +2800,7 @@ function activate(context) {
         notifyOnFail: true,
         source: "manual"
       });
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         `Shelf：已发布 ${workspaceGuard.normalizeRelPath(activeDraft.publishedRelPath)}`
       );
     }
@@ -2557,7 +2809,7 @@ function activate(context) {
   const installGitHooksDisposable = vscode.commands.registerCommand("shelf.installGitHooks", async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
 
@@ -2576,9 +2828,9 @@ function activate(context) {
     );
 
     if (result.passed) {
-      vscode.window.showInformationMessage("Shelf：仓库 Git Hooks 已安装。");
+      showShelfInformationMessage("Shelf：仓库 Git Hooks 已安装。");
     } else {
-      const action = await vscode.window.showErrorMessage(
+      const action = await showShelfErrorMessage(
         "Shelf：安装仓库 Git Hooks 失败。",
         "打开日志"
       );
@@ -2594,12 +2846,12 @@ function activate(context) {
     async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
-        vscode.window.showWarningMessage("Shelf：当前没有可用于插入模板的活动编辑器。");
+        showShelfWarningMessage("Shelf：当前没有可用于插入模板的活动编辑器。");
         return;
       }
 
       if (editor.document.languageId !== "markdown") {
-        vscode.window.showWarningMessage("Shelf：framework 模块模板只能插入到 Markdown 文件。");
+        showShelfWarningMessage("Shelf：framework 模块模板只能插入到 Markdown 文件。");
         return;
       }
 
@@ -2609,7 +2861,7 @@ function activate(context) {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         output.appendLine(`[template] ${message}`);
-        vscode.window.showErrorMessage("Shelf：加载 @framework 模块模板失败。");
+        showShelfErrorMessage("Shelf：加载 @framework 模块模板失败。");
         return;
       }
 
@@ -2618,14 +2870,14 @@ function activate(context) {
         editor.selections
       );
       if (!inserted) {
-        vscode.window.showWarningMessage("Shelf：framework 模块模板插入已取消。");
+        showShelfWarningMessage("Shelf：framework 模块模板插入已取消。");
       }
     }
   );
 
   const showIssuesDisposable = vscode.commands.registerCommand("shelf.showIssues", async () => {
     if (!validationActive && lastRepoRoot) {
-      vscode.window.showInformationMessage(
+      showShelfInformationMessage(
         `Shelf 校验守卫已停用：当前工作区缺少 ${STANDARDS_TREE_FILE}。`
       );
       return;
@@ -2637,7 +2889,9 @@ function activate(context) {
     }
 
     if (lastRunIssues.length === 1 && lastRepoRoot) {
-      await revealIssue(lastRunIssues[0], lastRepoRoot);
+      await revealIssue(lastRunIssues[0], lastRepoRoot, {
+        notifyWarning: showShelfWarningMessage,
+      });
       return;
     }
 
@@ -2660,9 +2914,44 @@ function activate(context) {
     });
 
     if (selected && lastRepoRoot) {
-      await revealIssue(selected.issue, lastRepoRoot);
+      await revealIssue(selected.issue, lastRepoRoot, {
+        notifyWarning: showShelfWarningMessage,
+      });
     }
   });
+
+  const statusBarActionMenuDisposable = vscode.commands.registerCommand(
+    "shelf.statusBarActionMenu",
+    async () => {
+      const selected = await vscode.window.showQuickPick(
+        [
+          {
+            label: "Open Framework Tree (Recommended)",
+            description: "打开可拖动/可关闭/可调整大小的框架树图窗口。",
+            action: "openFrameworkTree",
+          },
+          {
+            label: "Show Issues",
+            description: "打开 Shelf 问题列表与定位入口。",
+            action: "showIssues",
+          },
+        ],
+        {
+          title: "Shelf Status Action",
+          placeHolder: "选择点击状态栏后的执行动作",
+          canPickMany: false,
+        }
+      );
+      if (!selected) {
+        return;
+      }
+      if (selected.action === "showIssues") {
+        await vscode.commands.executeCommand("shelf.showIssues");
+        return;
+      }
+      await vscode.commands.executeCommand("shelf.openFrameworkTree");
+    }
+  );
 
   const openFrameworkTreeDisposable = vscode.commands.registerCommand("shelf.openFrameworkTree", async () => {
     await openFrameworkTree();
@@ -2671,11 +2960,11 @@ function activate(context) {
   const refreshFrameworkTreeDisposable = vscode.commands.registerCommand("shelf.refreshFrameworkTree", async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
     await openFrameworkTree();
-    vscode.window.showInformationMessage("Shelf：框架树运行时投影已刷新。");
+    showShelfInformationMessage("Shelf：框架树运行时投影已刷新。");
   });
 
   const openEvidenceTreeDisposable = vscode.commands.registerCommand("shelf.openEvidenceTree", async () => {
@@ -2685,7 +2974,7 @@ function activate(context) {
   const refreshEvidenceTreeDisposable = vscode.commands.registerCommand("shelf.refreshEvidenceTree", async () => {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
-      vscode.window.showWarningMessage("Shelf：当前未打开工作区。");
+      showShelfWarningMessage("Shelf：当前未打开工作区。");
       return;
     }
 
@@ -2702,7 +2991,7 @@ function activate(context) {
         "Shelf：执行生成前预检",
         treeTitleForKind("evidence")
       );
-      vscode.window.showWarningMessage(
+      showShelfWarningMessage(
         freshnessDetail
           ? `Shelf：canonical 未 fresh，证据树刷新已阻断。${freshnessDetail}`
           : "Shelf：canonical 未 fresh，证据树刷新已阻断。"
@@ -2711,30 +3000,30 @@ function activate(context) {
     }
 
     await openEvidenceTree();
-    vscode.window.showInformationMessage("Shelf：证据树运行时投影已刷新。");
+    showShelfInformationMessage("Shelf：证据树运行时投影已刷新。");
   });
 
   const configurationDisposable = vscode.workspace.onDidChangeConfiguration(async (event) => {
-    const affectsIntentGate = INTENT_GATE_SETTING_KEYS.some((key) => event.affectsConfiguration(key));
     const affectsTreeView = TREE_WEBVIEW_SETTING_KEYS.some((key) => event.affectsConfiguration(key));
-    if (!affectsIntentGate && !affectsTreeView) {
+    const affectsFrameworkLint = FRAMEWORK_LINT_SETTING_KEYS.some((key) => event.affectsConfiguration(key));
+    if (!affectsTreeView && !affectsFrameworkLint) {
       return;
     }
-    await handleRuntimeSettingSourcesChanged({
-      reason: "VSCode shelf settings update",
-      refreshTree: affectsTreeView
-    });
+    if (affectsTreeView) {
+      await handleRuntimeSettingSourcesChanged({
+        refreshTree: affectsTreeView
+      });
+    }
+    if (affectsTreeView) {
+      applyStatusBarClickAction();
+    }
+    if (affectsFrameworkLint) {
+      refreshFrameworkLintForOpenDocuments({ immediate: true });
+    }
   });
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (doc) => {
-    const gateDecision = await enforceIntentGateOnSave(doc);
-    if (!gateDecision.allow) {
-      return;
-    }
-    const config = getShelfConfig();
-    if (!config.get("enableOnSave") || !shouldRunValidationTrigger("save")) {
-      return;
-    }
+    scheduleFrameworkLintForDocument(doc, { immediate: true });
 
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) {
@@ -2745,9 +3034,18 @@ function activate(context) {
     if (!workspaceGuard.isWatchedPath(rel) || isSuppressedGeneratedPath(rel)) {
       return;
     }
+    const isFrameworkDoc = frameworkNavigation.isFrameworkMarkdownFile(doc.uri.fsPath, folder.uri.fsPath);
+    const config = getShelfConfig();
 
     dirtyWatchedFiles.delete(doc.uri.fsPath);
-    scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+    if (config.get("enableOnSave") && shouldRunValidationTrigger("save")) {
+      if (isFrameworkDoc) {
+        await runValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+      } else {
+        scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
+      }
+    }
+    await maybeRefreshFrameworkTreeForSavedDocument(doc);
   });
 
   const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -2755,28 +3053,14 @@ function activate(context) {
     if (!folder || !event.document?.uri?.fsPath) {
       return;
     }
+    scheduleFrameworkLintForDocument(event.document, { immediate: false });
+    const didAutoExpandFrameworkDashEntry = maybeAutoExpandFrameworkDashEntry(event);
+    if (!didAutoExpandFrameworkDashEntry) {
+      maybeAutoTriggerFrameworkSuggest(event);
+    }
     const relPath = workspaceGuard.normalizeRelPath(path.relative(folder.uri.fsPath, event.document.uri.fsPath));
     if (!workspaceGuard.isWatchedPath(relPath) || isSuppressedGeneratedPath(relPath)) {
       return;
-    }
-
-    const intentSettings = readIntentGateSettings();
-    if (
-      intentSettings.enabled
-      && !isIntentGateTemporaryBypassEnabled(intentSettings, "save_guard")
-      && isIntentGateGuardedPath(folder.uri.fsPath, event.document.uri.fsPath, intentSettings)
-    ) {
-      const fsPath = event.document.uri.fsPath;
-      if (event.document.isDirty && !guardedBaselineByPath.has(fsPath) && !restoringGuardedFiles.has(fsPath)) {
-        try {
-          guardedBaselineByPath.set(fsPath, fs.readFileSync(fsPath, "utf8"));
-        } catch (error) {
-          output.appendLine(`[intent-gate] ${relPath} 基线快照失败：${String(error)}`);
-        }
-      }
-      if (!event.document.isDirty) {
-        guardedBaselineByPath.delete(fsPath);
-      }
     }
 
     if (event.document.isDirty) {
@@ -2788,6 +3072,19 @@ function activate(context) {
     dirtyWatchedFiles.delete(event.document.uri.fsPath);
     refreshStatusFromCurrentState();
     refreshSidebarHome();
+  });
+
+  const openDocumentDisposable = vscode.workspace.onDidOpenTextDocument((document) => {
+    scheduleFrameworkLintForDocument(document, { immediate: true });
+  });
+
+  const closeDocumentDisposable = vscode.workspace.onDidCloseTextDocument((document) => {
+    if (!document?.uri) {
+      return;
+    }
+    const key = document.uri.toString();
+    clearFrameworkLintTimer(key);
+    frameworkLintDiagnostics.delete(document.uri);
   });
 
   const createDisposable = vscode.workspace.onDidCreateFiles(async (event) => {
@@ -2870,6 +3167,7 @@ function activate(context) {
         reason: `${localSettings.LOCAL_SETTINGS_REL_PATH} update`,
         refreshTree: true
       });
+      refreshFrameworkLintForOpenDocuments({ immediate: true });
     };
     localSettingsWatcher.onDidChange(refreshFromLocalSettingsFile);
     localSettingsWatcher.onDidCreate(refreshFromLocalSettingsFile);
@@ -2884,20 +3182,21 @@ function activate(context) {
     frameworkHoverDisposable,
     frameworkReferenceDisposable,
     frameworkCompletionDisposable,
+    frameworkLintQuickFixDisposable,
     insertFrameworkTemplateDisposable,
-    startGovernedTaskDisposable,
-    showGovernedTaskSessionDisposable,
-    clearGovernedTaskSessionDisposable,
     validateNowDisposable,
     codegenPreflightDisposable,
     publishFrameworkDraftDisposable,
     installGitHooksDisposable,
     showIssuesDisposable,
+    statusBarActionMenuDisposable,
     openFrameworkTreeDisposable,
     refreshFrameworkTreeDisposable,
     openEvidenceTreeDisposable,
     refreshEvidenceTreeDisposable,
     configurationDisposable,
+    openDocumentDisposable,
+    closeDocumentDisposable,
     changeDisposable,
     saveDisposable,
     createDisposable,
@@ -2910,6 +3209,7 @@ function activate(context) {
   if (shouldRunValidationTrigger("workspace")) {
     scheduleValidation({ mode: "change", triggerUris: [], notifyOnFail: false, source: "auto" });
   }
+  refreshFrameworkLintForOpenDocuments({ immediate: true });
   void refreshGitHookStatus({ promptIfMissing: true });
 }
 
@@ -2926,6 +3226,20 @@ function shellQuote(value) {
     return text;
   }
   return `'${text.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function enableFrameworkOnlyFallbackForMaterializeCommand(baseCommand) {
+  const command = String(baseCommand || DEFAULT_MATERIALIZE_COMMAND).trim();
+  if (!command) {
+    return DEFAULT_MATERIALIZE_COMMAND;
+  }
+  if (!/\bmaterialize_project\.py\b/.test(command)) {
+    return command;
+  }
+  if (/\s--allow-framework-only-fallback(?:\s|$)/.test(command)) {
+    return command;
+  }
+  return `${command} --allow-framework-only-fallback`;
 }
 
 function buildMaterializeCommand(baseCommand, projectFiles) {
@@ -3060,8 +3374,10 @@ function parseMypyResult(stdout, stderr, code) {
   };
 }
 
-function applyDiagnostics(parsed, collection, repoRoot, triggerUri) {
-  collection.clear();
+function applyDiagnostics(parsed, collection, repoRoot, triggerUri, { clearExisting = true } = {}) {
+  if (clearExisting) {
+    collection.clear();
+  }
   if (!parsed || !Array.isArray(parsed.errors) || !parsed.errors.length) {
     return;
   }
@@ -3908,14 +4224,17 @@ function buildSidebarHomeHtml(model) {
 </html>`;
 }
 
-async function revealIssue(issue, repoRoot) {
+async function revealIssue(issue, repoRoot, options = {}) {
+  const notifyWarning = typeof options.notifyWarning === "function"
+    ? options.notifyWarning
+    : (message) => vscode.window.showWarningMessage(message);
   const candidate = resolveIssueFile(issue.file, repoRoot);
   const fallbackTarget = resolveValidationFallbackFile(repoRoot);
   const target = (candidate && fs.existsSync(candidate))
     ? candidate
     : fallbackTarget;
   if (!target || !fs.existsSync(target)) {
-    vscode.window.showWarningMessage("Shelf 无可用定位文件：当前工作区未发现可打开的项目配置或规范文档。");
+    await notifyWarning("Shelf 无可用定位文件：当前工作区未发现可打开的项目配置或规范文档。");
     return;
   }
   const uri = vscode.Uri.file(target);

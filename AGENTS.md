@@ -16,7 +16,7 @@
 4. `ConfigModule` 只消费对应 `FrameworkModule` export；`CodeModule` 只消费对应 `ConfigModule.exact_export`；`EvidenceModule` 只消费对应 `CodeModule` export。
 5. 架构关系只允许用组合，不允许用继承。
 6. 项目由三部分决定：framework markdown、统一 project config、真实 code 实现。不要把项目做成手写特化分支。
-7. `communication` 只能承载结构化沟通要求；`exact` 只能承载 Code 层精确消费字段。
+7. `communication` 只能写结构化沟通要求；`exact` 只能写 Code 层精确消费字段。
 8. 自然语言说明只能做补充；机器判定必须依赖结构化字段。
 9. `generated/canonical.json` 是唯一机器真相源。其他 tree、report、evidence view 都只能是它的派生视图。
 10. 不要恢复旧的核心架构。不要保留并行真相源，不要把旧系统换个名字继续跑。
@@ -34,22 +34,24 @@
 8. 始终保持架构单一，不要创建 side channel
 
 ## 对话触发守卫（强制）
-- AGENTS 只认最终生效的 `shelf.*` 值作为门禁配置语义入口，不再维护独立目录常量；不再在 AGENTS 里区分配置来自哪个文件承载。
-- 门禁范围只看：`shelf.intentGateGuardedPathPrefixes` 与 `shelf.intentGateIgnoredPathPrefixes`。若未显式覆盖，插件默认受检目录为：`framework/`、`framework_drafts/`、`projects/`、`src/project_runtime/`、`scripts/`。
-- 检查开关只看：`shelf.intentGateEnabled`、`shelf.intentGateRunChangeValidationBeforeGrant`、`shelf.intentGateTemporaryBypasses`。当 `intentGateEnabled = false`，或 `intentGateRunChangeValidationBeforeGrant = false`，或 `intentGateTemporaryBypasses` 包含 `grant_pre_validation` / `*` 时，可临时关闭“改前 check-changes 检查”。
-- 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中“门禁作用范围”且未命中上述关闭条件，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
+- AGENTS 只认最终生效的 `shelf.*` 值作为门禁配置语义入口，不再维护独立目录常量；不再在 AGENTS 里区分配置最终写在哪个文件里。
+- 默认受检目录为：`framework/`
+- 只要用户在 AI 对话中提出“改代码/改配置/改脚本/改模块”诉求（无论中文或英文），且目标修改路径命中上述受检范围，AI 在开始任何文件修改前，必须先执行：`uv run python scripts/validate_canonical.py --check-changes`。
 - bootstrap 例外：若 `--check-changes` 失败原因为“当前仓库不存在任何 `projects/*/project.toml`”，可进入 bootstrap 模式继续生成首个 `project.toml` 与对应代码/产物；生成后必须立刻恢复常规门禁并重新执行 `--check-changes`。
-- 若上述命令失败，或输出包含 `FRAMEWORK_VIOLATION`，AI 必须拒绝继续修改命中门禁范围的文件，并明确提示“先由人修改 framework，再继续实现层变更”。
-- AI 完成命中门禁范围的修改后，提交前必须再次执行：`uv run python scripts/validate_canonical.py --check-changes`，除非命中上述临时关闭条件；未关闭时必须确保未引入新的 framework 语义越权。
+- 若上述命令失败且输出包含 `FRAMEWORK_VIOLATION`，或“需求 -> framework 映射”无法成立，AI 必须拒绝继续修改命中门禁范围的文件，并明确提示“先由人修改 framework，再继续实现层变更”。
+- 若上述命令失败但原因属于实现层漂移（示例：`static module boundary map mismatch`、`CORRESPONDENCE_VIOLATION`、`codegen_consistency`），且该需求可在当前 framework 中完成显式映射，AI 应继续修改实现层文件（`projects/**`、`src/project_runtime/**`、`scripts/**`）以修复漂移；`framework/**` 仍保持只读。
+- `projects/<project_id>/project.toml` 是实现层配置入口；在映射成立前提下，AI 可以修改该文件以把 config/code 对齐到已存在的 framework 约束，无需额外等待人工先改 framework。
+- AI 完成命中门禁范围的修改后，提交前必须再次执行：`uv run python scripts/validate_canonical.py --check-changes`，并确保未引入新的 framework 语义越权。
 - 该守卫属于“对话级自动触发”，不得要求用户手工复制临时 `project.toml` 才触发。
-- 当用户把 `intentGateGuardedPathPrefixes` 配置为仅 `framework/` 时，门禁只对 `framework/**` 生效。
 
 ### 对话意图到框架映射门禁（强制）
 - 用户提出“新增/调整功能”时，AI 必须先完成“需求 -> framework 显式映射”再动实现层文件。
 - 映射结果至少应包含：`module_id`、对应 `boundary_id`（或明确的 Rule/Base 约束）、以及落点 `exact.*` 路径。
 - 若 AI 不能给出上述映射，或映射结果无法在当前 framework 中找到对应约束，AI 必须拒绝修改命中门禁范围的实现文件，并提示“该需求尚未进入 framework，请先由人修改 framework”。
 - 在“映射失败”场景中，AI 不得通过“直接改 config 或 code”规避框架前置；不得创建平行真相路径。
-- `framework/**` 是人类作者源；AI 对 framework 默认只读。需要新增框架能力时，AI 只能给出修改建议，不得直接落盘 framework 文件。
+- `framework/**` 是人类作者源；AI 对 framework 绝对只读。不得因为“用户点名某个 framework 文件”“只是试写一版”“先改再恢复”或“先给人看效果”而直接落盘 framework 文件。
+- AI 需要给出候选稿时，必须按语义选择落点：正式 framework 作者稿候选写到 `framework_drafts/**`
+- AI 不得直接执行 `framework_drafts/** -> framework/**` 的发布动作；正式 framework 作者源落盘必须由人类确认并单独触发。
 
 ## 工程执行规范（强制）
 
@@ -76,6 +78,7 @@
 - 必须启用仓库 `pre-push` hook：`bash scripts/install_git_hooks.sh`。
 - 若 canonical 验证不通过，禁止推送。
 - 公开发布时，必须提供符合规范的双语版本说明与正式安装产物。
+- 公开发布版本说明必须按“上一版本 tag -> 当前版本 tag”的完整提交区间汇总；禁止只按单次会话/单次对话编写发布说明（示例：`shelf-ai-v0.1.20..shelf-ai-v0.1.21`）。
 
 ### 4. 规范优先级
 - 规范总纲：`specs/规范总纲与树形结构.md`

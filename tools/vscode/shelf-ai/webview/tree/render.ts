@@ -41,7 +41,7 @@ interface EdgeRenderRefs {
 const EDGE_ARROW_DEFAULT_MARKER_ID = "tree-edge-arrow-default";
 const EDGE_ARROW_ACTIVE_MARKER_ID = "tree-edge-arrow-active";
 const DEFAULT_ZOOM_MIN_SCALE = 0.68;
-const DEFAULT_ZOOM_MAX_SCALE = 1.55;
+const DEFAULT_ZOOM_MAX_SCALE = 2.4;
 const DEFAULT_WHEEL_SENSITIVITY = 1;
 const ZOOM_WHEEL_DELTA_BASE_MIN = -0.08;
 const ZOOM_WHEEL_DELTA_BASE_MAX = 0.08;
@@ -902,8 +902,8 @@ export class TreeCanvasRenderer {
           <ul class="hover-list">${hoverList(node.capabilityItems || [], "无能力声明", 2)}</ul>
         </section>
         <section class="hover-section">
-          <h4 class="hover-section-title">最小可行基</h4>
-          <ul class="hover-list">${hoverList(node.baseItems || [], "无最小可行基", 2)}</ul>
+          <h4 class="hover-section-title">最小结构基</h4>
+          <ul class="hover-list">${hoverList(node.baseItems || [], "无最小结构基", 2)}</ul>
         </section>
       </div>
       <div class="hover-footer">${footer}</div>

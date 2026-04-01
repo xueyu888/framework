@@ -288,8 +288,12 @@ function main() {
       "validation issues should carry the primary object id"
     );
     assert(
-      correspondenceIssues[0].message.includes("Demo correspondence failure"),
-      "custom correspondence reasons should be preserved when no localization rule matches"
+      correspondenceIssues[0].message.includes("对应关系校验失败"),
+      "unknown correspondence reasons should fall back to Chinese guidance"
+    );
+    assert(
+      !correspondenceIssues[0].message.includes("Demo correspondence failure"),
+      "unknown English correspondence reasons should not leak directly to diagnostics"
     );
     assert.strictEqual(
       correspondenceIssues[0].file,
@@ -332,6 +336,58 @@ function main() {
     assert(
       localizedIssues[1].message.includes("规则声明的参数边界未被有效读取"),
       "rule-boundary drift should be localized to Chinese by default"
+    );
+
+    const groupedBoundaryIssues = buildValidationIssues(
+      {
+        passed: false,
+        rule_count: 1,
+        error_count: 3,
+        issues: [
+          {
+            issue_kind: "audit_drift",
+            level: "error",
+            reason: `declared boundary not effectively read by base: ${moduleObjectId}.B1 -> INGRESS`,
+            object_ids: [moduleObjectId],
+            primary_object_id: moduleObjectId,
+          },
+          {
+            issue_kind: "audit_drift",
+            level: "error",
+            reason: `declared boundary not effectively read by base: ${moduleObjectId}.B1 -> ORDER`,
+            object_ids: [moduleObjectId],
+            primary_object_id: moduleObjectId,
+          },
+          {
+            issue_kind: "audit_drift",
+            level: "error",
+            reason: `declared boundary not effectively read by base: ${moduleObjectId}.B1 -> SLA`,
+            object_ids: [moduleObjectId],
+            primary_object_id: moduleObjectId,
+          },
+        ],
+        issue_count_by_object: {
+          [moduleObjectId]: 3,
+        },
+      },
+      rootPayload.object_index
+    );
+    assert.strictEqual(
+      groupedBoundaryIssues.length,
+      1,
+      "same-object boundary misses should be grouped into one actionable issue"
+    );
+    assert(
+      groupedBoundaryIssues[0].message.includes("INGRESS、ORDER、SLA"),
+      "grouped boundary issue should list all missing boundaries"
+    );
+    assert(
+      groupedBoundaryIssues[0].message.includes("建议：在对应 Base 实现中读取这些参数"),
+      "grouped boundary issue should provide explicit remediation guidance"
+    );
+    assert(
+      !groupedBoundaryIssues[0].message.includes("R*.4"),
+      "grouped boundary issue should not leak rule-template wildcard tokens"
     );
 
     const mergedIssues = mergeIssueLists(correspondenceIssues, [

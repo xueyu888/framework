@@ -70,15 +70,15 @@ function fallbackWorkbenchModuleText() {
 
 - \`C1\`：最小场景能力
 
-## 2. 参数定义
+## 2. 边界定义（Boundary / Parameter 参数）
 
 - \`CHAT\`：聊天参数
 - \`CONTEXT\`：上下文参数
 - \`RETURN\`：回跳参数
 
-## 3. 最小可行基
+## 3. 最小结构基（Minimal Structural Bases）
 
-- \`B1\`：最小承载基
+- \`B1\`：最小骨架基
 
 ## 4. 基组合原则
 
@@ -200,6 +200,11 @@ function main() {
     );
     const tempProjectPath = path.join(tempRepoRoot, "projects", "demo", "project.toml");
     writeFile(tempFrameworkPath, workbenchText);
+    const unresolvedCapabilityText = fallbackWorkbenchModuleText().replace(
+      "  - 输出能力：`C1`",
+      "  - 输出能力：`C1 + C2`"
+    );
+    const unresolvedCapabilityRef = locate(unresolvedCapabilityText, "C1 + C2");
     writeFile(
       tempProjectPath,
       `
@@ -249,6 +254,32 @@ framework_file = "framework/knowledge_base/L2-M0-知识库工作台场景模块.
       !noCanonicalRefs.some((item) => item.filePath.endsWith("project.toml")),
       "project config references should require canonical instead of inferred fallback"
     );
+
+    const unresolvedCapabilityDefinition = resolveDefinitionTarget({
+      repoRoot: tempRepoRoot,
+      filePath: tempFrameworkPath,
+      text: unresolvedCapabilityText,
+      line: unresolvedCapabilityRef.line,
+      character: unresolvedCapabilityRef.character + "C1 + ".length,
+    });
+    writeFile(tempFrameworkPath, unresolvedCapabilityText);
+    assert(unresolvedCapabilityDefinition, "undefined capability should still provide fallback definition");
+    assert.strictEqual(unresolvedCapabilityDefinition.filePath, tempFrameworkPath);
+    assert(
+      targetLineText(unresolvedCapabilityDefinition).includes("## 1. 能力声明"),
+      "undefined capability should fallback to capability section"
+    );
+
+    const unresolvedCapabilityHover = resolveHoverTarget({
+      repoRoot: tempRepoRoot,
+      filePath: tempFrameworkPath,
+      text: unresolvedCapabilityText,
+      line: unresolvedCapabilityRef.line,
+      character: unresolvedCapabilityRef.character + "C1 + ".length,
+    });
+    assert(unresolvedCapabilityHover, "undefined capability should still provide hover");
+    assert(unresolvedCapabilityHover.markdown.includes("当前文件未定义该符号"));
+    assert(unresolvedCapabilityHover.markdown.includes("能力声明"));
 
     const staleCanonicalPath = path.join(tempRepoRoot, "projects", "demo", "generated", "canonical.json");
     writeFile(

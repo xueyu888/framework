@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-import importlib
+import inspect
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from knowledge_base_runtime.runtime_profile import load_knowledge_base_runtime_profile
 
@@ -21,13 +21,18 @@ from project_runtime.correspondence_contracts import (
 from project_runtime.documents import export_documents
 from project_runtime.framework_layer import FrameworkModuleClass
 from project_runtime.models import KnowledgeDocument, SeedDocumentSource
-from project_runtime.static_modules.backend_l2_m0 import (
+from project_runtime.static_modules import get_static_module_contract_bundle
+from project_runtime.static_modules import registry as static_module_registry
+from project_runtime.static_modules.modules.backend.l2_m0 import (
     BACKEND_L2_M0_MODULE_ID,
+    BackendL2M0B1Base,
+    BackendL2M0B2Base,
+    BackendL2M0B3Base,
     BackendL2M0DynamicBoundaryParams,
     BackendL2M0Module,
     BackendL2M0StaticBoundaryParams,
 )
-from project_runtime.static_modules import all_module_contracts as static_module_contracts
+from project_runtime.utils import relative_path
 
 
 class CodeModuleClass:
@@ -87,34 +92,32 @@ def _class_symbol(class_type: type[Any]) -> str:
     return f"{class_type.__module__}:{class_type.__name__}"
 
 
-@lru_cache(maxsize=1)
-def _backend_l2_m0_module_lines() -> tuple[str, ...]:
-    module_file = Path(__file__).resolve().parent / "static_modules" / "backend_l2_m0.py"
-    return tuple(module_file.read_text(encoding="utf-8").splitlines())
-
-
-def _find_backend_l2_m0_line(needle: str, *, fallback: int = 1) -> int:
-    if not needle:
-        return fallback
-    for index, line_text in enumerate(_backend_l2_m0_module_lines(), start=1):
-        if needle in line_text:
-            return index
-    return fallback
-
-
-@lru_cache(maxsize=1)
-def _all_module_contract_lines() -> tuple[str, ...]:
-    module_file = Path(__file__).resolve().parent / "static_modules" / "all_module_contracts.py"
-    return tuple(module_file.read_text(encoding="utf-8").splitlines())
-
-
-def _find_all_module_contract_line(needle: str, *, fallback: int = 1) -> int:
-    if not needle:
-        return fallback
-    for index, line_text in enumerate(_all_module_contract_lines(), start=1):
-        if needle in line_text:
-            return index
-    return fallback
+def _source_ref_for_object(
+    obj: Any,
+    *,
+    section: str,
+    anchor: str,
+    token: str,
+    fallback_file_path: str,
+    fallback_line: int = 1,
+) -> dict[str, Any]:
+    file_path = fallback_file_path
+    line_no = fallback_line
+    try:
+        source_file = inspect.getsourcefile(obj)
+        _, source_line = inspect.getsourcelines(obj)
+    except (OSError, TypeError):
+        source_file = None
+    if source_file:
+        file_path = relative_path(Path(source_file).resolve())
+        line_no = int(source_line)
+    return {
+        "file_path": file_path,
+        "line": line_no,
+        "section": section,
+        "anchor": anchor,
+        "token": token,
+    }
 
 
 class CodeBoundaryStaticClass:
@@ -623,7 +626,7 @@ def _build_module_contract_state(binding: ConfigModuleBinding) -> ModuleContract
     module_id = binding.framework_module.module_id
     module_key = module_key_from_id(module_id)
     field_bindings = tuple(_module_field_bindings(binding))
-    bundle = static_module_contracts.get_static_module_contract_bundle(module_id)
+    bundle = get_static_module_contract_bundle(module_id)
     if bundle is None:
         raise ValueError(f"missing static module contract bundle: {module_id}")
     static_params_type = bundle.static_params_type
@@ -691,7 +694,7 @@ def _module_compile_symbol(
     if module_id == knowledge_base_module_id:
         return "project_runtime.code_layer:_compile_knowledge_base_domain_spec"
     if module_id == BACKEND_L2_M0_MODULE_ID:
-        return "project_runtime.static_modules.backend_l2_m0:BackendL2M0Module.export_service_spec"
+        return "project_runtime.static_modules.modules.backend.l2_m0:BackendL2M0Module.export_service_spec"
     if module_id == backend_module_id:
         return "project_runtime.code_layer:_compile_backend_service_spec"
     return "project_runtime.code_layer:build_code_modules"
@@ -779,23 +782,23 @@ def _boundary_slot_source_ref(
     backend_module_id: str,
 ) -> dict[str, Any]:
     if module_id == BACKEND_L2_M0_MODULE_ID:
-        needle_by_boundary = {
-            "LIBRARY": "def knowledge_base_payload(",
-            "PREVIEW": "def preview_retrieval_payload(",
-            "CHAT": "def answer_policy_payload(",
-            "RESULT": "def transport_payload(",
-            "AUTH": "def write_policy_payload(",
-            "TRACE": "def trace_retrieval_payload(",
+        source_by_boundary: dict[str, object] = {
+            "LIBRARY": BackendL2M0B1Base.knowledge_base_payload,
+            "PREVIEW": BackendL2M0B1Base.preview_retrieval_payload,
+            "CHAT": BackendL2M0B2Base.answer_policy_payload,
+            "RESULT": BackendL2M0B3Base.transport_payload,
+            "AUTH": BackendL2M0B3Base.write_policy_payload,
+            "TRACE": BackendL2M0B3Base.trace_retrieval_payload,
         }
-        fallback = _find_backend_l2_m0_line("class BackendL2M0Module(", fallback=1)
-        line = _find_backend_l2_m0_line(needle_by_boundary.get(boundary_id, ""), fallback=fallback)
-        return {
-            "file_path": "src/project_runtime/static_modules/backend_l2_m0.py",
-            "line": line,
-            "section": "backend_l2_m0_module",
-            "anchor": f"{module_id}:{boundary_id}",
-            "token": boundary_id,
-        }
+        source_obj = source_by_boundary.get(boundary_id, BackendL2M0Module)
+        return _source_ref_for_object(
+            source_obj,
+            section="backend_l2_m0_module",
+            anchor=f"{module_id}:{boundary_id}",
+            token=boundary_id,
+            fallback_file_path="src/project_runtime/code_layer.py",
+            fallback_line=1,
+        )
     fallback_line = _find_code_line("def _build_implementation_slots(", fallback=1)
     needle = ""
     section = "implementation_slots"
@@ -824,24 +827,24 @@ def _runtime_slot_source_ref(
     anchor_path: str,
 ) -> dict[str, Any]:
     if module_id == BACKEND_L2_M0_MODULE_ID:
-        needle_by_anchor = {
-            "backend_service_spec.knowledge_base": "def knowledge_base_payload(",
-            "backend_service_spec.retrieval": "def export_service_spec(",
-            "backend_service_spec.answer_policy": "def answer_policy_payload(",
-            "backend_service_spec.return_policy": "def return_policy_payload(",
-            "backend_service_spec.transport": "def transport_payload(",
-            "backend_service_spec.interaction_copy": "def interaction_copy_payload(",
-            "backend_service_spec.write_policy": "def write_policy_payload(",
+        source_by_anchor: dict[str, object] = {
+            "backend_service_spec.knowledge_base": BackendL2M0B1Base.knowledge_base_payload,
+            "backend_service_spec.retrieval": BackendL2M0Module.export_service_spec,
+            "backend_service_spec.answer_policy": BackendL2M0B2Base.answer_policy_payload,
+            "backend_service_spec.return_policy": BackendL2M0B2Base.return_policy_payload,
+            "backend_service_spec.transport": BackendL2M0B3Base.transport_payload,
+            "backend_service_spec.interaction_copy": BackendL2M0B3Base.interaction_copy_payload,
+            "backend_service_spec.write_policy": BackendL2M0B3Base.write_policy_payload,
         }
-        fallback = _find_backend_l2_m0_line("def export_service_spec(", fallback=1)
-        line = _find_backend_l2_m0_line(needle_by_anchor.get(anchor_path, ""), fallback=fallback)
-        return {
-            "file_path": "src/project_runtime/static_modules/backend_l2_m0.py",
-            "line": line,
-            "section": "backend_l2_m0_module",
-            "anchor": f"{module_id}:{boundary_id}:{anchor_path}",
-            "token": boundary_id,
-        }
+        source_obj = source_by_anchor.get(anchor_path, BackendL2M0Module.export_service_spec)
+        return _source_ref_for_object(
+            source_obj,
+            section="backend_l2_m0_module",
+            anchor=f"{module_id}:{boundary_id}:{anchor_path}",
+            token=boundary_id,
+            fallback_file_path="src/project_runtime/code_layer.py",
+            fallback_line=1,
+        )
     fallback_line = _find_code_line("def _module_runtime_slot_map(", fallback=1)
     line = _find_code_line(f'"{anchor_path}"', fallback=fallback_line)
     return {
@@ -1289,13 +1292,36 @@ def _append_module_code_exports(
         existing[key] = value
 
 
+def _module_custom_exports(
+    *,
+    state: ModuleContractState,
+    exact_export: dict[str, Any],
+) -> dict[str, Any]:
+    module_ctor = cast(Any, state.module_type)
+    module_instance = module_ctor(state.static_params, state.runtime_params)
+    exporter = getattr(module_instance, "export_module_spec", None)
+    if not callable(exporter):
+        return {}
+    signature = inspect.signature(exporter)
+    if "exact_export" in signature.parameters:
+        payload = exporter(exact_export=exact_export)
+    else:
+        payload = exporter()
+    if not isinstance(payload, dict):
+        raise ValueError(
+            "export_module_spec must return a dict payload: "
+            f"module_id={state.module_id} got={type(payload).__name__}"
+        )
+    return payload
+
+
 def build_code_modules(
     config_modules: tuple[ConfigModuleBinding, ...],
     *,
     root_module_ids: dict[str, str],
     root_role_dependencies: dict[str, Any] | None = None,
 ) -> tuple[tuple[CodeModuleBinding, ...], dict[str, Any]]:
-    importlib.reload(static_module_contracts)
+    static_module_registry.reload_static_module_contracts()
     bindings: list[CodeModuleBinding] = []
     runtime_exports: dict[str, Any] = {}
     contract_state_by_module = {
@@ -1442,6 +1468,12 @@ def build_code_modules(
         state = contract_state_by_module[module_id]
         module_key = state.module_key
         exact_export = binding.config_module.exact_export
+        module_custom_exports = _module_custom_exports(state=state, exact_export=exact_export)
+        _append_module_code_exports(
+            module_code_exports_by_id,
+            module_id=module_id,
+            payload=module_custom_exports,
+        )
         code_exports = dict(module_code_exports_by_id.get(module_id, {}))
         module_name_fragment = state.module_name_fragment
         class_name = f"{module_name_fragment}CodeModule"
@@ -1554,28 +1586,14 @@ def build_code_modules(
             }
             for rule_type in rule_types
         ]
-        source_ref: dict[str, Any] = {
-            "file_path": "src/project_runtime/code_layer.py",
-            "section": "code_module",
-            "anchor": module_id,
-            "token": module_id,
-        }
-        if module_type.__module__ == "project_runtime.static_modules.all_module_contracts":
-            source_ref = {
-                "file_path": "src/project_runtime/static_modules/all_module_contracts.py",
-                "line": _find_all_module_contract_line(f"class {module_type.__name__}(", fallback=1),
-                "section": "all_module_contracts",
-                "anchor": f"class {module_type.__name__}",
-                "token": module_id,
-            }
-        elif module_id == BACKEND_L2_M0_MODULE_ID:
-            source_ref = {
-                "file_path": "src/project_runtime/static_modules/backend_l2_m0.py",
-                "line": _find_backend_l2_m0_line("class BackendL2M0Module(", fallback=1),
-                "section": "backend_l2_m0_module",
-                "anchor": "class BackendL2M0Module",
-                "token": module_id,
-            }
+        source_ref = _source_ref_for_object(
+            module_type,
+            section="static_module_class",
+            anchor=f"class {module_type.__name__}",
+            token=module_id,
+            fallback_file_path="src/project_runtime/code_layer.py",
+            fallback_line=_find_code_line("def build_code_modules(", fallback=1),
+        )
         code_module = type(
             class_name,
             (CodeModuleClass,),
