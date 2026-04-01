@@ -1,6 +1,6 @@
 # 项目层
 
-`projects/` 承载 Config 层的具体项目实例。
+`projects/` 放 Config 层的具体项目实例。
 
 每个项目统一使用：
 

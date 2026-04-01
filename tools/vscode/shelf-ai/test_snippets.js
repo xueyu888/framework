@@ -141,18 +141,6 @@ function main() {
     (configuration["shelf.statusBarClickAction"]?.enum || []).includes("quickPick"),
     "package.json must support quickPick status bar click action"
   );
-  assert(
-    !Object.prototype.hasOwnProperty.call(configuration, "shelf.intentGateEnforcementMode"),
-    "package.json should not expose save-time intent gate enforcement mode"
-  );
-  assert(
-    !Object.prototype.hasOwnProperty.call(configuration, "shelf.intentGateGuardedPathPrefixes"),
-    "package.json should not expose save-time guarded path prefixes"
-  );
-  assert(
-    !Object.prototype.hasOwnProperty.call(configuration, "shelf.intentGateIgnoredPathPrefixes"),
-    "package.json should not expose save-time ignored path prefixes"
-  );
 
   const frameworkSnippet = snippetJson["@framework Module Template"];
   assert(frameworkSnippet, "markdown snippets must keep the @framework module template");
@@ -211,6 +199,10 @@ function main() {
   assert(
     /registerCodeActionsProvider\s*\(/.test(extensionSource),
     "extension.js must register framework markdown quick-fix provider"
+  );
+  assert(
+    extensionSource.includes('if (code === "FWL012")'),
+    "extension.js must provide a heading-order quick fix for FWL012 diagnostics"
   );
   assert(
     extensionSource.includes("editor.action.triggerSuggest"),

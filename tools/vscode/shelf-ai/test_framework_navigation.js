@@ -78,7 +78,7 @@ function fallbackWorkbenchModuleText() {
 
 ## 3. 最小结构基（Minimal Structural Bases）
 
-- \`B1\`：最小承载基
+- \`B1\`：最小骨架基
 
 ## 4. 基组合原则
 
