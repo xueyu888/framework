@@ -27,14 +27,37 @@ NON_RESPONSIBILITY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>N\d+)`\s+(?P<name>[^
 BOUNDARY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>[A-Za-z0-9_]+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
 BASE_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>B\d+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
 VERIFY_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>V\d+)`\s+(?P<name>[^：:]+)[：:]\s*(?P<body>.+)$")
+RULE_LINE_PATTERN = re.compile(r"^-\s+`(?P<id>R\d+)`\s+`(?P<name>[^`]+)`[：:]\s*(?P<body>.+)$")
 RULE_TOP_PATTERN = re.compile(r"^-\s+`(?P<id>R\d+)`\s+(?P<name>.+)$")
 RULE_CHILD_PATTERN = re.compile(r"^\s*-\s+`(?P<id>R\d+\.\d+)`\s+(?P<body>.+)$")
 SOURCE_EXPR_PATTERN = re.compile(r"来源[：:]\s*`(?P<expr>[^`]+)`")
 INLINE_REF_PATTERN = re.compile(
     r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.M(?P<module>\d+)(?:\[(?P<rules>[^\]]*)\])?$"
 )
+SYMBOL_TOKEN_PATTERN = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*\b")
+CAPABILITY_SECTION_TITLES = (
+    "## 4. 能力声明（Capability Statement）",
+    "## 1. 能力声明（Capability Statement）",
+)
+NON_RESPONSIBILITY_SECTION_TITLES = (
+    "### 非职责声明（Non-Responsibility Statement）",
+)
 PARAMETER_SECTION_TITLES = (
+    "### 3.2 参数边界（Parameter Constraints）",
+    "## 3. 边界定义（Boundary）",
+    "## 2. 边界定义（Boundary）",
     "## 2. 边界定义（Boundary / Parameter 参数）",
+)
+BASE_SECTION_TITLES = (
+    "## 1. 最小结构基（Minimal Structural Bases）",
+    "## 3. 最小结构基（Minimal Structural Bases）",
+)
+RULE_SECTION_TITLES = (
+    "## 2. 基排列组合（Base Arrangement / Combination）",
+    "## 4. 基组合原则（Base Combination Principles）",
+)
+VERIFICATION_SECTION_TITLES = (
+    "## 5. 验证（Verification）",
 )
 RULE_PARAMETER_BINDING_PREFIXES = ("参数绑定：", "边界绑定：")
 
@@ -43,7 +66,7 @@ def _split_sections(text: str) -> dict[str, list[tuple[int, str]]]:
     sections: dict[str, list[tuple[int, str]]] = {}
     current: str | None = None
     for line_number, line in enumerate(text.splitlines(), start=1):
-        if line.startswith("## "):
+        if line.startswith("## ") or line.startswith("### "):
             current = line.strip()
             sections[current] = []
             continue
@@ -100,6 +123,18 @@ def _extract_inline_expr(line: str) -> str:
     elif ":" in body:
         body = body.split(":", 1)[1]
     return body.strip().rstrip("。")
+
+
+def _ordered_unique(items: Iterable[str]) -> tuple[str, ...]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        value = item.strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
 
 
 def _parse_inline_refs(inline_expr: str, default_framework: str) -> tuple[FrameworkUpstreamLink, ...]:
@@ -242,6 +277,7 @@ def _parse_bases(
 
 def _parse_rules(
     lines: list[tuple[int, str]],
+    boundary_ids: tuple[str, ...],
     *,
     relative_file: str,
 ) -> tuple[FrameworkRule, ...]:
@@ -254,6 +290,7 @@ def _parse_rules(
     invalids: tuple[str, ...] = tuple()
     bindings: tuple[str, ...] = tuple()
     items: list[FrameworkRule] = []
+    boundary_lookup = {boundary_id.lower(): boundary_id for boundary_id in boundary_ids}
 
     def flush() -> None:
         nonlocal current_id, current_name, current_line, participants, combination, outputs, invalids, bindings
@@ -286,9 +323,45 @@ def _parse_rules(
         invalids = tuple()
         bindings = tuple()
 
+    def parse_rule_body(body: str) -> tuple[tuple[str, ...], str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+        clean_body = body.strip().rstrip("。")
+        symbol_tokens = _ordered_unique(SYMBOL_TOKEN_PATTERN.findall(clean_body))
+        participant_bases = _ordered_unique(token for token in symbol_tokens if re.fullmatch(r"B\d+", token))
+        output_capabilities = _ordered_unique(token for token in symbol_tokens if re.fullmatch(r"C\d+", token))
+        invalid_conclusions = _ordered_unique(token for token in symbol_tokens if re.fullmatch(r"N\d+", token))
+        boundary_bindings = _ordered_unique(
+            boundary_lookup[token.lower()]
+            for token in symbol_tokens
+            if token.lower() in boundary_lookup
+        )
+        return participant_bases, clean_body, output_capabilities, invalid_conclusions, boundary_bindings
+
     for line_number, raw_line in lines:
         stripped = raw_line.strip()
         if not stripped:
+            continue
+        line_match = RULE_LINE_PATTERN.match(stripped)
+        if line_match is not None:
+            flush()
+            parsed = parse_rule_body(line_match.group("body"))
+            items.append(
+                FrameworkRule(
+                    rule_id=line_match.group("id"),
+                    name=line_match.group("name").strip(),
+                    participant_bases=parsed[0],
+                    combination=parsed[1],
+                    output_capabilities=parsed[2],
+                    invalid_conclusions=parsed[3],
+                    boundary_bindings=parsed[4],
+                    source_ref=_source_ref(
+                        relative_file,
+                        line=line_number,
+                        section="rule",
+                        anchor=f"rule:{line_match.group('id').lower()}",
+                        token=line_match.group("id"),
+                    ),
+                )
+            )
             continue
         top_match = RULE_TOP_PATTERN.match(stripped)
         if top_match is not None:
@@ -302,15 +375,23 @@ def _parse_rules(
             continue
         body = child_match.group("body").strip().rstrip("。")
         if body.startswith("参与基："):
-            participants = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
+            participants = _ordered_unique(
+                item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+")
+            )
         elif body.startswith("组合方式："):
             combination = body.split("：", 1)[1].strip()
         elif body.startswith("输出能力："):
-            outputs = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
+            outputs = _ordered_unique(
+                item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+")
+            )
         elif body.startswith("失效结论："):
-            invalids = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
+            invalids = _ordered_unique(
+                item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+")
+            )
         elif any(body.startswith(prefix) for prefix in RULE_PARAMETER_BINDING_PREFIXES):
-            bindings = tuple(item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+"))
+            bindings = _ordered_unique(
+                item.strip() for item in body.split("：", 1)[1].replace("`", "").split("+")
+            )
     flush()
     return tuple(items)
 
@@ -324,6 +405,19 @@ def _section_lines(
         if lines is not None:
             return lines
     return []
+
+
+def _merge_section_lines(
+    sections: dict[str, list[tuple[int, str]]],
+    *titles: str,
+) -> list[tuple[int, str]]:
+    merged: list[tuple[int, str]] = []
+    for title in titles:
+        lines = sections.get(title)
+        if lines is None:
+            continue
+        merged.extend(lines)
+    return sorted(merged, key=lambda item: item[0])
 
 
 def _parse_verifications(
@@ -374,6 +468,16 @@ def parse_framework_module(path: str | Path) -> FrameworkModule:
         if line.strip() == title_text.strip():
             title_line = line_number
             break
+    capability_lines = _merge_section_lines(
+        sections,
+        *CAPABILITY_SECTION_TITLES,
+        *NON_RESPONSIBILITY_SECTION_TITLES,
+    )
+    boundary_lines = _section_lines(sections, *PARAMETER_SECTION_TITLES)
+    base_lines = _section_lines(sections, *BASE_SECTION_TITLES)
+    rule_lines = _section_lines(sections, *RULE_SECTION_TITLES)
+    verification_lines = _section_lines(sections, *VERIFICATION_SECTION_TITLES)
+    boundaries = _parse_boundaries(boundary_lines, relative_file=relative_file)
     return FrameworkModule(
         framework=framework,
         level=int(file_match.group("level")),
@@ -383,28 +487,26 @@ def parse_framework_module(path: str | Path) -> FrameworkModule:
         title_en=title_match.group("en").strip(),
         intro=_extract_intro(text),
         capabilities=_parse_capabilities(
-            sections.get("## 1. 能力声明（Capability Statement）", []),
+            capability_lines,
             relative_file=relative_file,
         ),
         non_responsibilities=_parse_non_responsibilities(
-            sections.get("## 1. 能力声明（Capability Statement）", []),
+            capability_lines,
             relative_file=relative_file,
         ),
-        boundaries=_parse_boundaries(
-            _section_lines(sections, *PARAMETER_SECTION_TITLES),
-            relative_file=relative_file,
-        ),
+        boundaries=boundaries,
         bases=_parse_bases(
-            sections.get("## 3. 最小结构基（Minimal Structural Bases）", []),
+            base_lines,
             framework,
             relative_file=relative_file,
         ),
         rules=_parse_rules(
-            sections.get("## 4. 基组合原则（Base Combination Principles）", []),
+            rule_lines,
+            tuple(item.boundary_id for item in boundaries),
             relative_file=relative_file,
         ),
         verifications=_parse_verifications(
-            sections.get("## 5. 验证（Verification）", []),
+            verification_lines,
             relative_file=relative_file,
         ),
         source_ref=_source_ref(
