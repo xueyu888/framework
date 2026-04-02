@@ -29,22 +29,20 @@ const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze([
   "P",
   "B",
   "R",
-  "V",
   "N",
   "c",
   "p",
   "b",
   "r",
-  "v",
   "n",
 ]);
 const FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS = new Set(FRAMEWORK_COMPLETION_TRIGGER_CHARS);
 const FRAMEWORK_REQUIRED_SECTION_HEADINGS = Object.freeze([
-  "## 1. 能力声明（Capability Statement）",
-  "## 2. 边界定义（Boundary / Parameter 参数）",
-  "## 3. 最小结构基（Minimal Structural Bases）",
-  "## 4. 基组合原则（Base Combination Principles）",
-  "## 5. 验证（Verification）",
+  "## 0. 目标 (Goal)",
+  "## 1. 最小结构基（Minimal Structural Bases）",
+  "## 2. 基排列组合（Base Arrangement / Combination）",
+  "## 3. 边界定义（Boundary）",
+  "## 4. 能力声明（Capability Statement）",
 ]);
 const FRAMEWORK_RULE_HINTS = {
   FW002: "@framework 必须无参数",
@@ -63,21 +61,23 @@ const FRAMEWORK_RULE_HINTS = {
   FW029: "框架内联模块引用图必须无环",
   FW030: "边界参数必须包含来源",
   FW031: "边界来源必须引用 C* 且引用合法",
-  FW040: "R*/R*.* 编号必须合法并可追溯",
+  FW040: "R* 编号必须合法并可追溯",
   FW041: "每个 R* 必须包含参与基/组合方式/输出能力/参数绑定",
   FW050: "R*.输出能力必须引用已定义 C*",
   FW060: "新符号必须通过输出结构声明后才可在规则中使用",
   FWL001: "标题必须为 中文名:EnglishName",
   FWL002: "@framework 必须为无参数单行",
-  FWL003: "必须包含 1~5 标准章节",
+  FWL003: "必须包含 0~4 标准章节",
   FWL004: "列表项必须使用 -",
-  FWL005: "能力章节条目格式必须合法（C*/N*）",
-  FWL006: "边界定义条目格式必须合法",
-  FWL007: "最小结构基条目格式必须合法",
-  FWL008: "规则条目格式必须合法",
-  FWL009: "验证条目格式必须合法",
+  FWL005: "能力声明条目格式必须合法（C*/N*）",
+  FWL006: "边界定义与 3.1/3.2 子章节格式必须合法",
+  FWL007: "最小结构基条目格式必须合法（B*）",
+  FWL008: "基排列组合条目格式必须合法（R* 单行）",
   FWL010: "章节内必须至少存在一个可解析条目",
   FWL011: "规则引用的符号必须先在本模块中定义",
+  FWL013: "C/N/B/R 编号必须唯一",
+  FWL014: "每条 R* 必须声明输出能力或失效结论",
+  FWL015: "framework 正文不得出现旧写法（上游模块/project.toml/配置 section）",
   FWL012: "标准二级标题内容与顺序必须合法"
 };
 
@@ -1602,26 +1602,32 @@ function activate(context) {
     let sectionId = "";
     for (let index = 0; index <= safeLine; index += 1) {
       const trimmed = document.lineAt(index).text.trim();
-      if (trimmed === "## 1. 能力声明（Capability Statement）") {
-        sectionId = "capability";
+      if (trimmed === "## 0. 目标 (Goal)") {
+        sectionId = "goal";
         continue;
       }
-      if (
-        trimmed === "## 2. 边界定义（Boundary / Parameter 参数）"
-      ) {
-        sectionId = "parameter";
-        continue;
-      }
-      if (trimmed === "## 3. 最小结构基（Minimal Structural Bases）") {
+      if (trimmed === "## 1. 最小结构基（Minimal Structural Bases）") {
         sectionId = "base";
         continue;
       }
-      if (trimmed === "## 4. 基组合原则（Base Combination Principles）") {
+      if (trimmed === "## 2. 基排列组合（Base Arrangement / Combination）") {
         sectionId = "rule";
         continue;
       }
-      if (trimmed === "## 5. 验证（Verification）") {
-        sectionId = "verification";
+      if (trimmed === "## 3. 边界定义（Boundary）") {
+        sectionId = "boundary";
+        continue;
+      }
+      if (trimmed === "### 3.1 接口定义（IO / Ports）") {
+        sectionId = "boundary-ports";
+        continue;
+      }
+      if (trimmed === "### 3.2 参数边界（Parameter Constraints）") {
+        sectionId = "boundary-parameters";
+        continue;
+      }
+      if (trimmed === "## 4. 能力声明（Capability Statement）") {
+        sectionId = "capability";
       }
     }
     return sectionId;
@@ -1752,11 +1758,23 @@ function activate(context) {
       }
       const missingHeadings = FRAMEWORK_REQUIRED_SECTION_HEADINGS.filter((heading) => !existingHeadings.has(heading));
       if (missingHeadings.length) {
+        const headingBlocks = missingHeadings.map((heading) => {
+          if (heading === "## 3. 边界定义（Boundary）") {
+            return [
+              heading,
+              "",
+              "### 3.1 接口定义（IO / Ports）",
+              "",
+              "### 3.2 参数边界（Parameter Constraints）",
+            ].join("\n");
+          }
+          return heading;
+        });
         quickFixes.push(
           createFrameworkQuickFix(
             document,
             diagnostic,
-            "补全标准章节（1~5）",
+            "补全标准章节（0~4）",
             (edit) => {
               const tailLine = Math.max(0, document.lineCount - 1);
               const tailPos = new vscode.Position(tailLine, document.lineAt(tailLine).text.length);
@@ -1764,7 +1782,7 @@ function activate(context) {
               edit.insert(
                 document.uri,
                 tailPos,
-                `${suffix}\n${missingHeadings.join("\n\n")}\n`
+                `${suffix}\n${headingBlocks.join("\n\n")}\n`
               );
               return true;
             }
@@ -1823,18 +1841,22 @@ function activate(context) {
     }
 
     if (code === "FWL006") {
+      const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
       const inferred = inferFrameworkSymbolNumberFromLine(lineText, "P")
         || nextFrameworkSymbolNumber(documentText, "P");
+      const replacement = sectionId === "boundary-ports"
+        ? "- `PORT_IN`：运行时输入接口，待补充接口说明。\n"
+        : `- \`P${inferred}\` 参数名：待定义参数约束。\n`;
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准参数条目",
+          sectionId === "boundary-ports" ? "替换为标准接口条目" : "替换为标准参数条目",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`P${inferred}\` 参数名：待定义参数约束。来源：\`C1\`。\n`
+              replacement
             );
             return true;
           }
@@ -1854,7 +1876,7 @@ function activate(context) {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`B${inferred}\` 结构基名：待定义结构。来源：\`C1 + P1\`。\n`
+              `- \`B${inferred}\` 结构基名：待定义结构说明。\n`
             );
             return true;
           }
@@ -1866,39 +1888,16 @@ function activate(context) {
       const inferredRuleNumber = inferFrameworkSymbolNumberFromLine(lineText, "R")
         || inferNearestRuleNumber(document, lineIndex)
         || nextFrameworkSymbolNumber(documentText, "R");
-      const blockText = [
-        `- \`R${inferredRuleNumber}\` 规则名`,
-        `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
-        `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
-        `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
-        `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
-      ].join("\n");
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准 R 规则块",
-          (edit) => {
-            edit.replace(document.uri, lineRange, `${blockText}\n`);
-            return true;
-          }
-        )
-      );
-    }
-
-    if (code === "FWL009") {
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "V")
-        || nextFrameworkSymbolNumber(documentText, "V");
-      quickFixes.push(
-        createFrameworkQuickFix(
-          document,
-          diagnostic,
-          "替换为标准 V 条目",
+          "替换为标准 R 条目",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`V${inferred}\` 验证名：待补充验证要求。\n`
+              `- \`R${inferredRuleNumber}\` \`规则名\`：由 \`{B1, B2}\` 形成 \`结果\`，导出 \`C1\`。\n`
             );
             return true;
           }
@@ -1909,23 +1908,19 @@ function activate(context) {
     if (code === "FWL010") {
       const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
       let template = "";
-      if (sectionId === "capability") {
-        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
-      } else if (sectionId === "parameter") {
-        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。来源：\`C1\`。`;
+      if (sectionId === "goal") {
+        template = "- 目标说明。";
       } else if (sectionId === "base") {
-        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构。来源：\`C1 + P1\`。`;
+        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构说明。`;
       } else if (sectionId === "rule") {
         const inferredRuleNumber = nextFrameworkSymbolNumber(documentText, "R");
-        template = [
-          `- \`R${inferredRuleNumber}\` 规则名`,
-          `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
-          `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
-          `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
-          `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
-        ].join("\n");
-      } else if (sectionId === "verification") {
-        template = `- \`V${nextFrameworkSymbolNumber(documentText, "V")}\` 验证名：待补充验证要求。`;
+        template = `- \`R${inferredRuleNumber}\` \`规则名\`：由 \`{B1, B2}\` 形成 \`结果\`，导出 \`C1\`。`;
+      } else if (sectionId === "boundary-ports") {
+        template = "- `PORT_IN`：运行时输入接口，待补充接口说明。";
+      } else if (sectionId === "boundary" || sectionId === "boundary-parameters") {
+        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。`;
+      } else if (sectionId === "capability") {
+        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
       }
       if (template) {
         quickFixes.push(
