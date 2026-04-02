@@ -66,31 +66,34 @@ function fallbackWorkbenchModuleText() {
   return `
 # 知识库工作台场景模块
 
-## 1. 能力声明
+## 0. 目标 (Goal)
 
-- \`C1\`：最小场景能力
+- 最小场景目标。
 
-## 2. 边界定义（Boundary / Parameter 参数）
-
-- \`CHAT\`：聊天参数
-- \`CONTEXT\`：上下文参数
-- \`RETURN\`：回跳参数
-
-## 3. 最小结构基（Minimal Structural Bases）
+## 1. 最小结构基（Minimal Structural Bases）
 
 - \`B1\`：最小骨架基
 
-## 4. 基组合原则
+## 2. 基排列组合（Base Arrangement / Combination）
 
-- \`R1\`：基础组合
-  - 参与基：\`B1\`
-  - 基组合：\`B1\`
-  - 输出能力：\`C1\`
-  - 参数绑定：CHAT + CONTEXT + RETURN
+- \`R1\` \`基础组合\`：由 \`{B1}\` 在 \`CHAT + CONTEXT + RETURN\` 约束下导出 \`C1\`。
 
-## 5. 验证
+## 3. 边界定义（Boundary）
 
-- \`V1\`：最小验证
+### 3.1 接口定义（IO / Ports）
+
+- \`QUERY_IN\`：输入接口。
+- \`ANSWER_OUT\`：输出接口。
+
+### 3.2 参数边界（Parameter Constraints）
+
+- \`CHAT\` 聊天参数：限制聊天模式。
+- \`CONTEXT\` 上下文参数：限制上下文窗口。
+- \`RETURN\` 回跳参数：限制回跳策略。
+
+## 4. 能力声明（Capability Statement）
+
+- \`C1\` 最小场景能力：支持最小场景处理。
 `.trimStart();
 }
 
@@ -201,8 +204,8 @@ function main() {
     const tempProjectPath = path.join(tempRepoRoot, "projects", "demo", "project.toml");
     writeFile(tempFrameworkPath, workbenchText);
     const unresolvedCapabilityText = fallbackWorkbenchModuleText().replace(
-      "  - 输出能力：`C1`",
-      "  - 输出能力：`C1 + C2`"
+      "导出 `C1`。",
+      "导出 `C1 + C2`。"
     );
     const unresolvedCapabilityRef = locate(unresolvedCapabilityText, "C1 + C2");
     writeFile(
@@ -266,7 +269,7 @@ framework_file = "framework/knowledge_base/L2-M0-知识库工作台场景模块.
     assert(unresolvedCapabilityDefinition, "undefined capability should still provide fallback definition");
     assert.strictEqual(unresolvedCapabilityDefinition.filePath, tempFrameworkPath);
     assert(
-      targetLineText(unresolvedCapabilityDefinition).includes("## 1. 能力声明"),
+      targetLineText(unresolvedCapabilityDefinition).includes("## 4. 能力声明"),
       "undefined capability should fallback to capability section"
     );
 
