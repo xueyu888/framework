@@ -636,6 +636,8 @@ function activate(context) {
       .filter((relPath) => authoritativeSources.has(relPath))
       .sort();
     return {
+      hasProjects: summary.hasProjects,
+      bootstrapMode: summary.bootstrapMode,
       projects: summary.projects,
       blockingProjects: summary.blockingProjects,
       dirtySourceRelPaths,
@@ -662,6 +664,9 @@ function activate(context) {
   };
 
   const describeCanonicalFreshness = (freshnessState) => {
+    if (!freshnessState.hasProjects) {
+      return "当前仓库没有 projects/*/project.toml，仍处于 bootstrap / framework authoring 状态";
+    }
     const parts = [];
     if (freshnessState.dirtySourceRelPaths.length) {
       parts.push(`作者源有未校验变更：${freshnessState.dirtySourceRelPaths.slice(0, 2).join(", ")}`);
@@ -869,6 +874,25 @@ function activate(context) {
     const repoRoot = folder.uri.fsPath;
     const config = getShelfConfig();
     const projectFiles = workspaceGuard.discoverProjectFiles(repoRoot);
+    if (!projectFiles.length) {
+      output.clear();
+      output.appendLine("[codegen-preflight] passed=True bootstrap_mode=True");
+      output.appendLine(
+        "- no projects/*/project.toml found; preflight stays in bootstrap/no-project mode until a project config exists"
+      );
+      lastRunIssues = [];
+      lastRepoRoot = repoRoot;
+      lastValidationAt = new Date().toISOString();
+      lastValidationMode = "full";
+      lastValidationPassed = true;
+      applyDiagnostics({ passed: true, errors: [] }, diagnostics, repoRoot, null);
+      statusController.refresh();
+      refreshSidebarHome();
+      showShelfInformationMessage(
+        "Shelf 生成前预检已跳过物化：当前仓库没有 project.toml，仍处于 bootstrap / framework authoring 状态。"
+      );
+      return;
+    }
     const materializeCommand = buildMaterializeCommand(
       String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND),
       projectFiles
@@ -2167,7 +2191,7 @@ function activate(context) {
     const freshnessState = getCanonicalFreshnessState(repoRoot);
     const freshnessDetail = describeCanonicalFreshness(freshnessState);
     const frameworkTreeReady = fs.existsSync(path.join(repoRoot, "framework"));
-    const evidenceTreeReady = !freshnessState.hasBlocking;
+    const evidenceTreeReady = freshnessState.hasProjects && !freshnessState.hasBlocking;
     const guardMode = config.get("guardMode") === "strict" ? "strict" : "normal";
     const issueLevels = countIssueLevels(lastRunIssues);
     const issueCount = issueLevels.totalCount;
@@ -2176,12 +2200,16 @@ function activate(context) {
     const hasWarningOnly = warningIssueCount > 0 && errorIssueCount === 0;
       const issueSummary = validationEnabled
       ? (
+        !freshnessState.hasProjects
+          ? "零项目（bootstrap）"
+          : (
         lastValidationPassed === null
           ? "尚未运行"
           : (
             errorIssueCount > 0
               ? `${errorIssueCount} 个错误${warningIssueCount > 0 ? ` + ${warningIssueCount} 个警告` : ""}`
               : (warningIssueCount > 0 ? `${warningIssueCount} 个警告` : "无问题")
+          )
           )
       )
       : "校验已停用";
@@ -2243,6 +2271,17 @@ function activate(context) {
       calloutAction = {
         action: "openStandards",
         label: "打开规范总纲路径"
+      };
+    } else if (!freshnessState.hasProjects) {
+      heroTone = "warning";
+      heroStatus = "零项目 bootstrap";
+      heroSummary = "当前仓库还没有 project.toml。你可以继续做 framework 作者编辑，但正式物化与证据树尚未建立。";
+      calloutTone = "warning";
+      calloutTitle = "继续做 framework 作者编辑";
+      calloutBody = "当前适合继续使用 framework lint、补全和框架树浏览。要恢复 full materialization、证据树和正式跨层导航，先创建 projects/<project_id>/project.toml。";
+      calloutAction = {
+        action: "openTree",
+        label: "打开框架树"
       };
     } else if (freshnessState.hasBlocking) {
       heroTone = "error";
@@ -2319,19 +2358,27 @@ function activate(context) {
       },
       {
         label: "证据树视图",
-        value: evidenceTreeReady ? "就绪" : "受阻",
-        tone: evidenceTreeReady ? "ok" : "error",
+        value: evidenceTreeReady ? "就绪" : (freshnessState.hasProjects ? "受阻" : "无项目"),
+        tone: evidenceTreeReady ? "ok" : (freshnessState.hasProjects ? "error" : "warning"),
         note: evidenceTreeReady
           ? "运行时投影（基于 canonical，不持久化）。"
-          : "canonical 不是 fresh 状态，正式证据树已收紧。"
+          : (
+            freshnessState.hasProjects
+              ? "canonical 不是 fresh 状态，正式证据树已收紧。"
+              : "当前没有 project.toml，证据树与正式跨层导航尚未建立。"
+          )
       },
       {
         label: "Canonical Freshness",
-        value: freshnessState.hasBlocking ? "过期" : "新鲜",
-        tone: freshnessState.hasBlocking ? "error" : "ok",
-        note: freshnessState.hasBlocking
-          ? (freshnessDetail || "先 materialize / validate，再继续信任正式跨层结果。")
-          : "当前正式跨层跳转与证据树可继续信任 canonical。"
+        value: !freshnessState.hasProjects ? "无项目" : (freshnessState.hasBlocking ? "过期" : "新鲜"),
+        tone: !freshnessState.hasProjects ? "warning" : (freshnessState.hasBlocking ? "error" : "ok"),
+        note: !freshnessState.hasProjects
+          ? "当前仓库仍处于 bootstrap/no-project 模式，canonical 主链尚未建立。"
+          : (
+            freshnessState.hasBlocking
+              ? (freshnessDetail || "先 materialize / validate，再继续信任正式跨层结果。")
+              : "当前正式跨层跳转与证据树可继续信任 canonical。"
+          )
       },
       {
         label: "守卫模式",
@@ -2406,6 +2453,8 @@ function activate(context) {
     let issueEmptyText = "当前没有可展示的问题。";
     if (!validationEnabled) {
       issueEmptyText = "当前工作区的 canonical 守卫已停用，所以这里不会自动汇总问题。";
+    } else if (!freshnessState.hasProjects) {
+      issueEmptyText = "当前仓库没有项目配置；这里不会显示 canonical 问题汇总。先创建 projects/<project_id>/project.toml。";
     } else if (lastValidationPassed === null) {
       issueEmptyText = "本会话尚未执行校验。先跑一次完整校验，侧边栏才能显示最新问题摘要。";
     } else if (lastValidationPassed === true) {
@@ -3211,6 +3260,7 @@ function activate(context) {
 function deactivate() {}
 
 const execCommand = validationRuntime.execCommand;
+const parseCommandResult = validationRuntime.parseCommandResult;
 
 function shellQuote(value) {
   const text = String(value ?? "");
@@ -3249,36 +3299,7 @@ function buildMaterializeCommand(baseCommand, projectFiles) {
 }
 
 function parseResult(stdout, stderr, code) {
-  const text = [stdout, stderr].filter(Boolean).join("\n").trim();
-
-  try {
-    const data = JSON.parse(stdout || stderr || "{}");
-    if (typeof data.passed === "boolean" && Array.isArray(data.errors)) {
-      return {
-        passed: data.passed,
-        errors: data.errors.map(normalizeIssue)
-      };
-    }
-  } catch (_) {
-    // Fallback to text parsing below.
-  }
-
-  const errors = [];
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("- ")) {
-      errors.push(normalizeIssue(trimmed.slice(2)));
-    }
-  }
-
-  if (!errors.length && code !== 0 && text) {
-    errors.push(normalizeIssue(text));
-  }
-
-  return {
-    passed: code === 0 && errors.length === 0,
-    errors
-  };
+  return parseCommandResult(stdout, stderr, code, { normalizeIssue });
 }
 
 function parseStageFailure(code, message, stdout, stderr, exitCode) {

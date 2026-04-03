@@ -118,7 +118,9 @@ Default commands:
 
 `validate_canonical.py` enforces one-to-one boundary projection at repository guard level. If any boundary still maps to multiple related paths, validation fails with `FRAMEWORK_VIOLATION` and asks for framework updates first.
 
-`Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation.
+When the repository currently has no `projects/*/project.toml`, `validate_canonical.py` and `materialize_project.py` return no-op success and explicitly report bootstrap / no-project mode. `src/main.py serve` still requires a real project file before runtime startup.
+
+`Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation. If no project config exists yet, the command reports bootstrap / framework-authoring mode instead of failing.
 
 Framework markdown lint is independent from project selection: syntax diagnostics are computed directly from the current `framework/**` or `framework_drafts/**` document and rendered as standard VSCode Problems diagnostics.
 The same diagnostics expose Quick Fix actions (lightbulb) for common formatting mistakes, including list marker normalization, missing `@framework`, missing standard sections, and invalid C/P/B/R/V entry formatting.
@@ -136,6 +138,7 @@ The framework tree is parsed directly from `framework/**` modules and their `B*`
 The canvas renders a module-only author graph: `B*` and rule participation stay available in hover/inspection, while module arrows are collapsed from upstream module refs in base definitions (for example `L0.M0[...]`).
 Framework markdown saves should trigger canonical refresh in background so machine-mainline artifacts remain up-to-date, but framework tree rendering itself does not wait for canonical.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
+When no `projects/*/project.toml` exists yet, Shelf keeps framework authoring features available but treats the evidence tree and formal cross-layer navigation as not yet established.
 Framework-only fallback snapshots are marked as degraded materialization state, so evidence tree remains blocked until the next full materialization succeeds.
 
 ## Project Config Navigation
