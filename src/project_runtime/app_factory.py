@@ -17,6 +17,3 @@ def build_project_app(project_file: str | Path | None = None) -> FastAPI:
     if resolved_file is None:
         resolved_file = os.environ.get(PROJECT_FILE_ENV) or DEFAULT_PROJECT_FILE
     return build_project_app_from_project_file(resolved_file)
-
-
-app = build_project_app()
