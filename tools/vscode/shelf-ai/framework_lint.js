@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 
 const TITLE_PATTERN = /^#\s+(?<cn>[^:]+):(?<en>.+)$/;
@@ -9,6 +10,9 @@ const PORT_LINE_PATTERN = /^-\s+`(?<id>[A-Za-z][A-Za-z0-9_]*)`\s*[：:]\s*(?<bod
 const PARAMETER_LINE_PATTERN = /^-\s+`(?<id>[A-Za-z][A-Za-z0-9_]*)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
 const SYMBOL_TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
 const FORBIDDEN_CONFIG_SECTION_PATTERN = /\[(?:exact|communication|framework)\.[^\]]+\]/i;
+const FRAMEWORK_MODULE_PATH_PATTERN = /^(framework|framework_drafts)\/([^/]+)\/L\d+-M\d+-[^/]+\.md$/;
+const FRAMEWORK_CONTROLLED_PATH_PATTERN = /^(framework|framework_drafts)(?:\/|$)/;
+const MARKDOWN_LINK_PATTERN = /\[[^\]]*]\(([^)]+)\)/g;
 
 const SECTION_GOAL_TITLE = "## 0. 目标 (Goal)";
 const SECTION_BASE_TITLE = "## 1. 最小结构基（Minimal Structural Bases）";
@@ -21,6 +25,10 @@ const SECTION_BOUNDARY_PARAMETERS_TITLE = "### 3.2 参数边界（Parameter Cons
 
 function normalizeSlashes(value) {
   return String(value || "").replace(/\\/g, "/");
+}
+
+function toLowerPath(value) {
+  return normalizeSlashes(value).toLowerCase();
 }
 
 function toRelativeFilePath(filePath, repoRoot) {
@@ -37,6 +45,70 @@ function toRelativeFilePath(filePath, repoRoot) {
   return relative;
 }
 
+function isMarkdownPath(value) {
+  return toLowerPath(value).endsWith(".md");
+}
+
+function isControlledFrameworkPath(value) {
+  return FRAMEWORK_CONTROLLED_PATH_PATTERN.test(normalizeSlashes(value));
+}
+
+function getFrameworkScopeInfo(relPath) {
+  const normalized = normalizeSlashes(relPath);
+  const parts = normalized.split("/").filter(Boolean);
+  if (!parts.length || (parts[0] !== "framework" && parts[0] !== "framework_drafts")) {
+    return null;
+  }
+  return {
+    rootName: parts[0],
+    domain: parts[1] || "",
+    relativeWithinDomain: parts.slice(2).join("/"),
+  };
+}
+
+function parseFrameworkDirectiveLines(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const directives = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (!trimmed.startsWith("@framework")) {
+      continue;
+    }
+    directives.push({
+      line: index + 1,
+      text: trimmed,
+    });
+  }
+  return directives;
+}
+
+function hasFrameworkDirective(text) {
+  return parseFrameworkDirectiveLines(text).length > 0;
+}
+
+function classifyFrameworkMarkdown({ repoRoot, filePath, text }) {
+  const relativePath = toRelativeFilePath(filePath, repoRoot);
+  const normalizedPath = normalizeSlashes(relativePath || "");
+  const scopeInfo = getFrameworkScopeInfo(normalizedPath);
+  const directiveLines = parseFrameworkDirectiveLines(text);
+  const isMarkdown = isMarkdownPath(normalizedPath);
+  const isModulePath = FRAMEWORK_MODULE_PATH_PATTERN.test(normalizedPath);
+  const isControlledMarkdown = Boolean(scopeInfo) && isMarkdown;
+  const isFrameworkModuleDocument = directiveLines.length > 0 || isModulePath;
+
+  return {
+    file: normalizedPath,
+    isMarkdown,
+    isControlledMarkdown,
+    isFrameworkModuleDocument,
+    isModulePath,
+    hasFrameworkDirective: directiveLines.length > 0,
+    directiveLines,
+    scopeInfo,
+    shouldLint: isMarkdown && (isControlledMarkdown || directiveLines.length > 0),
+  };
+}
+
 function createIssue({ file, line, column, code, message, level = "error" }) {
   return {
     file,
@@ -46,6 +118,27 @@ function createIssue({ file, line, column, code, message, level = "error" }) {
     message,
     level,
   };
+}
+
+function dedupeIssues(issues) {
+  const seen = new Set();
+  const deduped = [];
+  for (const issue of issues || []) {
+    const signature = [
+      String(issue?.file || ""),
+      Number(issue?.line || 1),
+      Number(issue?.column || 1),
+      String(issue?.code || ""),
+      String(issue?.message || ""),
+      String(issue?.level || ""),
+    ].join("::");
+    if (seen.has(signature)) {
+      continue;
+    }
+    seen.add(signature);
+    deduped.push(issue);
+  }
+  return deduped;
 }
 
 function splitSectionBlocks(lines) {
@@ -656,7 +749,7 @@ function lintForbiddenLegacyPatterns({ lines, file, issues }) {
   }
 }
 
-function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
+function lintFrameworkModuleMarkdown({ repoRoot, filePath, text }) {
   const lines = String(text || "").split(/\r?\n/);
   const file = toRelativeFilePath(filePath, repoRoot);
   const issues = [];
@@ -687,16 +780,7 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
     );
   }
 
-  const directiveLines = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const trimmed = lines[index].trim();
-    if (trimmed.startsWith("@framework")) {
-      directiveLines.push({
-        line: index + 1,
-        text: trimmed,
-      });
-    }
-  }
+  const directiveLines = parseFrameworkDirectiveLines(text);
 
   if (directiveLines.length === 0) {
     issues.push(
@@ -841,6 +925,242 @@ function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
   return issues;
 }
 
+function trimMarkdownLinkTarget(rawTarget) {
+  let target = String(rawTarget || "").trim();
+  if (target.startsWith("<") && target.endsWith(">")) {
+    target = target.slice(1, -1).trim();
+  }
+  const titleMatch = /^(?<path>.+?)\s+["'][^"']*["']$/.exec(target);
+  if (titleMatch?.groups?.path) {
+    target = titleMatch.groups.path.trim();
+  }
+  const hashIndex = target.indexOf("#");
+  if (hashIndex >= 0) {
+    target = target.slice(0, hashIndex);
+  }
+  return target.trim();
+}
+
+function isExternalMarkdownLink(target) {
+  const text = String(target || "").trim();
+  return !text
+    || text.startsWith("#")
+    || /^[a-z][a-z0-9+.-]*:/i.test(text)
+    || text.startsWith("//");
+}
+
+function offsetToLineColumn(text, offset) {
+  const source = String(text || "");
+  const safeOffset = Math.max(0, Math.min(Number(offset || 0), source.length));
+  let line = 1;
+  let column = 1;
+  for (let index = 0; index < safeOffset; index += 1) {
+    if (source[index] === "\n") {
+      line += 1;
+      column = 1;
+      continue;
+    }
+    column += 1;
+  }
+  return { line, column };
+}
+
+function extractLocalMarkdownLinks(filePath, text) {
+  const links = [];
+  const source = String(text || "");
+  for (const match of source.matchAll(MARKDOWN_LINK_PATTERN)) {
+    const rawTarget = String(match[1] || "");
+    const target = trimMarkdownLinkTarget(rawTarget);
+    if (isExternalMarkdownLink(target)) {
+      continue;
+    }
+    const offset = Number(match.index || 0) + match[0].indexOf(rawTarget);
+    const location = offsetToLineColumn(source, offset);
+    const resolvedPath = path.resolve(path.dirname(filePath), target);
+    links.push({
+      rawTarget,
+      target,
+      resolvedPath,
+      line: location.line,
+      column: location.column,
+    });
+  }
+  return links;
+}
+
+function listControlledMarkdownFiles(repoRoot) {
+  const files = [];
+  const walk = (currentPath) => {
+    if (!fs.existsSync(currentPath) || !fs.statSync(currentPath).isDirectory()) {
+      return;
+    }
+    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const childPath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        walk(childPath);
+        continue;
+      }
+      const relPath = normalizeSlashes(path.relative(repoRoot, childPath));
+      if (isMarkdownPath(relPath) && isControlledFrameworkPath(relPath)) {
+        files.push(childPath);
+      }
+    }
+  };
+
+  walk(path.join(repoRoot, "framework"));
+  walk(path.join(repoRoot, "framework_drafts"));
+  return files.sort();
+}
+
+function readFileWithOverrides(filePath, overrides) {
+  if (overrides && Object.prototype.hasOwnProperty.call(overrides, filePath)) {
+    return String(overrides[filePath] || "");
+  }
+  return fs.readFileSync(filePath, "utf8");
+}
+
+function sameFrameworkScope(left, right) {
+  return Boolean(left)
+    && Boolean(right)
+    && left.rootName === right.rootName
+    && left.domain
+    && left.domain === right.domain;
+}
+
+function lintFrameworkWorkspace({ repoRoot, documentOverrides = {} }) {
+  const issues = [];
+  const entries = listControlledMarkdownFiles(repoRoot).map((filePath) => {
+    const text = readFileWithOverrides(filePath, documentOverrides);
+    const classification = classifyFrameworkMarkdown({ repoRoot, filePath, text });
+    return {
+      filePath,
+      text,
+      classification,
+    };
+  });
+
+  const controlledModules = entries.filter((entry) => entry.classification.isModulePath);
+  const controlledAttachments = entries.filter((entry) => !entry.classification.isModulePath);
+  const referencedAttachments = new Set();
+
+  for (const entry of entries) {
+    issues.push(...lintFrameworkMarkdown({
+      repoRoot,
+      filePath: entry.filePath,
+      text: entry.text,
+    }));
+  }
+
+  for (const entry of controlledModules) {
+    const sourceScope = entry.classification.scopeInfo;
+    for (const link of extractLocalMarkdownLinks(entry.filePath, entry.text)) {
+      const resolvedRelPath = normalizeSlashes(path.relative(repoRoot, link.resolvedPath));
+      const targetScope = getFrameworkScopeInfo(resolvedRelPath);
+      const targetExists = fs.existsSync(link.resolvedPath) && fs.statSync(link.resolvedPath).isFile();
+      const targetIsMarkdown = isMarkdownPath(link.target);
+
+      if (!targetExists) {
+        issues.push(
+          createIssue({
+            file: entry.classification.file,
+            line: link.line,
+            column: link.column,
+            code: "FWL017",
+            message: `framework 模块引用的 Markdown 不存在：\`${link.target}\`。`,
+          })
+        );
+        continue;
+      }
+      if (!targetIsMarkdown) {
+        issues.push(
+          createIssue({
+            file: entry.classification.file,
+            line: link.line,
+            column: link.column,
+            code: "FWL017",
+            message: `framework 模块只允许直接引用 Markdown 文件：\`${link.target}\`。`,
+          })
+        );
+        continue;
+      }
+      if (!sameFrameworkScope(sourceScope, targetScope)) {
+        issues.push(
+          createIssue({
+            file: entry.classification.file,
+            line: link.line,
+            column: link.column,
+            code: "FWL017",
+            message: `framework 模块引用的 Markdown 必须位于同一受控域内：\`${link.target}\`。`,
+          })
+        );
+        continue;
+      }
+      if (!FRAMEWORK_MODULE_PATH_PATTERN.test(resolvedRelPath)) {
+        referencedAttachments.add(resolvedRelPath);
+      }
+    }
+  }
+
+  for (const entry of controlledAttachments) {
+    const relPath = entry.classification.file;
+    const scopeInfo = entry.classification.scopeInfo;
+    if (!scopeInfo?.domain) {
+      issues.push(
+        createIssue({
+          file: relPath,
+          line: 1,
+          column: 1,
+          code: "FWL018",
+          message: "framework 受控目录中的附属 Markdown 必须位于 `<root>/<domain>/...` 下，并被同域模块直接引用。",
+        })
+      );
+      continue;
+    }
+    if (!referencedAttachments.has(relPath)) {
+      issues.push(
+        createIssue({
+          file: relPath,
+          line: 1,
+          column: 1,
+          code: "FWL018",
+          message: "只有被 framework 模块直接引用的 Markdown 附件才是有效作者源；当前文件未被引用。",
+        })
+      );
+    }
+  }
+
+  return dedupeIssues(issues);
+}
+
+function lintFrameworkMarkdown({ repoRoot, filePath, text }) {
+  const classification = classifyFrameworkMarkdown({ repoRoot, filePath, text });
+  if (!classification.shouldLint) {
+    return [];
+  }
+
+  const issues = [];
+  if (classification.isFrameworkModuleDocument) {
+    issues.push(...lintFrameworkModuleMarkdown({ repoRoot, filePath, text }));
+    if (!classification.isModulePath) {
+      issues.push(
+        createIssue({
+          file: classification.file,
+          line: classification.directiveLines[0]?.line || 1,
+          column: 1,
+          code: "FWL016",
+          message: "带 `@framework` 的模块文件必须位于 `framework/<domain>/L*-M*-*.md` 或 `framework_drafts/<domain>/L*-M*-*.md`。",
+        })
+      );
+    }
+  }
+
+  return dedupeIssues(issues);
+}
+
 module.exports = {
+  classifyFrameworkMarkdown,
+  hasFrameworkDirective,
+  isControlledFrameworkPath,
+  lintFrameworkWorkspace,
   lintFrameworkMarkdown,
 };

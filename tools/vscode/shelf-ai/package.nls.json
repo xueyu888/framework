@@ -26,6 +26,7 @@
   "configuration.shelf.generatedEventSuppressionMs.description": "Suppression window, in milliseconds, for generated file watcher events right after materialization.",
   "configuration.shelf.manualValidationRestartThresholdMs.description": "Elapsed time threshold, in milliseconds, before Shelf can restart a stale validation command on manual retrigger.",
   "configuration.shelf.validationDebounceMs.description": "Debounce delay, in milliseconds, before Shelf starts a queued validation run.",
+  "configuration.shelf.frameworkLintOnlyOnFrameworkChanges.description": "When framework-controlled markdown changes, run framework lint only and skip canonical validation/materialization/type-check automation.",
   "configuration.shelf.frameworkLintEnabled.description": "Enable real-time framework markdown syntax diagnostics (independent of project selection).",
   "configuration.shelf.frameworkLintOnType.description": "Run framework markdown syntax diagnostics while typing.",
   "configuration.shelf.frameworkLintDebounceMs.description": "Debounce delay, in milliseconds, before on-type framework markdown lint diagnostics.",

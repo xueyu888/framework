@@ -352,6 +352,11 @@
           "maximum": 5000,
           "description": "%configuration.shelf.validationDebounceMs.description%"
         },
+        "shelf.frameworkLintOnlyOnFrameworkChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.frameworkLintOnlyOnFrameworkChanges.description%"
+        },
         "shelf.frameworkLintEnabled": {
           "type": "boolean",
           "default": true,

@@ -94,6 +94,10 @@ function main() {
     "package.json must default shelf.fullValidationCommand to the supported canonical validation command"
   );
   assert(
+    configuration["shelf.frameworkLintOnlyOnFrameworkChanges"]?.default === true,
+    "package.json must enable framework-lint-only automation for framework changes by default"
+  );
+  assert(
     configuration["shelf.frameworkLintEnabled"]?.default === true,
     "package.json must enable framework realtime lint by default"
   );
@@ -243,6 +247,10 @@ function main() {
   assert(
     readme.includes("shelf.statusBarClickAction = quickPick"),
     "README must document quickPick status bar action mode"
+  );
+  assert(
+    readme.includes("shelf.frameworkLintOnlyOnFrameworkChanges = true"),
+    "README must document the framework-lint-only automation setting"
   );
   assert(
     readme.includes("Shelf: Refresh Framework Tree"),

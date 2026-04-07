@@ -78,7 +78,10 @@ const FRAMEWORK_RULE_HINTS = {
   FWL013: "C/N/B/R 编号必须唯一",
   FWL014: "每条 R* 必须声明输出能力或失效结论",
   FWL015: "framework 正文不得出现旧写法（上游模块/project.toml/配置 section）",
-  FWL012: "标准二级标题内容与顺序必须合法"
+  FWL012: "标准二级标题内容与顺序必须合法",
+  FWL016: "带 @framework 的模块文件必须使用受控 module 路径",
+  FWL017: "framework 模块只允许引用同域受控 Markdown",
+  FWL018: "framework 受控目录中的附属 Markdown 必须被模块直接引用"
 };
 
 function resetStatusToIdle(status) {
@@ -268,10 +271,12 @@ function createStatusController({
   };
 }
 
-function toWatchedTriggerUris(repoRoot, uris, isSuppressedGeneratedPath) {
+function toWatchedTriggerUris(repoRoot, uris, isSuppressedGeneratedPath, shouldIncludeRelPath = () => true) {
   return (uris || []).filter((uri) => {
     const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, uri.fsPath));
-    return workspaceGuard.isWatchedPath(relPath) && !isSuppressedGeneratedPath(relPath);
+    return workspaceGuard.isWatchedPath(relPath)
+      && !isSuppressedGeneratedPath(relPath)
+      && shouldIncludeRelPath(relPath);
   });
 }
 
@@ -288,9 +293,15 @@ function scheduleWatchedChangeValidation({
   uris,
   scheduleValidation,
   isSuppressedGeneratedPath,
+  shouldIncludeRelPath,
   source = "auto",
 }) {
-  const triggerUris = toWatchedTriggerUris(repoRoot, uris, isSuppressedGeneratedPath);
+  const triggerUris = toWatchedTriggerUris(
+    repoRoot,
+    uris,
+    isSuppressedGeneratedPath,
+    shouldIncludeRelPath
+  );
   if (!triggerUris.length) {
     return false;
   }
@@ -319,6 +330,7 @@ function createWorkspaceValidationWatchers({
   shouldRunValidationTrigger,
   scheduleValidation,
   isSuppressedGeneratedPath,
+  shouldIncludeRelPath,
 }) {
   const watcherPatterns = [
     ...workspaceGuard.WATCH_PREFIXES.map((prefix) => `${prefix}**`),
@@ -340,6 +352,7 @@ function createWorkspaceValidationWatchers({
         uris: [uri],
         scheduleValidation,
         isSuppressedGeneratedPath,
+        shouldIncludeRelPath,
       });
     };
 
@@ -411,6 +424,7 @@ function activate(context) {
     "shelf.frameworkAutoCompleteEnabled",
     "shelf.frameworkAutoTriggerSuggest",
     "shelf.frameworkQuickFixEnabled",
+    "shelf.frameworkLintOnlyOnFrameworkChanges",
   ];
 
   const clampInt = (value, minimum, maximum, fallback) => {
@@ -569,6 +583,13 @@ function activate(context) {
       autoCompleteEnabled: Boolean(config.get("frameworkAutoCompleteEnabled", true)),
       autoTriggerSuggest: Boolean(config.get("frameworkAutoTriggerSuggest", true)),
       quickFixEnabled: Boolean(config.get("frameworkQuickFixEnabled", true)),
+    };
+  };
+
+  const readValidationExecutionSettings = () => {
+    const config = getShelfConfig();
+    return {
+      frameworkLintOnlyOnFrameworkChanges: Boolean(config.get("frameworkLintOnlyOnFrameworkChanges", true)),
     };
   };
 
@@ -1458,6 +1479,21 @@ function activate(context) {
     await openTreeView("framework", { reveal: false });
   };
 
+  const classifyFrameworkLintDocument = (document) => {
+    if (!document || document.languageId !== "markdown" || document.uri.scheme !== "file") {
+      return null;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) {
+      return null;
+    }
+    return frameworkLint.classifyFrameworkMarkdown({
+      repoRoot: folder.uri.fsPath,
+      filePath: document.uri.fsPath,
+      text: document.getText(),
+    });
+  };
+
   const clearShelfDiagnosticsForUri = (uri) => {
     if (!uri || !uri.fsPath) {
       return;
@@ -1483,14 +1519,12 @@ function activate(context) {
   };
 
   const isFrameworkLintDocument = (document) => {
-    if (!document || document.languageId !== "markdown" || document.uri.scheme !== "file") {
-      return false;
-    }
-    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (!folder) {
-      return false;
-    }
-    return frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, folder.uri.fsPath);
+    return Boolean(classifyFrameworkLintDocument(document)?.shouldLint);
+  };
+
+  const isFrameworkAuthoringModuleDocument = (document) => {
+    const classification = classifyFrameworkLintDocument(document);
+    return Boolean(classification?.isFrameworkModuleDocument);
   };
 
   const clearFrameworkLintTimer = (key) => {
@@ -1509,27 +1543,37 @@ function activate(context) {
     clearFrameworkLintTimer(key);
 
     const lintSettings = readFrameworkLintSettings();
-    if (!lintSettings.enabled || !isFrameworkLintDocument(document)) {
-      frameworkLintDiagnostics.delete(document.uri);
+    const classification = classifyFrameworkLintDocument(document);
+    if (!lintSettings.enabled) {
+      frameworkLintDiagnostics.clear();
       return;
     }
 
     const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (!folder) {
+    if (!folder || !classification?.shouldLint) {
       frameworkLintDiagnostics.delete(document.uri);
       return;
     }
 
-    const lintIssues = frameworkLint
-      .lintFrameworkMarkdown({
-        repoRoot: folder.uri.fsPath,
-        filePath: document.uri.fsPath,
-        text: document.getText(),
-      })
-      .map((item) => normalizeIssue(item));
+    const lintIssues = frameworkLint.lintFrameworkWorkspace({
+      repoRoot: folder.uri.fsPath,
+      documentOverrides: {
+        [document.uri.fsPath]: document.getText(),
+      },
+    }).map((item) => normalizeIssue(item));
+
+    if (!classification.isControlledMarkdown && classification.hasFrameworkDirective) {
+      lintIssues.push(
+        ...frameworkLint.lintFrameworkMarkdown({
+          repoRoot: folder.uri.fsPath,
+          filePath: document.uri.fsPath,
+          text: document.getText(),
+        }).map((item) => normalizeIssue(item))
+      );
+    }
 
     if (!lintIssues.length) {
-      frameworkLintDiagnostics.delete(document.uri);
+      frameworkLintDiagnostics.clear();
       return;
     }
 
@@ -1983,7 +2027,7 @@ function activate(context) {
   };
 
   const maybeAutoTriggerFrameworkSuggest = (event) => {
-    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+    if (!event || !event.document || !isFrameworkAuthoringModuleDocument(event.document)) {
       return;
     }
     const lintSettings = readFrameworkLintSettings();
@@ -2008,7 +2052,7 @@ function activate(context) {
   };
 
   const maybeAutoExpandFrameworkDashEntry = (event) => {
-    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+    if (!event || !event.document || !isFrameworkAuthoringModuleDocument(event.document)) {
       return false;
     }
     const lintSettings = readFrameworkLintSettings();
@@ -2024,11 +2068,6 @@ function activate(context) {
     }
     const activeEditor = vscode.window.activeTextEditor;
     if (!activeEditor || activeEditor.document.uri.toString() !== event.document.uri.toString()) {
-      return false;
-    }
-    const folder = vscode.workspace.getWorkspaceFolder(event.document.uri);
-    const repoRoot = folder?.uri.fsPath || "";
-    if (!repoRoot || !frameworkNavigation.isFrameworkMarkdownFile(event.document.uri.fsPath, repoRoot)) {
       return false;
     }
     const cursorPosition = new vscode.Position(change.range.start.line, change.range.start.character + 1);
@@ -2728,10 +2767,7 @@ function activate(context) {
           return undefined;
         }
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-        const repoRoot = folder?.uri.fsPath || "";
-        const isFrameworkFile = repoRoot
-          ? frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)
-          : false;
+        const isFrameworkFile = isFrameworkAuthoringModuleDocument(document);
         const lineText = document.lineAt(position.line).text;
         const linePrefix = lineText.slice(0, position.character);
         const wordRange = document.getWordRangeAtPosition(position, /[@A-Za-z_][A-Za-z0-9_.-]*/);
@@ -3078,12 +3114,17 @@ function activate(context) {
     if (!workspaceGuard.isWatchedPath(rel) || isSuppressedGeneratedPath(rel)) {
       return;
     }
-    const isFrameworkDoc = frameworkNavigation.isFrameworkMarkdownFile(doc.uri.fsPath, folder.uri.fsPath);
+    const isFrameworkDoc = isFrameworkLintDocument(doc);
     const config = getShelfConfig();
+    const validationExecutionSettings = readValidationExecutionSettings();
 
     dirtyWatchedFiles.delete(doc.uri.fsPath);
     if (config.get("enableOnSave") && shouldRunValidationTrigger("save")) {
-      if (isFrameworkDoc) {
+      if (isFrameworkDoc && validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges) {
+        lastValidationPassed = null;
+        refreshStatusFromCurrentState();
+        refreshSidebarHome();
+      } else if (isFrameworkDoc) {
         await runValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
       } else {
         scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
@@ -3144,6 +3185,11 @@ function activate(context) {
       uris: event.files,
       scheduleValidation,
       isSuppressedGeneratedPath,
+      shouldIncludeRelPath: (relPath) => {
+        const validationExecutionSettings = readValidationExecutionSettings();
+        return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+          || !frameworkLint.isControlledFrameworkPath(relPath);
+      },
     });
   });
 
@@ -3160,6 +3206,11 @@ function activate(context) {
       uris: event.files,
       scheduleValidation,
       isSuppressedGeneratedPath,
+      shouldIncludeRelPath: (relPath) => {
+        const validationExecutionSettings = readValidationExecutionSettings();
+        return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+          || !frameworkLint.isControlledFrameworkPath(relPath);
+      },
     });
   });
 
@@ -3176,6 +3227,11 @@ function activate(context) {
       uris: flattenRenameEventUris(event.files),
       scheduleValidation,
       isSuppressedGeneratedPath,
+      shouldIncludeRelPath: (relPath) => {
+        const validationExecutionSettings = readValidationExecutionSettings();
+        return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+          || !frameworkLint.isControlledFrameworkPath(relPath);
+      },
     });
   });
 
@@ -3196,6 +3252,11 @@ function activate(context) {
         shouldRunValidationTrigger,
         scheduleValidation,
         isSuppressedGeneratedPath,
+        shouldIncludeRelPath: (relPath) => {
+          const validationExecutionSettings = readValidationExecutionSettings();
+          return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+            || !frameworkLint.isControlledFrameworkPath(relPath);
+        },
       })
     );
 
