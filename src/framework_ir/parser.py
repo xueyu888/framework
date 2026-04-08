@@ -32,7 +32,10 @@ RULE_TOP_PATTERN = re.compile(r"^-\s+`(?P<id>R\d+)`\s+(?P<name>.+)$")
 RULE_CHILD_PATTERN = re.compile(r"^\s*-\s+`(?P<id>R\d+\.\d+)`\s+(?P<body>.+)$")
 SOURCE_EXPR_PATTERN = re.compile(r"来源[：:]\s*`(?P<expr>[^`]+)`")
 INLINE_REF_PATTERN = re.compile(
-    r"^(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.M(?P<module>\d+)(?:\[(?P<rules>[^\]]*)\])?$"
+    r"(?<![A-Za-z0-9_])"
+    r"(?:(?P<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?P<level>\d+)\.M(?P<module>\d+)"
+    r"(?:\[(?P<rules>[^\]]*)\])?"
+    r"(?![A-Za-z0-9_])"
 )
 SYMBOL_TOKEN_PATTERN = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*\b")
 CAPABILITY_SECTION_TITLES = (
@@ -139,21 +142,34 @@ def _ordered_unique(items: Iterable[str]) -> tuple[str, ...]:
 
 def _parse_inline_refs(inline_expr: str, default_framework: str) -> tuple[FrameworkUpstreamLink, ...]:
     refs: list[FrameworkUpstreamLink] = []
+    seen: set[tuple[str, int, int, tuple[str, ...]]] = set()
     for part in inline_expr.split("+"):
         term = part.strip()
-        match = INLINE_REF_PATTERN.fullmatch(term)
-        if match is None:
-            continue
-        rules_text = (match.group("rules") or "").strip()
-        rules = tuple(item.strip() for item in rules_text.split(",") if item.strip())
-        refs.append(
-            FrameworkUpstreamLink(
-                framework=(match.group("framework") or default_framework).strip(),
-                level=int(match.group("level")),
-                module=int(match.group("module")),
-                rules=rules,
+        for match in INLINE_REF_PATTERN.finditer(term):
+            explicit_framework = (match.group("framework") or "").strip()
+            resolved_framework = explicit_framework or default_framework
+            is_embedded_ref = match.span() != (0, len(term))
+            if is_embedded_ref and explicit_framework and explicit_framework != default_framework:
+                continue
+            rules_text = (match.group("rules") or "").strip()
+            rules = tuple(item.strip() for item in rules_text.split(",") if item.strip())
+            signature = (
+                resolved_framework,
+                int(match.group("level")),
+                int(match.group("module")),
+                rules,
             )
-        )
+            if signature in seen:
+                continue
+            seen.add(signature)
+            refs.append(
+                FrameworkUpstreamLink(
+                    framework=signature[0],
+                    level=signature[1],
+                    module=signature[2],
+                    rules=signature[3],
+                )
+            )
     return tuple(refs)
 
 

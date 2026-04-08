@@ -1,0 +1,454 @@
+{
+  "text_chunk_set": [
+    {
+      "text_chunk_id": "tc-0001",
+      "title_block_id": "pb-0001",
+      "body_block_id_set": [],
+      "start_order": 1,
+      "end_order": 1,
+      "text": "# 框架文档Lint标准"
+    },
+    {
+      "text_chunk_id": "tc-0002",
+      "title_block_id": "pb-0002",
+      "body_block_id_set": [
+        "pb-0003"
+      ],
+      "start_order": 2,
+      "end_order": 3,
+      "text": "## 0. 定位\n本文件定义框架标准文档的表达协议与 lint 合同，不定义框架设计的语义核心。\n\n关系边界：\n- `specs/框架设计核心标准.md` 负责定义“什么结构成立、什么组合合法、哪些边界允许变化”。\n- 本文件负责定义这些结构在 Markdown、树注册与治理校验中必须如何表达、如何编号、如何被 lint。\n- `scripts/validate_strict_mapping.py` 是本文件的主要自动执行器，但脚本不是第一性事实来源；规则本体以本文件为准。"
+    },
+    {
+      "text_chunk_id": "tc-0003",
+      "title_block_id": "pb-0004",
+      "body_block_id_set": [
+        "pb-0005"
+      ],
+      "start_order": 4,
+      "end_order": 5,
+      "text": "## 1. 适用范围\n\n- `specs/` 下承载 L0/L1 标准的 Markdown 文件。\n- `framework/<module>/Lx-Mn-*.md` 下承载领域模块标准的 Markdown 文件。\n- `mapping/mapping_registry.json` 承载的标准树、映射注册与变更传导元数据。\n- `projects/<project_id>/generated/` 的生成产物一致性校验。"
+    },
+    {
+      "text_chunk_id": "tc-0004",
+      "title_block_id": "pb-0006",
+      "body_block_id_set": [],
+      "start_order": 6,
+      "end_order": 6,
+      "text": "## 2. 文档表达规则"
+    },
+    {
+      "text_chunk_id": "tc-0005",
+      "title_block_id": "pb-0007",
+      "body_block_id_set": [
+        "pb-0008"
+      ],
+      "start_order": 7,
+      "end_order": 8,
+      "text": "### 2.1 路径、层级与文件命名\n\n- `L0/L1` 标准文件必须位于 `specs/`。\n- `L2` 标准文件必须位于 `framework/<module>/Lx-Mn-*.md`。\n- `L3` 注册文件必须位于 `mapping/`。\n- 模块是文件级单元：一个 `framework/<domain>/Lx-Mn-*.md` 文件对应一个模块。\n- 当同层存在多个模块文件时，文件名必须使用 `Lx-Mn-*.md` 表示模块编号（例如 `L1-M0-...md`）。\n- 模块别名（若需要）是文件级信息，不得绑定到单个 `B*`。"
+    },
+    {
+      "text_chunk_id": "tc-0006",
+      "title_block_id": "pb-0009",
+      "body_block_id_set": [
+        "pb-0010"
+      ],
+      "start_order": 9,
+      "end_order": 10,
+      "text": "### 2.2 框架 Markdown 必备结构\n\n- 面向 `framework/*.md` 的标准模块文档必须保留 plain `@framework` 指令对应的标准模板起手入口。\n- `@framework` 入口属于框架作者起手约束，不得删除；若未来替换实现方式，必须提供同等直接、默认可用且可回归测试的替代入口。\n- 框架模块文档应按顺序提供以下主 section：\n  - `## 1. 能力声明`\n  - `## 2. 边界定义`\n  - `## 3. 最小可行基`\n  - `## 4. 基组合原则`\n  - `## 5. 验证`"
+    },
+    {
+      "text_chunk_id": "tc-0007",
+      "title_block_id": "pb-0011",
+      "body_block_id_set": [
+        "pb-0012"
+      ],
+      "start_order": 11,
+      "end_order": 12,
+      "text": "### 2.3 编号与表达格式\n\n- `C*`、`B*`、`R*`、`V*` 必须使用稳定、连续且可解析的编号。\n- 每个基必须具备 `B{n}` 标识，并可规范化映射为 `L{X}.M{m}.B{n}`。\n- `B*` 行格式应为 `B* 名称：<结构定义或 Lx.My[...] 或 framework.Lx.My[...]>。来源：\\`...\\``。\n- 若引用本框架更低层模块或外部更基础通用框架，模块引用必须直接内联写在 `B*` 主句中。\n- 禁止使用 `上游模块：...` 这类追加字段表达模块依赖。\n- 外部框架引用可写为 `frontend.L1.M0[R1,R2]` 这类显式形式；本地框架引用可写为 `L1.M0[R1,R2]`。"
+    },
+    {
+      "text_chunk_id": "tc-0008",
+      "title_block_id": "pb-0013",
+      "body_block_id_set": [
+        "pb-0014"
+      ],
+      "start_order": 13,
+      "end_order": 14,
+      "text": "## 3. 自动 Lint 与治理校验\n\n- 路径与层级 lint：校验 `L0/L1/L2/L3` 文件路径是否落在合法目录。\n- 文档结构 lint：校验 `@framework` 文档是否具备必备主 section、标题与可解析条目。\n- 编号与语法 lint：校验 `C/B/R/V` 编号、`B*` 表达格式、inline ref 语法以及禁用的遗留写法。\n- 引用图 lint：校验模块依赖方向、无环性、显式引用可解释性与根层自足性。\n- 树注册 lint：校验 `mapping/mapping_registry.json` 的标准树节点、唯一挂载关系与 L0-L3 落点。\n- 变更传导 lint：校验 `L0 -> L1 -> L2 -> L3` 的变更传播是否闭合。\n- 生成产物 lint：校验项目生成产物是否可由框架、`product_spec.toml` 与 `implementation_config.toml` 重新物化并保持一致。"
+    },
+    {
+      "text_chunk_id": "tc-0009",
+      "title_block_id": "pb-0015",
+      "body_block_id_set": [
+        "pb-0016"
+      ],
+      "start_order": 15,
+      "end_order": 16,
+      "text": "## 4. 非自动审查边界\n\n- lint 不替代 `specs/框架设计核心标准.md` 的语义判断。\n- “这个基是否真的是结构”“这个边界是否真正服务能力成立”“这个组合是否导出声明能力”仍以核心标准为准。\n- 当表达格式合法但语义不成立时，应先按核心标准修正文档结构定义，而不是放宽 lint。"
+    },
+    {
+      "text_chunk_id": "tc-0010",
+      "title_block_id": "pb-0017",
+      "body_block_id_set": [
+        "pb-0018"
+      ],
+      "start_order": 17,
+      "end_order": 18,
+      "text": "## 5. 外部关联\n\n- `specs/规范总纲与树形结构.md`\n- `specs/框架设计核心标准.md`\n- `mapping/mapping_registry.json`\n- `scripts/validate_strict_mapping.py`"
+    }
+  ],
+  "ownership_record_set": [
+    {
+      "block_id": "pb-0001",
+      "text_chunk_id": "tc-0001",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0002",
+      "text_chunk_id": "tc-0002",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0003",
+      "text_chunk_id": "tc-0002",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0004",
+      "text_chunk_id": "tc-0003",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0005",
+      "text_chunk_id": "tc-0003",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0006",
+      "text_chunk_id": "tc-0004",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0007",
+      "text_chunk_id": "tc-0005",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0008",
+      "text_chunk_id": "tc-0005",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0009",
+      "text_chunk_id": "tc-0006",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0010",
+      "text_chunk_id": "tc-0006",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0011",
+      "text_chunk_id": "tc-0007",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0012",
+      "text_chunk_id": "tc-0007",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0013",
+      "text_chunk_id": "tc-0008",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0014",
+      "text_chunk_id": "tc-0008",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0015",
+      "text_chunk_id": "tc-0009",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0016",
+      "text_chunk_id": "tc-0009",
+      "block_role": "body",
+      "position_in_chunk": 2
+    },
+    {
+      "block_id": "pb-0017",
+      "text_chunk_id": "tc-0010",
+      "block_role": "title",
+      "position_in_chunk": 1
+    },
+    {
+      "block_id": "pb-0018",
+      "text_chunk_id": "tc-0010",
+      "block_role": "body",
+      "position_in_chunk": 2
+    }
+  ],
+  "paragraph_block_set": [
+    {
+      "block_id": "pb-0001",
+      "order_index": 1,
+      "text": "# 框架文档Lint标准",
+      "start_offset": 0,
+      "end_offset": 13,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0002",
+      "order_index": 2,
+      "text": "## 0. 定位\n本文件定义框架标准文档的表达协议与 lint 合同，不定义框架设计的语义核心。",
+      "start_offset": 14,
+      "end_offset": 63,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0003",
+      "order_index": 3,
+      "text": "关系边界：\n- `specs/框架设计核心标准.md` 负责定义“什么结构成立、什么组合合法、哪些边界允许变化”。\n- 本文件负责定义这些结构在 Markdown、树注册与治理校验中必须如何表达、如何编号、如何被 lint。\n- `scripts/validate_strict_mapping.py` 是本文件的主要自动执行器，但脚本不是第一性事实来源；规则本体以本文件为准。",
+      "start_offset": 64,
+      "end_offset": 254,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0004",
+      "order_index": 4,
+      "text": "## 1. 适用范围",
+      "start_offset": 255,
+      "end_offset": 266,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0005",
+      "order_index": 5,
+      "text": "- `specs/` 下承载 L0/L1 标准的 Markdown 文件。\n- `framework/<module>/Lx-Mn-*.md` 下承载领域模块标准的 Markdown 文件。\n- `mapping/mapping_registry.json` 承载的标准树、映射注册与变更传导元数据。\n- `projects/<project_id>/generated/` 的生成产物一致性校验。",
+      "start_offset": 267,
+      "end_offset": 467,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0006",
+      "order_index": 6,
+      "text": "## 2. 文档表达规则",
+      "start_offset": 468,
+      "end_offset": 481,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0007",
+      "order_index": 7,
+      "text": "### 2.1 路径、层级与文件命名",
+      "start_offset": 482,
+      "end_offset": 501,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0008",
+      "order_index": 8,
+      "text": "- `L0/L1` 标准文件必须位于 `specs/`。\n- `L2` 标准文件必须位于 `framework/<module>/Lx-Mn-*.md`。\n- `L3` 注册文件必须位于 `mapping/`。\n- 模块是文件级单元：一个 `framework/<domain>/Lx-Mn-*.md` 文件对应一个模块。\n- 当同层存在多个模块文件时，文件名必须使用 `Lx-Mn-*.md` 表示模块编号（例如 `L1-M0-...md`）。\n- 模块别名（若需要）是文件级信息，不得绑定到单个 `B*`。",
+      "start_offset": 502,
+      "end_offset": 758,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0009",
+      "order_index": 9,
+      "text": "### 2.2 框架 Markdown 必备结构",
+      "start_offset": 759,
+      "end_offset": 784,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0010",
+      "order_index": 10,
+      "text": "- 面向 `framework/*.md` 的标准模块文档必须保留 plain `@framework` 指令对应的标准模板起手入口。\n- `@framework` 入口属于框架作者起手约束，不得删除；若未来替换实现方式，必须提供同等直接、默认可用且可回归测试的替代入口。\n- 框架模块文档应按顺序提供以下主 section：\n  - `## 1. 能力声明`\n  - `## 2. 边界定义`\n  - `## 3. 最小可行基`\n  - `## 4. 基组合原则`\n  - `## 5. 验证`",
+      "start_offset": 785,
+      "end_offset": 1034,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0011",
+      "order_index": 11,
+      "text": "### 2.3 编号与表达格式",
+      "start_offset": 1035,
+      "end_offset": 1051,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0012",
+      "order_index": 12,
+      "text": "- `C*`、`B*`、`R*`、`V*` 必须使用稳定、连续且可解析的编号。\n- 每个基必须具备 `B{n}` 标识，并可规范化映射为 `L{X}.M{m}.B{n}`。\n- `B*` 行格式应为 `B* 名称：<结构定义或 Lx.My[...] 或 framework.Lx.My[...]>。来源：\\`...\\``。\n- 若引用本框架更低层模块或外部更基础通用框架，模块引用必须直接内联写在 `B*` 主句中。\n- 禁止使用 `上游模块：...` 这类追加字段表达模块依赖。\n- 外部框架引用可写为 `frontend.L1.M0[R1,R2]` 这类显式形式；本地框架引用可写为 `L1.M0[R1,R2]`。",
+      "start_offset": 1052,
+      "end_offset": 1362,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0013",
+      "order_index": 13,
+      "text": "## 3. 自动 Lint 与治理校验",
+      "start_offset": 1363,
+      "end_offset": 1383,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0014",
+      "order_index": 14,
+      "text": "- 路径与层级 lint：校验 `L0/L1/L2/L3` 文件路径是否落在合法目录。\n- 文档结构 lint：校验 `@framework` 文档是否具备必备主 section、标题与可解析条目。\n- 编号与语法 lint：校验 `C/B/R/V` 编号、`B*` 表达格式、inline ref 语法以及禁用的遗留写法。\n- 引用图 lint：校验模块依赖方向、无环性、显式引用可解释性与根层自足性。\n- 树注册 lint：校验 `mapping/mapping_registry.json` 的标准树节点、唯一挂载关系与 L0-L3 落点。\n- 变更传导 lint：校验 `L0 -> L1 -> L2 -> L3` 的变更传播是否闭合。\n- 生成产物 lint：校验项目生成产物是否可由框架、`product_spec.toml` 与 `implementation_config.toml` 重新物化并保持一致。",
+      "start_offset": 1384,
+      "end_offset": 1796,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0015",
+      "order_index": 15,
+      "text": "## 4. 非自动审查边界",
+      "start_offset": 1797,
+      "end_offset": 1811,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0016",
+      "order_index": 16,
+      "text": "- lint 不替代 `specs/框架设计核心标准.md` 的语义判断。\n- “这个基是否真的是结构”“这个边界是否真正服务能力成立”“这个组合是否导出声明能力”仍以核心标准为准。\n- 当表达格式合法但语义不成立时，应先按核心标准修正文档结构定义，而不是放宽 lint。",
+      "start_offset": 1812,
+      "end_offset": 1949,
+      "block_role": "body"
+    },
+    {
+      "block_id": "pb-0017",
+      "order_index": 17,
+      "text": "## 5. 外部关联",
+      "start_offset": 1950,
+      "end_offset": 1961,
+      "block_role": "title"
+    },
+    {
+      "block_id": "pb-0018",
+      "order_index": 18,
+      "text": "- `specs/规范总纲与树形结构.md`\n- `specs/框架设计核心标准.md`\n- `mapping/mapping_registry.json`\n- `scripts/validate_strict_mapping.py`",
+      "start_offset": 1962,
+      "end_offset": 2079,
+      "block_role": "body"
+    }
+  ],
+  "trace_meta": {
+    "source_path": "/home/wuyz/Ability_Enhance/frame/shelf/specs/框架文档Lint标准.md",
+    "generated_at": "2026-03-11T08:40:21.499945+00:00",
+    "temporary_modules": {
+      "B1": "TEMP-B1-blank-line-splitter",
+      "B3": "TEMP-B3-markdown-role-judge",
+      "B4": "TEMP-B4-title-body-matcher"
+    },
+    "chunk_match_set": [
+      {
+        "text_chunk_id": "tc-0001",
+        "title_block_id": "pb-0001",
+        "body_block_id_set": [],
+        "start_order": 1,
+        "end_order": 1
+      },
+      {
+        "text_chunk_id": "tc-0002",
+        "title_block_id": "pb-0002",
+        "body_block_id_set": [
+          "pb-0003"
+        ],
+        "start_order": 2,
+        "end_order": 3
+      },
+      {
+        "text_chunk_id": "tc-0003",
+        "title_block_id": "pb-0004",
+        "body_block_id_set": [
+          "pb-0005"
+        ],
+        "start_order": 4,
+        "end_order": 5
+      },
+      {
+        "text_chunk_id": "tc-0004",
+        "title_block_id": "pb-0006",
+        "body_block_id_set": [],
+        "start_order": 6,
+        "end_order": 6
+      },
+      {
+        "text_chunk_id": "tc-0005",
+        "title_block_id": "pb-0007",
+        "body_block_id_set": [
+          "pb-0008"
+        ],
+        "start_order": 7,
+        "end_order": 8
+      },
+      {
+        "text_chunk_id": "tc-0006",
+        "title_block_id": "pb-0009",
+        "body_block_id_set": [
+          "pb-0010"
+        ],
+        "start_order": 9,
+        "end_order": 10
+      },
+      {
+        "text_chunk_id": "tc-0007",
+        "title_block_id": "pb-0011",
+        "body_block_id_set": [
+          "pb-0012"
+        ],
+        "start_order": 11,
+        "end_order": 12
+      },
+      {
+        "text_chunk_id": "tc-0008",
+        "title_block_id": "pb-0013",
+        "body_block_id_set": [
+          "pb-0014"
+        ],
+        "start_order": 13,
+        "end_order": 14
+      },
+      {
+        "text_chunk_id": "tc-0009",
+        "title_block_id": "pb-0015",
+        "body_block_id_set": [
+          "pb-0016"
+        ],
+        "start_order": 15,
+        "end_order": 16
+      },
+      {
+        "text_chunk_id": "tc-0010",
+        "title_block_id": "pb-0017",
+        "body_block_id_set": [
+          "pb-0018"
+        ],
+        "start_order": 17,
+        "end_order": 18
+      }
+    ]
+  },
+  "invalid_set": []
+}

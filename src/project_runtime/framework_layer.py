@@ -214,10 +214,29 @@ def _class_id(kind: str, *parts: str) -> str:
 
 
 def _exact_to_communication_path(path: str) -> str:
-    parts = path.split(".")
-    if len(parts) != 3 or parts[0] != "exact":
+    parts = [part for part in path.split(".") if part]
+    if len(parts) < 2 or parts[0] != "exact":
         return ""
-    return ".".join(("communication", parts[1], parts[2]))
+    return ".".join(("communication", *parts[1:]))
+
+
+@lru_cache(maxsize=1)
+def _framework_boundary_counts() -> dict[str, dict[str, int]]:
+    counts: dict[str, dict[str, int]] = {}
+    for module in load_framework_catalog().modules:
+        framework_counts = counts.setdefault(module.framework, {})
+        for boundary in module.boundaries:
+            framework_counts[boundary.boundary_id] = framework_counts.get(boundary.boundary_id, 0) + 1
+    return counts
+
+
+def _module_config_namespace(module: ParsedFrameworkModule) -> str:
+    return f"l{module.level}_m{module.module}"
+
+
+def _uses_module_scoped_boundary_path(module: ParsedFrameworkModule, boundary_id: str) -> bool:
+    framework_counts = _framework_boundary_counts().get(module.framework, {})
+    return framework_counts.get(boundary_id, 0) > 1
 
 
 def _boundary_projection(
@@ -256,12 +275,23 @@ def _module_boundary_projection(module: ParsedFrameworkModule, boundary_id: str)
     module_id = module.module_id
     module_key = module_key_from_id(module_id)
     field_name = boundary_field_name(boundary_id)
+    uses_module_scope = _uses_module_scoped_boundary_path(module, boundary_id)
+    primary_exact_path = (
+        f"exact.{module.framework}.{_module_config_namespace(module)}.{section}"
+        if uses_module_scope
+        else f"exact.{module.framework}.{section}"
+    )
+    note = (
+        "重复 boundary_id 使用模块级路径：exact.<framework>.<module_scope>.<boundary_id_lower>。"
+        if uses_module_scope
+        else "边界一对一映射：boundary_id 与 config/code 锚点同名。"
+    )
     return _boundary_projection(
         module,
         boundary_id,
-        primary_exact_path=f"exact.{module.framework}.{section}",
+        primary_exact_path=primary_exact_path,
         mapping_mode="direct",
-        note="边界一对一映射：boundary_id 与 config/code 锚点同名。",
+        note=note,
     ) | {
         "module_key": module_key,
         "static_field_name": field_name,
