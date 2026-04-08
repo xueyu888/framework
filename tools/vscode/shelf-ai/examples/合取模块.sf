@@ -1,0 +1,79 @@
+module 合取模块:ConjunctionModule:
+    Goal := "只用成立条件、元逻辑推理与结构同一，说明 Conj 的交换与结合为何落入同一结果类"
+
+    Base:
+        elem 命题变量集 := "V = {x, y, z, ...}"
+        elem 合法表达式集 := "T 是由变量与 Conj 递归形成的最小集合"
+        elem 赋值集合 := "Ω 是全部可能赋值的集合"
+        elem 推理规则集 := "合取消去、合取引入、双向引入"
+        relation[2:1] 原始合取 := "Conj(e, f) 把两个合法表达式组成一个新的合取表达式"
+        relation[2:1] 成立判断 := "Sat(e, α) 表示 e 在赋值 α 下成立"
+        relation[2:1] 结构同一 := "e ≈ f 表示 e 与 f 属于同一个结果类"
+        relation[2:1] 元逻辑合取 := "P ∧_m Q 只用于证明中的元逻辑连接"
+
+    Principles:
+        sat 最小形成 :=
+            on(<Base.命题变量集, Base.合法表达式集, Base.原始合取>),
+            body("任意变量都是合法表达式；若 e 与 f 合法，则 Conj(e, f) 合法")
+
+        sat 原子成立 :=
+            on(<Base.命题变量集, Base.赋值集合, Base.成立判断>),
+            body("Sat(x, α) 是否成立由 α 直接决定")
+
+        sat 合取成立 :=
+            on(<Base.原始合取, Base.赋值集合, Base.成立判断, Base.元逻辑合取>),
+            body("Sat(Conj(e, f), α) 当且仅当 Sat(e, α) ∧_m Sat(f, α)")
+
+        sat 条件同一 :=
+            on(<Base.结构同一, Base.赋值集合, Base.成立判断>),
+            body("若对任意 α ∈ Ω 都有 Sat(e, α) ↔ Sat(f, α)，则 e ≈ f")
+
+        sat 元逻辑推理 :=
+            on(<Base.推理规则集, Base.元逻辑合取>),
+            body("由推理规则可推出元逻辑合取的交换与结合，因此成立条件展开后的两侧可以做逻辑等价变形")
+
+        eq 二元交换 :=
+            on(<Spaces.二元排列>),
+            body("Conj(x, y) 与 Conj(y, x) 经过成立条件展开，并借由元逻辑合取交换后，在任意赋值上的判断完全一致")
+
+        eq 三元结合 :=
+            on(<Spaces.三元排列>),
+            body("Conj(Conj(x, y), z) 与 Conj(x, Conj(y, z)) 经过成立条件展开，并借由元逻辑合取结合后，在任意赋值上的判断完全一致")
+
+    Spaces:
+        comb 二元排列 :=
+            from(<Base.命题变量集, Base.原始合取, Base.成立判断, Base.结构同一>),
+            by(<Principles.最小形成, Principles.合取成立, Principles.条件同一, Principles.元逻辑推理, Principles.二元交换>)
+
+        comb 三元排列 :=
+            from(<Base.命题变量集, Base.原始合取, Base.成立判断, Base.结构同一>),
+            by(<Principles.最小形成, Principles.合取成立, Principles.条件同一, Principles.元逻辑推理, Principles.三元结合>)
+
+    Boundary:
+        in:view 二元输入 :=
+            of(Base.合法表达式集),
+            pick({x, y}),
+            card[1:1],
+            to(Spaces.二元排列)
+
+        in:view 三元输入 :=
+            of(Base.合法表达式集),
+            pick({x, y, z}),
+            card[1:1],
+            to(Spaces.三元排列)
+
+        out:view 二元同一结果 :=
+            of(Base.结构同一),
+            pick({Conj(x, y) ≈ Conj(y, x)}),
+            card[0:1],
+            from(Spaces.二元排列)
+
+        out:view 三元同一结果 :=
+            of(Base.结构同一),
+            pick({Conj(Conj(x, y), z) ≈ Conj(x, Conj(y, z))}),
+            card[0:1],
+            from(Spaces.三元排列)
+
+        param:enum 证明目标 :=
+            domain({交换律, 结合律}),
+            affects(<Boundary.二元输入, Boundary.三元输入, Boundary.二元同一结果, Boundary.三元同一结果>)
