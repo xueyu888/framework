@@ -73,7 +73,7 @@ summary = "列表中的每一项都必须是字符串"
 [communication.Chunk_Tagging.l0_m0.p14]
 summary = "字符串类型"
 
-[communication.Chunk_Tagging.p15]
+[communication.Chunk_Tagging.l0_m0.p15]
 summary = "领域ID必须为单个合法领域标识，并可关联到领域表中的主键"
 
 [communication.Chunk_Tagging.l1_m0.p1]
@@ -138,6 +138,9 @@ summary = "状态写回必须作用于 `enable_status`、`review_status` 和 `re
 
 [communication.Chunk_Tagging.l1_m1.p14]
 summary = "单次状态写回必须作用于单个文档下的一条或多条已有标注记录"
+
+[communication.Chunk_Tagging.l1_m1.p15]
+summary = "数据库类型固定为 postgres"
 
 [communication.Chunk_Tagging.l1_m2.p1]
 summary = "字符串类型"
@@ -324,7 +327,7 @@ item_type = "string"
 field_name = "domain_id"
 value_type = "string"
 
-[exact.Chunk_Tagging.p15]
+[exact.Chunk_Tagging.l0_m0.p15]
 foreign_key = "domains.domain_id"
 cardinality = "single"
 
@@ -395,6 +398,9 @@ mutable_fields = ["enable_status", "review_status", "review_source"]
 
 [exact.Chunk_Tagging.l1_m1.p14]
 write_scope = "single_document_existing_records"
+
+[exact.Chunk_Tagging.l1_m1.p15]
+database_type = "postgres"
 
 [exact.Chunk_Tagging.l1_m2.p1]
 field_name = "doc_id"

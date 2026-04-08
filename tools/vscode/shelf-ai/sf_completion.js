@@ -57,7 +57,7 @@ function detectShelfFrameworkCompletionContexts(linePrefix, documentText, lineNu
     contexts.add("file-empty");
   }
 
-  if (!authoringState.hasModule || lineNumber === 0 || trimmed.startsWith("module")) {
+  if (!authoringState.hasModule || lineNumber === 0 || /^MODULE\b/u.test(trimmed)) {
     contexts.add("module-line");
   }
 

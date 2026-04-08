@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.26 - 2026-04-08
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.25..shelf-ai-v0.1.26`.
+- Added a keyword-first `.sf` authoring preview backed by shared grammar/completion/lint/highlight rules, including the current `MODULE` header, `set/elem/relation[...]`, `sat/eq`, `comb/seq`, and `param<enum|range>` statement shapes.
+- Synced the extension-side `.sf` diagnostics, completion context detection, semantic token legend, examples, and tests to the new single-line authoring style instead of the earlier clause-based prototype.
+- Restored the release validation chain by fixing Chunk_Tagging module-scoped `P15` config paths and static contract bundle discovery, so `validate_canonical.py --check-changes` passes again before packaging and push.
+- Revalidated repository/plugin checks, then repackaged and reinstalled the local VSIX from the validated `0.1.26` workspace.
+
 ## 0.1.25 - 2026-04-03
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.24..shelf-ai-v0.1.25`.

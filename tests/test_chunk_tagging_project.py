@@ -51,7 +51,7 @@ class ChunkTaggingProjectTest(unittest.TestCase):
             for scope_id, summary in assembly.validation_reports.scopes.items()
             if any(not outcome.passed for outcome in summary.rules)
         }
-        self.assertEqual(failed_scope_ids, {"correspondence_guard"})
+        self.assertEqual(failed_scope_ids, set())
 
 
 if __name__ == "__main__":
