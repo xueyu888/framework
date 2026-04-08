@@ -9,7 +9,40 @@ from project_runtime.correspondence_contracts import boundary_field_name
 from project_runtime.framework_layer import _boundary_name_to_section
 
 
-FRAMEWORK_TEXT = """# 测试参数模块:DemoParameterModule
+NEW_FRAMEWORK_TEXT = """# 测试参数模块:DemoParameterModule
+
+@framework
+
+## 0. 目标 (Goal)
+
+- 目标说明。
+
+## 1. 最小结构基（Minimal Structural Bases）
+
+- `B1` 查询结构基：由查询文本与结果出口约束组成。来源：`C1 + query_in + Result_OUT`。
+
+## 2. 基排列组合（Base Arrangement / Combination）
+
+- `R1` `查询闭合规则`：由 `{B1}` 在 `query_in + Result_OUT` 约束下导出 `C1`。
+
+## 3. 边界定义（Boundary）
+
+### 3.1 接口定义（IO / Ports）
+
+- `QUERY_IN`：接收查询输入。
+- `RESULT_OUT`：输出查询结果。
+
+### 3.2 参数边界（Parameter Constraints）
+
+- `query_in` 查询输入参数：用于约束查询入口。来源：`C1`。
+- `Result_OUT` 结果输出参数：用于约束结果出口。来源：`C1`。
+
+## 4. 能力声明（Capability Statement）
+
+- `C1` 查询承接能力：支持承接查询输入。
+"""
+
+LEGACY_FRAMEWORK_TEXT = """# 旧版参数模块:LegacyParameterModule
 
 @framework
 
@@ -41,10 +74,10 @@ FRAMEWORK_TEXT = """# 测试参数模块:DemoParameterModule
 
 
 class FrameworkIrParserTest(unittest.TestCase):
-    def test_parser_accepts_snake_case_and_mixed_case_boundary_ids(self) -> None:
+    def test_parser_accepts_new_template_and_mixed_case_boundary_ids(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as tmp_dir:
             framework_file = Path(tmp_dir) / "L9-M9-测试参数模块.md"
-            framework_file.write_text(FRAMEWORK_TEXT, encoding="utf-8")
+            framework_file.write_text(NEW_FRAMEWORK_TEXT, encoding="utf-8")
 
             module = parse_framework_module(framework_file)
 
@@ -52,11 +85,24 @@ class FrameworkIrParserTest(unittest.TestCase):
         self.assertEqual(module.boundaries[0].source_ref.anchor, "boundary:query_in")
         self.assertEqual(module.boundaries[1].source_ref.anchor, "boundary:result_out")
         self.assertEqual(module.rules[0].boundary_bindings, ("query_in", "Result_OUT"))
+        self.assertEqual(module.rules[0].participant_bases, ("B1",))
+        self.assertEqual(module.rules[0].output_capabilities, ("C1",))
 
     def test_boundary_projection_names_normalize_to_lowercase(self) -> None:
         self.assertEqual(_boundary_name_to_section("query_in"), "query_in")
         self.assertEqual(_boundary_name_to_section("Result_OUT"), "result_out")
         self.assertEqual(boundary_field_name("Result_OUT"), "result_out")
+
+    def test_parser_keeps_legacy_framework_structure_compatible(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as tmp_dir:
+            framework_file = Path(tmp_dir) / "L9-M9-旧版参数模块.md"
+            framework_file.write_text(LEGACY_FRAMEWORK_TEXT, encoding="utf-8")
+
+            module = parse_framework_module(framework_file)
+
+        self.assertEqual(tuple(item.boundary_id for item in module.boundaries), ("query_in", "Result_OUT"))
+        self.assertEqual(module.rules[0].boundary_bindings, ("query_in", "Result_OUT"))
+        self.assertEqual(len(module.verifications), 1)
 
 
 if __name__ == "__main__":

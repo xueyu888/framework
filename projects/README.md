@@ -27,6 +27,5 @@
 
 当前样板：
 
-- `message_queue_basic`
-  - 项目配置：`projects/message_queue_basic/project.toml`
-  - 产物目录：`projects/message_queue_basic/generated/`
+- 暂无内置项目样板
+- 如需进入常规四层物化流程，请新增 `projects/<project_id>/project.toml`

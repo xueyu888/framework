@@ -259,6 +259,8 @@ function summarizeCanonicalFreshness(repoRoot) {
   );
   const blockingProjects = projects.filter((project) => project.status !== "fresh");
   return {
+    hasProjects: projects.length > 0,
+    bootstrapMode: projects.length === 0,
     projects,
     blockingProjects,
     hasBlockingProjects: blockingProjects.length > 0,

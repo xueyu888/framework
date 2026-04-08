@@ -28,7 +28,7 @@ def _resolve_project_file(repo_root: Path, project_file: str | None) -> Path | N
     return candidate
 
 
-def _bootstrap_skip_payload(project_file: str | None) -> dict[str, Any]:
+def _bootstrap_mode_payload(project_file: str | None) -> dict[str, Any]:
     return {
         "passed": True,
         "passed_count": 0,
@@ -38,8 +38,8 @@ def _bootstrap_skip_payload(project_file: str | None) -> dict[str, Any]:
         "scopes": {},
         "bootstrap_mode": True,
         "message": (
-            "skip check-changes: no projects/*/project.toml found; "
-            "allow bootstrap generation from framework first"
+            "no projects/*/project.toml found; "
+            "repository remains in bootstrap/no-project mode until a project config exists"
         ),
         "project_file": project_file or "",
     }
@@ -74,16 +74,32 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = _build_parser().parse_args()
     resolved_project_file = _resolve_project_file(REPO_ROOT, args.project_file)
-    if args.check_changes and (resolved_project_file is None or not resolved_project_file.is_file()):
-        discovered_projects = _discover_project_files(REPO_ROOT)
-        if not discovered_projects:
-            payload = _bootstrap_skip_payload(args.project_file)
-            if args.json:
-                print(json.dumps(payload, ensure_ascii=False))
-            else:
-                print(f"[validate] passed=True bootstrap_mode=True project={payload['project_file']}")
-                print(f"- {payload['message']}")
-            return 0
+    discovered_projects = _discover_project_files(REPO_ROOT)
+    if (resolved_project_file is None or not resolved_project_file.is_file()) and not discovered_projects:
+        payload = _bootstrap_mode_payload(args.project_file)
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=False))
+        else:
+            print(f"[validate] passed=True bootstrap_mode=True project={payload['project_file']}")
+            print(f"- {payload['message']}")
+        return 0
+    if resolved_project_file is not None and not resolved_project_file.is_file():
+        message = f"project file not found: {args.project_file or resolved_project_file}"
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "passed": False,
+                        "message": message,
+                        "project_file": args.project_file or "",
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print("[validate] passed=False")
+            print(f"- {message}")
+        return 1
     if resolved_project_file is None:
         message = (
             "no projects/*/project.toml found; "

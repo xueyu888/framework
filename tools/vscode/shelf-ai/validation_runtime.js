@@ -2,6 +2,50 @@ const cp = require("child_process");
 
 const DEFAULT_COMMAND_TIMEOUT_MS = 120 * 1000;
 
+function parseCommandResult(stdout, stderr, code, options = {}) {
+  const normalizeIssue = typeof options.normalizeIssue === "function"
+    ? options.normalizeIssue
+    : (issue) => issue;
+  const text = [stdout, stderr].filter(Boolean).join("\n").trim();
+
+  try {
+    const data = JSON.parse(stdout || stderr || "{}");
+    if (typeof data.passed === "boolean") {
+      const rawErrors = Array.isArray(data.errors) ? data.errors : [];
+      return {
+        passed: data.passed,
+        errors: rawErrors.map(normalizeIssue),
+      };
+    }
+  } catch (_) {
+    // Fallback to text parsing below.
+  }
+
+  if (code === 0 && /\bbootstrap_mode=True\b/.test(text)) {
+    return {
+      passed: true,
+      errors: [],
+    };
+  }
+
+  const errors = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("- ")) {
+      errors.push(normalizeIssue(trimmed.slice(2)));
+    }
+  }
+
+  if (!errors.length && code !== 0 && text) {
+    errors.push(normalizeIssue(text));
+  }
+
+  return {
+    passed: code === 0 && errors.length === 0,
+    errors,
+  };
+}
+
 function execCommand(command, cwd, options = {}) {
   const timeoutMs = Number.isFinite(Number(options.timeoutMs))
     ? Math.max(1, Number(options.timeoutMs))
@@ -120,4 +164,5 @@ module.exports = {
   DEFAULT_COMMAND_TIMEOUT_MS,
   createActiveCommandTracker,
   execCommand,
+  parseCommandResult,
 };

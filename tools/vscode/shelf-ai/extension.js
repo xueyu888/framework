@@ -29,22 +29,20 @@ const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze([
   "P",
   "B",
   "R",
-  "V",
   "N",
   "c",
   "p",
   "b",
   "r",
-  "v",
   "n",
 ]);
 const FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS = new Set(FRAMEWORK_COMPLETION_TRIGGER_CHARS);
 const FRAMEWORK_REQUIRED_SECTION_HEADINGS = Object.freeze([
-  "## 1. 能力声明（Capability Statement）",
-  "## 2. 边界定义（Boundary / Parameter 参数）",
-  "## 3. 最小结构基（Minimal Structural Bases）",
-  "## 4. 基组合原则（Base Combination Principles）",
-  "## 5. 验证（Verification）",
+  "## 0. 目标 (Goal)",
+  "## 1. 最小结构基（Minimal Structural Bases）",
+  "## 2. 基排列组合（Base Arrangement / Combination）",
+  "## 3. 边界定义（Boundary）",
+  "## 4. 能力声明（Capability Statement）",
 ]);
 const FRAMEWORK_RULE_HINTS = {
   FW002: "@framework 必须无参数",
@@ -63,21 +61,23 @@ const FRAMEWORK_RULE_HINTS = {
   FW029: "框架内联模块引用图必须无环",
   FW030: "边界参数必须包含来源",
   FW031: "边界来源必须引用 C* 且引用合法",
-  FW040: "R*/R*.* 编号必须合法并可追溯",
+  FW040: "R* 编号必须合法并可追溯",
   FW041: "每个 R* 必须包含参与基/组合方式/输出能力/参数绑定",
   FW050: "R*.输出能力必须引用已定义 C*",
   FW060: "新符号必须通过输出结构声明后才可在规则中使用",
   FWL001: "标题必须为 中文名:EnglishName",
   FWL002: "@framework 必须为无参数单行",
-  FWL003: "必须包含 1~5 标准章节",
+  FWL003: "必须包含 0~4 标准章节",
   FWL004: "列表项必须使用 -",
-  FWL005: "能力章节条目格式必须合法（C*/N*）",
-  FWL006: "边界定义条目格式必须合法",
-  FWL007: "最小结构基条目格式必须合法",
-  FWL008: "规则条目格式必须合法",
-  FWL009: "验证条目格式必须合法",
+  FWL005: "能力声明条目格式必须合法（C*/N*）",
+  FWL006: "边界定义与 3.1/3.2 子章节格式必须合法",
+  FWL007: "最小结构基条目格式必须合法（B*）",
+  FWL008: "基排列组合条目格式必须合法（R* 单行）",
   FWL010: "章节内必须至少存在一个可解析条目",
   FWL011: "规则引用的符号必须先在本模块中定义",
+  FWL013: "C/N/B/R 编号必须唯一",
+  FWL014: "每条 R* 必须声明输出能力或失效结论",
+  FWL015: "framework 正文不得出现旧写法（上游模块/project.toml/配置 section）",
   FWL012: "标准二级标题内容与顺序必须合法"
 };
 
@@ -636,6 +636,8 @@ function activate(context) {
       .filter((relPath) => authoritativeSources.has(relPath))
       .sort();
     return {
+      hasProjects: summary.hasProjects,
+      bootstrapMode: summary.bootstrapMode,
       projects: summary.projects,
       blockingProjects: summary.blockingProjects,
       dirtySourceRelPaths,
@@ -662,6 +664,9 @@ function activate(context) {
   };
 
   const describeCanonicalFreshness = (freshnessState) => {
+    if (!freshnessState.hasProjects) {
+      return "当前仓库没有 projects/*/project.toml，仍处于 bootstrap / framework authoring 状态";
+    }
     const parts = [];
     if (freshnessState.dirtySourceRelPaths.length) {
       parts.push(`作者源有未校验变更：${freshnessState.dirtySourceRelPaths.slice(0, 2).join(", ")}`);
@@ -869,6 +874,25 @@ function activate(context) {
     const repoRoot = folder.uri.fsPath;
     const config = getShelfConfig();
     const projectFiles = workspaceGuard.discoverProjectFiles(repoRoot);
+    if (!projectFiles.length) {
+      output.clear();
+      output.appendLine("[codegen-preflight] passed=True bootstrap_mode=True");
+      output.appendLine(
+        "- no projects/*/project.toml found; preflight stays in bootstrap/no-project mode until a project config exists"
+      );
+      lastRunIssues = [];
+      lastRepoRoot = repoRoot;
+      lastValidationAt = new Date().toISOString();
+      lastValidationMode = "full";
+      lastValidationPassed = true;
+      applyDiagnostics({ passed: true, errors: [] }, diagnostics, repoRoot, null);
+      statusController.refresh();
+      refreshSidebarHome();
+      showShelfInformationMessage(
+        "Shelf 生成前预检已跳过物化：当前仓库没有 project.toml，仍处于 bootstrap / framework authoring 状态。"
+      );
+      return;
+    }
     const materializeCommand = buildMaterializeCommand(
       String(config.get("materializeCommand") || DEFAULT_MATERIALIZE_COMMAND),
       projectFiles
@@ -1602,26 +1626,32 @@ function activate(context) {
     let sectionId = "";
     for (let index = 0; index <= safeLine; index += 1) {
       const trimmed = document.lineAt(index).text.trim();
-      if (trimmed === "## 1. 能力声明（Capability Statement）") {
-        sectionId = "capability";
+      if (trimmed === "## 0. 目标 (Goal)") {
+        sectionId = "goal";
         continue;
       }
-      if (
-        trimmed === "## 2. 边界定义（Boundary / Parameter 参数）"
-      ) {
-        sectionId = "parameter";
-        continue;
-      }
-      if (trimmed === "## 3. 最小结构基（Minimal Structural Bases）") {
+      if (trimmed === "## 1. 最小结构基（Minimal Structural Bases）") {
         sectionId = "base";
         continue;
       }
-      if (trimmed === "## 4. 基组合原则（Base Combination Principles）") {
+      if (trimmed === "## 2. 基排列组合（Base Arrangement / Combination）") {
         sectionId = "rule";
         continue;
       }
-      if (trimmed === "## 5. 验证（Verification）") {
-        sectionId = "verification";
+      if (trimmed === "## 3. 边界定义（Boundary）") {
+        sectionId = "boundary";
+        continue;
+      }
+      if (trimmed === "### 3.1 接口定义（IO / Ports）") {
+        sectionId = "boundary-ports";
+        continue;
+      }
+      if (trimmed === "### 3.2 参数边界（Parameter Constraints）") {
+        sectionId = "boundary-parameters";
+        continue;
+      }
+      if (trimmed === "## 4. 能力声明（Capability Statement）") {
+        sectionId = "capability";
       }
     }
     return sectionId;
@@ -1752,11 +1782,23 @@ function activate(context) {
       }
       const missingHeadings = FRAMEWORK_REQUIRED_SECTION_HEADINGS.filter((heading) => !existingHeadings.has(heading));
       if (missingHeadings.length) {
+        const headingBlocks = missingHeadings.map((heading) => {
+          if (heading === "## 3. 边界定义（Boundary）") {
+            return [
+              heading,
+              "",
+              "### 3.1 接口定义（IO / Ports）",
+              "",
+              "### 3.2 参数边界（Parameter Constraints）",
+            ].join("\n");
+          }
+          return heading;
+        });
         quickFixes.push(
           createFrameworkQuickFix(
             document,
             diagnostic,
-            "补全标准章节（1~5）",
+            "补全标准章节（0~4）",
             (edit) => {
               const tailLine = Math.max(0, document.lineCount - 1);
               const tailPos = new vscode.Position(tailLine, document.lineAt(tailLine).text.length);
@@ -1764,7 +1806,7 @@ function activate(context) {
               edit.insert(
                 document.uri,
                 tailPos,
-                `${suffix}\n${missingHeadings.join("\n\n")}\n`
+                `${suffix}\n${headingBlocks.join("\n\n")}\n`
               );
               return true;
             }
@@ -1823,18 +1865,22 @@ function activate(context) {
     }
 
     if (code === "FWL006") {
+      const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
       const inferred = inferFrameworkSymbolNumberFromLine(lineText, "P")
         || nextFrameworkSymbolNumber(documentText, "P");
+      const replacement = sectionId === "boundary-ports"
+        ? "- `PORT_IN`：运行时输入接口，待补充接口说明。\n"
+        : `- \`P${inferred}\` 参数名：待定义参数约束。\n`;
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准参数条目",
+          sectionId === "boundary-ports" ? "替换为标准接口条目" : "替换为标准参数条目",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`P${inferred}\` 参数名：待定义参数约束。来源：\`C1\`。\n`
+              replacement
             );
             return true;
           }
@@ -1854,7 +1900,7 @@ function activate(context) {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`B${inferred}\` 结构基名：待定义结构。来源：\`C1 + P1\`。\n`
+              `- \`B${inferred}\` 结构基名：待定义结构说明。\n`
             );
             return true;
           }
@@ -1866,39 +1912,16 @@ function activate(context) {
       const inferredRuleNumber = inferFrameworkSymbolNumberFromLine(lineText, "R")
         || inferNearestRuleNumber(document, lineIndex)
         || nextFrameworkSymbolNumber(documentText, "R");
-      const blockText = [
-        `- \`R${inferredRuleNumber}\` 规则名`,
-        `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
-        `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
-        `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
-        `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
-      ].join("\n");
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准 R 规则块",
-          (edit) => {
-            edit.replace(document.uri, lineRange, `${blockText}\n`);
-            return true;
-          }
-        )
-      );
-    }
-
-    if (code === "FWL009") {
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "V")
-        || nextFrameworkSymbolNumber(documentText, "V");
-      quickFixes.push(
-        createFrameworkQuickFix(
-          document,
-          diagnostic,
-          "替换为标准 V 条目",
+          "替换为标准 R 条目",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`V${inferred}\` 验证名：待补充验证要求。\n`
+              `- \`R${inferredRuleNumber}\` \`规则名\`：由 \`{B1, B2}\` 形成 \`结果\`，导出 \`C1\`。\n`
             );
             return true;
           }
@@ -1909,23 +1932,19 @@ function activate(context) {
     if (code === "FWL010") {
       const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
       let template = "";
-      if (sectionId === "capability") {
-        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
-      } else if (sectionId === "parameter") {
-        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。来源：\`C1\`。`;
+      if (sectionId === "goal") {
+        template = "- 目标说明。";
       } else if (sectionId === "base") {
-        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构。来源：\`C1 + P1\`。`;
+        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构说明。`;
       } else if (sectionId === "rule") {
         const inferredRuleNumber = nextFrameworkSymbolNumber(documentText, "R");
-        template = [
-          `- \`R${inferredRuleNumber}\` 规则名`,
-          `  - \`R${inferredRuleNumber}.1\` 参与基：\`B1 + B2\`。`,
-          `  - \`R${inferredRuleNumber}.2\` 组合方式：待补充。`,
-          `  - \`R${inferredRuleNumber}.3\` 输出能力：\`C1\`。`,
-          `  - \`R${inferredRuleNumber}.4\` 参数绑定：\`P1/P2\`。`,
-        ].join("\n");
-      } else if (sectionId === "verification") {
-        template = `- \`V${nextFrameworkSymbolNumber(documentText, "V")}\` 验证名：待补充验证要求。`;
+        template = `- \`R${inferredRuleNumber}\` \`规则名\`：由 \`{B1, B2}\` 形成 \`结果\`，导出 \`C1\`。`;
+      } else if (sectionId === "boundary-ports") {
+        template = "- `PORT_IN`：运行时输入接口，待补充接口说明。";
+      } else if (sectionId === "boundary" || sectionId === "boundary-parameters") {
+        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。`;
+      } else if (sectionId === "capability") {
+        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
       }
       if (template) {
         quickFixes.push(
@@ -2172,7 +2191,7 @@ function activate(context) {
     const freshnessState = getCanonicalFreshnessState(repoRoot);
     const freshnessDetail = describeCanonicalFreshness(freshnessState);
     const frameworkTreeReady = fs.existsSync(path.join(repoRoot, "framework"));
-    const evidenceTreeReady = !freshnessState.hasBlocking;
+    const evidenceTreeReady = freshnessState.hasProjects && !freshnessState.hasBlocking;
     const guardMode = config.get("guardMode") === "strict" ? "strict" : "normal";
     const issueLevels = countIssueLevels(lastRunIssues);
     const issueCount = issueLevels.totalCount;
@@ -2181,12 +2200,16 @@ function activate(context) {
     const hasWarningOnly = warningIssueCount > 0 && errorIssueCount === 0;
       const issueSummary = validationEnabled
       ? (
+        !freshnessState.hasProjects
+          ? "零项目（bootstrap）"
+          : (
         lastValidationPassed === null
           ? "尚未运行"
           : (
             errorIssueCount > 0
               ? `${errorIssueCount} 个错误${warningIssueCount > 0 ? ` + ${warningIssueCount} 个警告` : ""}`
               : (warningIssueCount > 0 ? `${warningIssueCount} 个警告` : "无问题")
+          )
           )
       )
       : "校验已停用";
@@ -2248,6 +2271,17 @@ function activate(context) {
       calloutAction = {
         action: "openStandards",
         label: "打开规范总纲路径"
+      };
+    } else if (!freshnessState.hasProjects) {
+      heroTone = "warning";
+      heroStatus = "零项目 bootstrap";
+      heroSummary = "当前仓库还没有 project.toml。你可以继续做 framework 作者编辑，但正式物化与证据树尚未建立。";
+      calloutTone = "warning";
+      calloutTitle = "继续做 framework 作者编辑";
+      calloutBody = "当前适合继续使用 framework lint、补全和框架树浏览。要恢复 full materialization、证据树和正式跨层导航，先创建 projects/<project_id>/project.toml。";
+      calloutAction = {
+        action: "openTree",
+        label: "打开框架树"
       };
     } else if (freshnessState.hasBlocking) {
       heroTone = "error";
@@ -2324,19 +2358,27 @@ function activate(context) {
       },
       {
         label: "证据树视图",
-        value: evidenceTreeReady ? "就绪" : "受阻",
-        tone: evidenceTreeReady ? "ok" : "error",
+        value: evidenceTreeReady ? "就绪" : (freshnessState.hasProjects ? "受阻" : "无项目"),
+        tone: evidenceTreeReady ? "ok" : (freshnessState.hasProjects ? "error" : "warning"),
         note: evidenceTreeReady
           ? "运行时投影（基于 canonical，不持久化）。"
-          : "canonical 不是 fresh 状态，正式证据树已收紧。"
+          : (
+            freshnessState.hasProjects
+              ? "canonical 不是 fresh 状态，正式证据树已收紧。"
+              : "当前没有 project.toml，证据树与正式跨层导航尚未建立。"
+          )
       },
       {
         label: "Canonical Freshness",
-        value: freshnessState.hasBlocking ? "过期" : "新鲜",
-        tone: freshnessState.hasBlocking ? "error" : "ok",
-        note: freshnessState.hasBlocking
-          ? (freshnessDetail || "先 materialize / validate，再继续信任正式跨层结果。")
-          : "当前正式跨层跳转与证据树可继续信任 canonical。"
+        value: !freshnessState.hasProjects ? "无项目" : (freshnessState.hasBlocking ? "过期" : "新鲜"),
+        tone: !freshnessState.hasProjects ? "warning" : (freshnessState.hasBlocking ? "error" : "ok"),
+        note: !freshnessState.hasProjects
+          ? "当前仓库仍处于 bootstrap/no-project 模式，canonical 主链尚未建立。"
+          : (
+            freshnessState.hasBlocking
+              ? (freshnessDetail || "先 materialize / validate，再继续信任正式跨层结果。")
+              : "当前正式跨层跳转与证据树可继续信任 canonical。"
+          )
       },
       {
         label: "守卫模式",
@@ -2411,6 +2453,8 @@ function activate(context) {
     let issueEmptyText = "当前没有可展示的问题。";
     if (!validationEnabled) {
       issueEmptyText = "当前工作区的 canonical 守卫已停用，所以这里不会自动汇总问题。";
+    } else if (!freshnessState.hasProjects) {
+      issueEmptyText = "当前仓库没有项目配置；这里不会显示 canonical 问题汇总。先创建 projects/<project_id>/project.toml。";
     } else if (lastValidationPassed === null) {
       issueEmptyText = "本会话尚未执行校验。先跑一次完整校验，侧边栏才能显示最新问题摘要。";
     } else if (lastValidationPassed === true) {
@@ -3216,6 +3260,7 @@ function activate(context) {
 function deactivate() {}
 
 const execCommand = validationRuntime.execCommand;
+const parseCommandResult = validationRuntime.parseCommandResult;
 
 function shellQuote(value) {
   const text = String(value ?? "");
@@ -3254,36 +3299,7 @@ function buildMaterializeCommand(baseCommand, projectFiles) {
 }
 
 function parseResult(stdout, stderr, code) {
-  const text = [stdout, stderr].filter(Boolean).join("\n").trim();
-
-  try {
-    const data = JSON.parse(stdout || stderr || "{}");
-    if (typeof data.passed === "boolean" && Array.isArray(data.errors)) {
-      return {
-        passed: data.passed,
-        errors: data.errors.map(normalizeIssue)
-      };
-    }
-  } catch (_) {
-    // Fallback to text parsing below.
-  }
-
-  const errors = [];
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("- ")) {
-      errors.push(normalizeIssue(trimmed.slice(2)));
-    }
-  }
-
-  if (!errors.length && code !== 0 && text) {
-    errors.push(normalizeIssue(text));
-  }
-
-  return {
-    passed: code === 0 && errors.length === 0,
-    errors
-  };
+  return parseCommandResult(stdout, stderr, code, { normalizeIssue });
 }
 
 function parseStageFailure(code, message, stdout, stderr, exitCode) {
