@@ -1,0 +1,36 @@
+module 父子任务状态记录模块:TaskStateRecorder:
+    Goal := "记录父任务及其子任务的状态，并在子任务状态变化后同步更新父任务状态"
+
+    Base:
+        elem 父任务提交处理逻辑 := [父任务提交处理逻辑](../../../docs/back_zrx/父任务提交处理逻辑.md)
+        elem 子任务提交处理逻辑 := [子任务提交处理逻辑](../../../docs/back_zrx/子任务提交处理逻辑.md)
+        attr 父任务状态记录表 := [父任务状态记录表](../../../docs/back_zrx/父任务状态记录表.md)
+        attr 子任务状态记录表 := [子任务状态记录表](../../../docs/back_zrx/子任务状态记录表.md)
+
+    Principles:
+        form 子任务提交 :=
+            on(<Base.子任务提交处理逻辑, Base.子任务状态记录表, Base.父任务状态记录表>),
+            body("接收子任务记录并同步更新父任务状态")
+        sat 子任务提交 :=
+            on(<Spaces.comb.子任务提交>),
+            body("父任务记录必须先存在，子任务提交后父任务状态必须同步更新")
+
+    Spaces:
+        comb 子任务提交 :=
+            from(<Base.子任务提交处理逻辑, Base.子任务状态记录表, Base.父任务状态记录表>),
+            by(<Principles.form.子任务提交, Principles.sat.子任务提交>)
+
+    Boundary:
+        in<schema> 子任务记录输入 :=
+            payload({子任务id, 父任务id, 子任务状态, 是否初次完成, 子任务附加信息}),
+            card(1),
+            to(Spaces.comb.子任务提交)
+
+        out<schema> 父任务记录输出 :=
+            payload({父任务id, 子任务总数, 已完成子任务数, 父任务状态, 父任务附加信息}),
+            card(0..1),
+            from(Spaces.comb.子任务提交)
+
+        param<enum> 子任务状态集合 :=
+            domain({pending, running, success, failed}),
+            affects(<Boundary.in.子任务记录输入, Spaces.comb.子任务提交>)

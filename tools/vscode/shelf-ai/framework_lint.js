@@ -1,27 +1,19 @@
 const fs = require("fs");
 const path = require("path");
+const frameworkGrammar = require("./framework_grammar");
 
-const TITLE_PATTERN = /^#\s+(?<cn>[^:]+):(?<en>.+)$/;
-const CAPABILITY_LINE_PATTERN = /^-\s+`(?<id>C\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
-const NON_RESPONSIBILITY_LINE_PATTERN = /^-\s+`(?<id>N\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
-const BASE_LINE_PATTERN = /^-\s+`(?<id>B\d+)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
-const RULE_LINE_PATTERN = /^-\s+`(?<id>R\d+)`\s+`(?<name>[^`]+)`[：:]\s*(?<body>.+)$/;
-const PORT_LINE_PATTERN = /^-\s+`(?<id>[A-Za-z][A-Za-z0-9_]*)`\s*[：:]\s*(?<body>.+)$/;
-const PARAMETER_LINE_PATTERN = /^-\s+`(?<id>[A-Za-z][A-Za-z0-9_]*)`\s+(?<name>[^：:]+)[：:]\s*(?<body>.+)$/;
-const SYMBOL_TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
+const TITLE_PATTERN = frameworkGrammar.FRAMEWORK_TITLE_PATTERN;
+const FRAMEWORK_DIRECTIVE = frameworkGrammar.FRAMEWORK_DIRECTIVE;
+const FRAMEWORK_REQUIRED_TOP_LEVEL_SECTIONS = frameworkGrammar.FRAMEWORK_REQUIRED_TOP_LEVEL_SECTIONS;
+const FRAMEWORK_REQUIRED_BOUNDARY_SECTIONS = frameworkGrammar.FRAMEWORK_REQUIRED_BOUNDARY_SECTIONS;
+const FRAMEWORK_SECTION_HEADINGS = frameworkGrammar.FRAMEWORK_SECTION_HEADINGS;
+
 const FORBIDDEN_CONFIG_SECTION_PATTERN = /\[(?:exact|communication|framework)\.[^\]]+\]/i;
 const FRAMEWORK_MODULE_PATH_PATTERN = /^(framework|framework_drafts)\/([^/]+)\/L\d+-M\d+-[^/]+\.md$/;
 const FRAMEWORK_CONTROLLED_PATH_PATTERN = /^(framework|framework_drafts)(?:\/|$)/;
 const MARKDOWN_LINK_PATTERN = /\[[^\]]*]\(([^)]+)\)/g;
 
-const SECTION_GOAL_TITLE = "## 0. 目标 (Goal)";
-const SECTION_BASE_TITLE = "## 1. 最小结构基（Minimal Structural Bases）";
-const SECTION_RULE_TITLE = "## 2. 基排列组合（Base Arrangement / Combination）";
-const SECTION_BOUNDARY_TITLE = "## 3. 边界定义（Boundary）";
-const SECTION_CAPABILITY_TITLE = "## 4. 能力声明（Capability Statement）";
-
-const SECTION_BOUNDARY_PORTS_TITLE = "### 3.1 接口定义（IO / Ports）";
-const SECTION_BOUNDARY_PARAMETERS_TITLE = "### 3.2 参数边界（Parameter Constraints）";
+const SYMBOL_REFERENCE_PATTERN = /\b(?<kind>base|cs|cp\.(?:form|sat|id|norm)|bd\.(?:in|out|param))\.(?<name>[^,\s<>(){}[\]]+)/gu;
 
 function normalizeSlashes(value) {
   return String(value || "").replace(/\\/g, "/");
@@ -67,11 +59,11 @@ function getFrameworkScopeInfo(relPath) {
 }
 
 function parseFrameworkDirectiveLines(text) {
-  const lines = String(text || "").split(/\r?\n/);
+  const lines = frameworkGrammar.splitLines(text);
   const directives = [];
   for (let index = 0; index < lines.length; index += 1) {
     const trimmed = lines[index].trim();
-    if (!trimmed.startsWith("@framework")) {
+    if (!trimmed.startsWith(FRAMEWORK_DIRECTIVE)) {
       continue;
     }
     directives.push({
@@ -187,40 +179,22 @@ function firstNonEmptyLine(lines) {
 }
 
 function markerColumn(rawLine) {
-  const starIndex = rawLine.indexOf("*");
-  if (starIndex >= 0) {
-    return starIndex + 1;
-  }
-  const dashIndex = rawLine.indexOf("-");
-  if (dashIndex >= 0) {
-    return dashIndex + 1;
-  }
-  const firstChar = rawLine.search(/\S/);
+  const firstChar = String(rawLine || "").search(/\S/u);
   return firstChar >= 0 ? firstChar + 1 : 1;
 }
 
 function headingColumn(rawLine) {
-  const firstChar = String(rawLine || "").search(/\S/);
+  const firstChar = String(rawLine || "").search(/\S/u);
   return firstChar >= 0 ? firstChar + 1 : 1;
 }
 
-function frameworkRequiredSectionTitles() {
-  return [
-    SECTION_GOAL_TITLE,
-    SECTION_BASE_TITLE,
-    SECTION_RULE_TITLE,
-    SECTION_BOUNDARY_TITLE,
-    SECTION_CAPABILITY_TITLE,
-  ];
-}
-
-function validateSectionHeadingSequence({ lines, file, issues, sectionBlocks }) {
+function validateTopSectionHeadingSequence({ lines, file, issues, sectionBlocks }) {
   const actualHeadings = sectionBlocks.map((block) => ({
     title: block.title,
     line: block.line,
     text: String(lines[block.line - 1] || block.title),
   }));
-  const expectedTitles = frameworkRequiredSectionTitles();
+  const expectedTitles = FRAMEWORK_REQUIRED_TOP_LEVEL_SECTIONS;
 
   let actualIndex = 0;
   let expectedIndex = 0;
@@ -297,59 +271,119 @@ function validateSectionHeadingSequence({ lines, file, issues, sectionBlocks }) 
   }
 }
 
-function lintFlatListSection({
-  block,
+function collectLogicalStatements(entries) {
+  const statements = [];
+  let current = null;
+
+  const flush = () => {
+    if (current && current.rows.length) {
+      statements.push(current);
+    }
+    current = null;
+  };
+
+  for (const row of entries || []) {
+    const trimmed = String(row?.trimmed || "");
+    if (!trimmed) {
+      flush();
+      continue;
+    }
+    if (trimmed.startsWith("### ")) {
+      flush();
+      continue;
+    }
+
+    const statementKind = frameworkGrammar.detectStatementKind(trimmed);
+    const isIndented = /^\s+/u.test(String(row?.text || ""));
+
+    if (statementKind) {
+      flush();
+      current = { rows: [row] };
+      continue;
+    }
+    if (current && isIndented) {
+      current.rows.push(row);
+      continue;
+    }
+
+    flush();
+    current = { rows: [row] };
+  }
+
+  flush();
+  return statements;
+}
+
+function lintSectionStatements({
   file,
   issues,
-  validPattern,
-  allowPatterns = [],
+  block,
+  sectionId,
   invalidCode,
   invalidMessage,
 }) {
-  let matchCount = 0;
+  const allowedStatementIds = new Set(frameworkGrammar.getAllowedStatementIdsForSection(sectionId));
+  const statements = collectLogicalStatements(block.entries);
+  let validCount = 0;
+  const parsedStatements = [];
 
-  for (const row of block.entries) {
-    if (!row.trimmed || row.trimmed === "---") {
-      continue;
-    }
-    if (row.trimmed.startsWith("### ")) {
-      continue;
-    }
-    if (!/^[-*]\s+/.test(row.trimmed)) {
-      continue;
-    }
-    if (/^\*\s+/.test(row.trimmed)) {
+  for (const statement of statements) {
+    const firstRow = statement.rows[0];
+    const firstTrimmed = String(firstRow?.trimmed || "");
+    const firstLineText = String(firstRow?.text || "");
+    const statementKind = frameworkGrammar.detectStatementKind(firstTrimmed);
+    const normalizedStatement = frameworkGrammar.normalizeStatementLines(
+      statement.rows.map((row) => row.text)
+    );
+
+    if (firstTrimmed.startsWith("-") || firstTrimmed.startsWith("*")) {
       issues.push(
         createIssue({
           file,
-          line: row.line,
-          column: markerColumn(row.text),
+          line: firstRow.line,
+          column: markerColumn(firstLineText),
           code: "FWL004",
-          message: "列表项必须使用 `-`，不要使用 `*`。",
+          message: "keyword-first grammar 不使用列表符，请直接写语句（如 `base ... := ...`）。",
         })
       );
       continue;
     }
 
-    const isAllowed = validPattern.test(row.trimmed)
-      || allowPatterns.some((pattern) => pattern.test(row.trimmed));
-    if (isAllowed) {
-      matchCount += 1;
+    if (!statementKind || !allowedStatementIds.has(statementKind)) {
+      issues.push(
+        createIssue({
+          file,
+          line: firstRow.line,
+          column: markerColumn(firstLineText),
+          code: invalidCode,
+          message: invalidMessage,
+        })
+      );
+      continue;
+    }
+    if (!frameworkGrammar.validateStatement(statementKind, normalizedStatement)) {
+      issues.push(
+        createIssue({
+          file,
+          line: firstRow.line,
+          column: markerColumn(firstLineText),
+          code: invalidCode,
+          message: invalidMessage,
+        })
+      );
       continue;
     }
 
-    issues.push(
-      createIssue({
-        file,
-        line: row.line,
-        column: markerColumn(row.text),
-        code: invalidCode,
-        message: invalidMessage,
-      })
-    );
+    validCount += 1;
+    parsedStatements.push({
+      kind: statementKind,
+      line: firstRow.line,
+      text: firstLineText,
+      normalized: normalizedStatement,
+    });
   }
 
-  if (matchCount === 0) {
+  if (validCount === 0) {
     issues.push(
       createIssue({
         file,
@@ -361,39 +395,59 @@ function lintFlatListSection({
       })
     );
   }
+
+  return parsedStatements;
 }
 
 function extractBoundarySubsections({ block, file, issues }) {
-  const portBlock = {
-    title: SECTION_BOUNDARY_PORTS_TITLE,
+  const inputBlock = {
+    title: FRAMEWORK_SECTION_HEADINGS.boundaryInput,
+    line: block.line,
+    entries: [],
+  };
+  const outputBlock = {
+    title: FRAMEWORK_SECTION_HEADINGS.boundaryOutput,
     line: block.line,
     entries: [],
   };
   const parameterBlock = {
-    title: SECTION_BOUNDARY_PARAMETERS_TITLE,
+    title: FRAMEWORK_SECTION_HEADINGS.boundaryParameter,
     line: block.line,
     entries: [],
   };
 
   let activeSubsection = "";
-  let hasPortsHeading = false;
-  let hasParametersHeading = false;
+  const seenHeadings = new Set();
 
   for (const row of block.entries) {
-    if (!row.trimmed || row.trimmed === "---") {
+    if (!row.trimmed) {
+      if (activeSubsection === "input") {
+        inputBlock.entries.push(row);
+      } else if (activeSubsection === "output") {
+        outputBlock.entries.push(row);
+      } else if (activeSubsection === "parameter") {
+        parameterBlock.entries.push(row);
+      }
       continue;
     }
     if (row.trimmed.startsWith("### ")) {
-      if (row.trimmed === SECTION_BOUNDARY_PORTS_TITLE) {
-        hasPortsHeading = true;
-        portBlock.line = row.line;
-        activeSubsection = "ports";
+      const subId = frameworkGrammar.detectFrameworkSectionIdFromHeading(row.trimmed);
+      if (subId === "boundary-input") {
+        activeSubsection = "input";
+        inputBlock.line = row.line;
+        seenHeadings.add(FRAMEWORK_SECTION_HEADINGS.boundaryInput);
         continue;
       }
-      if (row.trimmed === SECTION_BOUNDARY_PARAMETERS_TITLE) {
-        hasParametersHeading = true;
+      if (subId === "boundary-output") {
+        activeSubsection = "output";
+        outputBlock.line = row.line;
+        seenHeadings.add(FRAMEWORK_SECTION_HEADINGS.boundaryOutput);
+        continue;
+      }
+      if (subId === "boundary-parameter") {
+        activeSubsection = "parameter";
         parameterBlock.line = row.line;
-        activeSubsection = "parameters";
+        seenHeadings.add(FRAMEWORK_SECTION_HEADINGS.boundaryParameter);
         continue;
       }
       issues.push(
@@ -402,7 +456,7 @@ function extractBoundarySubsections({ block, file, issues }) {
           line: row.line,
           column: headingColumn(row.text),
           code: "FWL006",
-          message: `边界定义子章节标题错误：必须使用“${SECTION_BOUNDARY_PORTS_TITLE}”或“${SECTION_BOUNDARY_PARAMETERS_TITLE}”。`,
+          message: `边界子章节标题错误：必须使用“${FRAMEWORK_SECTION_HEADINGS.boundaryInput} / ${FRAMEWORK_SECTION_HEADINGS.boundaryOutput} / ${FRAMEWORK_SECTION_HEADINGS.boundaryParameter}”。`,
         })
       );
       activeSubsection = "";
@@ -416,290 +470,152 @@ function extractBoundarySubsections({ block, file, issues }) {
           line: row.line,
           column: markerColumn(row.text),
           code: "FWL006",
-          message: "边界定义中的内容必须位于 3.1 接口定义或 3.2 参数边界子章节内。",
+          message: "边界定义中的内容必须位于 Input / Output / Parameter 子章节内。",
         })
       );
       continue;
     }
 
-    if (activeSubsection === "ports") {
-      portBlock.entries.push(row);
+    if (activeSubsection === "input") {
+      inputBlock.entries.push(row);
       continue;
     }
-    if (activeSubsection === "parameters") {
-      parameterBlock.entries.push(row);
+    if (activeSubsection === "output") {
+      outputBlock.entries.push(row);
+      continue;
     }
+    parameterBlock.entries.push(row);
   }
 
-  if (!hasPortsHeading) {
+  for (const heading of FRAMEWORK_REQUIRED_BOUNDARY_SECTIONS) {
+    if (seenHeadings.has(heading)) {
+      continue;
+    }
     issues.push(
       createIssue({
         file,
         line: block.line,
         column: 1,
         code: "FWL006",
-        message: `缺少必需子章节：${SECTION_BOUNDARY_PORTS_TITLE}`,
-      })
-    );
-  }
-  if (!hasParametersHeading) {
-    issues.push(
-      createIssue({
-        file,
-        line: block.line,
-        column: 1,
-        code: "FWL006",
-        message: `缺少必需子章节：${SECTION_BOUNDARY_PARAMETERS_TITLE}`,
+        message: `缺少必需子章节：${heading}`,
       })
     );
   }
 
   return {
-    portBlock: hasPortsHeading ? portBlock : null,
-    parameterBlock: hasParametersHeading ? parameterBlock : null,
+    inputBlock: seenHeadings.has(FRAMEWORK_SECTION_HEADINGS.boundaryInput) ? inputBlock : null,
+    outputBlock: seenHeadings.has(FRAMEWORK_SECTION_HEADINGS.boundaryOutput) ? outputBlock : null,
+    parameterBlock: seenHeadings.has(FRAMEWORK_SECTION_HEADINGS.boundaryParameter) ? parameterBlock : null,
   };
 }
 
-function lintRuleSection({ block, file, issues }) {
-  let matchCount = 0;
+function collectDefinitionSymbols(parsedSections) {
+  const symbols = {
+    base: new Set(),
+    cs: new Set(),
+    cp: {
+      "cp.form": new Set(),
+      "cp.sat": new Set(),
+      "cp.id": new Set(),
+      "cp.norm": new Set(),
+    },
+    bd: {
+      "bd.in": new Set(),
+      "bd.out": new Set(),
+      "bd.param": new Set(),
+    },
+  };
 
-  for (const row of block.entries) {
-    if (!row.trimmed || row.trimmed === "---") {
-      continue;
+  const visit = (statement) => {
+    const definition = frameworkGrammar.getStatementDefinitionById(statement.kind);
+    if (!definition) {
+      return;
     }
-    if (row.trimmed.startsWith("### ")) {
-      continue;
+    const match = definition.pattern.exec(statement.normalized);
+    if (!match?.groups) {
+      return;
     }
-    if (!/^\s*[-*]\s+/.test(row.text)) {
-      continue;
+    const name = String(match.groups.name || "").trim();
+    if (!name) {
+      return;
     }
-    if (/^\s*\*\s+/.test(row.text)) {
-      issues.push(
-        createIssue({
-          file,
-          line: row.line,
-          column: markerColumn(row.text),
-          code: "FWL004",
-          message: "列表项必须使用 `-`，不要使用 `*`。",
-        })
-      );
-      continue;
+    if (statement.kind === "base") {
+      symbols.base.add(name);
+      return;
     }
+    if (statement.kind === "cs") {
+      symbols.cs.add(name);
+      return;
+    }
+    if (statement.kind.startsWith("cp.")) {
+      symbols.cp[statement.kind].add(name);
+      return;
+    }
+    if (statement.kind.startsWith("bd.")) {
+      symbols.bd[statement.kind].add(name);
+    }
+  };
 
-    if (RULE_LINE_PATTERN.test(row.trimmed)) {
-      matchCount += 1;
-      continue;
+  for (const sectionStatements of Object.values(parsedSections || {})) {
+    for (const statement of sectionStatements || []) {
+      visit(statement);
     }
-
-    issues.push(
-      createIssue({
-        file,
-        line: row.line,
-        column: markerColumn(row.text),
-        code: "FWL008",
-        message: "基排列组合章节条目格式错误，必须匹配 `- `R*` `规则名`：由 ... 导出 ...`。",
-      })
-    );
   }
-
-  if (matchCount === 0) {
-    issues.push(
-      createIssue({
-        file,
-        line: block.line,
-        column: 1,
-        code: "FWL010",
-        level: "warning",
-        message: `章节“${block.title}”没有可解析的条目。`,
-      })
-    );
-  }
+  return symbols;
 }
 
-function collectSectionTokenSet(block, pattern) {
-  const tokens = new Set();
-  if (!block) {
-    return tokens;
-  }
-  for (const row of block.entries) {
-    if (!row || !row.trimmed) {
-      continue;
-    }
-    const match = pattern.exec(row.trimmed);
-    if (!match || !match.groups || !match.groups.id) {
-      continue;
-    }
-    tokens.add(String(match.groups.id).trim());
-  }
-  return tokens;
-}
-
-function collectSectionTokenOccurrences(block, patterns) {
-  const occurrences = new Map();
-  if (!block) {
-    return occurrences;
-  }
-  for (const row of block.entries) {
-    if (!row || !row.trimmed) {
-      continue;
-    }
-    for (const pattern of patterns) {
-      const match = pattern.exec(row.trimmed);
-      if (!match || !match.groups || !match.groups.id) {
-        continue;
-      }
-      const token = String(match.groups.id).trim();
-      if (!token) {
-        continue;
-      }
-      if (!occurrences.has(token)) {
-        occurrences.set(token, []);
-      }
-      occurrences.get(token).push(row);
-      break;
-    }
-  }
-  return occurrences;
-}
-
-function lintDuplicateTokenOccurrences({ file, issues, occurrences }) {
-  for (const [token, rows] of occurrences.entries()) {
-    if (!Array.isArray(rows) || rows.length <= 1) {
-      continue;
-    }
-    const firstLine = rows[0].line;
-    for (const row of rows.slice(1)) {
-      issues.push(
-        createIssue({
-          file,
-          line: row.line,
-          column: markerColumn(row.text),
-          code: "FWL013",
-          message: `编号重复：\`${token}\` 已在第 ${firstLine} 行定义。`,
-        })
-      );
-    }
-  }
-}
-
-function extractSimpleTokens(expression, regex) {
-  const tokens = [];
-  for (const match of String(expression || "").matchAll(regex)) {
-    if (!match || !match[0]) {
-      continue;
-    }
-    tokens.push(match[0]);
-  }
-  return [...new Set(tokens)];
-}
-
-function extractBoundaryLikeTokens(expression) {
-  const tokens = [];
-  for (const match of String(expression || "").matchAll(SYMBOL_TOKEN_PATTERN)) {
-    const token = String(match[0] || "");
-    if (!token) {
-      continue;
-    }
-    if (/^(?:[BCNRV]\d+|L\d+|M\d+)$/i.test(token)) {
-      continue;
-    }
-    if (/^P\d+$/i.test(token) || token.includes("_")) {
-      tokens.push(token);
-    }
-  }
-  return [...new Set(tokens)];
-}
-
-function unresolvedSymbolIssue({ file, row, token, message }) {
-  const text = String(row?.text || "");
-  const index = text.indexOf(token);
+function unresolvedSymbolIssue({ file, statement, token, message }) {
+  const text = String(statement?.text || "");
+  const tokenIndex = text.indexOf(token);
   return createIssue({
     file,
-    line: row.line,
-    column: index >= 0 ? index + 1 : markerColumn(text),
+    line: statement.line,
+    column: tokenIndex >= 0 ? tokenIndex + 1 : markerColumn(text),
     code: "FWL011",
     message,
   });
 }
 
-function lintRuleReferenceIntegrity({
-  block,
-  file,
-  issues,
-  capabilityIds,
-  baseIds,
-  boundaryIds,
-}) {
-  if (!block) {
-    return;
+function lintSymbolReferences({ file, issues, parsedSections }) {
+  const symbols = collectDefinitionSymbols(parsedSections);
+  const allStatements = [];
+  for (const sectionStatements of Object.values(parsedSections || {})) {
+    allStatements.push(...sectionStatements);
   }
-  const canCheckCapability = capabilityIds.size > 0;
-  const canCheckBase = baseIds.size > 0;
-  const boundaryIdSet = new Set([...boundaryIds].map((item) => String(item || "").toLowerCase()));
 
-  for (const row of block.entries) {
-    const match = RULE_LINE_PATTERN.exec(row.trimmed);
-    if (!match || !match.groups || !match.groups.body) {
-      continue;
-    }
-    const expression = String(match.groups.body || "");
-    const outputTokens = extractSimpleTokens(expression, /\bC\d+\b/g);
-    const invalidTokens = extractSimpleTokens(expression, /\bN\d+\b/g);
-
-    if (!outputTokens.length && !invalidTokens.length) {
-      issues.push(
-        createIssue({
-          file,
-          line: row.line,
-          column: markerColumn(row.text),
-          code: "FWL014",
-          message: "规则必须至少声明一种结果：输出能力（C*）或失效结论（N*）。",
-        })
-      );
+  for (const statement of allStatements) {
+    let expression = statement.normalized;
+    if (statement.kind === "cs") {
+      expression = expression.replace(/^cs\.[^\s:=]+\s*:=\s*/u, "");
     }
 
-    if (canCheckBase) {
-      for (const token of extractSimpleTokens(expression, /\bB\d+\b/g)) {
-        if (baseIds.has(token)) {
-          continue;
-        }
-        issues.push(
-          unresolvedSymbolIssue({
-            file,
-            row,
-            token,
-            message: `规则引用了未定义的结构基 \`${token}\`。请先在“${SECTION_BASE_TITLE}”中定义。`,
-          })
-        );
-      }
-    }
-
-    if (canCheckCapability) {
-      for (const token of outputTokens) {
-        if (capabilityIds.has(token)) {
-          continue;
-        }
-        issues.push(
-          unresolvedSymbolIssue({
-            file,
-            row,
-            token,
-            message: `规则引用了未定义的能力 \`${token}\`。请先在“${SECTION_CAPABILITY_TITLE}”中定义。`,
-          })
-        );
-      }
-    }
-
-    for (const token of extractBoundaryLikeTokens(expression)) {
-      if (boundaryIdSet.has(token.toLowerCase())) {
+    for (const match of expression.matchAll(SYMBOL_REFERENCE_PATTERN)) {
+      const kind = String(match.groups?.kind || "").trim();
+      const name = String(match.groups?.name || "").trim();
+      const token = String(match[0] || "").trim();
+      if (!kind || !name || !token) {
         continue;
       }
+
+      if (kind === "base" && symbols.base.has(name)) {
+        continue;
+      }
+      if (kind === "cs" && symbols.cs.has(name)) {
+        continue;
+      }
+      if (kind.startsWith("cp.") && symbols.cp[kind]?.has(name)) {
+        continue;
+      }
+      if (kind.startsWith("bd.") && symbols.bd[kind]?.has(name)) {
+        continue;
+      }
+
       issues.push(
         unresolvedSymbolIssue({
           file,
-          row,
+          statement,
           token,
-          message: `规则引用了未定义的边界符号 \`${token}\`。请先在“${SECTION_BOUNDARY_TITLE}”中定义。`,
+          message: `语句引用了未定义符号 \`${token}\`。`,
         })
       );
     }
@@ -713,14 +629,14 @@ function lintForbiddenLegacyPatterns({ lines, file, issues }) {
     if (!trimmed) {
       continue;
     }
-    if (/上游模块[：:]/.test(trimmed)) {
+    if (/上游模块[：:]/u.test(trimmed)) {
       issues.push(
         createIssue({
           file,
           line: index + 1,
           column: markerColumn(text),
           code: "FWL015",
-          message: "禁止使用“上游模块：...”，请在 B* 主句中内联写模块引用。",
+          message: "禁止使用“上游模块：...”，请直接使用 grammar 里的符号引用。",
         })
       );
     }
@@ -750,7 +666,7 @@ function lintForbiddenLegacyPatterns({ lines, file, issues }) {
 }
 
 function lintFrameworkModuleMarkdown({ repoRoot, filePath, text }) {
-  const lines = String(text || "").split(/\r?\n/);
+  const lines = frameworkGrammar.splitLines(text);
   const file = toRelativeFilePath(filePath, repoRoot);
   const issues = [];
 
@@ -781,7 +697,6 @@ function lintFrameworkModuleMarkdown({ repoRoot, filePath, text }) {
   }
 
   const directiveLines = parseFrameworkDirectiveLines(text);
-
   if (directiveLines.length === 0) {
     issues.push(
       createIssue({
@@ -794,7 +709,7 @@ function lintFrameworkModuleMarkdown({ repoRoot, filePath, text }) {
     );
   }
   for (const directive of directiveLines) {
-    if (directive.text !== "@framework") {
+    if (directive.text !== FRAMEWORK_DIRECTIVE) {
       issues.push(
         createIssue({
           file,
@@ -808,118 +723,124 @@ function lintFrameworkModuleMarkdown({ repoRoot, filePath, text }) {
   }
 
   const sectionBlocks = splitSectionBlocks(lines);
-  validateSectionHeadingSequence({
+  validateTopSectionHeadingSequence({
     lines,
     file,
     issues,
     sectionBlocks,
   });
 
-  const baseSection = findSectionBlock(sectionBlocks, SECTION_BASE_TITLE);
+  const goalSection = findSectionBlock(sectionBlocks, FRAMEWORK_SECTION_HEADINGS.goal);
+  const baseSection = findSectionBlock(sectionBlocks, FRAMEWORK_SECTION_HEADINGS.base);
+  const combinationPrinciplesSection = findSectionBlock(
+    sectionBlocks,
+    FRAMEWORK_SECTION_HEADINGS.combinationPrinciples
+  );
+  const combinationSpaceSection = findSectionBlock(
+    sectionBlocks,
+    FRAMEWORK_SECTION_HEADINGS.combinationSpace
+  );
+  const boundarySection = findSectionBlock(sectionBlocks, FRAMEWORK_SECTION_HEADINGS.boundary);
+
+  const parsedSections = {
+    goal: [],
+    base: [],
+    "combination-principles": [],
+    "combination-space": [],
+    "boundary-input": [],
+    "boundary-output": [],
+    "boundary-parameter": [],
+  };
+
+  if (goalSection) {
+    parsedSections.goal = lintSectionStatements({
+      file,
+      issues,
+      block: goalSection,
+      sectionId: "goal",
+      invalidCode: "FWL005",
+      invalidMessage: "Goal 章节格式错误，必须匹配 `goal <Name> := ...`。",
+    });
+  }
   if (baseSection) {
-    lintFlatListSection({
+    parsedSections.base = lintSectionStatements({
+      file,
+      issues,
       block: baseSection,
-      file,
-      issues,
-      validPattern: BASE_LINE_PATTERN,
+      sectionId: "base",
       invalidCode: "FWL007",
-      invalidMessage: "最小结构基章节条目格式错误，必须匹配 `- `B*` 名称：描述。`。",
+      invalidMessage: "Base 章节格式错误，必须匹配 `base <Name> := ...`。",
     });
   }
-
-  const ruleSection = findSectionBlock(sectionBlocks, SECTION_RULE_TITLE);
-  if (ruleSection) {
-    lintRuleSection({
-      block: ruleSection,
+  if (combinationPrinciplesSection) {
+    parsedSections["combination-principles"] = lintSectionStatements({
       file,
       issues,
+      block: combinationPrinciplesSection,
+      sectionId: "combination-principles",
+      invalidCode: "FWL008",
+      invalidMessage: "Combination Principles 章节格式错误，必须匹配 `cp.form/sat/id/norm ... on ... := ...`。",
+    });
+  }
+  if (combinationSpaceSection) {
+    parsedSections["combination-space"] = lintSectionStatements({
+      file,
+      issues,
+      block: combinationSpaceSection,
+      sectionId: "combination-space",
+      invalidCode: "FWL008",
+      invalidMessage: "Combination Space 章节格式错误，必须匹配 `cs.<Name> := ... by ...`。",
     });
   }
 
-  const boundarySection = findSectionBlock(sectionBlocks, SECTION_BOUNDARY_TITLE);
-  let portBlock = null;
-  let parameterBlock = null;
   if (boundarySection) {
     const boundarySubsections = extractBoundarySubsections({
       block: boundarySection,
       file,
       issues,
     });
-    if (boundarySubsections.portBlock) {
-      portBlock = boundarySubsections.portBlock;
-      lintFlatListSection({
-        block: boundarySubsections.portBlock,
+    if (boundarySubsections.inputBlock) {
+      parsedSections["boundary-input"] = lintSectionStatements({
         file,
         issues,
-        validPattern: PORT_LINE_PATTERN,
+        block: boundarySubsections.inputBlock,
+        sectionId: "boundary-input",
         invalidCode: "FWL006",
-        invalidMessage: "接口定义条目格式错误，必须匹配 `- `PORT_ID`：描述。`。",
+        invalidMessage: "Input 章节格式错误，必须匹配 `bd.in <Name> := ...`。",
+      });
+    }
+    if (boundarySubsections.outputBlock) {
+      parsedSections["boundary-output"] = lintSectionStatements({
+        file,
+        issues,
+        block: boundarySubsections.outputBlock,
+        sectionId: "boundary-output",
+        invalidCode: "FWL006",
+        invalidMessage: "Output 章节格式错误，必须匹配 `bd.out <Name> := ...`。",
       });
     }
     if (boundarySubsections.parameterBlock) {
-      parameterBlock = boundarySubsections.parameterBlock;
-      lintFlatListSection({
-        block: boundarySubsections.parameterBlock,
+      parsedSections["boundary-parameter"] = lintSectionStatements({
         file,
         issues,
-        validPattern: PARAMETER_LINE_PATTERN,
+        block: boundarySubsections.parameterBlock,
+        sectionId: "boundary-parameter",
         invalidCode: "FWL006",
-        invalidMessage: "参数边界条目格式错误，必须匹配 `- `PARAM` 参数名：描述。`。",
+        invalidMessage: "Parameter 章节格式错误，必须匹配 `bd.param <Name> := ...`。",
       });
     }
   }
 
-  const capabilitySection = findSectionBlock(sectionBlocks, SECTION_CAPABILITY_TITLE);
-  if (capabilitySection) {
-    lintFlatListSection({
-      block: capabilitySection,
-      file,
-      issues,
-      validPattern: CAPABILITY_LINE_PATTERN,
-      allowPatterns: [NON_RESPONSIBILITY_LINE_PATTERN],
-      invalidCode: "FWL005",
-      invalidMessage: "能力章节条目格式错误，必须匹配 `- `C*` 名称：描述。` 或 `- `N*` 名称：描述。`。",
-    });
-  }
+  lintSymbolReferences({
+    file,
+    issues,
+    parsedSections,
+  });
 
   lintForbiddenLegacyPatterns({
     lines,
     file,
     issues,
-  });
-
-  lintDuplicateTokenOccurrences({
-    file,
-    issues,
-    occurrences: collectSectionTokenOccurrences(capabilitySection, [
-      CAPABILITY_LINE_PATTERN,
-      NON_RESPONSIBILITY_LINE_PATTERN,
-    ]),
-  });
-  lintDuplicateTokenOccurrences({
-    file,
-    issues,
-    occurrences: collectSectionTokenOccurrences(baseSection, [BASE_LINE_PATTERN]),
-  });
-  lintDuplicateTokenOccurrences({
-    file,
-    issues,
-    occurrences: collectSectionTokenOccurrences(ruleSection, [RULE_LINE_PATTERN]),
-  });
-
-  const capabilityIds = collectSectionTokenSet(capabilitySection, CAPABILITY_LINE_PATTERN);
-  const baseIds = collectSectionTokenSet(baseSection, BASE_LINE_PATTERN);
-  const boundaryIds = new Set([
-    ...collectSectionTokenSet(portBlock, PORT_LINE_PATTERN),
-    ...collectSectionTokenSet(parameterBlock, PARAMETER_LINE_PATTERN),
-  ]);
-  lintRuleReferenceIntegrity({
-    block: ruleSection,
-    file,
-    issues,
-    capabilityIds,
-    baseIds,
-    boundaryIds,
   });
 
   return issues;
@@ -930,7 +851,7 @@ function trimMarkdownLinkTarget(rawTarget) {
   if (target.startsWith("<") && target.endsWith(">")) {
     target = target.slice(1, -1).trim();
   }
-  const titleMatch = /^(?<path>.+?)\s+["'][^"']*["']$/.exec(target);
+  const titleMatch = /^(?<path>.+?)\s+["'][^"']*["']$/u.exec(target);
   if (titleMatch?.groups?.path) {
     target = titleMatch.groups.path.trim();
   }

@@ -26,6 +26,7 @@ Authoring-term note:
 - Runs canonical validation and optionally `mypy` from the extension.
 - Adds project-independent framework markdown syntax diagnostics (Problems 波浪线) while typing/saving.
 - Adds context-aware framework markdown completion (section-aware + auto-number defaults) and lint Quick Fix actions.
+- Adds an experimental `.sf` language preview (`shelf-framework`) with its own semantic highlight, lint, and completion, without replacing formal `framework/*.md` author sources.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
 - Keeps ordinary implementation saves unblocked; repository-side validation/hook checks remain the main enforcement boundary.
 
@@ -96,6 +97,7 @@ Framework lint execution scope:
 
 - Shelf lints every Markdown file under `framework/**` and `framework_drafts/**`.
 - Shelf also lints any Markdown file whose content contains `@framework`, even outside those directories.
+- Shelf also lints standalone `.sf` files as an editor-only preview language (`shelf-framework`); those files do not participate in canonical, materialize, or publish flows.
 - Inside `framework/**` / `framework_drafts/**`, only Markdown attachments that are directly referenced by a framework module are treated as valid authoring files; orphan Markdown files are reported as errors.
 - Framework modules may only directly reference Markdown files inside the same controlled framework domain.
 
