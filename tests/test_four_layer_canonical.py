@@ -68,6 +68,7 @@ def _framework_module_by_id(framework_modules: tuple[type[Any], ...], module_id:
 
 class FourLayerCanonicalTest(unittest.TestCase):
     def test_static_contract_registry_covers_all_framework_modules(self) -> None:
+        _default_project_file()
         framework_module_ids = {module.module_id for module in load_framework_catalog().modules}
         static_contract_module_ids = set(STATIC_MODULE_CONTRACTS)
         missing = sorted(framework_module_ids - static_contract_module_ids)
