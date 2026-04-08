@@ -148,28 +148,32 @@ function main() {
   assert(Array.isArray(frameworkSnippet.body), "@framework snippet must have a body array");
   assert(frameworkSnippet.body.includes("@framework"), "@framework snippet body must include the directive line");
   assert(
-    frameworkSnippet.body.includes("## 1. 能力声明（Capability Statement）"),
-    "@framework snippet must include capability statement section"
+    frameworkSnippet.body.includes("## 0. 目标 (Goal)"),
+    "@framework snippet must include goal section"
   );
   assert(
-    frameworkSnippet.body.includes("## 2. 边界定义（Boundary / Parameter 参数）"),
-    "@framework snippet must include boundary/parameter section"
-  );
-  assert(
-    frameworkSnippet.body.includes("## 3. 最小结构基（Minimal Structural Bases）"),
+    frameworkSnippet.body.includes("## 1. 最小结构基（Minimal Structural Bases）"),
     "@framework snippet must include base section"
   );
   assert(
-    frameworkSnippet.body.includes("## 4. 基组合原则（Base Combination Principles）"),
-    "@framework snippet must include rule section"
+    frameworkSnippet.body.includes("## 2. 基排列组合（Base Arrangement / Combination）"),
+    "@framework snippet must include base arrangement section"
   );
   assert(
-    frameworkSnippet.body.includes("## 5. 验证（Verification）"),
-    "@framework snippet must include verification section"
+    frameworkSnippet.body.includes("## 3. 边界定义（Boundary）"),
+    "@framework snippet must include boundary section"
   );
   assert(
-    !frameworkSnippet.body.some((line) => String(line || "").startsWith("### ")),
-    "@framework snippet should not include third-level headings"
+    frameworkSnippet.body.includes("### 3.1 接口定义（IO / Ports）"),
+    "@framework snippet must include boundary ports subsection"
+  );
+  assert(
+    frameworkSnippet.body.includes("### 3.2 参数边界（Parameter Constraints）"),
+    "@framework snippet must include boundary parameters subsection"
+  );
+  assert(
+    frameworkSnippet.body.includes("## 4. 能力声明（Capability Statement）"),
+    "@framework snippet must include capability statement section"
   );
 
   assert(
@@ -314,25 +318,42 @@ function main() {
     "",
     "@framework",
     "",
-    "## 1. 能力声明（Capability Statement）",
+    "## 0. 目标 (Goal)",
+    "",
+    "- 目标说明。",
+    "",
+    "## 1. 最小结构基（Minimal Structural Bases）",
+    "",
+    "- `B1` 输入基：描述。",
+    "",
+    "## 2. 基排列组合（Base Arrangement / Combination）",
+    "",
+    "- `R7` `现有规则`：由 `{B1}` 形成 `结果`，导出 `C1`。",
+    "",
+    "## 3. 边界定义（Boundary）",
+    "",
+    "### 3.1 接口定义（IO / Ports）",
+    "",
+    "- `QUERY_IN`：运行时输入接口。",
+    "",
+    "### 3.2 参数边界（Parameter Constraints）",
+    "",
+    "- `P1` 查询长度：描述。",
+    "",
+    "## 4. 能力声明（Capability Statement）",
     "",
     "- `C1` 现有能力：描述。",
     "- `N1` 非职责声明：描述。",
-    "",
-    "## 4. 基组合原则（Base Combination Principles）",
-    "",
-    "- `R7` 现有规则",
-    "  - `R7.1` 参与基：`B1 + B2`。",
   ].join("\n");
 
   const capabilityEntries = frameworkCompletion.getFrameworkCompletionEntries(
-    "- ",
-    "",
-    true,
-    {
-      documentText: authoringSample,
-      lineNumber: 6,
-    }
+      "- ",
+      "",
+      true,
+      {
+        documentText: authoringSample,
+        lineNumber: 27,
+      }
   );
   assert(
     capabilityEntries.some((entry) => entry.label === "C 条目"),
@@ -356,29 +377,25 @@ function main() {
 
   const baseEntries = frameworkCompletion.getFrameworkCompletionEntries("- `B", "B", true, {
     documentText: authoringSample,
-    lineNumber: 6,
+    lineNumber: 8,
   });
   assert(
     baseEntries.some((entry) => entry.label === "B 条目"),
     "base completion must include the B entry template"
   );
 
-  const ruleChildEntries = frameworkCompletion.getFrameworkCompletionEntries("  - `R7.", "R7.", true, {
+  const ruleEntries = frameworkCompletion.getFrameworkCompletionEntries("- `R", "R", true, {
     documentText: authoringSample,
     lineNumber: 12,
   });
   assert(
-    ruleChildEntries.some((entry) => entry.label === "R*.1 参与基"),
-    "rule child completion must include R*.1"
+    ruleEntries.some((entry) => entry.label === "R 条目"),
+    "rule completion must include single-line R entry"
   );
+  const ruleEntry = ruleEntries.find((entry) => entry.label === "R 条目");
   assert(
-    ruleChildEntries.some((entry) => entry.label === "R*.4 参数绑定"),
-    "rule child completion must include R*.4"
-  );
-  const ruleChildEntry = ruleChildEntries.find((entry) => entry.label === "R*.1 参与基");
-  assert(
-    ruleChildEntry?.insertText.includes("R${1:7}.1"),
-    "rule child completion should infer nearest rule number"
+    ruleEntry?.insertText.includes("R${1:8}"),
+    "rule completion should infer next rule number"
   );
 
   const parameterAuthoringSample = [
@@ -386,13 +403,15 @@ function main() {
     "",
     "@framework",
     "",
-    "## 1. 能力声明（Capability Statement）",
+    "## 3. 边界定义（Boundary）",
     "",
-    "- `C1` 现有能力：描述。",
+    "### 3.1 接口定义（IO / Ports）",
     "",
-    "## 2. 边界定义（Boundary / Parameter 参数）",
+    "- `QUERY_IN`：描述。",
     "",
-    "- `P1` 现有参数：描述。来源：`C1`。",
+    "### 3.2 参数边界（Parameter Constraints）",
+    "",
+    "- `P1` 现有参数：描述。",
     "",
   ].join("\n");
   const parameterDashAutoExpansion = frameworkCompletion.getFrameworkDashAutoExpansion(
@@ -416,7 +435,7 @@ function main() {
     true,
     {
       documentText: authoringSample,
-      lineNumber: 6,
+      lineNumber: 27,
     }
   );
   assert.strictEqual(

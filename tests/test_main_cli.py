@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import unittest
 from unittest import mock
@@ -55,6 +56,19 @@ class MainCliTest(unittest.TestCase):
         self.assertEqual(result, 0)
         build_project_app.assert_called_once()
         uvicorn_run.assert_called_once()
+
+    @mock.patch("main.build_project_app")
+    def test_serve_without_project_reports_bootstrap_state(self, build_project_app: mock.Mock) -> None:
+        build_project_app.side_effect = FileNotFoundError(
+            "no projects/*/project.toml found; specify --project-file or create a project config first"
+        )
+
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            result = shelf_main.main(["serve"])
+
+        self.assertEqual(result, 1)
+        self.assertIn("bootstrap/no-project mode", stderr.getvalue())
+        self.assertIn("projects/<project_id>/project.toml", stderr.getvalue())
 
 
 if __name__ == "__main__":

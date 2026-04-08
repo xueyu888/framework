@@ -10,30 +10,34 @@ const VALID_FRAMEWORK_TEXT = [
   "",
   "@framework",
   "",
-  "## 1. 能力声明（Capability Statement）",
+  "## 0. 目标 (Goal)",
   "",
-  "- `C1` 单元定位能力：支持通过定位键唯一定位文本单元。",
+  "- 目标说明。",
+  "",
+  "## 1. 最小结构基（Minimal Structural Bases）",
+  "",
+  "- `B1` 文本索引基：用于索引定位。",
+  "- `B2` 文本载荷基：用于承载原文。",
+  "",
+  "## 2. 基排列组合（Base Arrangement / Combination）",
+  "",
+  "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`，导出 `C1`。",
+  "",
+  "## 3. 边界定义（Boundary）",
+  "",
+  "### 3.1 接口定义（IO / Ports）",
+  "",
+  "- `QUERY_IN`：运行时输入接口，接收单个查询。",
+  "- `TEXT_OUT`：运行时输出接口，导出文本单元。",
+  "",
+  "### 3.2 参数边界（Parameter Constraints）",
+  "",
+  "- `P1` 查询长度：约束查询长度上限。",
+  "",
+  "## 4. 能力声明（Capability Statement）",
+  "",
+  "- `C1` 文本定位能力：支持定位并读取文本单元。",
   "- `N1` 非职责声明：不负责复杂语义检索。",
-  "",
-  "## 2. 边界定义（Boundary / Parameter 参数）",
-  "",
-  "- `P1` 文档标识参数：用于限定文本单元所属文档。来源：`C1`。",
-  "",
-  "## 3. 最小结构基（Minimal Structural Bases）",
-  "",
-  "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + P1`。",
-  "",
-  "## 4. 基组合原则（Base Combination Principles）",
-  "",
-  "- `R1` 文本定位组合",
-  "  - `R1.1` 参与基：`B1`。",
-  "  - `R1.2` 组合方式：按索引优先，再做局部过滤。",
-  "  - `R1.3` 输出能力：`C1`。",
-  "  - `R1.4` 参数绑定：`P1`。",
-  "",
-  "## 5. 验证（Verification）",
-  "",
-  "- `V1` 定位验证：给定定位键时必须返回唯一文本单元。",
 ].join("\n");
 
 function runLint(text) {
@@ -46,88 +50,64 @@ function runLint(text) {
 
 function main() {
   const validIssues = runLint(VALID_FRAMEWORK_TEXT);
-  assert.strictEqual(validIssues.length, 0, "valid framework text should not produce lint issues");
+  assert.strictEqual(validIssues.length, 0, "valid new framework template should not produce lint issues");
 
-  const snakeCaseBoundaryText = VALID_FRAMEWORK_TEXT
-    .replace(
-      "- `P1` 文档标识参数：用于限定文本单元所属文档。来源：`C1`。",
-      "- `query_in` 查询输入参数：用于限定本次检索的查询入口。来源：`C1`。"
-    )
-    .replace(
-      "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + P1`。",
-      "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + query_in`。"
-    )
-    .replace(
-      "  - `R1.4` 参数绑定：`P1`。",
-      "  - `R1.4` 参数绑定：`query_in`。"
-    );
-  const snakeCaseBoundaryIssues = runLint(snakeCaseBoundaryText);
+  const snakeCaseParameterText = VALID_FRAMEWORK_TEXT.replace(
+    "- `P1` 查询长度：约束查询长度上限。",
+    "- `query_length` 查询长度：约束查询长度上限。"
+  );
+  const snakeCaseParameterIssues = runLint(snakeCaseParameterText);
   assert.strictEqual(
-    snakeCaseBoundaryIssues.length,
+    snakeCaseParameterIssues.length,
     0,
     "snake_case parameter ids should be accepted by framework lint"
   );
 
-  const validWithGoalText = VALID_FRAMEWORK_TEXT.replace(
-    "## 1. 能力声明（Capability Statement）",
-    "## 0. 目标 (Goal)\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
-  );
-  const validWithGoalIssues = runLint(validWithGoalText);
-  assert.strictEqual(validWithGoalIssues.length, 0, "optional ## 0 goal (Goal) section should remain valid");
-
-  const invalidGoalWithoutEnglishText = VALID_FRAMEWORK_TEXT.replace(
-    "## 1. 能力声明（Capability Statement）",
-    "## 0. 目标\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
-  );
-  const invalidGoalWithoutEnglishIssues = runLint(invalidGoalWithoutEnglishText);
+  const oldStyleHeadingText = VALID_FRAMEWORK_TEXT
+    .replace(
+      "## 1. 最小结构基（Minimal Structural Bases）",
+      "## 1. 能力声明（Capability Statement）"
+    )
+    .replace(
+      "## 4. 能力声明（Capability Statement）",
+      "## 5. 验证（Verification）"
+    );
+  const oldStyleHeadingIssues = runLint(oldStyleHeadingText);
   assert(
-    invalidGoalWithoutEnglishIssues.some((issue) => issue.code === "FWL012"),
-    "## 0. 目标 without (Goal) should be rejected by heading-order lint"
+    oldStyleHeadingIssues.some((issue) => issue.code === "FWL012"),
+    "old heading sequence should be rejected by new lint rules"
+  );
+
+  const missingBoundarySubsectionText = VALID_FRAMEWORK_TEXT.replace(
+    "### 3.2 参数边界（Parameter Constraints）\n\n- `P1` 查询长度：约束查询长度上限。\n\n",
+    ""
+  );
+  const missingBoundarySubsectionIssues = runLint(missingBoundarySubsectionText);
+  assert(
+    missingBoundarySubsectionIssues.some((issue) => issue.code === "FWL006"),
+    "missing boundary subsection 3.2 should be reported"
   );
 
   const starText = VALID_FRAMEWORK_TEXT.replace(
-    "- `C1` 单元定位能力：支持通过定位键唯一定位文本单元。",
-    "* `C1` 单元定位能力：支持通过定位键唯一定位文本单元。"
+    "- `B1` 文本索引基：用于索引定位。",
+    "* `B1` 文本索引基：用于索引定位。"
   );
   const starIssues = runLint(starText);
   assert(starIssues.some((issue) => issue.code === "FWL004"), "star list marker should be rejected");
 
-  const wrongSectionTitleText = VALID_FRAMEWORK_TEXT.replace(
-    "## 2. 边界定义（Boundary / Parameter 参数）",
-    "## 2. 参数说明"
+  const oldRuleChildText = VALID_FRAMEWORK_TEXT.replace(
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`，导出 `C1`。",
+    "- `R1` `文本定位组合`\n  - `R1.1` 参与基：`B1 + B2`。"
   );
-  const wrongSectionTitleIssues = runLint(wrongSectionTitleText);
-  const wrongSectionTitleLine = wrongSectionTitleText.split("\n").indexOf("## 2. 参数说明") + 1;
+  const oldRuleChildIssues = runLint(oldRuleChildText);
   assert(
-    wrongSectionTitleIssues.some(
-      (issue) => issue.code === "FWL012" && issue.line === wrongSectionTitleLine
-    ),
-    "wrong second-level heading should be reported on the exact heading line"
-  );
-
-  const missingSectionText = VALID_FRAMEWORK_TEXT.replace(
-    "## 5. 验证（Verification）\n\n- `V1` 定位验证：给定定位键时必须返回唯一文本单元。",
-    ""
-  );
-  const missingIssues = runLint(missingSectionText);
-  assert(
-    missingIssues.some((issue) => issue.code === "FWL003"),
-    "missing required trailing section should still be reported"
-  );
-
-  const misplacedThirdLevelText = VALID_FRAMEWORK_TEXT.replace(
-    "## 2. 边界定义（Boundary / Parameter 参数）",
-    "## 2. 边界定义（Boundary / Parameter 参数）\n\n### 乱写的小标题"
-  );
-  const misplacedThirdLevelIssues = runLint(misplacedThirdLevelText);
-  assert(
-    !misplacedThirdLevelIssues.some((issue) => issue.code === "FWL006"),
-    "third-level headings should be tolerated as neutral separators"
+    oldRuleChildIssues.some((issue) => issue.code === "FWL008"),
+    "old rule child format should be rejected by new lint rules"
   );
 
   const missingCapabilityRefText = VALID_FRAMEWORK_TEXT.replace(
-    "  - `R1.3` 输出能力：`C1`。",
-    "  - `R1.3` 输出能力：`C1 + C2`。"
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`，导出 `C1`。",
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`，导出 `C2`。"
   );
   const missingCapabilityRefIssues = runLint(missingCapabilityRefText);
   assert(
@@ -135,6 +115,54 @@ function main() {
       (issue) => issue.code === "FWL011" && String(issue.message || "").includes("`C2`")
     ),
     "undefined capability reference should be reported"
+  );
+
+  const duplicateCapabilityText = `${VALID_FRAMEWORK_TEXT}\n- \`C1\` 重复能力：重复定义。`;
+  const duplicateCapabilityIssues = runLint(duplicateCapabilityText);
+  assert(
+    duplicateCapabilityIssues.some((issue) => issue.code === "FWL013"),
+    "duplicate C/N/B/R ids should be reported"
+  );
+
+  const missingRuleOutcomeText = VALID_FRAMEWORK_TEXT.replace(
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`，导出 `C1`。",
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`。"
+  );
+  const missingRuleOutcomeIssues = runLint(missingRuleOutcomeText);
+  assert(
+    missingRuleOutcomeIssues.some((issue) => issue.code === "FWL014"),
+    "rule must declare C* output or N* invalid conclusion"
+  );
+
+  const missingBoundaryRefText = VALID_FRAMEWORK_TEXT.replace(
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 形成 `可读取单元`，导出 `C1`。",
+    "- `R1` `文本定位组合`：由 `{B1, B2}` 在 `missing_param` 约束下形成 `可读取单元`，导出 `C1`。"
+  );
+  const missingBoundaryRefIssues = runLint(missingBoundaryRefText);
+  assert(
+    missingBoundaryRefIssues.some(
+      (issue) => issue.code === "FWL011" && String(issue.message || "").includes("missing_param")
+    ),
+    "undefined boundary symbol referenced by rule should be reported"
+  );
+
+  const forbiddenLegacyText = VALID_FRAMEWORK_TEXT
+    .replace("- `B1` 文本索引基：用于索引定位。", "- `B1` 文本索引基：用于索引定位。上游模块：L0.M0")
+    .replace("- `N1` 非职责声明：不负责复杂语义检索。", "- `N1` 非职责声明：详见 projects/demo/project.toml。");
+  const forbiddenLegacyIssues = runLint(forbiddenLegacyText);
+  assert(
+    forbiddenLegacyIssues.some((issue) => issue.code === "FWL015"),
+    "legacy forbidden patterns should be reported"
+  );
+
+  const invalidParameterIdText = VALID_FRAMEWORK_TEXT.replace(
+    "- `P1` 查询长度：约束查询长度上限。",
+    "- `123` 查询长度：约束查询长度上限。"
+  );
+  const invalidParameterIdIssues = runLint(invalidParameterIdText);
+  assert(
+    invalidParameterIdIssues.some((issue) => issue.code === "FWL006"),
+    "parameter id should start with alphabetic character"
   );
 }
 

@@ -73,9 +73,10 @@ def _serve_project(project_file: str | Path | None, *, host: str, port: int, rel
     if reload:
         materialize_project_runtime(resolved_project_file)
         uvicorn.run(
-            "project_runtime.app_factory:app",
+            "project_runtime.app_factory:build_project_app",
             host=host,
             port=port,
+            factory=True,
             reload=True,
             app_dir=str(SRC_DIR),
             reload_dirs=[str(path) for path in RELOAD_DIRS],
@@ -87,11 +88,26 @@ def _serve_project(project_file: str | Path | None, *, host: str, port: int, rel
     uvicorn.run(app, host=host, port=port)
 
 
+def _format_missing_project_message(error: FileNotFoundError) -> str:
+    detail = str(error).strip() or "no projects/*/project.toml found"
+    if "no projects/*/project.toml found" in detail:
+        return (
+            "Shelf serve cannot start in bootstrap/no-project mode. "
+            "Create projects/<project_id>/project.toml first.\n"
+            f"{detail}"
+        )
+    return detail
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(_normalize_argv(list(sys.argv[1:] if argv is None else argv)))
     if args.command == "serve":
-        _serve_project(args.project_file, host=args.host, port=args.port, reload=args.reload)
+        try:
+            _serve_project(args.project_file, host=args.host, port=args.port, reload=args.reload)
+        except FileNotFoundError as error:
+            print(_format_missing_project_message(error), file=sys.stderr)
+            return 1
         return 0
     parser.print_help()
     return 0

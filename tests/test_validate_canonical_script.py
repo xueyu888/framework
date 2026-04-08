@@ -63,6 +63,33 @@ def test_validate_check_changes_bootstrap_skip_when_no_project_files(
     assert "bootstrap_mode=True" in stdout
 
 
+def test_validate_bootstrap_skip_when_no_project_files_without_check_changes(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    (tmp_path / "projects").mkdir(parents=True, exist_ok=True)
+
+    args = argparse.Namespace(
+        project_file="projects/bootstrap/project.toml",
+        check_changes=False,
+        json=False,
+    )
+    monkeypatch.setattr(validate_script, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(validate_script, "_build_parser", lambda: _ParserStub(args))
+    monkeypatch.setattr(
+        validate_script,
+        "materialize_project_runtime",
+        lambda _: (_ for _ in ()).throw(AssertionError("unexpected materialize call")),
+    )
+
+    exit_code = validate_script.main()
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert "bootstrap_mode=True" in stdout
+    assert "bootstrap/no-project mode" in stdout
+
+
 def test_validate_check_changes_bootstrap_skip_json_output(
     tmp_path: Path,
     monkeypatch,
@@ -119,3 +146,31 @@ def test_validate_uses_materialize_when_project_file_exists(
     exit_code = validate_script.main()
     assert exit_code == 0
     assert called["project_file"] == "projects/demo/project.toml"
+
+
+def test_validate_reports_missing_project_file_when_workspace_has_projects(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    project_dir = tmp_path / "projects" / "demo"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / "project.toml").write_text("[framework]\nmodules = []\n", encoding="utf-8")
+
+    args = argparse.Namespace(
+        project_file="projects/demo/missing.toml",
+        check_changes=False,
+        json=False,
+    )
+    monkeypatch.setattr(validate_script, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(validate_script, "_build_parser", lambda: _ParserStub(args))
+    monkeypatch.setattr(
+        validate_script,
+        "materialize_project_runtime",
+        lambda _: (_ for _ in ()).throw(AssertionError("unexpected materialize call")),
+    )
+
+    exit_code = validate_script.main()
+    stdout = capsys.readouterr().out
+    assert exit_code == 1
+    assert "project file not found" in stdout

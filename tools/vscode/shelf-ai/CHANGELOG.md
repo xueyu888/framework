@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.25 - 2026-04-03
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.24..shelf-ai-v0.1.25`.
+- Synced Shelf AI with the new framework authoring template shape: parser/runtime terminology, snippets, navigation, completion, and framework-tree-related tests now accept the current author-source structure instead of the previous template assumptions.
+- Tightened framework lint contract checks and aligned the repository-side framework inputs in the same range, including the latest backend retrieval-flow draft reshaping and the replacement of the old message_queue sample baseline.
+- Added explicit zero-project bootstrap support across repository scripts and Shelf AI UI states, so preflight/validate/materialize can report legal no-project mode while evidence-tree and formal canonical-backed navigation still wait for a real `projects/<project_id>/project.toml`.
+- The same commit range also adds a separate markdown live rendering prototype under `tools/vscode/shelf-md-live`; it is not bundled into the `shelf-ai` VSIX, but it is part of the audited repository range for this release note.
+- Revalidated the extension and repository checks, then repackaged and reinstalled the VSIX from the validated `0.1.25` baseline.
+
 ## 0.1.24 - 2026-03-26
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.23..shelf-ai-v0.1.24`.

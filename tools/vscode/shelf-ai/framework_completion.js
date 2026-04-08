@@ -4,11 +4,13 @@ const path = require("path");
 const MARKDOWN_SNIPPETS_FILE = path.join(__dirname, "snippets", "markdown.code-snippets");
 const FRAMEWORK_TEMPLATE_SNIPPET_NAME = "@framework Module Template";
 const FRAMEWORK_SECTION_HEADINGS = Object.freeze({
-  capability: "## 1. 能力声明（Capability Statement）",
-  parameter: "## 2. 边界定义（Boundary / Parameter 参数）",
-  base: "## 3. 最小结构基（Minimal Structural Bases）",
-  rule: "## 4. 基组合原则（Base Combination Principles）",
-  verification: "## 5. 验证（Verification）",
+  goal: "## 0. 目标 (Goal)",
+  base: "## 1. 最小结构基（Minimal Structural Bases）",
+  rule: "## 2. 基排列组合（Base Arrangement / Combination）",
+  boundary: "## 3. 边界定义（Boundary）",
+  boundaryPorts: "### 3.1 接口定义（IO / Ports）",
+  boundaryParameters: "### 3.2 参数边界（Parameter Constraints）",
+  capability: "## 4. 能力声明（Capability Statement）",
 });
 
 function splitLines(text) {
@@ -34,11 +36,8 @@ function getFrameworkTemplateSnippetText() {
 
 function detectSectionIdFromHeading(trimmedHeading) {
   const heading = String(trimmedHeading || "").trim();
-  if (heading === FRAMEWORK_SECTION_HEADINGS.capability) {
-    return "capability";
-  }
-  if (heading === FRAMEWORK_SECTION_HEADINGS.parameter) {
-    return "parameter";
+  if (heading === FRAMEWORK_SECTION_HEADINGS.goal) {
+    return "goal";
   }
   if (heading === FRAMEWORK_SECTION_HEADINGS.base) {
     return "base";
@@ -46,8 +45,17 @@ function detectSectionIdFromHeading(trimmedHeading) {
   if (heading === FRAMEWORK_SECTION_HEADINGS.rule) {
     return "rule";
   }
-  if (heading === FRAMEWORK_SECTION_HEADINGS.verification) {
-    return "verification";
+  if (heading === FRAMEWORK_SECTION_HEADINGS.boundary) {
+    return "boundary";
+  }
+  if (heading === FRAMEWORK_SECTION_HEADINGS.boundaryPorts) {
+    return "boundary-ports";
+  }
+  if (heading === FRAMEWORK_SECTION_HEADINGS.boundaryParameters) {
+    return "boundary-parameters";
+  }
+  if (heading === FRAMEWORK_SECTION_HEADINGS.capability) {
+    return "capability";
   }
   return "";
 }
@@ -59,8 +67,11 @@ function detectFrameworkAuthoringState(documentText, lineNumber = 0) {
 
   for (let index = 0; index <= safeLineNumber; index += 1) {
     const trimmed = lines[index].trim();
-    if (trimmed.startsWith("## ")) {
-      sectionId = detectSectionIdFromHeading(trimmed);
+    if (trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
+      const detected = detectSectionIdFromHeading(trimmed);
+      if (detected) {
+        sectionId = detected;
+      }
     }
   }
 
@@ -77,10 +88,9 @@ function collectNextSymbolNumbers(documentText) {
     P: 0,
     B: 0,
     R: 0,
-    V: 0,
     N: 0,
   };
-  const symbolPattern = /`([CPBRVN])(\d+)(?:\.\d+)?`/g;
+  const symbolPattern = /`([CPBRN])(\d+)(?:\.\d+)?`/g;
   for (const match of text.matchAll(symbolPattern)) {
     const symbol = String(match[1] || "");
     const number = Number(match[2] || 0);
@@ -96,7 +106,6 @@ function collectNextSymbolNumbers(documentText) {
     P: maxima.P + 1,
     B: maxima.B + 1,
     R: maxima.R + 1,
-    V: maxima.V + 1,
     N: maxima.N + 1,
   };
 }
@@ -123,10 +132,8 @@ function createCompletionDefinitions(dynamic = {}) {
     P: Number(dynamic.nextNumbers?.P || 1),
     B: Number(dynamic.nextNumbers?.B || 1),
     R: Number(dynamic.nextNumbers?.R || 1),
-    V: Number(dynamic.nextNumbers?.V || 1),
     N: Number(dynamic.nextNumbers?.N || 1),
   };
-  const nearestRuleNumber = Number(dynamic.nearestRuleNumber || 0) || next.R;
   return [
     {
       id: "framework-title",
@@ -140,7 +147,7 @@ function createCompletionDefinitions(dynamic = {}) {
       id: "framework-module-template",
       label: "@framework 标准模块模板",
       detail: "插入完整框架标准模板",
-      documentation: "覆盖标题、@framework、能力声明、参数、最小结构基、组合原则与验证。",
+      documentation: "覆盖 0~4 主章节、边界子章节、能力与非职责声明。",
       insertText: getFrameworkTemplateSnippetText(),
       contexts: ["at", "framework-file-empty"],
     },
@@ -153,44 +160,68 @@ function createCompletionDefinitions(dynamic = {}) {
       contexts: ["at", "framework-file-empty"],
     },
     {
-      id: "section-capability",
-      label: "## 1. 能力声明（Capability Statement）",
-      detail: "插入能力声明主章节",
-      documentation: "固定框架章节：能力声明。",
-      insertText: "## 1. 能力声明（Capability Statement）",
-      contexts: ["hash", "framework-file-empty", "section"],
-    },
-    {
-      id: "section-boundary",
-      label: "## 2. 边界定义（Boundary / Parameter 参数）",
-      detail: "插入边界定义主章节",
-      documentation: "固定框架章节：边界定义（代码层消费为参数）。",
-      insertText: "## 2. 边界定义（Boundary / Parameter 参数）",
+      id: "section-goal",
+      label: "## 0. 目标 (Goal)",
+      detail: "插入目标主章节",
+      documentation: "固定框架章节：目标。",
+      insertText: "## 0. 目标 (Goal)",
       contexts: ["hash", "framework-file-empty", "section"],
     },
     {
       id: "section-base",
-      label: "## 3. 最小结构基（Minimal Structural Bases）",
+      label: "## 1. 最小结构基（Minimal Structural Bases）",
       detail: "插入最小结构基主章节",
       documentation: "固定框架章节：最小结构基。",
-      insertText: "## 3. 最小结构基（Minimal Structural Bases）",
+      insertText: "## 1. 最小结构基（Minimal Structural Bases）",
       contexts: ["hash", "framework-file-empty", "section"],
     },
     {
       id: "section-rule",
-      label: "## 4. 基组合原则（Base Combination Principles）",
-      detail: "插入基组合原则主章节",
-      documentation: "固定框架章节：基组合原则。",
-      insertText: "## 4. 基组合原则（Base Combination Principles）",
+      label: "## 2. 基排列组合（Base Arrangement / Combination）",
+      detail: "插入基排列组合主章节",
+      documentation: "固定框架章节：基排列组合。",
+      insertText: "## 2. 基排列组合（Base Arrangement / Combination）",
       contexts: ["hash", "framework-file-empty", "section"],
     },
     {
-      id: "section-verification",
-      label: "## 5. 验证（Verification）",
-      detail: "插入验证主章节",
-      documentation: "固定框架章节：验证。",
-      insertText: "## 5. 验证（Verification）",
+      id: "section-boundary",
+      label: "## 3. 边界定义（Boundary）",
+      detail: "插入边界定义主章节",
+      documentation: "固定框架章节：边界定义。",
+      insertText: "## 3. 边界定义（Boundary）",
       contexts: ["hash", "framework-file-empty", "section"],
+    },
+    {
+      id: "section-capability",
+      label: "## 4. 能力声明（Capability Statement）",
+      detail: "插入能力声明主章节",
+      documentation: "固定框架章节：能力声明。",
+      insertText: "## 4. 能力声明（Capability Statement）",
+      contexts: ["hash", "framework-file-empty", "section"],
+    },
+    {
+      id: "subsection-boundary-ports",
+      label: "### 3.1 接口定义（IO / Ports）",
+      detail: "插入边界接口定义子章节",
+      documentation: "边界章节固定子章节：接口定义。",
+      insertText: "### 3.1 接口定义（IO / Ports）",
+      contexts: ["hash", "framework-file-empty", "section", "section-boundary"],
+    },
+    {
+      id: "subsection-boundary-parameters",
+      label: "### 3.2 参数边界（Parameter Constraints）",
+      detail: "插入边界参数约束子章节",
+      documentation: "边界章节固定子章节：参数边界。",
+      insertText: "### 3.2 参数边界（Parameter Constraints）",
+      contexts: ["hash", "framework-file-empty", "section"],
+    },
+    {
+      id: "goal-item",
+      label: "目标条目",
+      detail: "插入目标说明条目",
+      documentation: "用于 `## 0. 目标` 章节。",
+      insertText: "- ${1:目标说明。}",
+      contexts: ["list", "framework-file-empty", "section-goal"],
     },
     {
       id: "capability-item",
@@ -214,74 +245,42 @@ function createCompletionDefinitions(dynamic = {}) {
       ],
     },
     {
+      id: "port-item",
+      label: "接口条目",
+      detail: "插入 IO / Ports 条目",
+      documentation: "用于边界接口定义（3.1）。",
+      insertText: "- `${1:PORT_IN}`：${2:运行时输入接口，待补充接口说明。}",
+      contexts: ["list", "boundary-symbol", "framework-file-empty", "section-boundary-ports"],
+    },
+    {
       id: "boundary-item",
       label: "参数条目",
-      detail: "插入边界定义条目",
-      documentation: "用于边界定义；可替换 `P1` 为 `SURFACE`、`CHAT` 等稳定参数名。",
-      insertText: `- \`\${1:P${next.P}}\` \${2:参数名}：\${3:待定义参数约束}。来源：\`\${4:C1}\`。`,
-      contexts: ["list", "boundary-symbol", "framework-file-empty", "section-parameter"],
+      detail: "插入参数边界条目",
+      documentation: "用于边界参数约束（3.2）。",
+      insertText: `- \`\${1:P${next.P}}\` \${2:参数名}：\${3:待定义参数约束}。`,
+      contexts: [
+        "list",
+        "boundary-symbol",
+        "framework-file-empty",
+        "section-boundary",
+        "section-boundary-parameters",
+      ],
     },
     {
       id: "base-item",
       label: "B 条目",
       detail: "插入最小结构基条目",
       documentation: "用于 `B*` 结构基定义。",
-      insertText: `- \`B\${1:${next.B}}\` \${2:结构基名}：\${3:L0.M0[R1] 或 frontend.L1.M0[R1,R2]}。来源：\`\${4:C1 + P1}\`。`,
+      insertText: `- \`B\${1:${next.B}}\` \${2:结构基名}：\${3:待定义结构说明}。`,
       contexts: ["list", "base-symbol", "framework-file-empty", "section-base"],
     },
     {
-      id: "rule-block",
-      label: "R 规则块",
-      detail: "插入完整组合规则块",
-      documentation: "用于 `R*` 主规则及 `R*.1~R*.4` 子项。",
-      insertText: [
-        `- \`R\${1:${next.R}}\` \${2:规则名}`,
-        "  - `R${1}.1` 参与基：`${3:B1 + B2}`。",
-        "  - `R${1}.2` 组合方式：${4:待补充}。",
-        "  - `R${1}.3` 输出能力：`${5:C1}`。",
-        "  - `R${1}.4` 参数绑定：`${6:P1/P2}`。",
-      ].join("\n"),
+      id: "rule-item",
+      label: "R 条目",
+      detail: "插入基排列组合条目",
+      documentation: "用于 `R*` 单行规则条目。",
+      insertText: `- \`R\${1:${next.R}}\` \`\${2:规则名}\`：由 \`\${3:{B1, B2}}\` 形成 \`\${4:结果}\`，导出 \`\${5:C1}\`。`,
       contexts: ["list", "rule-symbol", "framework-file-empty", "section-rule"],
-    },
-    {
-      id: "rule-participants",
-      label: "R*.1 参与基",
-      detail: "插入组合规则参与基子项",
-      documentation: "固定子项：参与基。",
-      insertText: `  - \`R\${1:${nearestRuleNumber}}.1\` 参与基：\`\${2:B1 + B2}\`。`,
-      contexts: ["rule-child", "rule-symbol", "section-rule"],
-    },
-    {
-      id: "rule-composition",
-      label: "R*.2 组合方式",
-      detail: "插入组合方式子项",
-      documentation: "固定子项：组合方式。",
-      insertText: `  - \`R\${1:${nearestRuleNumber}}.2\` 组合方式：\${2:待补充}。`,
-      contexts: ["rule-child", "rule-symbol", "section-rule"],
-    },
-    {
-      id: "rule-output",
-      label: "R*.3 输出能力",
-      detail: "插入输出能力子项",
-      documentation: "固定子项：输出能力。",
-      insertText: `  - \`R\${1:${nearestRuleNumber}}.3\` 输出能力：\`\${2:C1}\`。`,
-      contexts: ["rule-child", "rule-symbol", "section-rule"],
-    },
-    {
-      id: "rule-boundary",
-      label: "R*.4 参数绑定",
-      detail: "插入参数绑定子项",
-      documentation: "固定子项：参数绑定。",
-      insertText: `  - \`R\${1:${nearestRuleNumber}}.4\` 参数绑定：\`\${2:P1/P2}\`。`,
-      contexts: ["rule-child", "rule-symbol", "section-rule"],
-    },
-    {
-      id: "verification-item",
-      label: "V 条目",
-      detail: "插入验证条目",
-      documentation: "用于 `V*` 验证结论或验证约束。",
-      insertText: `- \`V\${1:${next.V}}\` \${2:验证名}：\${3:待补充验证要求}。`,
-      contexts: ["list", "verification-symbol", "framework-file-empty", "section-verification"],
     },
   ];
 }
@@ -327,12 +326,6 @@ function detectFrameworkCompletionContexts(linePrefix, wordPrefix, isFrameworkFi
   if (/^R\d*$/.test(upperWord) || compact.startsWith("-R") || compact.startsWith("R")) {
     contexts.add("rule-symbol");
   }
-  if (/^R\d+\.\d*$/.test(upperWord) || compact.startsWith("R1.") || compact.startsWith("-R1.")) {
-    contexts.add("rule-child");
-  }
-  if (/^V\d*$/.test(upperWord) || compact.startsWith("-V") || compact.startsWith("V")) {
-    contexts.add("verification-symbol");
-  }
   if (/^N\d*$/.test(upperWord) || compact.startsWith("-N") || compact.startsWith("N")) {
     contexts.add("non-responsibility-symbol");
   }
@@ -354,11 +347,7 @@ function getFrameworkCompletionEntries(linePrefix, wordPrefix, isFrameworkFile, 
     return [];
   }
   const activeSectionContext = [...contexts].find((item) => item.startsWith("section-")) || "";
-  const symbolContexts = new Set(
-    [...contexts].filter((item) =>
-      item.endsWith("-symbol") || item === "rule-child"
-    )
-  );
+  const symbolContexts = new Set([...contexts].filter((item) => item.endsWith("-symbol")));
   const allDefinitions = createCompletionDefinitions({
     nextNumbers,
     nearestRuleNumber,
@@ -396,7 +385,7 @@ function getFrameworkDashAutoExpansion(linePrefix, isFrameworkFile, options = {}
   const documentText = String(options.documentText || "");
   const lineNumber = Number(options.lineNumber || 0);
   const authoringState = detectFrameworkAuthoringState(documentText, lineNumber);
-  if (authoringState.sectionId !== "parameter") {
+  if (authoringState.sectionId !== "boundary-parameters") {
     return null;
   }
   const entries = getFrameworkCompletionEntries(
