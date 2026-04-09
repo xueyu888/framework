@@ -1,141 +1,231 @@
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
-const { lintFrameworkMarkdown } = require("./framework_lint");
-
-const repoRoot = path.resolve(__dirname, "..", "..", "..");
+const {
+  classifyFrameworkMarkdown,
+  isControlledFrameworkPath,
+  lintFrameworkMarkdown,
+  lintFrameworkWorkspace,
+} = require("./framework_lint");
 
 const VALID_FRAMEWORK_TEXT = [
   "# 知识库文本单元模块:KnowledgeBaseTextUnitModule",
   "",
   "@framework",
   "",
-  "## 1. 能力声明（Capability Statement）",
+  "## Goal",
   "",
-  "- `C1` 单元定位能力：支持通过定位键唯一定位文本单元。",
-  "- `N1` 非职责声明：不负责复杂语义检索。",
+  "goal 文本单元定位 := 在给定输入下定位并返回文本单元",
   "",
-  "## 2. 边界定义（Boundary / Parameter 参数）",
+  "## Base",
   "",
-  "- `P1` 文档标识参数：用于限定文本单元所属文档。来源：`C1`。",
+  "base 文本索引基 := 用于索引定位",
+  "base 文本载荷基 := 用于承载原文",
   "",
-  "## 3. 最小结构基（Minimal Structural Bases）",
+  "## Combination Principles",
   "",
-  "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + P1`。",
+  "cp.form 文本定位组合 on <base.文本索引基, base.文本载荷基> := 同时具备定位与读取能力",
+  "cp.sat 文本定位组合 on cs.可读取文本单元 := 输入必须包含可解析查询",
+  "cp.id 文本定位组合 on cs.可读取文本单元 := 相同输入产生同一定位结果",
+  "cp.norm 文本定位组合 on cs.可读取文本单元 := 标准写法以 cs.可读取文本单元 为准",
   "",
-  "## 4. 基组合原则（Base Combination Principles）",
+  "## Combination Space",
   "",
-  "- `R1` 文本定位组合",
-  "  - `R1.1` 参与基：`B1`。",
-  "  - `R1.2` 组合方式：按索引优先，再做局部过滤。",
-  "  - `R1.3` 输出能力：`C1`。",
-  "  - `R1.4` 参数绑定：`P1`。",
+  "cs.可读取文本单元 := <base.文本索引基, base.文本载荷基> by <cp.form.文本定位组合, cp.sat.文本定位组合, cp.id.文本定位组合, cp.norm.文本定位组合>",
   "",
-  "## 5. 验证（Verification）",
+  "## Boundary",
   "",
-  "- `V1` 定位验证：给定定位键时必须返回唯一文本单元。",
+  "### Input",
+  "",
+  "bd.in 查询输入 := payload({query}), cardinality(1), to(cs.可读取文本单元)",
+  "",
+  "### Output",
+  "",
+  "bd.out 文本输出 := payload({text}), cardinality(0..1), from(cs.可读取文本单元)",
+  "",
+  "### Parameter",
+  "",
+  "bd.param 查询长度上限 := domain(int), affects(cs.可读取文本单元, bd.in.查询输入)",
 ].join("\n");
 
-function runLint(text) {
+function writeFile(filePath, text) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, text, "utf8");
+}
+
+function withTempRepo(run) {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "shelf-framework-lint-"));
+  try {
+    run(repoRoot);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+}
+
+function runLint(repoRoot, relativePath, text) {
+  const filePath = path.join(repoRoot, relativePath);
+  writeFile(filePath, text);
   return lintFrameworkMarkdown({
     repoRoot,
-    filePath: path.join(repoRoot, "framework", "backend", "L0-M0-测试模块.md"),
+    filePath,
     text,
   });
 }
 
 function main() {
-  const validIssues = runLint(VALID_FRAMEWORK_TEXT);
-  assert.strictEqual(validIssues.length, 0, "valid framework text should not produce lint issues");
+  assert.strictEqual(isControlledFrameworkPath("framework/demo/L0-M0-示例模块.md"), true);
+  assert.strictEqual(isControlledFrameworkPath("framework_drafts/demo/docs/ref.md"), true);
+  assert.strictEqual(isControlledFrameworkPath("docs/demo.md"), false);
 
-  const snakeCaseBoundaryText = VALID_FRAMEWORK_TEXT
-    .replace(
-      "- `P1` 文档标识参数：用于限定文本单元所属文档。来源：`C1`。",
-      "- `query_in` 查询输入参数：用于限定本次检索的查询入口。来源：`C1`。"
-    )
-    .replace(
-      "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + P1`。",
-      "- `B1` 文本索引基：L0.M0[R1]。来源：`C1 + query_in`。"
-    )
-    .replace(
-      "  - `R1.4` 参数绑定：`P1`。",
-      "  - `R1.4` 参数绑定：`query_in`。"
+  withTempRepo((repoRoot) => {
+    const validIssues = runLint(repoRoot, "framework/backend/L0-M0-测试模块.md", VALID_FRAMEWORK_TEXT);
+    assert.strictEqual(validIssues.length, 0, "valid keyword-first framework should not produce lint issues");
+
+    const oldStyleHeadingText = VALID_FRAMEWORK_TEXT.replace("## Base", "## Capability");
+    const oldStyleHeadingIssues = runLint(repoRoot, "framework/backend/L0-M0-测试模块.md", oldStyleHeadingText);
+    assert(
+      oldStyleHeadingIssues.some((issue) => issue.code === "FWL012"),
+      "invalid heading sequence should be rejected by framework lint"
     );
-  const snakeCaseBoundaryIssues = runLint(snakeCaseBoundaryText);
-  assert.strictEqual(
-    snakeCaseBoundaryIssues.length,
-    0,
-    "snake_case parameter ids should be accepted by framework lint"
-  );
 
-  const validWithGoalText = VALID_FRAMEWORK_TEXT.replace(
-    "## 1. 能力声明（Capability Statement）",
-    "## 0. 目标 (Goal)\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
-  );
-  const validWithGoalIssues = runLint(validWithGoalText);
-  assert.strictEqual(validWithGoalIssues.length, 0, "optional ## 0 goal (Goal) section should remain valid");
+    const missingBoundarySubsectionText = VALID_FRAMEWORK_TEXT.replace(
+      "### Output\n\nbd.out 文本输出 := payload({text}), cardinality(0..1), from(cs.可读取文本单元)\n\n",
+      ""
+    );
+    const missingBoundarySubsectionIssues = runLint(
+      repoRoot,
+      "framework/backend/L0-M0-测试模块.md",
+      missingBoundarySubsectionText
+    );
+    assert(
+      missingBoundarySubsectionIssues.some((issue) => issue.code === "FWL006"),
+      "missing boundary subsection should be reported"
+    );
 
-  const invalidGoalWithoutEnglishText = VALID_FRAMEWORK_TEXT.replace(
-    "## 1. 能力声明（Capability Statement）",
-    "## 0. 目标\n\n目标说明。\n\n## 1. 能力声明（Capability Statement）"
-  );
-  const invalidGoalWithoutEnglishIssues = runLint(invalidGoalWithoutEnglishText);
-  assert(
-    invalidGoalWithoutEnglishIssues.some((issue) => issue.code === "FWL012"),
-    "## 0. 目标 without (Goal) should be rejected by heading-order lint"
-  );
+    const listStyleText = VALID_FRAMEWORK_TEXT.replace(
+      "base 文本索引基 := 用于索引定位",
+      "- base 文本索引基 := 用于索引定位"
+    );
+    const listStyleIssues = runLint(repoRoot, "framework/backend/L0-M0-测试模块.md", listStyleText);
+    assert(
+      listStyleIssues.some((issue) => issue.code === "FWL004"),
+      "list markers should be rejected by keyword-first lint"
+    );
 
-  const starText = VALID_FRAMEWORK_TEXT.replace(
-    "- `C1` 单元定位能力：支持通过定位键唯一定位文本单元。",
-    "* `C1` 单元定位能力：支持通过定位键唯一定位文本单元。"
-  );
-  const starIssues = runLint(starText);
-  assert(starIssues.some((issue) => issue.code === "FWL004"), "star list marker should be rejected");
+    const invalidCombinationText = VALID_FRAMEWORK_TEXT.replace(
+      "cp.form 文本定位组合 on <base.文本索引基, base.文本载荷基> := 同时具备定位与读取能力",
+      "cp.form 文本定位组合 := 同时具备定位与读取能力"
+    );
+    const invalidCombinationIssues = runLint(
+      repoRoot,
+      "framework/backend/L0-M0-测试模块.md",
+      invalidCombinationText
+    );
+    assert(
+      invalidCombinationIssues.some((issue) => issue.code === "FWL008"),
+      "cp statements must include `on ... := ...`"
+    );
 
-  const wrongSectionTitleText = VALID_FRAMEWORK_TEXT.replace(
-    "## 2. 边界定义（Boundary / Parameter 参数）",
-    "## 2. 参数说明"
-  );
-  const wrongSectionTitleIssues = runLint(wrongSectionTitleText);
-  const wrongSectionTitleLine = wrongSectionTitleText.split("\n").indexOf("## 2. 参数说明") + 1;
-  assert(
-    wrongSectionTitleIssues.some(
-      (issue) => issue.code === "FWL012" && issue.line === wrongSectionTitleLine
-    ),
-    "wrong second-level heading should be reported on the exact heading line"
-  );
+    const missingSymbolText = VALID_FRAMEWORK_TEXT.replace(
+      "cs.可读取文本单元 := <base.文本索引基, base.文本载荷基> by <cp.form.文本定位组合, cp.sat.文本定位组合, cp.id.文本定位组合, cp.norm.文本定位组合>",
+      "cs.可读取文本单元 := <base.文本索引基, base.不存在基> by <cp.form.文本定位组合, cp.sat.文本定位组合, cp.id.文本定位组合, cp.norm.文本定位组合>"
+    );
+    const missingSymbolIssues = runLint(repoRoot, "framework/backend/L0-M0-测试模块.md", missingSymbolText);
+    assert(
+      missingSymbolIssues.some(
+        (issue) => issue.code === "FWL011" && String(issue.message || "").includes("base.不存在基")
+      ),
+      "undefined symbol references should be reported"
+    );
 
-  const missingSectionText = VALID_FRAMEWORK_TEXT.replace(
-    "## 5. 验证（Verification）\n\n- `V1` 定位验证：给定定位键时必须返回唯一文本单元。",
-    ""
-  );
-  const missingIssues = runLint(missingSectionText);
-  assert(
-    missingIssues.some((issue) => issue.code === "FWL003"),
-    "missing required trailing section should still be reported"
-  );
+    const forbiddenLegacyText = VALID_FRAMEWORK_TEXT.replace(
+      "goal 文本单元定位 := 在给定输入下定位并返回文本单元",
+      "goal 文本单元定位 := 在给定输入下定位并返回文本单元。详见 projects/demo/project.toml"
+    );
+    const forbiddenLegacyIssues = runLint(repoRoot, "framework/backend/L0-M0-测试模块.md", forbiddenLegacyText);
+    assert(
+      forbiddenLegacyIssues.some((issue) => issue.code === "FWL015"),
+      "legacy forbidden patterns should be reported"
+    );
 
-  const misplacedThirdLevelText = VALID_FRAMEWORK_TEXT.replace(
-    "## 2. 边界定义（Boundary / Parameter 参数）",
-    "## 2. 边界定义（Boundary / Parameter 参数）\n\n### 乱写的小标题"
-  );
-  const misplacedThirdLevelIssues = runLint(misplacedThirdLevelText);
-  assert(
-    !misplacedThirdLevelIssues.some((issue) => issue.code === "FWL006"),
-    "third-level headings should be tolerated as neutral separators"
-  );
+    const externalFrameworkPath = path.join(repoRoot, "docs", "outside-framework.md");
+    const externalFrameworkIssues = lintFrameworkMarkdown({
+      repoRoot,
+      filePath: externalFrameworkPath,
+      text: VALID_FRAMEWORK_TEXT,
+    });
+    assert(
+      externalFrameworkIssues.some((issue) => issue.code === "FWL016"),
+      "@framework outside controlled module path should be rejected"
+    );
 
-  const missingCapabilityRefText = VALID_FRAMEWORK_TEXT.replace(
-    "  - `R1.3` 输出能力：`C1`。",
-    "  - `R1.3` 输出能力：`C1 + C2`。"
-  );
-  const missingCapabilityRefIssues = runLint(missingCapabilityRefText);
-  assert(
-    missingCapabilityRefIssues.some(
-      (issue) => issue.code === "FWL011" && String(issue.message || "").includes("`C2`")
-    ),
-    "undefined capability reference should be reported"
-  );
+    const classification = classifyFrameworkMarkdown({
+      repoRoot,
+      filePath: path.join(repoRoot, "framework", "backend", "L0-M0-测试模块.md"),
+      text: VALID_FRAMEWORK_TEXT,
+    });
+    assert.strictEqual(classification.shouldLint, true);
+    assert.strictEqual(classification.isModulePath, true);
+    assert.strictEqual(classification.isFrameworkModuleDocument, true);
+  });
+
+  withTempRepo((repoRoot) => {
+    writeFile(
+      path.join(repoRoot, "framework", "demo", "L0-M0-示例模块.md"),
+      VALID_FRAMEWORK_TEXT.replace(
+        "goal 文本单元定位 := 在给定输入下定位并返回文本单元",
+        "goal 文本单元定位 := 在给定输入下定位并返回文本单元，参考 [说明](docs/引用.md)"
+      )
+    );
+    writeFile(path.join(repoRoot, "framework", "demo", "docs", "引用.md"), "# 引用\n");
+    const workspaceIssues = lintFrameworkWorkspace({ repoRoot });
+    assert.strictEqual(workspaceIssues.length, 0, "directly referenced attachment markdown should be accepted");
+  });
+
+  withTempRepo((repoRoot) => {
+    writeFile(
+      path.join(repoRoot, "framework", "demo", "L0-M0-示例模块.md"),
+      VALID_FRAMEWORK_TEXT
+    );
+    writeFile(path.join(repoRoot, "framework", "demo", "docs", "孤立.md"), "# 孤立\n");
+    const workspaceIssues = lintFrameworkWorkspace({ repoRoot });
+    assert(
+      workspaceIssues.some(
+        (issue) => issue.code === "FWL018" && String(issue.file || "").endsWith("framework/demo/docs/孤立.md")
+      ),
+      "unreferenced attachment markdown should be reported"
+    );
+  });
+
+  withTempRepo((repoRoot) => {
+    writeFile(path.join(repoRoot, "docs", "外部.md"), "# 外部\n");
+    writeFile(
+      path.join(repoRoot, "framework", "demo", "L0-M0-示例模块.md"),
+      VALID_FRAMEWORK_TEXT.replace(
+        "goal 文本单元定位 := 在给定输入下定位并返回文本单元",
+        "goal 文本单元定位 := 在给定输入下定位并返回文本单元，外部引用 [外部](../../docs/外部.md)"
+      )
+    );
+    const workspaceIssues = lintFrameworkWorkspace({ repoRoot });
+    assert(
+      workspaceIssues.some((issue) => issue.code === "FWL017"),
+      "module links to markdown outside the controlled framework scope should be rejected"
+    );
+  });
+
+  withTempRepo((repoRoot) => {
+    writeFile(
+      path.join(repoRoot, "framework", "demo", "docs", "错误附件.md"),
+      VALID_FRAMEWORK_TEXT
+    );
+    const workspaceIssues = lintFrameworkWorkspace({ repoRoot });
+    assert(
+      workspaceIssues.some((issue) => issue.code === "FWL016"),
+      "attachment markdown inside framework scope must not declare @framework"
+    );
+  });
 }
 
 main();

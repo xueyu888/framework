@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.27 - 2026-04-09
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.26..shelf-ai-v0.1.27`.
+- Reworked the `.sf` protocol docs and README entry so the experimental language now documents direct `Base.xxx` boundary bindings, multi-line right-hand values, ordered-collection notation, and the current `t(i)` time-point writing convention in one coherent authoring path.
+- Updated the extension-side `.sf` lint/test path to accept declaration heads with indented continuation lines and to surface a more precise `SFL009` message when continuation indentation is wrong.
+- Synced the plugin evidence snapshot and the accompanying back_zrx draft docs so the “first completion” example now distinguishes historical completion facts from the current trigger event instead of mixing the two concepts.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.27`.
+
+## 0.1.26 - 2026-04-08
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.25..shelf-ai-v0.1.26`.
+- Added a keyword-first `.sf` authoring preview backed by shared grammar/completion/lint/highlight rules, including the current `MODULE` header, `set/elem/relation[...]`, `sat/eq`, `comb/seq`, and `param<enum|range>` statement shapes.
+- Synced the extension-side `.sf` diagnostics, completion context detection, semantic token legend, examples, and tests to the new single-line authoring style instead of the earlier clause-based prototype.
+- Restored the release validation chain by fixing Chunk_Tagging module-scoped `P15` config paths and static contract bundle discovery, so `validate_canonical.py --check-changes` passes again before packaging and push.
+- Revalidated repository/plugin checks, then repackaged and reinstalled the local VSIX from the validated `0.1.26` workspace.
+
+## 0.1.25 - 2026-04-03
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.24..shelf-ai-v0.1.25`.
+- Synced Shelf AI with the new framework authoring template shape: parser/runtime terminology, snippets, navigation, completion, and framework-tree-related tests now accept the current author-source structure instead of the previous template assumptions.
+- Tightened framework lint contract checks and aligned the repository-side framework inputs in the same range, including the latest backend retrieval-flow draft reshaping and the replacement of the old message_queue sample baseline.
+- Added explicit zero-project bootstrap support across repository scripts and Shelf AI UI states, so preflight/validate/materialize can report legal no-project mode while evidence-tree and formal canonical-backed navigation still wait for a real `projects/<project_id>/project.toml`.
+- The same commit range also adds a separate markdown live rendering prototype under `tools/vscode/shelf-md-live`; it is not bundled into the `shelf-ai` VSIX, but it is part of the audited repository range for this release note.
+- Revalidated the extension and repository checks, then repackaged and reinstalled the VSIX from the validated `0.1.25` baseline.
+
 ## 0.1.24 - 2026-03-26
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.23..shelf-ai-v0.1.24`.

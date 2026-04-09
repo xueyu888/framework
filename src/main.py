@@ -10,7 +10,6 @@ import uvicorn
 from project_runtime import DEFAULT_PROJECT_FILE, materialize_project_runtime
 from project_runtime.app_factory import PROJECT_FILE_ENV, build_project_app
 
-
 SRC_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SRC_DIR.parent
 DEFAULT_HOST = "127.0.0.1"
@@ -45,7 +44,10 @@ def _normalize_argv(argv: list[str]) -> list[str]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Shelf repository entrypoint. Default behavior loads the configured project runtime and serves it."
+        description=(
+            "Shelf repository entrypoint. Default behavior loads the configured project runtime "
+            "and serves it."
+        )
     )
     subparsers = parser.add_subparsers(dest="command")
     serve_parser = subparsers.add_parser("serve", help="load the selected project runtime and start the demo server")
@@ -56,7 +58,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--host", default=DEFAULT_HOST, help=f"bind host (default: {DEFAULT_HOST})")
     serve_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"bind port (default: {DEFAULT_PORT})")
-    serve_parser.add_argument("--reload", action="store_true", help="enable uvicorn reload mode and pre-materialize generated artifacts")
+    serve_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="enable uvicorn reload mode and pre-materialize generated artifacts",
+    )
     return parser
 
 
@@ -73,9 +79,10 @@ def _serve_project(project_file: str | Path | None, *, host: str, port: int, rel
     if reload:
         materialize_project_runtime(resolved_project_file)
         uvicorn.run(
-            "project_runtime.app_factory:app",
+            "project_runtime.app_factory:build_project_app",
             host=host,
             port=port,
+            factory=True,
             reload=True,
             app_dir=str(SRC_DIR),
             reload_dirs=[str(path) for path in RELOAD_DIRS],
@@ -87,11 +94,26 @@ def _serve_project(project_file: str | Path | None, *, host: str, port: int, rel
     uvicorn.run(app, host=host, port=port)
 
 
+def _format_missing_project_message(error: FileNotFoundError) -> str:
+    detail = str(error).strip() or "no projects/*/project.toml found"
+    if "no projects/*/project.toml found" in detail:
+        return (
+            "Shelf serve cannot start in bootstrap/no-project mode. "
+            "Create projects/<project_id>/project.toml first.\n"
+            f"{detail}"
+        )
+    return detail
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(_normalize_argv(list(sys.argv[1:] if argv is None else argv)))
     if args.command == "serve":
-        _serve_project(args.project_file, host=args.host, port=args.port, reload=args.reload)
+        try:
+            _serve_project(args.project_file, host=args.host, port=args.port, reload=args.reload)
+        except FileNotFoundError as error:
+            print(_format_missing_project_message(error), file=sys.stderr)
+            return 1
         return 0
     parser.print_help()
     return 0

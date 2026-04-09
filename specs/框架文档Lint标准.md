@@ -16,14 +16,17 @@
 - 每个正式 framework 文件必须使用 `framework/<domain>/Lx-Mn-*.md` 命名。
 - 每个文件必须保留 plain `@framework` 起手入口。
 - 每个文件必须包含以下主 section：
-  - `## 1. 能力声明`
-  - `## 2. 边界定义（Boundary / Parameter 参数）`
-  - `## 3. 最小结构基（Minimal Structural Bases）`
-  - `## 4. 基组合原则`
-  - `## 5. 验证`
-- 当前作者语法统一使用 `边界定义 / 参数绑定`。
+  - `## 0. 目标 (Goal)`
+  - `## 1. 最小结构基（Minimal Structural Bases）`
+  - `## 2. 基排列组合（Base Arrangement / Combination）`
+  - `## 3. 边界定义（Boundary）`
+  - `## 4. 能力声明（Capability Statement）`
+- `## 3. 边界定义（Boundary）` 必须包含以下子 section：
+  - `### 3.1 接口定义（IO / Ports）`
+  - `### 3.2 参数边界（Parameter Constraints）`
+- 当前作者语法统一使用 `边界定义 / 参数边界`。
 - 参数项 `boundary_id` 允许使用 `snake_case`、兼容既有全大写/混合大小写 token；下游 section / field 名统一按小写归一化，大小写本身不表达额外语义。
-- `C* / N* / B* / R* / V*` 编号必须稳定、唯一、可解析。
+- `C* / N* / B* / R*` 编号必须稳定、唯一、可解析。
 - `B*` 的上游模块引用必须写在主句中，不得使用 `上游模块：...`。
 - framework 模块正文不得直接写入 `project.toml` 路径、已删除的双轨配置文件名、已删除的旧映射清单名或旧配置 section 语法。
 
@@ -57,9 +60,10 @@
 
 - framework Markdown 结构完整性
 - Framework / Base / Rule class 物化完整性
-- 每个 `B*` 至少绑定一个参数边界（由规则参数绑定闭包计算）
 - 每个 `B*` 至少参与一条 `R*` 组合规则
 - 每条 `R*` 至少声明一种结果：输出能力或失效结论
+- `## 3` 子章节必须完整包含 `3.1` 与 `3.2`
+- `3.1` 仅允许接口条目格式，`3.2` 仅允许参数条目格式
 - 禁止伪拆分：同模块内两个 `B*` 若边界集合、规则参与集合、下游影响集合完全一致则判定违规
 - `project.toml` 可解析性
 - contract 切片与四层 compile 结果一致性

@@ -28,12 +28,14 @@ function createFrameworkAuthorGraphFixture() {
     [
       "# L0-M0 Source Module",
       "",
-      "## 3. 最小结构基（Minimal Structural Bases）",
+      "## 0. 目标 (Goal)",
+      "- 最小目标。",
+      "",
+      "## 1. 最小结构基（Minimal Structural Bases）",
       "- `B1` 输入载荷基：消息内容。",
       "",
-      "## 4. 基组合原则（Base Combination Principles）",
-      "- `R1` 最小组合",
-      "  - `R1.1` 参与基：`B1`。",
+      "## 2. 基排列组合（Base Arrangement / Combination）",
+      "- `R1` `最小组合`：由 `{B1}` 形成 `最小输出`，导出 `C1`。",
       "",
     ].join("\n")
   );
@@ -42,13 +44,15 @@ function createFrameworkAuthorGraphFixture() {
     [
       "# L1-M0 Aggregate Module",
       "",
-      "## 3. 最小结构基（Minimal Structural Bases）",
+      "## 0. 目标 (Goal)",
+      "- 聚合目标。",
+      "",
+      "## 1. 最小结构基（Minimal Structural Bases）",
       "- `B1` 上游聚合基：L0.M0[R1]。",
       "- `B2` 输出结构基：聚合后的输出。",
       "",
-      "## 4. 基组合原则（Base Combination Principles）",
-      "- `R2` 聚合组合",
-      "  - `R2.1` 参与基：`B1 + B2`。",
+      "## 2. 基排列组合（Base Arrangement / Combination）",
+      "- `R2` `聚合组合`：由 `{B1, B2}` 形成 `聚合结果`，导出 `C1`。",
       "",
     ].join("\n")
   );
@@ -143,12 +147,14 @@ function createFrameworkOnlyFixtureWithoutProjects() {
     [
       "# L0-M0 Source Module",
       "",
-      "## 3. 最小结构基（Minimal Structural Bases）",
+      "## 0. 目标 (Goal)",
+      "- 最小目标。",
+      "",
+      "## 1. 最小结构基（Minimal Structural Bases）",
       "- `B1` 输入基。",
       "",
-      "## 4. 基组合原则（Base Combination Principles）",
-      "- `R1` 最小组合",
-      "  - `R1.1` 参与基：`B1`。",
+      "## 2. 基排列组合（Base Arrangement / Combination）",
+      "- `R1` `最小组合`：由 `{B1}` 形成 `最小输出`，导出 `C1`。",
       "",
     ].join("\n")
   );

@@ -1,16 +1,10 @@
 # Project Discovery Audit
 
 - schema_version: `project-discovery-audit/v2`
-- project_count: `1`
+- project_count: `0`
 
-## message_queue_basic
+当前未发现 `projects/*/project.toml`。
 
-- project_file: `projects/message_queue_basic/project.toml`
-- runtime_scene: `message_queue`
-- generated_dir: `projects/message_queue_basic/generated`
-- canonical_json: `projects/message_queue_basic/generated/canonical.json`
-- classification: `four-layer-project`
-- root[message_queue]: `framework/message_queue/L1-M0-消息队列标准模块.md`
-- reason: contains project entry file
-- reason: config compiles into framework/config/code/evidence canonical layers
-- reason: derived artifacts point back to canonical.json
+- 当前仓库处于 bootstrap / authoring 状态
+- 默认 `validate` / `materialize` 命令会以 no-op success 提示当前仍无项目
+- 若新增 `projects/<project_id>/project.toml`，该审计视图应随之更新

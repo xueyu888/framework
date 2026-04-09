@@ -1,0 +1,25 @@
+{
+  "documents": {
+    "framework_design_core_standard": {
+      "source_path": "/home/wuyz/Ability_Enhance/frame/shelf/specs/框架设计核心标准.md",
+      "chunks_path": "/home/wuyz/Ability_Enhance/frame/shelf/framework/document_chunking/res/framework_design_core_standard.chunks.json",
+      "validation_path": "/home/wuyz/Ability_Enhance/frame/shelf/framework/document_chunking/res/framework_design_core_standard.validation.json",
+      "markdown_path": "/home/wuyz/Ability_Enhance/frame/shelf/framework/document_chunking/res/framework_design_core_standard.chunks.md",
+      "passed": true,
+      "chunk_count": 14,
+      "paragraph_block_count": 31,
+      "invalid_record_count": 0
+    },
+    "framework_doc_lint_standard": {
+      "source_path": "/home/wuyz/Ability_Enhance/frame/shelf/specs/框架文档Lint标准.md",
+      "chunks_path": "/home/wuyz/Ability_Enhance/frame/shelf/framework/document_chunking/res/framework_doc_lint_standard.chunks.json",
+      "validation_path": "/home/wuyz/Ability_Enhance/frame/shelf/framework/document_chunking/res/framework_doc_lint_standard.validation.json",
+      "markdown_path": "/home/wuyz/Ability_Enhance/frame/shelf/framework/document_chunking/res/framework_doc_lint_standard.chunks.md",
+      "passed": true,
+      "chunk_count": 10,
+      "paragraph_block_count": 18,
+      "invalid_record_count": 0
+    }
+  },
+  "all_passed": true
+}

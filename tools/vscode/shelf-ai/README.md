@@ -26,6 +26,7 @@ Authoring-term note:
 - Runs canonical validation and optionally `mypy` from the extension.
 - Adds project-independent framework markdown syntax diagnostics (Problems 波浪线) while typing/saving.
 - Adds context-aware framework markdown completion (section-aware + auto-number defaults) and lint Quick Fix actions.
+- Adds an experimental `.sf` language preview (`shelf-framework`) with its own semantic highlight, lint, and completion, without replacing formal `framework/*.md` author sources.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
 - Keeps ordinary implementation saves unblocked; repository-side validation/hook checks remain the main enforcement boundary.
 
@@ -34,6 +35,8 @@ Authoring-term note:
 - 插件后续设计与实现的正式契约文档：
   `tools/vscode/shelf-ai/插件设计与实现契约.md`
 - 后续凡是插件相关代码变更，都应同步检查并在需要时更新该文档。
+- `.sf` 实验语言当前作者规范文档：
+  `tools/vscode/shelf-ai/keyword-first-grammar-协议.md`
 
 ## Install (Local)
 
@@ -82,6 +85,7 @@ Local workspace overlay file:
 - `shelf.generatedEventSuppressionMs = 2500`
 - `shelf.manualValidationRestartThresholdMs = 15000`
 - `shelf.validationDebounceMs = 250`
+- `shelf.frameworkLintOnlyOnFrameworkChanges = true`
 - `shelf.frameworkLintEnabled = true`
 - `shelf.frameworkLintOnType = true`
 - `shelf.frameworkLintDebounceMs = 300`
@@ -91,6 +95,21 @@ Local workspace overlay file:
 
 Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload. Framework lint/completion/quick-fix settings take effect immediately for currently opened framework markdown files.
 
+Framework lint execution scope:
+
+- Shelf lints every Markdown file under `framework/**` and `framework_drafts/**`.
+- Shelf also lints any Markdown file whose content contains `@framework`, even outside those directories.
+- Shelf also lints standalone `.sf` files as an editor-only preview language (`shelf-framework`); those files do not participate in canonical, materialize, or publish flows.
+- Inside `framework/**` / `framework_drafts/**`, only Markdown attachments that are directly referenced by a framework module are treated as valid authoring files; orphan Markdown files are reported as errors.
+- Framework modules may only directly reference Markdown files inside the same controlled framework domain.
+
+Framework-only automation setting:
+
+- `shelf.frameworkLintOnlyOnFrameworkChanges = true`:
+  when a framework-controlled Markdown file changes, Shelf only updates framework lint diagnostics.
+  save-triggered canonical validation, auto-materialization, and mypy do not run for those framework changes.
+  manual `Shelf: Validate Canonical Now` and `Shelf: Run Codegen Preflight` keep their normal full-chain behavior.
+
 Notification popup behavior:
 
 - `shelf.showMessagePopups = true`: keep Shelf right-corner popup messages enabled.
@@ -99,7 +118,8 @@ Notification popup behavior:
 Framework tree behavior settings:
 
 - `shelf.frameworkTreeAutoRefreshOnSave = true`:
-  after framework markdown is saved, Shelf runs save-time change validation/materialization first, then refreshes an open framework tree.
+  after framework markdown is saved, Shelf refreshes an open framework tree in the background.
+  if `shelf.frameworkLintOnlyOnFrameworkChanges = false`, Shelf first runs the save-time change validation/materialization pipeline and then refreshes the tree.
   save-time refresh is background-only and will not auto-pop or force-focus the framework tree panel.
   when full materialization fails and the materialize command uses `scripts/materialize_project.py`, Shelf enables `--allow-framework-only-fallback` to refresh `canonical.framework` snapshot first.
 - `shelf.statusBarClickAction = openFrameworkTree`:
@@ -118,9 +138,11 @@ Default commands:
 
 `validate_canonical.py` enforces one-to-one boundary projection at repository guard level. If any boundary still maps to multiple related paths, validation fails with `FRAMEWORK_VIOLATION` and asks for framework updates first.
 
-`Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation.
+When the repository currently has no `projects/*/project.toml`, `validate_canonical.py` and `materialize_project.py` return no-op success and explicitly report bootstrap / no-project mode. `src/main.py serve` still requires a real project file before runtime startup.
 
-Framework markdown lint is independent from project selection: syntax diagnostics are computed directly from the current `framework/**` or `framework_drafts/**` document and rendered as standard VSCode Problems diagnostics.
+`Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation. If no project config exists yet, the command reports bootstrap / framework-authoring mode instead of failing.
+
+Framework markdown lint is independent from project selection: syntax diagnostics are computed directly from framework-controlled Markdown and rendered as standard VSCode Problems diagnostics.
 The same diagnostics expose Quick Fix actions (lightbulb) for common formatting mistakes, including list marker normalization, missing `@framework`, missing standard sections, and invalid C/P/B/R/V entry formatting.
 
 The `@framework` template entry is a repository-side hard authoring contract and must not be removed without an equally direct replacement.
@@ -136,6 +158,7 @@ The framework tree is parsed directly from `framework/**` modules and their `B*`
 The canvas renders a module-only author graph: `B*` and rule participation stay available in hover/inspection, while module arrows are collapsed from upstream module refs in base definitions (for example `L0.M0[...]`).
 Framework markdown saves should trigger canonical refresh in background so machine-mainline artifacts remain up-to-date, but framework tree rendering itself does not wait for canonical.
 When canonical is stale, missing, or invalid, Shelf blocks the formal evidence tree until you materialize again.
+When no `projects/*/project.toml` exists yet, Shelf keeps framework authoring features available but treats the evidence tree and formal cross-layer navigation as not yet established.
 Framework-only fallback snapshots are marked as degraded materialization state, so evidence tree remains blocked until the next full materialization succeeds.
 
 ## Project Config Navigation
@@ -156,4 +179,4 @@ The extension no longer treats the removed dual-track config files as live autho
 Public release notes live at:
 
 - `tools/vscode/shelf-ai/CHANGELOG.md`
-- `tools/vscode/shelf-ai/release-notes/0.1.24.md`
+- `tools/vscode/shelf-ai/release-notes/0.1.25.md`

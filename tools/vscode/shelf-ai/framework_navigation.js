@@ -8,24 +8,31 @@ const MODULE_REF_WITH_RULES_PATTERN =
   /(?:(?<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?<level>\d+)\.M(?<module>\d+)\[(?<rules>[^\]]+)\]/g;
 const MODULE_REF_PATTERN = /(?:(?<framework>[A-Za-z][A-Za-z0-9_-]*)\.)?L(?<level>\d+)\.M(?<module>\d+)/g;
 const RULE_TOKEN_PATTERN = /R\d+(?:\.\d+)?/g;
-const CORE_TOKEN_PATTERN = /R\d+\.\d+|R\d+|B\d+|C\d+|V\d+/g;
+const CORE_TOKEN_PATTERN = /R\d+\.\d+|R\d+|B\d+|C\d+|P\d+|N\d+|V\d+/g;
 const UPPER_SYMBOL_PATTERN = /[A-Z][A-Z0-9_]+/g;
+const WORD_SYMBOL_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
 const BACKTICK_SEGMENT_PATTERN = /`([^`]+)`/g;
 const SYMBOL_TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9_]*/g;
 const TOML_SECTION_PATTERN = /^\s*\[([A-Za-z0-9_.-]+)\]\s*$/;
 
 const SECTION_PREFIXES = [
-  ["## 1. 能力声明", "capability"],
-  ["## 2. 边界定义", "boundary"],
-  ["## 3. 最小结构基", "base"],
-  ["## 4. 基组合原则", "rule"],
+  ["### 3.1 接口定义", "boundary-ports"],
+  ["### 3.2 参数边界", "boundary-parameters"],
+  ["## 0. 目标", "goal"],
+  ["## 1. 最小结构基", "base"],
+  ["## 2. 基排列组合", "rule"],
+  ["## 3. 边界定义", "boundary"],
+  ["## 4. 能力声明", "capability"],
   ["## 5. 验证", "verification"],
 ];
 const SECTION_DISPLAY_NAMES = {
+  goal: "目标（Goal）",
   capability: "能力声明（Capability Statement）",
-  boundary: "边界定义（Boundary / Parameter 参数）",
+  boundary: "边界定义（Boundary）",
+  "boundary-ports": "接口定义（IO / Ports）",
+  "boundary-parameters": "参数边界（Parameter Constraints）",
   base: "最小结构基（Minimal Structural Bases）",
-  rule: "基组合原则（Base Combination Principles）",
+  rule: "基排列组合（Base Arrangement / Combination）",
   verification: "验证（Verification）",
 };
 
@@ -123,6 +130,38 @@ function extractAfterColon(text) {
   return match ? match[1].trim() : "";
 }
 
+function orderedUnique(items) {
+  const ordered = [];
+  const seen = new Set();
+  for (const item of items || []) {
+    const token = String(item || "").trim();
+    if (!token || seen.has(token)) {
+      continue;
+    }
+    seen.add(token);
+    ordered.push(token);
+  }
+  return ordered;
+}
+
+function parseRuleBodyText(body, boundaryTokens = new Set()) {
+  const text = String(body || "").replace(/[。.\s]+$/g, "");
+  const symbolTokens = orderedUnique(text.match(WORD_SYMBOL_PATTERN) || []);
+  const participatingBases = orderedUnique(symbolTokens.filter((token) => /^B\d+$/.test(token))).join(" + ");
+  const output = orderedUnique(symbolTokens.filter((token) => /^C\d+$/.test(token))).join(" + ");
+  const invalid = orderedUnique(symbolTokens.filter((token) => /^N\d+$/.test(token))).join(" + ");
+  const boundary = orderedUnique(
+    symbolTokens.filter((token) => boundaryTokens.has(token) || boundaryTokens.has(token.toLowerCase()))
+  ).join(" + ");
+  return {
+    combination: text,
+    participatingBases,
+    output,
+    invalid,
+    boundary,
+  };
+}
+
 function buildDefinitionIndex(text) {
   const symbols = new Map();
   const boundaryIds = new Set();
@@ -185,13 +224,14 @@ function buildDefinitionIndex(text) {
       continue;
     }
 
-    if (section === "boundary") {
-      const match = /^\s*[-*]\s*`([A-Za-z][A-Za-z0-9_]*)`/.exec(lineText);
+    if (section === "boundary" || section === "boundary-ports" || section === "boundary-parameters") {
+      const match = /^\s*[-*]\s*`([A-Za-z][A-Za-z0-9_]*)`(?:\s+[^：:]+)?[：:]/.exec(lineText);
       if (match) {
         const token = match[1];
         const character = match.index + match[0].indexOf(token);
+        const kind = section === "boundary-ports" ? "boundaryPort" : "boundary";
         const item = {
-          kind: "boundary",
+          kind,
           token,
           text: trimListMarker(lineText),
           line: lineIndex,
@@ -199,6 +239,7 @@ function buildDefinitionIndex(text) {
           length: token.length,
         };
         boundaryIds.add(token);
+        boundaryIds.add(token.toLowerCase());
         registerSymbol(symbols, token, lineIndex, character);
         boundaries.push(item);
         itemByToken.set(token, item);
@@ -227,23 +268,87 @@ function buildDefinitionIndex(text) {
     }
 
     if (section === "rule") {
-      const topMatch = /^\s*[-*]\s*`(R\d+)`\s*/.exec(lineText);
-      if (topMatch) {
-        const token = topMatch[1];
-        const character = topMatch.index + topMatch[0].indexOf(token);
+      const registerDerivedRuleSymbols = (sourceText, parentToken, textValue) => {
+        for (const segmentMatch of String(sourceText || "").matchAll(BACKTICK_SEGMENT_PATTERN)) {
+          const segment = segmentMatch[1];
+          const segmentOffset = (segmentMatch.index || 0) + 1;
+          for (const tokenMatch of segment.matchAll(SYMBOL_TOKEN_PATTERN)) {
+            const token = tokenMatch[0];
+            if (
+              /^C\d+$/.test(token) ||
+              /^B\d+$/.test(token) ||
+              /^N\d+$/.test(token) ||
+              /^V\d+$/.test(token) ||
+              /^R\d+(?:\.\d+)?$/.test(token) ||
+              boundaryIds.has(token) ||
+              boundaryIds.has(token.toLowerCase())
+            ) {
+              continue;
+            }
+            registerSymbol(symbols, token, lineIndex, segmentOffset + (tokenMatch.index || 0));
+            itemByToken.set(token, {
+              kind: "derivedSymbol",
+              token,
+              text: textValue,
+              line: lineIndex,
+              character: segmentOffset + (tokenMatch.index || 0),
+              length: token.length,
+              parentToken,
+            });
+          }
+        }
+      };
+
+      const lineMatch = /^\s*[-*]\s*`(R\d+)`\s+`([^`]+)`[：:]\s*(.+)$/.exec(lineText);
+      if (lineMatch) {
+        const token = lineMatch[1];
+        const character = lineMatch.index + lineMatch[0].indexOf(token);
         const textValue = trimListMarker(lineText);
+        const parsed = parseRuleBodyText(lineMatch[3], boundaryIds);
         const item = {
           kind: "rule",
           token,
           text: textValue,
-          title: textValue.replace(/^`R\d+`\s*/, "").trim(),
+          title: lineMatch[2].trim(),
           line: lineIndex,
           character,
           length: token.length,
-          participatingBases: "",
-          combination: "",
-          output: "",
-          boundary: "",
+          participatingBases: parsed.participatingBases,
+          combination: parsed.combination,
+          output: parsed.output,
+          invalid: parsed.invalid,
+          boundary: parsed.boundary,
+          children: [],
+        };
+        registerSymbol(symbols, token, lineIndex, character);
+        rules.push(item);
+        ruleByToken.set(token, item);
+        itemByToken.set(token, item);
+        registerDerivedRuleSymbols(lineMatch[3], token, textValue);
+        currentRule = item;
+        continue;
+      }
+
+      const topMatch = /^\s*[-*]\s*`(R\d+)`\s*(.*)$/.exec(lineText);
+      if (topMatch) {
+        const token = topMatch[1];
+        const character = topMatch.index + topMatch[0].indexOf(token);
+        const textValue = trimListMarker(lineText);
+        const rawTitle = String(topMatch[2] || "").trim();
+        const parsed = parseRuleBodyText(rawTitle, boundaryIds);
+        const item = {
+          kind: "rule",
+          token,
+          text: textValue,
+          title: rawTitle.replace(/[：:]\s*$/, ""),
+          line: lineIndex,
+          character,
+          length: token.length,
+          participatingBases: parsed.participatingBases,
+          combination: parsed.combination,
+          output: parsed.output,
+          invalid: parsed.invalid,
+          boundary: parsed.boundary,
           children: [],
         };
         registerSymbol(symbols, token, lineIndex, character);
@@ -284,34 +389,7 @@ function buildDefinitionIndex(text) {
             parentRule.boundary = extractAfterColon(textValue);
           }
         }
-        if (lineText.includes("输出结构")) {
-          for (const segmentMatch of lineText.matchAll(BACKTICK_SEGMENT_PATTERN)) {
-            const segment = segmentMatch[1];
-            const segmentOffset = (segmentMatch.index || 0) + 1;
-            for (const tokenMatch of segment.matchAll(SYMBOL_TOKEN_PATTERN)) {
-              const token = tokenMatch[0];
-              if (
-                /^C\d+$/.test(token) ||
-                /^B\d+$/.test(token) ||
-                /^V\d+$/.test(token) ||
-                /^R\d+(?:\.\d+)?$/.test(token) ||
-                boundaryIds.has(token)
-              ) {
-                continue;
-              }
-              registerSymbol(symbols, token, lineIndex, segmentOffset + (tokenMatch.index || 0));
-              itemByToken.set(token, {
-                kind: "derivedSymbol",
-                token,
-                text: textValue,
-                line: lineIndex,
-                character: segmentOffset + (tokenMatch.index || 0),
-                length: token.length,
-                parentToken,
-              });
-            }
-          }
-        }
+        registerDerivedRuleSymbols(lineText, parentToken, textValue);
       }
       continue;
     }
@@ -393,6 +471,24 @@ function findTokenContext(lineText, character) {
       level: `L${match.groups?.level || ""}`,
       moduleId: `M${match.groups?.module || ""}`,
     };
+  }
+
+  for (const segmentMatch of lineText.matchAll(BACKTICK_SEGMENT_PATTERN)) {
+    const segmentText = segmentMatch[1];
+    const segmentStart = (segmentMatch.index || 0) + 1;
+    for (const tokenMatch of segmentText.matchAll(WORD_SYMBOL_PATTERN)) {
+      const tokenStart = segmentStart + (tokenMatch.index || 0);
+      const tokenEnd = tokenStart + tokenMatch[0].length;
+      if (!containsPosition(tokenStart, tokenEnd, character)) {
+        continue;
+      }
+      return {
+        kind: "localSymbol",
+        token: tokenMatch[0],
+        start: tokenStart,
+        end: tokenEnd,
+      };
+    }
   }
 
   for (const match of lineText.matchAll(CORE_TOKEN_PATTERN)) {
@@ -701,13 +797,22 @@ function resolveUndefinedSymbolSection(token, lineText) {
   if (/^B\d+$/.test(safeToken)) {
     return "base";
   }
+  if (/^P\d+$/.test(safeToken)) {
+    return "boundary-parameters";
+  }
   if (/^V\d+$/.test(safeToken)) {
     return "verification";
   }
   if (/^R\d+(?:\.\d+)?$/.test(safeToken)) {
     return "rule";
   }
-  if (/^[A-Z][A-Z0-9_]+$/.test(safeToken) && /(参数绑定|边界绑定)/.test(String(lineText || ""))) {
+  if (
+    /^[A-Z][A-Z0-9_]+$/.test(safeToken)
+    && /(参数绑定|边界绑定|接口|输入|输出|导出|IO|PORTS?)/i.test(String(lineText || ""))
+  ) {
+    return "boundary";
+  }
+  if (/^[A-Za-z][A-Za-z0-9_]+$/.test(safeToken) && safeToken.includes("_")) {
     return "boundary";
   }
   return "";
@@ -718,7 +823,11 @@ function resolveUndefinedSymbolFallbackTarget(index, token, lineText) {
   if (!section) {
     return null;
   }
-  const anchor = index.sectionHeaders[section] || index.header;
+  const fallbackSections = [section];
+  if (section === "boundary-parameters") {
+    fallbackSections.push("boundary");
+  }
+  const anchor = fallbackSections.map((name) => index.sectionHeaders[name]).find(Boolean) || index.header;
   if (!anchor) {
     return null;
   }
@@ -779,6 +888,9 @@ function pushRuleSummary(parts, rule) {
   if (rule.output) {
     parts.push(`  输出能力：${rule.output}`);
   }
+  if (rule.invalid) {
+    parts.push(`  失效结论：${rule.invalid}`);
+  }
   if (rule.boundary) {
     parts.push(`  参数绑定：${rule.boundary}`);
   }
@@ -830,6 +942,9 @@ function buildRuleHoverMarkdown(moduleInfo, rule) {
   }
   if (rule.output) {
     parts.push(`输出能力：${rule.output}`);
+  }
+  if (rule.invalid) {
+    parts.push(`失效结论：${rule.invalid}`);
   }
   if (rule.boundary) {
     parts.push(`参数绑定：${rule.boundary}`);

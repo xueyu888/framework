@@ -1,0 +1,1388 @@
+{
+  "assumptions": {
+    "N": 2,
+    "x": 30.0,
+    "y": 30.0,
+    "h": 30.0,
+    "side_panel_height_max": 30.0,
+    "rod_length_unlimited": true,
+    "payload_is_qualification_only": true,
+    "opening_ignored": true,
+    "external_property_defaults": {
+      "rod_capacity": 60.0,
+      "support_panel_capacity": 90.0,
+      "connector_capacity": 45.0,
+      "board_capacity": 120.0,
+      "board_deflection_capacity": 100.0
+    },
+    "load_model": "engineering_approximation",
+    "interactive_cube_enabled": true
+  },
+  "rule_interpretation": {
+    "single_layer_patterns": 11,
+    "raw_total_for_N": "11^2 = 121",
+    "dedup": "rotation equivalence around vertical axis (0/90/180/270 deg)",
+    "R2": "per layer E_total=4 with E(rod)=1 and E(panel)=2, shared panel corner counted once; full-corner coverage",
+    "R4_note": "90-degree panel-panel connection is allowed but does not relax corner support completeness",
+    "R7": "per layer at least one side open",
+    "load_qualification": "load pass/fail and utilization are evaluated from external base capacities; not used to filter combo legality"
+  },
+  "raw_combo_count": 121,
+  "unique_combo_count_after_rotation_dedup": 33,
+  "valid_combos": [
+    {
+      "combo_id": "CASE-01",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:back-front)",
+      "equivalent_count": 2,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:无|支撑板:left-right)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-01.obj",
+      "preview_png": "CASE-01.png"
+    },
+    {
+      "combo_id": "CASE-02",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:left-right)",
+      "equivalent_count": 2,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:无|支撑板:back-front)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "left",
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-02.obj",
+      "preview_png": "CASE-02.png"
+    },
+    {
+      "combo_id": "CASE-03",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL|支撑板:front-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:FL|支撑板:back-right)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-03.obj",
+      "preview_png": "CASE-03.png"
+    },
+    {
+      "combo_id": "CASE-04",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR|支撑板:front)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BR-FR|支撑板:left)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-04.obj",
+      "preview_png": "CASE-04.png"
+    },
+    {
+      "combo_id": "CASE-05",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+      "equivalent_count": 2,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-05.obj",
+      "preview_png": "CASE-05.png"
+    },
+    {
+      "combo_id": "CASE-06",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-FL|支撑板:right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:FL-FR|支撑板:back)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "FL"
+          ],
+          "support_panels": [
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-06.obj",
+      "preview_png": "CASE-06.png"
+    },
+    {
+      "combo_id": "CASE-07",
+      "label": "第1层(杆:无|支撑板:back-front) 第2层(杆:BR|支撑板:front-left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:无|支撑板:back-front) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:无|支撑板:left-right) 第2层(杆:FR|支撑板:back-left)"
+      ],
+      "layers": [
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BR"
+          ],
+          "support_panels": [
+            "front",
+            "left"
+          ],
+          "open_sides": [
+            "right",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-07.obj",
+      "preview_png": "CASE-07.png"
+    },
+    {
+      "combo_id": "CASE-08",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:back-front)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:无|支撑板:back-front)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-08.obj",
+      "preview_png": "CASE-08.png"
+    },
+    {
+      "combo_id": "CASE-09",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:left-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:无|支撑板:left-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "left",
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-09.obj",
+      "preview_png": "CASE-09.png"
+    },
+    {
+      "combo_id": "CASE-10",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL|支撑板:front-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:FR|支撑板:back-left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-10.obj",
+      "preview_png": "CASE-10.png"
+    },
+    {
+      "combo_id": "CASE-11",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR|支撑板:front)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:FL-FR|支撑板:back)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-11.obj",
+      "preview_png": "CASE-11.png"
+    },
+    {
+      "combo_id": "CASE-12",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-12.obj",
+      "preview_png": "CASE-12.png"
+    },
+    {
+      "combo_id": "CASE-13",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-FL|支撑板:right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BR-FR|支撑板:left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "FL"
+          ],
+          "support_panels": [
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-13.obj",
+      "preview_png": "CASE-13.png"
+    },
+    {
+      "combo_id": "CASE-14",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR|支撑板:front-left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:FL|支撑板:back-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BR"
+          ],
+          "support_panels": [
+            "front",
+            "left"
+          ],
+          "open_sides": [
+            "right",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-14.obj",
+      "preview_png": "CASE-14.png"
+    },
+    {
+      "combo_id": "CASE-15",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR-FR|支撑板:left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL-FL|支撑板:right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BR",
+            "FR"
+          ],
+          "support_panels": [
+            "left"
+          ],
+          "open_sides": [
+            "front",
+            "right",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-15.obj",
+      "preview_png": "CASE-15.png"
+    },
+    {
+      "combo_id": "CASE-16",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL|支撑板:back-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BR|支撑板:front-left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "FL"
+          ],
+          "support_panels": [
+            "back",
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-16.obj",
+      "preview_png": "CASE-16.png"
+    },
+    {
+      "combo_id": "CASE-17",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL-FR|支撑板:back)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL-BR|支撑板:front)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "FL",
+            "FR"
+          ],
+          "support_panels": [
+            "back"
+          ],
+          "open_sides": [
+            "front",
+            "right",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-17.obj",
+      "preview_png": "CASE-17.png"
+    },
+    {
+      "combo_id": "CASE-18",
+      "label": "第1层(杆:BL|支撑板:front-right) 第2层(杆:FR|支撑板:back-left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL|支撑板:front-right) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:BR|支撑板:front-left) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:FL|支撑板:back-right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:FR|支撑板:back-left) 第2层(杆:BL|支撑板:front-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "FR"
+          ],
+          "support_panels": [
+            "back",
+            "left"
+          ],
+          "open_sides": [
+            "front",
+            "right"
+          ]
+        }
+      ],
+      "obj": "CASE-18.obj",
+      "preview_png": "CASE-18.png"
+    },
+    {
+      "combo_id": "CASE-19",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:back-front)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:无|支撑板:back-front)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-19.obj",
+      "preview_png": "CASE-19.png"
+    },
+    {
+      "combo_id": "CASE-20",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:left-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:无|支撑板:left-right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:无|支撑板:left-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "left",
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-20.obj",
+      "preview_png": "CASE-20.png"
+    },
+    {
+      "combo_id": "CASE-21",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL|支撑板:front-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:FR|支撑板:back-left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-21.obj",
+      "preview_png": "CASE-21.png"
+    },
+    {
+      "combo_id": "CASE-22",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR|支撑板:front)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:FL-FR|支撑板:back)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-22.obj",
+      "preview_png": "CASE-22.png"
+    },
+    {
+      "combo_id": "CASE-23",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-23.obj",
+      "preview_png": "CASE-23.png"
+    },
+    {
+      "combo_id": "CASE-24",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-FL|支撑板:right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BR-FR|支撑板:left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "FL"
+          ],
+          "support_panels": [
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-24.obj",
+      "preview_png": "CASE-24.png"
+    },
+    {
+      "combo_id": "CASE-25",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR|支撑板:front-left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:FL|支撑板:back-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BR"
+          ],
+          "support_panels": [
+            "front",
+            "left"
+          ],
+          "open_sides": [
+            "right",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-25.obj",
+      "preview_png": "CASE-25.png"
+    },
+    {
+      "combo_id": "CASE-26",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR-FR|支撑板:left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL-FL|支撑板:right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BR",
+            "FR"
+          ],
+          "support_panels": [
+            "left"
+          ],
+          "open_sides": [
+            "front",
+            "right",
+            "back"
+          ]
+        }
+      ],
+      "obj": "CASE-26.obj",
+      "preview_png": "CASE-26.png"
+    },
+    {
+      "combo_id": "CASE-27",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL|支撑板:back-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BR|支撑板:front-left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "FL"
+          ],
+          "support_panels": [
+            "back",
+            "right"
+          ],
+          "open_sides": [
+            "front",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-27.obj",
+      "preview_png": "CASE-27.png"
+    },
+    {
+      "combo_id": "CASE-28",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL-FR|支撑板:back)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FL-FR|支撑板:back)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL-BR|支撑板:front)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "FL",
+            "FR"
+          ],
+          "support_panels": [
+            "back"
+          ],
+          "open_sides": [
+            "front",
+            "right",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-28.obj",
+      "preview_png": "CASE-28.png"
+    },
+    {
+      "combo_id": "CASE-29",
+      "label": "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FR|支撑板:back-left)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR|支撑板:front) 第2层(杆:FR|支撑板:back-left)",
+        "第1层(杆:BL-FL|支撑板:right) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BR-FR|支撑板:left) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:FL-FR|支撑板:back) 第2层(杆:BL|支撑板:front-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "FR"
+          ],
+          "support_panels": [
+            "back",
+            "left"
+          ],
+          "open_sides": [
+            "front",
+            "right"
+          ]
+        }
+      ],
+      "obj": "CASE-29.obj",
+      "preview_png": "CASE-29.png"
+    },
+    {
+      "combo_id": "CASE-30",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:无|支撑板:back-front)",
+      "equivalent_count": 2,
+      "equivalent_members": [
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:无|支撑板:back-front)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:无|支撑板:left-right)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [],
+          "support_panels": [
+            "back",
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-30.obj",
+      "preview_png": "CASE-30.png"
+    },
+    {
+      "combo_id": "CASE-31",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL|支撑板:front-right)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL|支撑板:front-right)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BR|支撑板:front-left)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:FL|支撑板:back-right)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:FR|支撑板:back-left)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL"
+          ],
+          "support_panels": [
+            "front",
+            "right"
+          ],
+          "open_sides": [
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-31.obj",
+      "preview_png": "CASE-31.png"
+    },
+    {
+      "combo_id": "CASE-32",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR|支撑板:front)",
+      "equivalent_count": 4,
+      "equivalent_members": [
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR|支撑板:front)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-FL|支撑板:right)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BR-FR|支撑板:left)",
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:FL-FR|支撑板:back)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR"
+          ],
+          "support_panels": [
+            "front"
+          ],
+          "open_sides": [
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-32.obj",
+      "preview_png": "CASE-32.png"
+    },
+    {
+      "combo_id": "CASE-33",
+      "label": "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR-FL-FR|支撑板:无)",
+      "equivalent_count": 1,
+      "equivalent_members": [
+        "第1层(杆:BL-BR-FL-FR|支撑板:无) 第2层(杆:BL-BR-FL-FR|支撑板:无)"
+      ],
+      "layers": [
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        },
+        {
+          "rods": [
+            "BL",
+            "BR",
+            "FL",
+            "FR"
+          ],
+          "support_panels": [],
+          "open_sides": [
+            "front",
+            "right",
+            "back",
+            "left"
+          ]
+        }
+      ],
+      "obj": "CASE-33.obj",
+      "preview_png": "CASE-33.png"
+    }
+  ],
+  "overview_png": "ALL_COMBOS_3D.png",
+  "interactive_html": "interactive_3d.html"
+}

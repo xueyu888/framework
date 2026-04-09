@@ -14,11 +14,16 @@ Framework -> Config -> Code -> Evidence
 - `Evidence` 层负责验证、快照、追溯和 GUI 材料
 - `projects/*/generated/canonical.json` 是唯一机器真相源
 
-## 样例项目
+## 项目状态
 
-- [projects/message_queue_basic/project.toml](./projects/message_queue_basic/project.toml)
+当前仓库未附带默认项目实例。
 
-该项目用于验证 message_queue 场景的四层主链物化与校验流程。
+这意味着仓库目前处于 bootstrap / authoring 状态：
+
+- `framework/*.md` 仍可继续演化作者源
+- `uv run python scripts/validate_canonical.py` 与 `uv run python scripts/materialize_project.py` 会以 no-op success 提示当前处于零项目 bootstrap 状态
+- `uv run python scripts/validate_canonical.py --check-changes` 仍可用于 bootstrap 门禁
+- 在创建新的 `projects/<project_id>/project.toml` 之前，`src/main.py serve` 不会自动获得默认项目
 
 ## 快速开始
 
@@ -26,12 +31,18 @@ Framework -> Config -> Code -> Evidence
 uv sync
 bash scripts/install_git_hooks.sh
 uv run mypy
-uv run python scripts/materialize_project.py
-uv run python scripts/validate_canonical.py
-uv run python src/main.py
+uv run python scripts/validate_canonical.py --check-changes
 ```
 
-默认入口：
+创建新的 `projects/<project_id>/project.toml` 之后，再执行：
+
+```bash
+uv run python scripts/materialize_project.py --project-file projects/<project_id>/project.toml
+uv run python scripts/validate_canonical.py --project-file projects/<project_id>/project.toml
+uv run python src/main.py serve --project-file projects/<project_id>/project.toml
+```
+
+运行后默认入口：
 
 - App: `http://127.0.0.1:8000/`
 - Project Config API: `http://127.0.0.1:8000/project/config`

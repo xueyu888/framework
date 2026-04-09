@@ -1,0 +1,557 @@
+# 项目配置（Config 层唯一入口）
+#
+# 目标：
+# 1) 将 Chunk_Tagging framework 物化为可追溯的 Config/Code/Evidence 链路。
+# 2) 对重复的 `P*` 边界采用模块级 section：`communication/exact.Chunk_Tagging.lx_my.pn`。
+# 3) 用中文注释保留人与 AI 协作入口；Code 仍只消费 exact。
+#
+# 注意：
+# - framework/*.md 仍是作者源；本文件只实例化当前项目。
+# - generated/canonical.json 由物化流程生成，禁止手工改写 generated 目录。
+
+[project]
+project_id = "chunk_tagging_basic"
+runtime_scene = "chunk_tagging"
+display_name = "Chunk Tagging 基础样例"
+description = "围绕 Chunk_Tagging 框架的评分、系统判定与人工审核闭环配置。"
+version = "0.1.0"
+
+[framework]
+# 这里选择审核闭环 root module，并额外挂上记录结构模块；其余同 framework upstream 自动收敛。
+
+[[framework.modules]]
+role = "review_flow"
+framework_file = "framework/Chunk_Tagging/L3-M0-标注审核模块.md"
+
+[[framework.modules]]
+role = "chunk_tag_record"
+framework_file = "framework/Chunk_Tagging/L1-M2-文本-标签评分记录.md"
+
+# communication 负责人与 AI 的结构化沟通要求。
+# 对 Chunk_Tagging，由于多个模块重复使用 P1/P2...，这里按 module scope 分组讨论。
+[communication]
+
+[communication.Chunk_Tagging.l0_m0.p1]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l0_m0.p2]
+summary = "标签ID必须唯一"
+
+[communication.Chunk_Tagging.l0_m0.p3]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l0_m0.p4]
+summary = "中文"
+
+[communication.Chunk_Tagging.l0_m0.p5]
+summary = "不超过10字符"
+
+[communication.Chunk_Tagging.l0_m0.p6]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l0_m0.p7]
+summary = "不超过100字符"
+
+[communication.Chunk_Tagging.l0_m0.p8]
+summary = "列表类型"
+
+[communication.Chunk_Tagging.l0_m0.p9]
+summary = "列表中的每一项都必须是字符串"
+
+[communication.Chunk_Tagging.l0_m0.p10]
+summary = "列表类型"
+
+[communication.Chunk_Tagging.l0_m0.p11]
+summary = "列表中的每一项都必须是字符串"
+
+[communication.Chunk_Tagging.l0_m0.p12]
+summary = "列表类型"
+
+[communication.Chunk_Tagging.l0_m0.p13]
+summary = "列表中的每一项都必须是字符串"
+
+[communication.Chunk_Tagging.l0_m0.p14]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l0_m0.p15]
+summary = "领域ID必须为单个合法领域标识，并可关联到领域表中的主键"
+
+[communication.Chunk_Tagging.l1_m0.p1]
+summary = "输入文本块结构必须至少包含 `doc_id`、`chunk_id` 与 `content` 字段，并满足 `backend.L0.M0[R3]` 的组合规则"
+
+[communication.Chunk_Tagging.l1_m0.p2]
+summary = "单次输入的文本块数量为1"
+
+[communication.Chunk_Tagging.l1_m0.p3]
+summary = "输入标签定义必须满足 `L0.M0[R1]` 的组合规则"
+
+[communication.Chunk_Tagging.l1_m0.p4]
+summary = "单次输入的标签定义数量为 `1`"
+
+[communication.Chunk_Tagging.l1_m0.p5]
+summary = "输入大模型接口结构必须至少包含可执行评分调用所需的模型、提示词或调用入口字段"
+
+[communication.Chunk_Tagging.l1_m0.p6]
+summary = "输出评分结果必须落在 `0~1.0` 范围内"
+
+[communication.Chunk_Tagging.l1_m0.p7]
+summary = "输出结果必须包含与评分对应的理由说明，且理由类型为字符串"
+
+[communication.Chunk_Tagging.l1_m1.p1]
+summary = "输入查询条件必须为单个合法文档ID"
+
+[communication.Chunk_Tagging.l1_m1.p2]
+summary = "查询得到的文本块集合中的每个文本块都必须满足 `backend.L0.M0[R3]` 的组合规则"
+
+[communication.Chunk_Tagging.l1_m1.p3]
+summary = "查询得到的文档领域必须为单个合法领域标识"
+
+[communication.Chunk_Tagging.l1_m1.p4]
+summary = "根据领域查询得到的标签定义集合中的每个标签定义都必须满足 `L0.M0[R1]` 的组合规则"
+
+[communication.Chunk_Tagging.l1_m1.p5]
+summary = "查询得到的标注记录必须属于单个文档ID下的已有标注记录，且至少包含 `doc_id`、`chunk_id`、`tag_name`、`confidence`、`reason`、`review_status` 与 `enable_status` 字段"
+
+[communication.Chunk_Tagging.l1_m1.p6]
+summary = "单次查询的标注记录必须全部属于同一个文档ID"
+
+[communication.Chunk_Tagging.l1_m1.p7]
+summary = "写入数据库的标注记录必须至少包含 `doc_id`、`chunk_id`、`tag_name`、`confidence`、`reason` 和 `review_status` 字段"
+
+[communication.Chunk_Tagging.l1_m1.p8]
+summary = "单次写入的标注记录数量等于 `1`"
+
+[communication.Chunk_Tagging.l1_m1.p9]
+summary = "导出的人工审核数据必须至少包含 `doc_id`、`chunk_id`、`tag_name`、`confidence`、`reason`、`enable_status`、`review_status` 与对应文本块内容"
+
+[communication.Chunk_Tagging.l1_m1.p10]
+summary = "每条标注记录都必须能通过 `doc_id + chunk_id` 关联到唯一文本块内容，且该文本块内容必须满足 `backend.L0.M0[R3]` 的组合规则"
+
+[communication.Chunk_Tagging.l1_m1.p11]
+summary = "写回输入必须至少包含记录定位字段、`enable_status`、`review_status` 与 `review_source` 字段"
+
+[communication.Chunk_Tagging.l1_m1.p12]
+summary = "写回结果中的 `enable_status` 只能为 `启用`、`不启用` 或 `待人工审核`；`review_status` 只能为 `已审核` 或 `未审核`"
+
+[communication.Chunk_Tagging.l1_m1.p13]
+summary = "状态写回必须作用于 `enable_status`、`review_status` 和 `review_source` 字段"
+
+[communication.Chunk_Tagging.l1_m1.p14]
+summary = "单次状态写回必须作用于单个文档下的一条或多条已有标注记录"
+
+[communication.Chunk_Tagging.l1_m1.p15]
+summary = "数据库类型固定为 postgres"
+
+[communication.Chunk_Tagging.l1_m2.p1]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l1_m2.p2]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l1_m2.p3]
+summary = "原文档ID与文本块ID必须能联合定位到唯一文本块"
+
+[communication.Chunk_Tagging.l1_m2.p4]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l1_m2.p5]
+summary = "标签ID必须能唯一定位到对应标签"
+
+[communication.Chunk_Tagging.l1_m2.p6]
+summary = "数值类型"
+
+[communication.Chunk_Tagging.l1_m2.p7]
+summary = "匹配评分结果必须落在 `0~1.0` 之间"
+
+[communication.Chunk_Tagging.l1_m2.p8]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l1_m2.p9]
+summary = "审核状态值范围为 `未审核` 或 `已审核`"
+
+[communication.Chunk_Tagging.l1_m2.p10]
+summary = "字符串类型或空值"
+
+[communication.Chunk_Tagging.l1_m2.p11]
+summary = "审核来源值范围为 `system`、对应用户名或空值"
+
+[communication.Chunk_Tagging.l1_m2.p12]
+summary = "字符串类型"
+
+[communication.Chunk_Tagging.l1_m2.p13]
+summary = "启用状态值范围为 `启用`、`不启用` 或 `待人工审核`"
+
+[communication.Chunk_Tagging.l2_m0.p1]
+summary = "输入文档ID必须为单个合法文档标识"
+
+[communication.Chunk_Tagging.l2_m0.p2]
+summary = "单次输入的文档ID数量为 `1`"
+
+[communication.Chunk_Tagging.l2_m0.p3]
+summary = "输入数据库接口必须满足 `L1.M1[R2]` 的组合要求"
+
+[communication.Chunk_Tagging.l2_m0.p4]
+summary = "根据文档ID查询得到的文本块集合中的每个文本块都必须满足 `backend.L0.M0[R3]` 的组合规则"
+
+[communication.Chunk_Tagging.l2_m0.p5]
+summary = "当前文档对应的文本块数量必须大于等于 `1`"
+
+[communication.Chunk_Tagging.l2_m0.p6]
+summary = "根据文档领域查询得到的标签定义集合中的每个标签定义都必须满足 `L0.M0[R1]` 的组合规则"
+
+[communication.Chunk_Tagging.l2_m0.p7]
+summary = "当前文档领域对应的标签定义数量必须大于等于 `1`"
+
+[communication.Chunk_Tagging.l2_m0.p8]
+summary = "单次评分接口必须满足 `L1.M0[R1]` 的组合要求"
+
+[communication.Chunk_Tagging.l2_m0.p9]
+summary = "写入数据库的每条标注记录都必须补充 `review_status = 未审核`"
+
+[communication.Chunk_Tagging.l2_m0.p10]
+summary = "写入数据库的标注记录必须至少包含 `doc_id`、`chunk_id`、`tag_name`、`confidence`、`reason` 和 `review_status` 字段"
+
+[communication.Chunk_Tagging.l2_m1.p1]
+summary = "输入文档ID必须为单个合法文档标识"
+
+[communication.Chunk_Tagging.l2_m1.p2]
+summary = "单次输入的文档ID数量为 `1`"
+
+[communication.Chunk_Tagging.l2_m1.p3]
+summary = "阈值的范围在0.0到1.0"
+
+[communication.Chunk_Tagging.l2_m1.p4]
+summary = "float类型"
+
+[communication.Chunk_Tagging.l2_m1.p5]
+summary = "启动阈值必须大于不启动阈值"
+
+[communication.Chunk_Tagging.l2_m1.p6]
+summary = "输入数据库接口必须满足 `L1.M1[R3,R5]` 的组合要求"
+
+[communication.Chunk_Tagging.l2_m2.p1]
+summary = "输入文档ID必须为单个合法文档标识"
+
+[communication.Chunk_Tagging.l2_m2.p2]
+summary = "单次输入的文档ID数量为 `1`"
+
+[communication.Chunk_Tagging.l2_m2.p3]
+summary = "输入数据库接口必须满足 `L1.M1[R4,R5]` 的组合要求"
+
+[communication.Chunk_Tagging.l2_m2.p4]
+summary = "读取出的记录必须限定为该文档下 `enable_status = 待人工审核` 且 `review_status = 未审核` 的记录"
+
+[communication.Chunk_Tagging.l2_m2.p5]
+summary = "导出的人工审核数据必须至少包含 `doc_id`、`chunk_id`、`tag_name`、`confidence`、`reason`、`enable_status`、`review_status` 与对应文本块内容"
+
+[communication.Chunk_Tagging.l2_m2.p6]
+summary = "输入的人工确认结果必须至少包含记录定位字段、人工最终结论与审核来源字段"
+
+[communication.Chunk_Tagging.l2_m2.p7]
+summary = "人工最终结论只能为 `启用` 或 `不启用`，不得继续写回 `待人工审核`"
+
+[communication.Chunk_Tagging.l2_m2.p8]
+summary = "写回数据库后的记录必须更新 `enable_status`、`review_status` 和 `review_source` 字段，其中 `review_status = 已审核`"
+
+[communication.Chunk_Tagging.l3_m0.p1]
+summary = "流转入口必须为单个合法文档ID"
+
+[communication.Chunk_Tagging.l3_m0.p2]
+summary = "系统判定阶段必须输入合法的启用阈值与不启用阈值，且启用阈值必须大于不启用阈值"
+
+[communication.Chunk_Tagging.l3_m0.p3]
+summary = "完整流转必须按“评分 -> 系统判定 -> 人工审核”的顺序展开，不得跳过前序阶段直接进入后序阶段"
+
+[communication.Chunk_Tagging.l3_m0.p4]
+summary = "只有系统判定结果为 `待人工审核` 的记录才允许进入人工审核段"
+
+[communication.Chunk_Tagging.l3_m0.p5]
+summary = "人工审核只作用于 `enable_status = 待人工审核` 且 `review_status = 未审核` 的记录"
+
+[communication.Chunk_Tagging.l3_m0.p6]
+summary = "完整流转结束后，每条标注记录都必须落到合法的 `enable_status`、`review_status` 与 `review_source` 状态组合"
+
+# exact 负责 Code 层精确消费字段。
+# 这里使用 module scope 消除 Chunk_Tagging 内部重复 P* 的语义碰撞。
+[exact]
+
+[exact.Chunk_Tagging.l0_m0.p1]
+field_name = "tag_id"
+value_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p2]
+unique_scope = "global"
+primary_key = true
+
+[exact.Chunk_Tagging.l0_m0.p3]
+field_name = "tag_name"
+value_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p4]
+language = "zh-CN"
+
+[exact.Chunk_Tagging.l0_m0.p5]
+max_length = 10
+length_unit = "char"
+
+[exact.Chunk_Tagging.l0_m0.p6]
+field_name = "description"
+value_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p7]
+max_length = 100
+length_unit = "char"
+
+[exact.Chunk_Tagging.l0_m0.p8]
+field_name = "positive_signals"
+container_type = "list"
+
+[exact.Chunk_Tagging.l0_m0.p9]
+item_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p10]
+field_name = "negative_signals"
+container_type = "list"
+
+[exact.Chunk_Tagging.l0_m0.p11]
+item_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p12]
+field_name = "examples"
+container_type = "list"
+
+[exact.Chunk_Tagging.l0_m0.p13]
+item_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p14]
+field_name = "domain_id"
+value_type = "string"
+
+[exact.Chunk_Tagging.l0_m0.p15]
+foreign_key = "domains.domain_id"
+cardinality = "single"
+
+[exact.Chunk_Tagging.l1_m0.p1]
+required_fields = ["doc_id", "chunk_id", "content"]
+source_rule = "backend.L0.M0.R3"
+
+[exact.Chunk_Tagging.l1_m0.p2]
+input_count = 1
+
+[exact.Chunk_Tagging.l1_m0.p3]
+required_rule = "Chunk_Tagging.L0.M0.R1"
+
+[exact.Chunk_Tagging.l1_m0.p4]
+tag_definition_count = 1
+
+[exact.Chunk_Tagging.l1_m0.p5]
+interface_fields = ["provider", "model", "prompt_template", "invoke_entry"]
+
+[exact.Chunk_Tagging.l1_m0.p6]
+min_confidence = 0.0
+max_confidence = 1.0
+
+[exact.Chunk_Tagging.l1_m0.p7]
+reason_required = true
+reason_type = "string"
+
+[exact.Chunk_Tagging.l1_m1.p1]
+query_scope = "single_doc_id"
+
+[exact.Chunk_Tagging.l1_m1.p2]
+chunk_fields = ["doc_id", "chunk_id", "content"]
+
+[exact.Chunk_Tagging.l1_m1.p3]
+domain_result_cardinality = "single"
+value_type = "string"
+
+[exact.Chunk_Tagging.l1_m1.p4]
+required_rule = "Chunk_Tagging.L0.M0.R1"
+
+[exact.Chunk_Tagging.l1_m1.p5]
+record_fields = ["doc_id", "chunk_id", "tag_name", "confidence", "reason", "review_status", "enable_status"]
+
+[exact.Chunk_Tagging.l1_m1.p6]
+same_doc_only = true
+
+[exact.Chunk_Tagging.l1_m1.p7]
+insert_fields = ["doc_id", "chunk_id", "tag_name", "confidence", "reason", "review_status"]
+
+[exact.Chunk_Tagging.l1_m1.p8]
+batch_size = 1
+
+[exact.Chunk_Tagging.l1_m1.p9]
+manual_review_fields = ["doc_id", "chunk_id", "tag_name", "confidence", "reason", "enable_status", "review_status", "content"]
+
+[exact.Chunk_Tagging.l1_m1.p10]
+join_keys = ["doc_id", "chunk_id"]
+
+[exact.Chunk_Tagging.l1_m1.p11]
+status_fields = ["doc_id", "chunk_id", "tag_name", "enable_status", "review_status", "review_source"]
+
+[exact.Chunk_Tagging.l1_m1.p12]
+enable_status_values = ["启用", "不启用", "待人工审核"]
+review_status_values = ["已审核", "未审核"]
+
+[exact.Chunk_Tagging.l1_m1.p13]
+mutable_fields = ["enable_status", "review_status", "review_source"]
+
+[exact.Chunk_Tagging.l1_m1.p14]
+write_scope = "single_document_existing_records"
+
+[exact.Chunk_Tagging.l1_m1.p15]
+database_type = "postgres"
+
+[exact.Chunk_Tagging.l1_m2.p1]
+field_name = "doc_id"
+value_type = "string"
+
+[exact.Chunk_Tagging.l1_m2.p2]
+field_name = "chunk_id"
+value_type = "string"
+
+[exact.Chunk_Tagging.l1_m2.p3]
+locator_fields = ["doc_id", "chunk_id"]
+
+[exact.Chunk_Tagging.l1_m2.p4]
+field_name = "tag_id"
+value_type = "string"
+
+[exact.Chunk_Tagging.l1_m2.p5]
+tag_locator_unique = true
+
+[exact.Chunk_Tagging.l1_m2.p6]
+field_name = "confidence"
+value_type = "float"
+
+[exact.Chunk_Tagging.l1_m2.p7]
+min_confidence = 0.0
+max_confidence = 1.0
+
+[exact.Chunk_Tagging.l1_m2.p8]
+field_name = "review_status"
+value_type = "string"
+
+[exact.Chunk_Tagging.l1_m2.p9]
+allowed_values = ["未审核", "已审核"]
+
+[exact.Chunk_Tagging.l1_m2.p10]
+field_name = "review_source"
+nullable = true
+
+[exact.Chunk_Tagging.l1_m2.p11]
+allowed_values = ["system", "manual_user", ""]
+
+[exact.Chunk_Tagging.l1_m2.p12]
+field_name = "enable_status"
+value_type = "string"
+
+[exact.Chunk_Tagging.l1_m2.p13]
+allowed_values = ["启用", "不启用", "待人工审核"]
+
+[exact.Chunk_Tagging.l2_m0.p1]
+input_fields = ["doc_id"]
+input_count = 1
+
+[exact.Chunk_Tagging.l2_m0.p2]
+doc_id_count = 1
+
+[exact.Chunk_Tagging.l2_m0.p3]
+database_contract = "Chunk_Tagging.L1.M1.R2"
+
+[exact.Chunk_Tagging.l2_m0.p4]
+chunk_fields = ["doc_id", "chunk_id", "content"]
+
+[exact.Chunk_Tagging.l2_m0.p5]
+min_chunk_count = 1
+
+[exact.Chunk_Tagging.l2_m0.p6]
+tag_definition_rule = "Chunk_Tagging.L0.M0.R1"
+
+[exact.Chunk_Tagging.l2_m0.p7]
+min_tag_count = 1
+
+[exact.Chunk_Tagging.l2_m0.p8]
+scoring_contract = "Chunk_Tagging.L1.M0.R1"
+
+[exact.Chunk_Tagging.l2_m0.p9]
+default_review_status = "未审核"
+
+[exact.Chunk_Tagging.l2_m0.p10]
+insert_fields = ["doc_id", "chunk_id", "tag_name", "confidence", "reason", "review_status"]
+
+[exact.Chunk_Tagging.l2_m1.p1]
+input_fields = ["doc_id"]
+
+[exact.Chunk_Tagging.l2_m1.p2]
+enable_threshold = 0.8
+disable_threshold = 0.5
+
+[exact.Chunk_Tagging.l2_m1.p3]
+min_value = 0.0
+max_value = 1.0
+
+[exact.Chunk_Tagging.l2_m1.p4]
+numeric_type = "float"
+
+[exact.Chunk_Tagging.l2_m1.p5]
+enable_gt_disable = true
+
+[exact.Chunk_Tagging.l2_m1.p6]
+database_contract = "Chunk_Tagging.L1.M1.R3,R5"
+
+[exact.Chunk_Tagging.l2_m2.p1]
+input_fields = ["doc_id"]
+
+[exact.Chunk_Tagging.l2_m2.p2]
+input_count = 1
+
+[exact.Chunk_Tagging.l2_m2.p3]
+database_contract = "Chunk_Tagging.L1.M1.R4,R5"
+
+[exact.Chunk_Tagging.l2_m2.p4]
+pending_enable_status = "待人工审核"
+pending_review_status = "未审核"
+
+[exact.Chunk_Tagging.l2_m2.p5]
+export_fields = ["doc_id", "chunk_id", "tag_name", "confidence", "reason", "enable_status", "review_status", "content"]
+
+[exact.Chunk_Tagging.l2_m2.p6]
+confirmation_fields = ["doc_id", "chunk_id", "tag_name", "enable_status", "review_source"]
+
+[exact.Chunk_Tagging.l2_m2.p7]
+allowed_manual_results = ["启用", "不启用"]
+
+[exact.Chunk_Tagging.l2_m2.p8]
+write_back_fields = ["enable_status", "review_status", "review_source"]
+final_review_status = "已审核"
+
+[exact.Chunk_Tagging.l3_m0.p1]
+entry_fields = ["doc_id"]
+
+[exact.Chunk_Tagging.l3_m0.p2]
+threshold_fields = ["enable_threshold", "disable_threshold"]
+enable_gt_disable = true
+
+[exact.Chunk_Tagging.l3_m0.p3]
+flow_order = ["score", "system_enable", "manual_review"]
+
+[exact.Chunk_Tagging.l3_m0.p4]
+manual_handoff_enable_status = "待人工审核"
+
+[exact.Chunk_Tagging.l3_m0.p5]
+manual_scope_enable_status = "待人工审核"
+manual_scope_review_status = "未审核"
+
+[exact.Chunk_Tagging.l3_m0.p6]
+valid_state_triplets = [
+  "启用|已审核|system",
+  "不启用|已审核|system",
+  "启用|已审核|manual_user",
+  "不启用|已审核|manual_user",
+]
+
+[exact.evidence]
+
+[exact.evidence.artifacts]
+canonical_json = "canonical.json"
