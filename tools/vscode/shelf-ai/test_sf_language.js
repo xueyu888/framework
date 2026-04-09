@@ -5,6 +5,7 @@ const path = require("path");
 const sfGrammar = require("./sf_grammar");
 const sfCompletion = require("./sf_completion");
 const sfLint = require("./sf_lint");
+const sfTextMateGrammar = require("./sf_textmate_grammar");
 
 const extensionRoot = __dirname;
 
@@ -23,12 +24,13 @@ const VALID_SAMPLE = [
   "    Base:",
   "        set 变量集合 := \"记作 V；元素写作 x、y、z 等，表示可被赋值的命题变量。\"",
   "        set 常元集合 := \"元素写作 0、1；0 表示恒假，1 表示恒真。\"",
+  "        struct 表达式树 := \"记作 Tree；它表示由常元、变量与连接子递归生成的复合结构。\"",
   "        seq 变元序列 := \"记作 <x, y, z>；表示变量的一个有序排列。\"",
-  "        operator[2:1] And := \"记作 And(e, f)；二元连接子，表示 e 与 f 同时取 1。\"",
-  "        operator[2:1] Or := \"记作 Or(e, f)；二元连接子，表示 e 与 f 至少一侧取 1。\"",
-  "        operator[1:1] Not := \"记作 Not(e)；一元连接子，表示把 e 的 0/1 取值翻转。\"",
+  "        op[2:1] And := \"记作 And(e, f)；二元连接子，表示 e 与 f 同时取 1。\"",
+  "        op[2:1] Or := \"记作 Or(e, f)；二元连接子，表示 e 与 f 至少一侧取 1。\"",
+  "        op[1:1] Not := \"记作 Not(e)；一元连接子，表示把 e 的 0/1 取值翻转。\"",
   "        set 表达式集合 := \"记作 T；0、1 与变量属于 T；若 e、f ∈ T，则 And(e, f) 与 Or(e, f) 属于 T；若 e ∈ T，则 Not(e) 属于 T。\"",
-  "        operator[1:1] 赋值函数 := \"记作 α；它只对变量赋值，即 α: V -> {0, 1}。\"",
+  "        op[1:1] 赋值函数 := \"记作 α；它只对变量赋值，即 α: V -> {0, 1}。\"",
   "        set 赋值全体 := \"记作 Ω；它由全部赋值函数 α 构成，即 Ω = { α | α: V -> {0, 1} }。\"",
   "",
   "    Principles:",
@@ -48,6 +50,8 @@ const VALID_SAMPLE = [
   "        comb 定律结果分类 := \"对以上各候选分别应用 Principles.条件同一；凡成立条件完全一致者，归入同一结果类。\"",
   "",
   "    Boundary:",
+  "        in<enum> 输入变量 := Base.变量集合",
+  "        out<enum> 输出取值 := Boundary.变量取值边界",
   "        param<enum> 变量边界 := \"{x, y, z}\"",
   "        param<enum> 变量取值边界 := \"{0, 1}\"",
   "        param<range> 最大嵌套层数 := \"[0:2]\"",
@@ -82,8 +86,9 @@ const BASE_SEQ_AND_SPACES_SET_SAMPLE = [
   "",
   "    Base:",
   "        elem 字符 := \"记作 c，表示一个基本字符。\"",
+  "        struct 字符串对 := \"记作 Pair = <s, p>；表示待比较的一对字符串。\"",
   "        seq 字符串 := \"记作 x = <c1, c2, ..., cn>；其中每个 ci 都属于 Base.字符。\"",
-  "        operator[2:1] 精确匹配算子 := \"记作 M(s, p)；输入为一对 Base.字符串，输出为 Base.匹配状态。\"",
+  "        op[2:1] 精确匹配算子 := \"记作 M(s, p)；输入为一对 Base.字符串，输出为 Base.匹配状态。\"",
   "        set 匹配状态 := {yes, no}",
   "",
   "    Principles:",
@@ -126,11 +131,44 @@ function main() {
     (packageJson.files || []).includes("languages/**") || (packageJson.files || []).includes("languages/shelf-framework.json"),
     "package.json must package the .sf language configuration"
   );
+  assert(
+    (packageJson.files || []).includes("sf_textmate_grammar.js"),
+    "package.json must package the .sf textmate grammar generator"
+  );
+  assert(
+    (packageJson.activationEvents || []).includes(`onLanguage:${sfGrammar.SF_LANGUAGE_ID}`),
+    "package.json must activate the extension when a .sf file is opened"
+  );
+  const grammarContribution = (packageJson.contributes?.grammars || []).find(
+    (item) => item.language === sfGrammar.SF_LANGUAGE_ID
+  );
+  assert(grammarContribution, "package.json must contribute a TextMate grammar for the .sf language");
+  assert.strictEqual(
+    grammarContribution.scopeName,
+    "source.shelf-framework",
+    "the .sf TextMate grammar must use the shared shelf-framework scope"
+  );
+  assert.strictEqual(
+    grammarContribution.path,
+    "./languages/shelf-framework.tmLanguage.json",
+    "the .sf TextMate grammar must point at the generated tmLanguage file"
+  );
+  assert.strictEqual(
+    packageJson.contributes?.configurationDefaults?.["[shelf-framework]"]?.["editor.semanticHighlighting.enabled"],
+    true,
+    "package.json must enable semantic highlighting by default for the .sf language"
+  );
 
   assert(
     extensionSource.includes('language: sfGrammar.SF_LANGUAGE_ID')
       || extensionSource.includes(`language: "${sfGrammar.SF_LANGUAGE_ID}"`),
     "extension.js must register providers for the .sf language id"
+  );
+  const generatedTextMateGrammar = JSON.parse(readText("languages/shelf-framework.tmLanguage.json"));
+  assert.deepStrictEqual(
+    generatedTextMateGrammar,
+    sfTextMateGrammar.buildShelfFrameworkTextMateGrammar(),
+    "the checked-in .sf TextMate grammar must stay aligned with the shared grammar generator"
   );
 
   const issues = sfLint.lintShelfFrameworkFile({
@@ -156,7 +194,7 @@ function main() {
   assert.strictEqual(
     crossBlockKindIssues.length,
     0,
-    "Base.seq, Base.operator, Spaces.set, and open boundary subtypes should pass lint"
+    "Base.struct, Base.seq, Base.op, Spaces.set, and Boundary in/out should pass lint"
   );
 
   const invalidBoundarySample = VALID_SAMPLE.replace("param<range> 最大嵌套层数", "param 最大嵌套层数");
@@ -167,6 +205,15 @@ function main() {
   assert(
     invalidBoundaryIssues.some((issue) => issue.code === "SFL008"),
     "boundary declarations without subtype should be rejected"
+  );
+  const invalidBoundaryOpSample = VALID_SAMPLE.replace("in<enum> 输入变量 := Base.变量集合", "op[2:1] 输入边界 := \"<x> -> y\"");
+  const invalidBoundaryOpIssues = sfLint.lintShelfFrameworkFile({
+    filePath: "/tmp/demo.sf",
+    text: invalidBoundaryOpSample,
+  });
+  assert(
+    invalidBoundaryOpIssues.some((issue) => issue.code === "SFL008"),
+    "boundary declarations must reject op statements and keep only in/out/param forms"
   );
 
   const invalidModuleSample = VALID_SAMPLE.replace(/^MODULE/u, "module");
@@ -181,7 +228,9 @@ function main() {
 
   const tokens = sfGrammar.collectShelfFrameworkSemanticTokens(VALID_SAMPLE);
   assert(tokens.some((token) => token.tokenType === sfGrammar.SEMANTIC_TOKEN_TYPES.statementKeyword));
+  assert(tokens.some((token) => token.tokenType === sfGrammar.SEMANTIC_TOKEN_TYPES.declarationName));
   assert(tokens.some((token) => token.tokenType === sfGrammar.SEMANTIC_TOKEN_TYPES.reference));
+  assert(tokens.some((token) => token.tokenType === sfGrammar.SEMANTIC_TOKEN_TYPES.shape));
   assert(tokens.some((token) => token.tokenType === sfGrammar.SEMANTIC_TOKEN_TYPES.subtype));
 
   const fileEntries = sfCompletion.getShelfFrameworkCompletionEntries("", "", {
@@ -202,12 +251,16 @@ function main() {
     lineNumber: 4,
   });
   assert(
-    baseEntries.some((entry) => entry.label === "operator[2:1]"),
-    "base context must offer operator[2:1]"
+    baseEntries.some((entry) => entry.label === "op[2:1]"),
+    "base context must offer op[2:1]"
   );
   assert(
     baseEntries.some((entry) => entry.label === "set"),
     "base context must offer set"
+  );
+  assert(
+    baseEntries.some((entry) => entry.label === "struct"),
+    "base context must offer struct"
   );
   assert(
     baseEntries.some((entry) => entry.label === "seq"),
@@ -229,8 +282,20 @@ function main() {
 
   const boundaryEntries = sfCompletion.getShelfFrameworkCompletionEntries("        ", "", {
     documentText: VALID_SAMPLE,
-    lineNumber: 30,
+    lineNumber: 31,
   });
+  assert(
+    !boundaryEntries.some((entry) => entry.label === "op[2:1]"),
+    "boundary context must not offer op[2:1]"
+  );
+  assert(
+    boundaryEntries.some((entry) => entry.label === "in<subtype>"),
+    "boundary context must offer in<subtype>"
+  );
+  assert(
+    boundaryEntries.some((entry) => entry.label === "out<subtype>"),
+    "boundary context must offer out<subtype>"
+  );
   assert(
     boundaryEntries.some((entry) => entry.label === "param<enum>"),
     "boundary context must offer param<enum>"

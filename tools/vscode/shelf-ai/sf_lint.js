@@ -266,8 +266,8 @@ function lintShelfFrameworkFile({ filePath, text }) {
     sectionId: "base",
     code: "SFL005",
     definitionPathPrefix: "Base",
-    emptyMessage: "`Base` block 至少需要一个 `set/seq/elem/operator` 声明。",
-    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`seq 名称 := 值`、`elem 名称 := 值` 或 `operator[shape] 名称 := 值`。",
+    emptyMessage: "`Base` block 至少需要一个 `set/elem/struct/seq/op` 声明。",
+    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`elem 名称 := 值`、`struct 名称 := 值`、`seq 名称 := 值` 或 `op[shape] 名称 := 值`。",
   });
   validateFlatBlock({
     file,
@@ -305,7 +305,7 @@ function lintShelfFrameworkFile({ filePath, text }) {
     references,
     code: "SFL008",
     definitionPathPrefix: "Boundary",
-    emptyMessage: "`Boundary` block 至少需要一个 `param<...>` 声明。",
+    emptyMessage: "`Boundary` block 至少需要一个 `param/in/out` 声明。",
     invalidMessage: "`Boundary` 内只允许 `param<子类型> 名称 := 值`、`in<子类型> 名称 := 值` 或 `out<子类型> 名称 := 值`。",
   });
 

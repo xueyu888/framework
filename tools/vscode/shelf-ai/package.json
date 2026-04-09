@@ -32,6 +32,7 @@
     "sf_completion.js",
     "sf_grammar.js",
     "sf_lint.js",
+    "sf_textmate_grammar.js",
     "framework_navigation.js",
     "config_navigation.js",
     "correspondence_runtime.js",
@@ -48,10 +49,11 @@
     "Other"
   ],
   "scripts": {
+    "build:sf-grammar": "node scripts/build_sf_textmate_grammar.js",
     "build:webview": "node scripts/build_tree_webview.mjs",
     "check:webview-types": "tsc --pretty false --noEmit -p webview/tree/tsconfig.json",
     "test": "node test_guarding.js && node test_framework_navigation.js && node test_framework_lint.js && node test_config_navigation.js && node test_correspondence_runtime.js && node test_evidence_tree.js && node test_validation_runtime.js && node test_local_settings.js && node test_snippets.js && node test_sf_language.js && node test_tree_runtime_models.js && node test_tree_webview_bridge.js",
-    "vscode:prepublish": "npm run build:webview"
+    "vscode:prepublish": "npm run build:sf-grammar && npm run build:webview"
   },
   "devDependencies": {
     "@types/d3-selection": "^3.0.11",
@@ -65,6 +67,7 @@
   },
   "activationEvents": [
     "onStartupFinished",
+    "onLanguage:shelf-framework",
     "onView:shelf.sidebarHome",
     "onCommand:shelf.insertFrameworkModuleTemplate",
     "onCommand:shelf.installGitHooks",
@@ -91,6 +94,18 @@
         "configuration": "./languages/shelf-framework.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "shelf-framework",
+        "scopeName": "source.shelf-framework",
+        "path": "./languages/shelf-framework.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[shelf-framework]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
     "snippets": [
       {
         "language": "markdown",

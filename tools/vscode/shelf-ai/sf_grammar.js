@@ -32,6 +32,15 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     completionDetail: "插入 Base.elem 声明",
   },
   {
+    id: "struct",
+    sectionId: "base",
+    keyword: "struct",
+    pattern: /^struct\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "struct ${1:复合结构} := \"${2:结构说明}\"",
+    completionLabel: "struct",
+    completionDetail: "插入 Base.struct 声明",
+  },
+  {
     id: "seq-base",
     sectionId: "base",
     keyword: "seq",
@@ -41,13 +50,14 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     completionDetail: "插入 Base.seq 声明",
   },
   {
-    id: "operator",
+    id: "op-base",
     sectionId: "base",
-    keyword: "operator",
-    pattern: /^operator(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "operator[2:1] ${1:操作子} := \"${2:操作子说明}\"",
-    completionLabel: "operator[2:1]",
-    completionDetail: "插入 Base.operator 声明",
+    keyword: "op",
+    annotationKind: "shape",
+    pattern: /^op(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "op[2:1] ${1:操作子} := \"${2:操作子说明}\"",
+    completionLabel: "op[2:1]",
+    completionDetail: "插入 Base.op 声明",
   },
   {
     id: "sat",
@@ -98,6 +108,7 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     id: "in",
     sectionId: "boundary",
     keyword: "in",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^in<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "in<subtype> ${1:输入边界} := \"${2:输入约束}\"",
@@ -108,6 +119,7 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     id: "out",
     sectionId: "boundary",
     keyword: "out",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^out<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "out<subtype> ${1:输出边界} := \"${2:输出约束}\"",
@@ -118,6 +130,7 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     id: "param-enum",
     sectionId: "boundary",
     keyword: "param",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^param<enum>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "param<enum> ${1:参数边界} := \"${2:{a, b}}\"",
@@ -128,6 +141,7 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     id: "param-range",
     sectionId: "boundary",
     keyword: "param",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^param<range>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "param<range> ${1:范围边界} := \"${2:[0:2]}\"",
@@ -188,34 +202,38 @@ const SF_TEMPLATE_SNIPPET_BODY = Object.freeze([
   "    Base:",
   "        set ${4:集合基} := \"${5:集合说明}\"",
   "        elem ${6:结构基} := \"${7:结构说明}\"",
-  "        seq ${8:有序结构基} := \"${9:有序结构说明}\"",
-  "        operator[2:1] ${10:操作子} := \"${11:操作子说明}\"",
+  "        struct ${8:复合结构} := \"${9:结构说明}\"",
+  "        seq ${10:有序结构基} := \"${11:有序结构说明}\"",
+  "        op[2:1] ${12:操作子} := \"${13:操作子说明}\"",
   "",
   "    Principles:",
-  "        sat ${12:成立原则} := \"${13:说明成立条件}\"",
-  "        eq ${14:判同原则} := \"${15:说明何时归入同一结果类}\"",
+  "        sat ${14:成立原则} := \"${15:说明成立条件}\"",
+  "        eq ${16:判同原则} := \"${17:说明何时归入同一结果类}\"",
   "",
   "    Spaces:",
-  "        set ${16:结果集合} := \"${17:结果集合说明}\"",
-  "        comb ${18:组合分类} := \"${19:说明这一类组合如何得到}\"",
-  "        seq ${20:候选序列} := \"${21:说明这一组候选}\"",
+  "        set ${18:结果集合} := \"${19:结果集合说明}\"",
+  "        comb ${20:组合分类} := \"${21:说明这一类组合如何得到}\"",
+  "        seq ${22:候选序列} := \"${23:说明这一组候选}\"",
   "",
   "    Boundary:",
-  "        param<enum> ${22:变量边界} := \"${23:{x, y, z}}\"",
-  "        param<enum> ${24:变量取值边界} := \"${25:{0, 1}}\"",
-  "        param<range> ${26:最大嵌套层数} := \"${27:[0:2]}\"",
+  "        in<subtype> ${24:输入边界} := \"${25:输入约束}\"",
+  "        out<subtype> ${26:输出边界} := \"${27:输出约束}\"",
+  "        param<enum> ${28:变量边界} := \"${29:{x, y, z}}\"",
+  "        param<range> ${30:最大嵌套层数} := \"${31:[0:2]}\"",
 ]);
 
 const SF_REFERENCE_PATTERN = /\b(?:Base|Principles|Spaces|Boundary)\.[^,\s，。；;:：<>(){}[\]"']+/gu;
 const SF_CLAUSE_PATTERN = /$^/gu;
-const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|seq|operator|sat|eq|comb|in|out|param)(?<subtype>(?:\[[^\]]+\]|<[^>]+>))?\s/u;
+const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|struct|seq|op|sat|eq|comb|in|out|param)(?<annotation>(?:\[(?<shape>[^\]]+)\]|<(?<subtype>[^>]+)>))?(?<gap>\s+)(?<name>[^:=]+?)\s*:=\s/u;
 
 const SEMANTIC_TOKEN_TYPES = Object.freeze({
   block: "type",
   statementKeyword: "keyword",
   reference: "namespace",
   clauseKeyword: "keyword",
-  subtype: "type",
+  declarationName: "variable",
+  shape: "operator",
+  subtype: "typeParameter",
 });
 
 function splitLines(text) {
@@ -321,18 +339,31 @@ function collectShelfFrameworkSemanticTokens(text) {
     if (indent === 8) {
       const headMatch = trimmed.match(SF_DECLARATION_HEAD_PATTERN);
       if (headMatch?.groups?.keyword) {
+        const annotation = String(headMatch.groups.annotation || "");
+        const gap = String(headMatch.groups.gap || "");
+        const name = String(headMatch.groups.name || "");
         tokens.push({
           line: lineIndex,
           startChar: indent,
           length: headMatch.groups.keyword.length,
           tokenType: SEMANTIC_TOKEN_TYPES.statementKeyword,
         });
-        if (headMatch.groups.subtype) {
+        if (annotation) {
           tokens.push({
             line: lineIndex,
             startChar: indent + headMatch.groups.keyword.length,
-            length: headMatch.groups.subtype.length,
-            tokenType: SEMANTIC_TOKEN_TYPES.subtype,
+            length: annotation.length,
+            tokenType: headMatch.groups.shape
+              ? SEMANTIC_TOKEN_TYPES.shape
+              : SEMANTIC_TOKEN_TYPES.subtype,
+          });
+        }
+        if (name) {
+          tokens.push({
+            line: lineIndex,
+            startChar: indent + headMatch.groups.keyword.length + annotation.length + gap.length,
+            length: name.length,
+            tokenType: SEMANTIC_TOKEN_TYPES.declarationName,
           });
         }
       }
