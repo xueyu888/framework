@@ -107,12 +107,14 @@
   - `tools/vscode/shelf-ai/guarding.js`
   - `tools/vscode/shelf-ai/framework_navigation.js`
   - `tools/vscode/shelf-ai/framework_completion.js`
+  - `tools/vscode/shelf-ai/framework_grammar.js`
   - `tools/vscode/shelf-ai/evidence_tree.js`
   - `tools/vscode/shelf-ai/validation_runtime.js`
   - `tools/vscode/shelf-ai/package.json`
   - `tools/vscode/shelf-ai/README.md`
   - `tools/vscode/shelf-ai/release-notes/*`
   - 与插件直接耦合的 tree / validation / materialize 脚本
+- Shelf AI 的 framework 作者语法必须采用“单 grammar 真相源”实现：`lint`、`snippet/completion`、`highlight` 三者只能共同消费同一套 grammar 定义，禁止各自维护分叉规则。
 - `tools/vscode/shelf-ai/插件设计与实现契约.md` 第 13 章《仓库技术方案（当前讨论基线）》是本仓库技术方案讨论与落地的固定入口。
 - 以后凡是修改本仓库代码（不限语言、不限目录），提交前都必须审查第 13 章是否需要更新。
 - 若实现语义、模块边界、交互行为、依赖策略、验证门槛任一发生变化，必须同步更新第 13 章；未更新视为任务未完成。

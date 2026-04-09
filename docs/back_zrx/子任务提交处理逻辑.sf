@@ -1,0 +1,22 @@
+MODULE 任务初次完成判断器:TaskFisrt :
+    Goal := "当任务传入，判断任务是不是第一次完成"
+
+    Base:
+        set 是否完成过 := {finished, unfinished}
+        set 传入的任务完成状态 := {finish，unfinish}
+        set 是否第一次完成 := {yes, no}
+
+    Principles:
+        sat 任务完成判断 := ~A1 & A2
+
+    Spaces:
+        seq s := <  <finished, finish, no>,
+                    <finished, unfinish, no>,
+                    <unfinished, finish, yes>,
+                    <unfinished, unfinish, no>>
+
+    Boundary:
+        in<enum> Base.是否完成过 := {finished, unfinished}
+        in<enum> Base.传入的任务完成状态 := {finish，unfinish}
+        out<enum> Base.是否第一次完成 := {yes, no}
+

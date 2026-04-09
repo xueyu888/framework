@@ -334,7 +334,7 @@ class ChunkTaggingL1M0Module(ModuleContract):
 
 CHUNK_TAGGING_L1_M1_MODULE_ID = 'Chunk_Tagging.L1.M1'
 CHUNK_TAGGING_L1_M1_MODULE_KEY = 'Chunk_Tagging__L1__M1'
-CHUNK_TAGGING_L1_M1_BOUNDARY_FIELD_MAP = {'P1': 'p1', 'P2': 'p2', 'P3': 'p3', 'P4': 'p4', 'P5': 'p5', 'P6': 'p6', 'P7': 'p7', 'P8': 'p8', 'P9': 'p9', 'P10': 'p10', 'P11': 'p11', 'P12': 'p12', 'P13': 'p13', 'P14': 'p14'}
+CHUNK_TAGGING_L1_M1_BOUNDARY_FIELD_MAP = {'P1': 'p1', 'P2': 'p2', 'P3': 'p3', 'P4': 'p4', 'P5': 'p5', 'P6': 'p6', 'P7': 'p7', 'P8': 'p8', 'P9': 'p9', 'P10': 'p10', 'P11': 'p11', 'P12': 'p12', 'P13': 'p13', 'P14': 'p14', 'P15': 'p15'}
 
 @dataclass(frozen=True, slots=True)
 class ChunkTaggingL1M1StaticBoundaryParams(StaticBoundaryParamsContract):
@@ -352,6 +352,7 @@ class ChunkTaggingL1M1StaticBoundaryParams(StaticBoundaryParamsContract):
     p12: object = None
     p13: object = None
     p14: object = None
+    p15: object = None
 
     framework_module_id: ClassVar[str] = CHUNK_TAGGING_L1_M1_MODULE_ID
     module_key: ClassVar[str] = CHUNK_TAGGING_L1_M1_MODULE_KEY
@@ -373,6 +374,7 @@ class ChunkTaggingL1M1RuntimeBoundaryParams(RuntimeBoundaryParamsContract):
     p12: object = UNSET
     p13: object = UNSET
     p14: object = UNSET
+    p15: object = UNSET
 
     framework_module_id: ClassVar[str] = CHUNK_TAGGING_L1_M1_MODULE_ID
     module_key: ClassVar[str] = CHUNK_TAGGING_L1_M1_MODULE_KEY
@@ -1210,12 +1212,6 @@ class ChunkTaggingL3M0B3Base(ChunkTaggingBaseContract):
     owner_module_id: ClassVar[str] = CHUNK_TAGGING_L3_M0_MODULE_ID
     boundary_ids: ClassVar[tuple[str, ...]] = ('P1', 'P2', 'P3', 'P4', 'P5', 'P6')
 
-class ChunkTaggingL3M0B4Base(ChunkTaggingBaseContract):
-    framework_base_id: ClassVar[str] = 'Chunk_Tagging.L3.M0.B4'
-    framework_base_short_id: ClassVar[str] = 'B4'
-    owner_module_id: ClassVar[str] = CHUNK_TAGGING_L3_M0_MODULE_ID
-    boundary_ids: ClassVar[tuple[str, ...]] = ('P1', 'P2', 'P3', 'P4', 'P5', 'P6')
-
 class ChunkTaggingL3M0R1Rule(ChunkTaggingRuleContract):
     framework_rule_id: ClassVar[str] = 'Chunk_Tagging.L3.M0.R1'
     framework_rule_short_id: ClassVar[str] = 'R1'
@@ -1232,26 +1228,24 @@ class ChunkTaggingL3M0R2Rule(ChunkTaggingRuleContract):
     framework_rule_id: ClassVar[str] = 'Chunk_Tagging.L3.M0.R2'
     framework_rule_short_id: ClassVar[str] = 'R2'
     owner_module_id: ClassVar[str] = CHUNK_TAGGING_L3_M0_MODULE_ID
-    base_ids: ClassVar[tuple[str, ...]] = ('Chunk_Tagging.L3.M0.B1', 'Chunk_Tagging.L3.M0.B3', 'Chunk_Tagging.L3.M0.B4')
+    base_ids: ClassVar[tuple[str, ...]] = ('Chunk_Tagging.L3.M0.B2', 'Chunk_Tagging.L3.M0.B3')
     boundary_ids: ClassVar[tuple[str, ...]] = ('P1', 'P3', 'P4', 'P5', 'P6')
 
-    def __init__(self, base_b1: ChunkTaggingL3M0B1Base, base_b3: ChunkTaggingL3M0B3Base, base_b4: ChunkTaggingL3M0B4Base) -> None:
-        self._base_b1 = base_b1
+    def __init__(self, base_b2: ChunkTaggingL3M0B2Base, base_b3: ChunkTaggingL3M0B3Base) -> None:
+        self._base_b2 = base_b2
         self._base_b3 = base_b3
-        self._base_b4 = base_b4
 
 class ChunkTaggingL3M0R3Rule(ChunkTaggingRuleContract):
     framework_rule_id: ClassVar[str] = 'Chunk_Tagging.L3.M0.R3'
     framework_rule_short_id: ClassVar[str] = 'R3'
     owner_module_id: ClassVar[str] = CHUNK_TAGGING_L3_M0_MODULE_ID
-    base_ids: ClassVar[tuple[str, ...]] = ('Chunk_Tagging.L3.M0.B1', 'Chunk_Tagging.L3.M0.B2', 'Chunk_Tagging.L3.M0.B3', 'Chunk_Tagging.L3.M0.B4')
+    base_ids: ClassVar[tuple[str, ...]] = ('Chunk_Tagging.L3.M0.B1', 'Chunk_Tagging.L3.M0.B2', 'Chunk_Tagging.L3.M0.B3')
     boundary_ids: ClassVar[tuple[str, ...]] = ('P1', 'P2', 'P3', 'P4', 'P5', 'P6')
 
-    def __init__(self, base_b1: ChunkTaggingL3M0B1Base, base_b2: ChunkTaggingL3M0B2Base, base_b3: ChunkTaggingL3M0B3Base, base_b4: ChunkTaggingL3M0B4Base) -> None:
+    def __init__(self, base_b1: ChunkTaggingL3M0B1Base, base_b2: ChunkTaggingL3M0B2Base, base_b3: ChunkTaggingL3M0B3Base) -> None:
         self._base_b1 = base_b1
         self._base_b2 = base_b2
         self._base_b3 = base_b3
-        self._base_b4 = base_b4
 
 class ChunkTaggingL3M0Module(ModuleContract):
     framework_module_id: ClassVar[str] = CHUNK_TAGGING_L3_M0_MODULE_ID
@@ -1270,7 +1264,6 @@ class ChunkTaggingL3M0Module(ModuleContract):
             ChunkTaggingL3M0B1Base,
             ChunkTaggingL3M0B2Base,
             ChunkTaggingL3M0B3Base,
-            ChunkTaggingL3M0B4Base,
         ),
     )
     RuleTypes: ClassVar[tuple[type[RuleContract], ...]] = cast(
@@ -1295,10 +1288,9 @@ class ChunkTaggingL3M0Module(ModuleContract):
         self.b1 = ChunkTaggingL3M0B1Base(self)
         self.b2 = ChunkTaggingL3M0B2Base(self)
         self.b3 = ChunkTaggingL3M0B3Base(self)
-        self.b4 = ChunkTaggingL3M0B4Base(self)
         self.r1 = ChunkTaggingL3M0R1Rule(self.b1, self.b2, self.b3)
-        self.r2 = ChunkTaggingL3M0R2Rule(self.b1, self.b3, self.b4)
-        self.r3 = ChunkTaggingL3M0R3Rule(self.b1, self.b2, self.b3, self.b4)
+        self.r2 = ChunkTaggingL3M0R2Rule(self.b2, self.b3)
+        self.r3 = ChunkTaggingL3M0R3Rule(self.b1, self.b2, self.b3)
 
     @classmethod
     def from_payload(
@@ -1423,7 +1415,6 @@ __all__ = [
     'ChunkTaggingL3M0B1Base',
     'ChunkTaggingL3M0B2Base',
     'ChunkTaggingL3M0B3Base',
-    'ChunkTaggingL3M0B4Base',
     'ChunkTaggingL3M0R1Rule',
     'ChunkTaggingL3M0R2Rule',
     'ChunkTaggingL3M0R3Rule',

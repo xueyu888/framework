@@ -26,6 +26,7 @@
   "configuration.shelf.generatedEventSuppressionMs.description": "物化后对 generated 文件监听事件的抑制窗口（毫秒）。",
   "configuration.shelf.manualValidationRestartThresholdMs.description": "手动重触发时，Shelf 可重启卡住校验命令的已耗时阈值（毫秒）。",
   "configuration.shelf.validationDebounceMs.description": "Shelf 启动排队校验前的防抖延迟（毫秒）。",
+  "configuration.shelf.frameworkLintOnlyOnFrameworkChanges.description": "当 framework 受控 Markdown 变化时，只运行 framework lint，并跳过 canonical 校验、物化与类型检查自动化。",
   "configuration.shelf.frameworkLintEnabled.description": "启用 framework markdown 的实时语法诊断（与项目选择无关）。",
   "configuration.shelf.frameworkLintOnType.description": "在输入过程中实时执行 framework markdown 语法诊断。",
   "configuration.shelf.frameworkLintDebounceMs.description": "输入触发 framework markdown 语法诊断前的防抖延迟（毫秒）。",

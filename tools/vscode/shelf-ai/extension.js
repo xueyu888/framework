@@ -5,6 +5,10 @@ const frameworkNavigation = require("./framework_navigation");
 const configNavigation = require("./config_navigation");
 const frameworkCompletion = require("./framework_completion");
 const frameworkLint = require("./framework_lint");
+const frameworkGrammar = require("./framework_grammar");
+const sfCompletion = require("./sf_completion");
+const sfLint = require("./sf_lint");
+const sfGrammar = require("./sf_grammar");
 const evidenceTree = require("./evidence_tree");
 const correspondenceRuntime = require("./correspondence_runtime");
 const workspaceGuard = require("./guarding");
@@ -19,31 +23,38 @@ const DEFAULT_MATERIALIZE_COMMAND = "uv run python scripts/materialize_project.p
 const DEFAULT_PUBLISH_FRAMEWORK_DRAFT_COMMAND = "uv run python scripts/publish_framework_draft.py";
 const DEFAULT_TYPE_CHECK_COMMAND = "uv run mypy";
 const DEFAULT_INSTALL_GIT_HOOKS_COMMAND = "bash scripts/install_git_hooks.sh";
-const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze([
-  "@",
-  "#",
-  "-",
-  "`",
-  ".",
-  "C",
-  "P",
-  "B",
-  "R",
-  "N",
-  "c",
-  "p",
-  "b",
-  "r",
-  "n",
-]);
+const FRAMEWORK_COMPLETION_TRIGGER_CHARS = Object.freeze(
+  frameworkGrammar.getFrameworkCompletionTriggerChars()
+);
 const FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS = new Set(FRAMEWORK_COMPLETION_TRIGGER_CHARS);
+const SF_COMPLETION_TRIGGER_CHARS = Object.freeze(
+  sfGrammar.getShelfFrameworkCompletionTriggerChars()
+);
+const SF_AUTO_SUGGEST_TRIGGER_CHARS = new Set(SF_COMPLETION_TRIGGER_CHARS);
 const FRAMEWORK_REQUIRED_SECTION_HEADINGS = Object.freeze([
-  "## 0. 目标 (Goal)",
-  "## 1. 最小结构基（Minimal Structural Bases）",
-  "## 2. 基排列组合（Base Arrangement / Combination）",
-  "## 3. 边界定义（Boundary）",
-  "## 4. 能力声明（Capability Statement）",
+  ...frameworkGrammar.FRAMEWORK_REQUIRED_TOP_LEVEL_SECTIONS,
 ]);
+const FRAMEWORK_BOUNDARY_HEADING = frameworkGrammar.FRAMEWORK_SECTION_HEADINGS.boundary;
+const FRAMEWORK_BOUNDARY_SUBSECTION_HEADINGS = Object.freeze([
+  ...frameworkGrammar.FRAMEWORK_REQUIRED_BOUNDARY_SECTIONS,
+]);
+const FRAMEWORK_SEMANTIC_TOKEN_TYPES = Object.freeze([
+  frameworkGrammar.SEMANTIC_TOKEN_TYPES.heading,
+  frameworkGrammar.SEMANTIC_TOKEN_TYPES.statementKeyword,
+  frameworkGrammar.SEMANTIC_TOKEN_TYPES.reference,
+]);
+const FRAMEWORK_SEMANTIC_TOKENS_LEGEND = new vscode.SemanticTokensLegend(
+  FRAMEWORK_SEMANTIC_TOKEN_TYPES
+);
+const SF_SEMANTIC_TOKEN_TYPES = Object.freeze([
+  sfGrammar.SEMANTIC_TOKEN_TYPES.block,
+  sfGrammar.SEMANTIC_TOKEN_TYPES.statementKeyword,
+  sfGrammar.SEMANTIC_TOKEN_TYPES.reference,
+  sfGrammar.SEMANTIC_TOKEN_TYPES.subtype,
+]);
+const SF_SEMANTIC_TOKENS_LEGEND = new vscode.SemanticTokensLegend(
+  SF_SEMANTIC_TOKEN_TYPES
+);
 const FRAMEWORK_RULE_HINTS = {
   FW002: "@framework 必须无参数",
   FW003: "标题必须为 中文名:EnglishName",
@@ -67,18 +78,31 @@ const FRAMEWORK_RULE_HINTS = {
   FW060: "新符号必须通过输出结构声明后才可在规则中使用",
   FWL001: "标题必须为 中文名:EnglishName",
   FWL002: "@framework 必须为无参数单行",
-  FWL003: "必须包含 0~4 标准章节",
-  FWL004: "列表项必须使用 -",
-  FWL005: "能力声明条目格式必须合法（C*/N*）",
-  FWL006: "边界定义与 3.1/3.2 子章节格式必须合法",
-  FWL007: "最小结构基条目格式必须合法（B*）",
-  FWL008: "基排列组合条目格式必须合法（R* 单行）",
+  FWL003: "必须包含 Goal/Base/Combination/Boundary 标准章节",
+  FWL004: "keyword-first 语法不使用列表符",
+  FWL005: "Goal 章节语句格式必须合法",
+  FWL006: "Boundary 章节及 Input/Output/Parameter 子章节格式必须合法",
+  FWL007: "Base 章节语句格式必须合法",
+  FWL008: "Combination Principles/Space 语句格式必须合法",
   FWL010: "章节内必须至少存在一个可解析条目",
   FWL011: "规则引用的符号必须先在本模块中定义",
-  FWL013: "C/N/B/R 编号必须唯一",
-  FWL014: "每条 R* 必须声明输出能力或失效结论",
+  FWL013: "编号必须唯一",
+  FWL014: "规则结果声明必须完整",
   FWL015: "framework 正文不得出现旧写法（上游模块/project.toml/配置 section）",
-  FWL012: "标准二级标题内容与顺序必须合法"
+  FWL012: "标准二级标题内容与顺序必须合法",
+  FWL016: "带 @framework 的模块文件必须使用受控 module 路径",
+  FWL017: "framework 模块只允许引用同域受控 Markdown",
+  FWL018: "framework 受控目录中的附属 Markdown 必须被模块直接引用",
+  SFL001: ".sf 文件必须以 MODULE 中文模块名:EnglishName: 起始",
+  SFL002: ".sf 缩进必须使用 4 个空格，禁止 tab",
+  SFL003: ".sf 顶层块顺序必须固定为 Goal / Base / Principles / Spaces / Boundary",
+  SFL004: "Goal 必须使用单行 Goal := \"...\"",
+  SFL005: "Base block 语句格式必须合法",
+  SFL006: "Principles block 语句格式必须合法",
+  SFL007: "Spaces block 语句格式必须合法",
+  SFL008: "Boundary block 语句格式必须合法",
+  SFL009: ".sf 缩进层级必须固定为 4 空格步长",
+  SFL010: ".sf 中的引用必须指向当前文件内已定义符号"
 };
 
 function resetStatusToIdle(status) {
@@ -268,10 +292,12 @@ function createStatusController({
   };
 }
 
-function toWatchedTriggerUris(repoRoot, uris, isSuppressedGeneratedPath) {
+function toWatchedTriggerUris(repoRoot, uris, isSuppressedGeneratedPath, shouldIncludeRelPath = () => true) {
   return (uris || []).filter((uri) => {
     const relPath = workspaceGuard.normalizeRelPath(path.relative(repoRoot, uri.fsPath));
-    return workspaceGuard.isWatchedPath(relPath) && !isSuppressedGeneratedPath(relPath);
+    return workspaceGuard.isWatchedPath(relPath)
+      && !isSuppressedGeneratedPath(relPath)
+      && shouldIncludeRelPath(relPath);
   });
 }
 
@@ -288,9 +314,15 @@ function scheduleWatchedChangeValidation({
   uris,
   scheduleValidation,
   isSuppressedGeneratedPath,
+  shouldIncludeRelPath,
   source = "auto",
 }) {
-  const triggerUris = toWatchedTriggerUris(repoRoot, uris, isSuppressedGeneratedPath);
+  const triggerUris = toWatchedTriggerUris(
+    repoRoot,
+    uris,
+    isSuppressedGeneratedPath,
+    shouldIncludeRelPath
+  );
   if (!triggerUris.length) {
     return false;
   }
@@ -319,6 +351,7 @@ function createWorkspaceValidationWatchers({
   shouldRunValidationTrigger,
   scheduleValidation,
   isSuppressedGeneratedPath,
+  shouldIncludeRelPath,
 }) {
   const watcherPatterns = [
     ...workspaceGuard.WATCH_PREFIXES.map((prefix) => `${prefix}**`),
@@ -340,6 +373,7 @@ function createWorkspaceValidationWatchers({
         uris: [uri],
         scheduleValidation,
         isSuppressedGeneratedPath,
+        shouldIncludeRelPath,
       });
     };
 
@@ -411,6 +445,7 @@ function activate(context) {
     "shelf.frameworkAutoCompleteEnabled",
     "shelf.frameworkAutoTriggerSuggest",
     "shelf.frameworkQuickFixEnabled",
+    "shelf.frameworkLintOnlyOnFrameworkChanges",
   ];
 
   const clampInt = (value, minimum, maximum, fallback) => {
@@ -569,6 +604,13 @@ function activate(context) {
       autoCompleteEnabled: Boolean(config.get("frameworkAutoCompleteEnabled", true)),
       autoTriggerSuggest: Boolean(config.get("frameworkAutoTriggerSuggest", true)),
       quickFixEnabled: Boolean(config.get("frameworkQuickFixEnabled", true)),
+    };
+  };
+
+  const readValidationExecutionSettings = () => {
+    const config = getShelfConfig();
+    return {
+      frameworkLintOnlyOnFrameworkChanges: Boolean(config.get("frameworkLintOnlyOnFrameworkChanges", true)),
     };
   };
 
@@ -1458,6 +1500,34 @@ function activate(context) {
     await openTreeView("framework", { reveal: false });
   };
 
+  const classifyFrameworkLintDocument = (document) => {
+    if (!document || document.uri.scheme !== "file") {
+      return null;
+    }
+    if (document.languageId === sfGrammar.SF_LANGUAGE_ID || sfGrammar.isShelfFrameworkFilePath(document.uri.fsPath)) {
+      return {
+        sourceKind: "sf",
+        shouldLint: true,
+        isFrameworkModuleDocument: true,
+      };
+    }
+    if (document.languageId !== "markdown") {
+      return null;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) {
+      return null;
+    }
+    return {
+      sourceKind: "markdown",
+      ...frameworkLint.classifyFrameworkMarkdown({
+      repoRoot: folder.uri.fsPath,
+      filePath: document.uri.fsPath,
+      text: document.getText(),
+      }),
+    };
+  };
+
   const clearShelfDiagnosticsForUri = (uri) => {
     if (!uri || !uri.fsPath) {
       return;
@@ -1483,14 +1553,12 @@ function activate(context) {
   };
 
   const isFrameworkLintDocument = (document) => {
-    if (!document || document.languageId !== "markdown" || document.uri.scheme !== "file") {
-      return false;
-    }
-    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (!folder) {
-      return false;
-    }
-    return frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, folder.uri.fsPath);
+    return Boolean(classifyFrameworkLintDocument(document)?.shouldLint);
+  };
+
+  const isFrameworkAuthoringModuleDocument = (document) => {
+    const classification = classifyFrameworkLintDocument(document);
+    return Boolean(classification?.isFrameworkModuleDocument);
   };
 
   const clearFrameworkLintTimer = (key) => {
@@ -1509,27 +1577,49 @@ function activate(context) {
     clearFrameworkLintTimer(key);
 
     const lintSettings = readFrameworkLintSettings();
-    if (!lintSettings.enabled || !isFrameworkLintDocument(document)) {
-      frameworkLintDiagnostics.delete(document.uri);
+    const classification = classifyFrameworkLintDocument(document);
+    if (!lintSettings.enabled) {
+      frameworkLintDiagnostics.clear();
       return;
     }
-
     const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (!folder) {
+    if (!classification?.shouldLint) {
       frameworkLintDiagnostics.delete(document.uri);
       return;
     }
+    const repoRoot = folder?.uri.fsPath || path.dirname(document.uri.fsPath);
+    let lintIssues = [];
 
-    const lintIssues = frameworkLint
-      .lintFrameworkMarkdown({
-        repoRoot: folder.uri.fsPath,
+    if (classification.sourceKind === "sf") {
+      lintIssues = sfLint.lintShelfFrameworkFile({
         filePath: document.uri.fsPath,
         text: document.getText(),
-      })
-      .map((item) => normalizeIssue(item));
+      }).map((item) => normalizeIssue(item));
+    } else {
+      if (!folder) {
+        frameworkLintDiagnostics.delete(document.uri);
+        return;
+      }
+      lintIssues = frameworkLint.lintFrameworkWorkspace({
+        repoRoot: folder.uri.fsPath,
+        documentOverrides: {
+          [document.uri.fsPath]: document.getText(),
+        },
+      }).map((item) => normalizeIssue(item));
+
+      if (!classification.isControlledMarkdown && classification.hasFrameworkDirective) {
+        lintIssues.push(
+          ...frameworkLint.lintFrameworkMarkdown({
+            repoRoot: folder.uri.fsPath,
+            filePath: document.uri.fsPath,
+            text: document.getText(),
+          }).map((item) => normalizeIssue(item))
+        );
+      }
+    }
 
     if (!lintIssues.length) {
-      frameworkLintDiagnostics.delete(document.uri);
+      frameworkLintDiagnostics.clear();
       return;
     }
 
@@ -1537,7 +1627,7 @@ function activate(context) {
       passed: false,
       errors: lintIssues,
     };
-    applyDiagnostics(payload, frameworkLintDiagnostics, folder.uri.fsPath, document.uri, {
+    applyDiagnostics(payload, frameworkLintDiagnostics, repoRoot, document.uri, {
       clearExisting: false,
     });
   };
@@ -1626,32 +1716,9 @@ function activate(context) {
     let sectionId = "";
     for (let index = 0; index <= safeLine; index += 1) {
       const trimmed = document.lineAt(index).text.trim();
-      if (trimmed === "## 0. 目标 (Goal)") {
-        sectionId = "goal";
-        continue;
-      }
-      if (trimmed === "## 1. 最小结构基（Minimal Structural Bases）") {
-        sectionId = "base";
-        continue;
-      }
-      if (trimmed === "## 2. 基排列组合（Base Arrangement / Combination）") {
-        sectionId = "rule";
-        continue;
-      }
-      if (trimmed === "## 3. 边界定义（Boundary）") {
-        sectionId = "boundary";
-        continue;
-      }
-      if (trimmed === "### 3.1 接口定义（IO / Ports）") {
-        sectionId = "boundary-ports";
-        continue;
-      }
-      if (trimmed === "### 3.2 参数边界（Parameter Constraints）") {
-        sectionId = "boundary-parameters";
-        continue;
-      }
-      if (trimmed === "## 4. 能力声明（Capability Statement）") {
-        sectionId = "capability";
+      const detected = frameworkGrammar.detectFrameworkSectionIdFromHeading(trimmed);
+      if (detected) {
+        sectionId = detected;
       }
     }
     return sectionId;
@@ -1783,13 +1850,11 @@ function activate(context) {
       const missingHeadings = FRAMEWORK_REQUIRED_SECTION_HEADINGS.filter((heading) => !existingHeadings.has(heading));
       if (missingHeadings.length) {
         const headingBlocks = missingHeadings.map((heading) => {
-          if (heading === "## 3. 边界定义（Boundary）") {
+          if (heading === FRAMEWORK_BOUNDARY_HEADING) {
             return [
               heading,
               "",
-              "### 3.1 接口定义（IO / Ports）",
-              "",
-              "### 3.2 参数边界（Parameter Constraints）",
+              ...FRAMEWORK_BOUNDARY_SUBSECTION_HEADINGS,
             ].join("\n");
           }
           return heading;
@@ -1798,7 +1863,7 @@ function activate(context) {
           createFrameworkQuickFix(
             document,
             diagnostic,
-            "补全标准章节（0~4）",
+            "补全标准章节",
             (edit) => {
               const tailLine = Math.max(0, document.lineCount - 1);
               const tailPos = new vscode.Position(tailLine, document.lineAt(tailLine).text.length);
@@ -1816,19 +1881,33 @@ function activate(context) {
     }
 
     if (code === "FWL004") {
-      const marker = /^(\s*)\*/.exec(lineText);
+      const marker = /^(\s*)[-*]\s*/u.exec(lineText);
       if (marker) {
         quickFixes.push(
           createFrameworkQuickFix(
             document,
             diagnostic,
-            "将 `*` 列表改为 `-`",
+            "改为 keyword-first 语句模板",
             (edit) => {
-              const column = marker[1].length;
+              const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
+              let template = "goal GoalName := 本模块目标说明";
+              if (sectionId === "base") {
+                template = "base BaseName := 一句定义或 Lx.My::Base.Name";
+              } else if (sectionId === "combination-principles") {
+                template = "cp.form PrincipleName on base.Name / cs.Name / form := 什么能组成什么";
+              } else if (sectionId === "combination-space") {
+                template = "cs.CombinationName := base.Name / cs.Name / ... by cp.form.Name, cp.sat.Name";
+              } else if (sectionId === "boundary-input") {
+                template = "bd.in InputName := payload(...), cardinality(...), to(base.Name / cs.Name)";
+              } else if (sectionId === "boundary-output") {
+                template = "bd.out OutputName := payload(...), cardinality(...), from(cs.Name)";
+              } else if (sectionId === "boundary-parameter") {
+                template = "bd.param ParameterName := domain(...), affects(cs.Name / bd.in.Name / bd.out.Name)";
+              }
               edit.replace(
                 document.uri,
-                new vscode.Range(lineIndex, column, lineIndex, column + 1),
-                "-"
+                lineRange,
+                `${template}\n`
               );
               return true;
             }
@@ -1838,25 +1917,16 @@ function activate(context) {
     }
 
     if (code === "FWL005") {
-      const normalizedLineText = String(lineText || "");
-      const preferNonResponsibility = /`N\d*(?:\.\d+)?`/.test(normalizedLineText)
-        || normalizedLineText.includes("非职责");
-      const symbol = preferNonResponsibility ? "N" : "C";
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, symbol)
-        || nextFrameworkSymbolNumber(documentText, symbol);
-      const replacement = preferNonResponsibility
-        ? `- \`N${inferred}\` 非职责声明：待补充非职责范围。\n`
-        : `- \`C${inferred}\` 能力名：待补充结构能力说明。\n`;
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          `替换为标准 ${symbol} 条目`,
+          "替换为标准 Goal 语句",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              replacement
+              "goal GoalName := 本模块目标说明\n"
             );
             return true;
           }
@@ -1866,16 +1936,17 @@ function activate(context) {
 
     if (code === "FWL006") {
       const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "P")
-        || nextFrameworkSymbolNumber(documentText, "P");
-      const replacement = sectionId === "boundary-ports"
-        ? "- `PORT_IN`：运行时输入接口，待补充接口说明。\n"
-        : `- \`P${inferred}\` 参数名：待定义参数约束。\n`;
+      let replacement = "bd.in InputName := payload(...), cardinality(...), to(base.Name / cs.Name)\n";
+      if (sectionId === "boundary-output") {
+        replacement = "bd.out OutputName := payload(...), cardinality(...), from(cs.Name)\n";
+      } else if (sectionId === "boundary-parameter") {
+        replacement = "bd.param ParameterName := domain(...), affects(cs.Name / bd.in.Name / bd.out.Name)\n";
+      }
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          sectionId === "boundary-ports" ? "替换为标准接口条目" : "替换为标准参数条目",
+          "替换为标准边界语句",
           (edit) => {
             edit.replace(
               document.uri,
@@ -1889,18 +1960,16 @@ function activate(context) {
     }
 
     if (code === "FWL007") {
-      const inferred = inferFrameworkSymbolNumberFromLine(lineText, "B")
-        || nextFrameworkSymbolNumber(documentText, "B");
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准 B 条目",
+          "替换为标准 Base 语句",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`B${inferred}\` 结构基名：待定义结构说明。\n`
+              "base BaseName := 一句定义或 Lx.My::Base.Name\n"
             );
             return true;
           }
@@ -1909,19 +1978,20 @@ function activate(context) {
     }
 
     if (code === "FWL008") {
-      const inferredRuleNumber = inferFrameworkSymbolNumberFromLine(lineText, "R")
-        || inferNearestRuleNumber(document, lineIndex)
-        || nextFrameworkSymbolNumber(documentText, "R");
+      const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
+      const replacement = sectionId === "combination-space"
+        ? "cs.CombinationName := base.Name / cs.Name / ... by cp.form.Name, cp.sat.Name, cp.id.Name, cp.norm.Name\n"
+        : "cp.form PrincipleName on base.Name / cs.Name / form := 什么能组成什么\n";
       quickFixes.push(
         createFrameworkQuickFix(
           document,
           diagnostic,
-          "替换为标准 R 条目",
+          "替换为标准组合语句",
           (edit) => {
             edit.replace(
               document.uri,
               lineRange,
-              `- \`R${inferredRuleNumber}\` \`规则名\`：由 \`{B1, B2}\` 形成 \`结果\`，导出 \`C1\`。\n`
+              replacement
             );
             return true;
           }
@@ -1933,18 +2003,19 @@ function activate(context) {
       const sectionId = detectFrameworkSectionAtLine(document, lineIndex);
       let template = "";
       if (sectionId === "goal") {
-        template = "- 目标说明。";
+        template = "goal GoalName := 本模块目标说明";
       } else if (sectionId === "base") {
-        template = `- \`B${nextFrameworkSymbolNumber(documentText, "B")}\` 结构基名：待定义结构说明。`;
-      } else if (sectionId === "rule") {
-        const inferredRuleNumber = nextFrameworkSymbolNumber(documentText, "R");
-        template = `- \`R${inferredRuleNumber}\` \`规则名\`：由 \`{B1, B2}\` 形成 \`结果\`，导出 \`C1\`。`;
-      } else if (sectionId === "boundary-ports") {
-        template = "- `PORT_IN`：运行时输入接口，待补充接口说明。";
-      } else if (sectionId === "boundary" || sectionId === "boundary-parameters") {
-        template = `- \`P${nextFrameworkSymbolNumber(documentText, "P")}\` 参数名：待定义参数约束。`;
-      } else if (sectionId === "capability") {
-        template = `- \`C${nextFrameworkSymbolNumber(documentText, "C")}\` 能力名：待补充结构能力说明。`;
+        template = "base BaseName := 一句定义或 Lx.My::Base.Name";
+      } else if (sectionId === "combination-principles") {
+        template = "cp.form PrincipleName on base.Name / cs.Name / form := 什么能组成什么";
+      } else if (sectionId === "combination-space") {
+        template = "cs.CombinationName := base.Name / cs.Name / ... by cp.form.Name, cp.sat.Name, cp.id.Name, cp.norm.Name";
+      } else if (sectionId === "boundary-input") {
+        template = "bd.in InputName := payload(...), cardinality(...), to(base.Name / cs.Name)";
+      } else if (sectionId === "boundary-output") {
+        template = "bd.out OutputName := payload(...), cardinality(...), from(cs.Name)";
+      } else if (sectionId === "boundary-parameter") {
+        template = "bd.param ParameterName := domain(...), affects(cs.Name / bd.in.Name / bd.out.Name)";
       }
       if (template) {
         quickFixes.push(
@@ -1983,7 +2054,11 @@ function activate(context) {
   };
 
   const maybeAutoTriggerFrameworkSuggest = (event) => {
-    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+    if (!event || !event.document) {
+      return;
+    }
+    const classification = classifyFrameworkLintDocument(event.document);
+    if (!classification?.isFrameworkModuleDocument) {
       return;
     }
     const lintSettings = readFrameworkLintSettings();
@@ -1997,7 +2072,10 @@ function activate(context) {
     if (!change || typeof change.text !== "string" || change.text.length !== 1 || change.rangeLength !== 0) {
       return;
     }
-    if (!FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS.has(change.text)) {
+    const triggerChars = classification.sourceKind === "sf"
+      ? SF_AUTO_SUGGEST_TRIGGER_CHARS
+      : FRAMEWORK_AUTO_SUGGEST_TRIGGER_CHARS;
+    if (!triggerChars.has(change.text)) {
       return;
     }
     const activeEditor = vscode.window.activeTextEditor;
@@ -2008,7 +2086,11 @@ function activate(context) {
   };
 
   const maybeAutoExpandFrameworkDashEntry = (event) => {
-    if (!event || !event.document || !isFrameworkLintDocument(event.document)) {
+    if (!event || !event.document || !isFrameworkAuthoringModuleDocument(event.document)) {
+      return false;
+    }
+    const classification = classifyFrameworkLintDocument(event.document);
+    if (classification?.sourceKind !== "markdown") {
       return false;
     }
     const lintSettings = readFrameworkLintSettings();
@@ -2024,11 +2106,6 @@ function activate(context) {
     }
     const activeEditor = vscode.window.activeTextEditor;
     if (!activeEditor || activeEditor.document.uri.toString() !== event.document.uri.toString()) {
-      return false;
-    }
-    const folder = vscode.workspace.getWorkspaceFolder(event.document.uri);
-    const repoRoot = folder?.uri.fsPath || "";
-    if (!repoRoot || !frameworkNavigation.isFrameworkMarkdownFile(event.document.uri.fsPath, repoRoot)) {
       return false;
     }
     const cursorPosition = new vscode.Position(change.range.start.line, change.range.start.character + 1);
@@ -2719,6 +2796,62 @@ function activate(context) {
     }
   );
 
+  const frameworkHighlightDisposable = vscode.languages.registerDocumentSemanticTokensProvider(
+    { language: "markdown", scheme: "file" },
+    {
+      provideDocumentSemanticTokens(document) {
+        if (!isFrameworkLintDocument(document)) {
+          return null;
+        }
+        const tokens = frameworkGrammar.collectFrameworkSemanticTokens(document.getText());
+        const builder = new vscode.SemanticTokensBuilder(FRAMEWORK_SEMANTIC_TOKENS_LEGEND);
+        for (const token of tokens) {
+          const tokenTypeIndex = FRAMEWORK_SEMANTIC_TOKEN_TYPES.indexOf(token.tokenType);
+          if (tokenTypeIndex < 0) {
+            continue;
+          }
+          builder.push(
+            token.line,
+            token.startChar,
+            token.length,
+            tokenTypeIndex,
+            0
+          );
+        }
+        return builder.build();
+      },
+    },
+    FRAMEWORK_SEMANTIC_TOKENS_LEGEND
+  );
+
+  const sfHighlightDisposable = vscode.languages.registerDocumentSemanticTokensProvider(
+    { language: sfGrammar.SF_LANGUAGE_ID, scheme: "file" },
+    {
+      provideDocumentSemanticTokens(document) {
+        if (!document || document.uri.scheme !== "file") {
+          return null;
+        }
+        const tokens = sfGrammar.collectShelfFrameworkSemanticTokens(document.getText());
+        const builder = new vscode.SemanticTokensBuilder(SF_SEMANTIC_TOKENS_LEGEND);
+        for (const token of tokens) {
+          const tokenTypeIndex = SF_SEMANTIC_TOKEN_TYPES.indexOf(token.tokenType);
+          if (tokenTypeIndex < 0) {
+            continue;
+          }
+          builder.push(
+            token.line,
+            token.startChar,
+            token.length,
+            tokenTypeIndex,
+            0
+          );
+        }
+        return builder.build();
+      },
+    },
+    SF_SEMANTIC_TOKENS_LEGEND
+  );
+
   const frameworkCompletionDisposable = vscode.languages.registerCompletionItemProvider(
     { language: "markdown", scheme: "file" },
     {
@@ -2728,10 +2861,7 @@ function activate(context) {
           return undefined;
         }
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-        const repoRoot = folder?.uri.fsPath || "";
-        const isFrameworkFile = repoRoot
-          ? frameworkNavigation.isFrameworkMarkdownFile(document.uri.fsPath, repoRoot)
-          : false;
+        const isFrameworkFile = isFrameworkAuthoringModuleDocument(document);
         const lineText = document.lineAt(position.line).text;
         const linePrefix = lineText.slice(0, position.character);
         const wordRange = document.getWordRangeAtPosition(position, /[@A-Za-z_][A-Za-z0-9_.-]*/);
@@ -2768,6 +2898,49 @@ function activate(context) {
       }
     },
     ...FRAMEWORK_COMPLETION_TRIGGER_CHARS
+  );
+
+  const sfCompletionDisposable = vscode.languages.registerCompletionItemProvider(
+    { language: sfGrammar.SF_LANGUAGE_ID, scheme: "file" },
+    {
+      provideCompletionItems(document, position) {
+        const lintSettings = readFrameworkLintSettings();
+        if (!lintSettings.autoCompleteEnabled) {
+          return undefined;
+        }
+        const lineText = document.lineAt(position.line).text;
+        const linePrefix = lineText.slice(0, position.character);
+        const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_.<>-]*/u);
+        const wordPrefix = wordRange
+          ? document.getText(new vscode.Range(wordRange.start, position))
+          : "";
+        const entries = sfCompletion.getShelfFrameworkCompletionEntries(
+          linePrefix,
+          wordPrefix,
+          {
+            documentText: document.getText(),
+            lineNumber: position.line,
+          }
+        );
+        if (!entries.length) {
+          return undefined;
+        }
+        return entries.map((entry, index) => {
+          const item = new vscode.CompletionItem(
+            entry.label,
+            vscode.CompletionItemKind.Snippet
+          );
+          item.detail = entry.detail;
+          item.documentation = new vscode.MarkdownString(entry.documentation);
+          item.insertText = new vscode.SnippetString(entry.insertText);
+          item.insertTextFormat = vscode.InsertTextFormat.Snippet;
+          item.sortText = String(index).padStart(3, "0");
+          item.filterText = entry.label;
+          return item;
+        });
+      }
+    },
+    ...SF_COMPLETION_TRIGGER_CHARS
   );
 
   const frameworkLintQuickFixDisposable = vscode.languages.registerCodeActionsProvider(
@@ -3078,12 +3251,17 @@ function activate(context) {
     if (!workspaceGuard.isWatchedPath(rel) || isSuppressedGeneratedPath(rel)) {
       return;
     }
-    const isFrameworkDoc = frameworkNavigation.isFrameworkMarkdownFile(doc.uri.fsPath, folder.uri.fsPath);
+    const isFrameworkDoc = isFrameworkLintDocument(doc);
     const config = getShelfConfig();
+    const validationExecutionSettings = readValidationExecutionSettings();
 
     dirtyWatchedFiles.delete(doc.uri.fsPath);
     if (config.get("enableOnSave") && shouldRunValidationTrigger("save")) {
-      if (isFrameworkDoc) {
+      if (isFrameworkDoc && validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges) {
+        lastValidationPassed = null;
+        refreshStatusFromCurrentState();
+        refreshSidebarHome();
+      } else if (isFrameworkDoc) {
         await runValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
       } else {
         scheduleValidation({ mode: "change", triggerUris: [doc.uri], notifyOnFail: false, source: "save" });
@@ -3144,6 +3322,11 @@ function activate(context) {
       uris: event.files,
       scheduleValidation,
       isSuppressedGeneratedPath,
+      shouldIncludeRelPath: (relPath) => {
+        const validationExecutionSettings = readValidationExecutionSettings();
+        return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+          || !frameworkLint.isControlledFrameworkPath(relPath);
+      },
     });
   });
 
@@ -3160,6 +3343,11 @@ function activate(context) {
       uris: event.files,
       scheduleValidation,
       isSuppressedGeneratedPath,
+      shouldIncludeRelPath: (relPath) => {
+        const validationExecutionSettings = readValidationExecutionSettings();
+        return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+          || !frameworkLint.isControlledFrameworkPath(relPath);
+      },
     });
   });
 
@@ -3176,6 +3364,11 @@ function activate(context) {
       uris: flattenRenameEventUris(event.files),
       scheduleValidation,
       isSuppressedGeneratedPath,
+      shouldIncludeRelPath: (relPath) => {
+        const validationExecutionSettings = readValidationExecutionSettings();
+        return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+          || !frameworkLint.isControlledFrameworkPath(relPath);
+      },
     });
   });
 
@@ -3196,6 +3389,11 @@ function activate(context) {
         shouldRunValidationTrigger,
         scheduleValidation,
         isSuppressedGeneratedPath,
+        shouldIncludeRelPath: (relPath) => {
+          const validationExecutionSettings = readValidationExecutionSettings();
+          return !validationExecutionSettings.frameworkLintOnlyOnFrameworkChanges
+            || !frameworkLint.isControlledFrameworkPath(relPath);
+        },
       })
     );
 
@@ -3225,7 +3423,10 @@ function activate(context) {
     configToCodeDefinitionDisposable,
     frameworkHoverDisposable,
     frameworkReferenceDisposable,
+    frameworkHighlightDisposable,
+    sfHighlightDisposable,
     frameworkCompletionDisposable,
+    sfCompletionDisposable,
     frameworkLintQuickFixDisposable,
     insertFrameworkTemplateDisposable,
     validateNowDisposable,

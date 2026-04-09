@@ -2,7 +2,7 @@
   "name": "shelf-ai",
   "displayName": "Shelf AI",
   "description": "Shelf AI: canonical-first navigation for the Framework -> Config -> Code -> Evidence chain.",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "publisher": "rdshr",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
@@ -27,12 +27,17 @@
     "guarding.js",
     "evidence_tree.js",
     "framework_completion.js",
+    "framework_grammar.js",
     "framework_lint.js",
+    "sf_completion.js",
+    "sf_grammar.js",
+    "sf_lint.js",
     "framework_navigation.js",
     "config_navigation.js",
     "correspondence_runtime.js",
     "validation_runtime.js",
     "local_settings.js",
+    "languages/**",
     "media/**",
     "snippets/**",
     "package.nls.json",
@@ -45,7 +50,7 @@
   "scripts": {
     "build:webview": "node scripts/build_tree_webview.mjs",
     "check:webview-types": "tsc --pretty false --noEmit -p webview/tree/tsconfig.json",
-    "test": "node test_guarding.js && node test_framework_navigation.js && node test_framework_lint.js && node test_config_navigation.js && node test_correspondence_runtime.js && node test_evidence_tree.js && node test_validation_runtime.js && node test_local_settings.js && node test_snippets.js && node test_tree_runtime_models.js && node test_tree_webview_bridge.js",
+    "test": "node test_guarding.js && node test_framework_navigation.js && node test_framework_lint.js && node test_config_navigation.js && node test_correspondence_runtime.js && node test_evidence_tree.js && node test_validation_runtime.js && node test_local_settings.js && node test_snippets.js && node test_sf_language.js && node test_tree_runtime_models.js && node test_tree_webview_bridge.js",
     "vscode:prepublish": "npm run build:webview"
   },
   "devDependencies": {
@@ -73,6 +78,19 @@
   ],
   "main": "./extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "shelf-framework",
+        "aliases": [
+          "Shelf Framework",
+          "shelf-framework"
+        ],
+        "extensions": [
+          ".sf"
+        ],
+        "configuration": "./languages/shelf-framework.json"
+      }
+    ],
     "snippets": [
       {
         "language": "markdown",
@@ -351,6 +369,11 @@
           "minimum": 0,
           "maximum": 5000,
           "description": "%configuration.shelf.validationDebounceMs.description%"
+        },
+        "shelf.frameworkLintOnlyOnFrameworkChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.shelf.frameworkLintOnlyOnFrameworkChanges.description%"
         },
         "shelf.frameworkLintEnabled": {
           "type": "boolean",

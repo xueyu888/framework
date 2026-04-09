@@ -1,61 +1,72 @@
 {
   "@framework Module Template": {
     "prefix": "@framework",
-    "description": "Insert neutral framework module template.",
+    "description": "Insert keyword-first framework module template.",
     "body": [
       "# ${1:中文模块名}:${2:EnglishName}",
       "",
       "@framework",
       "",
-      "## 0. 目标 (Goal)",
+      "## Goal",
       "",
-      "- 本模块目标：${3:待补充目标说明}。",
+      "goal ${3:GoalName} := ${4:本模块的目标是什么}",
       "",
-      "## 1. 最小结构基（Minimal Structural Bases）",
+      "## Base",
       "",
-      "- `B1` ${4:结构基一}：${5:待定义结构说明}。",
-      "- `B2` ${6:结构基二}：${7:待定义结构说明}。",
+      "base ${5:BaseName} := ${6:一句定义或 Lx.My::Base.Name}",
       "",
-      "## 2. 基排列组合（Base Arrangement / Combination）",
+      "## Combination Principles",
       "",
-      "- `R1` `${8:规则名}`：由 `{B1, B2}` 形成 `${9:结果}`，导出 `C1`。",
+      "cp.form ${7:PrincipleName} on ${8:base.Name / cs.Name / form} := ${9:什么能组成什么}",
+      "cp.sat ${10:PrincipleName} on ${11:base.Name / cs.Name / form} := ${12:什么条件下成立}",
+      "cp.id ${13:PrincipleName} on ${14:base.Name / cs.Name / form} := ${15:什么算同一个组合}",
+      "cp.norm ${16:PrincipleName} on ${17:base.Name / cs.Name / form} := ${18:同一个组合的标准写法}",
       "",
-      "## 3. 边界定义（Boundary）",
+      "## Combination Space",
       "",
-      "### 3.1 接口定义（IO / Ports）",
+      "cs.${19:CombinationName} := ${20:base.Name / cs.Name / ...} by ${21:cp.form.Name, cp.sat.Name, cp.id.Name, cp.norm.Name}",
       "",
-      "- `PORT_IN`：运行时输入接口，${10:待补充输入接口说明}。",
-      "- `PORT_OUT`：运行时输出接口，${11:待补充输出接口说明}。",
+      "## Boundary",
       "",
-      "### 3.2 参数边界（Parameter Constraints）",
+      "### Input",
       "",
-      "- `P1` ${12:参数一}：${13:待定义参数约束}。",
+      "bd.in ${22:InputName} := payload(${23:...}), cardinality(${24:...}), to(${25:base.Name / cs.Name})",
       "",
-      "## 4. 能力声明（Capability Statement）",
+      "### Output",
       "",
-      "- `C1` ${14:能力一}：${15:待补充能力说明}。",
-      "- `N1` 非职责声明：${16:待补充非职责范围}。"
+      "bd.out ${26:OutputName} := payload(${27:...}), cardinality(${28:...}), from(${29:cs.Name})",
+      "",
+      "### Parameter",
+      "",
+      "bd.param ${30:ParameterName} := domain(${31:...}), affects(${32:cp.form.Name / cp.sat.Name / cp.id.Name / cp.norm.Name / cs.Name / bd.in.Name / bd.out.Name})"
     ]
   },
-  "B Format Entry": {
-    "prefix": "B",
-    "description": "Insert B-item format only.",
+  "base Statement": {
+    "prefix": "base",
+    "description": "Insert base statement format.",
     "body": [
-      "- `B${1:1}` ${2:结构基名}：${3:待定义结构说明}。"
+      "base ${1:BaseName} := ${2:一句定义或 Lx.My::Base.Name}"
     ]
   },
-  "R Format Block": {
-    "prefix": "R",
-    "description": "Insert R-rule format item only.",
+  "cp.form Statement": {
+    "prefix": "cp.form",
+    "description": "Insert cp.form statement format.",
     "body": [
-      "- `R${1:1}` `${2:规则名}`：由 `{${3:B1}, ${4:B2}}` 形成 `${5:结果}`，导出 `${6:C1}`。"
+      "cp.form ${1:PrincipleName} on ${2:base.Name / cs.Name / form} := ${3:什么能组成什么}"
     ]
   },
-  "R Negative Block": {
-    "prefix": "RN",
-    "description": "Insert negative R-rule format item only.",
+  "cs Statement": {
+    "prefix": "cs.",
+    "description": "Insert cs statement format.",
     "body": [
-      "- `R${1:4}` `${2:禁止组合}`：由 `{${3:B1}, ${4:B2}}` 形成 `${5:非法组合}`，导出 `${6:N1}`。"
+      "cs.${1:CombinationName} := ${2:base.Name / cs.Name / ...} by ${3:cp.form.Name, cp.sat.Name, cp.id.Name, cp.norm.Name}"
+    ]
+  },
+  "bd.param Statement": {
+    "prefix": "bd.param",
+    "description": "Insert bd.param statement format.",
+    "body": [
+      "bd.param ${1:ParameterName} := domain(${2:...}), affects(${3:cs.Name / bd.in.Name / bd.out.Name})"
     ]
   }
 }
