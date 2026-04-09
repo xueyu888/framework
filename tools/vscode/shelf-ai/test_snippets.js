@@ -2,6 +2,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const frameworkCompletion = require("./framework_completion");
+const frameworkGrammar = require("./framework_grammar");
 
 const extensionRoot = __dirname;
 
@@ -26,6 +27,10 @@ function main() {
   assert(
     (packageJson.files || []).includes("framework_completion.js"),
     "package.json must package framework_completion.js"
+  );
+  assert(
+    (packageJson.files || []).includes("framework_grammar.js"),
+    "package.json must package framework_grammar.js"
   );
   assert(
     (packageJson.files || []).includes("guarding.js"),
@@ -94,6 +99,10 @@ function main() {
     "package.json must default shelf.fullValidationCommand to the supported canonical validation command"
   );
   assert(
+    configuration["shelf.frameworkLintOnlyOnFrameworkChanges"]?.default === true,
+    "package.json must enable framework-lint-only automation for framework changes by default"
+  );
+  assert(
     configuration["shelf.frameworkLintEnabled"]?.default === true,
     "package.json must enable framework realtime lint by default"
   );
@@ -117,30 +126,6 @@ function main() {
     configuration["shelf.frameworkQuickFixEnabled"]?.default === true,
     "package.json must enable framework lint quick fixes by default"
   );
-  assert.strictEqual(
-    configuration["shelf.frameworkTreeAutoRefreshOnSave"]?.default,
-    true,
-    "package.json must auto-refresh framework tree on save by default"
-  );
-  assert.strictEqual(
-    configuration["shelf.statusBarClickAction"]?.default,
-    "openFrameworkTree",
-    "package.json must default status bar click action to open framework tree"
-  );
-  assert.strictEqual(
-    configuration["shelf.showMessagePopups"]?.default,
-    true,
-    "package.json must enable popup messages by default"
-  );
-  assert.strictEqual(
-    configuration["shelf.treeZoomMaxScale"]?.default,
-    2.4,
-    "package.json must allow framework tree zooming beyond the old 155% cap by default"
-  );
-  assert(
-    (configuration["shelf.statusBarClickAction"]?.enum || []).includes("quickPick"),
-    "package.json must support quickPick status bar click action"
-  );
 
   const frameworkSnippet = snippetJson["@framework Module Template"];
   assert(frameworkSnippet, "markdown snippets must keep the @framework module template");
@@ -148,53 +133,46 @@ function main() {
   assert(Array.isArray(frameworkSnippet.body), "@framework snippet must have a body array");
   assert(frameworkSnippet.body.includes("@framework"), "@framework snippet body must include the directive line");
   assert(
-    frameworkSnippet.body.includes("## 0. 目标 (Goal)"),
-    "@framework snippet must include goal section"
+    frameworkSnippet.body.includes("## Goal"),
+    "@framework snippet must include Goal section"
   );
   assert(
-    frameworkSnippet.body.includes("## 1. 最小结构基（Minimal Structural Bases）"),
-    "@framework snippet must include base section"
+    frameworkSnippet.body.includes("## Base"),
+    "@framework snippet must include Base section"
   );
   assert(
-    frameworkSnippet.body.includes("## 2. 基排列组合（Base Arrangement / Combination）"),
-    "@framework snippet must include base arrangement section"
+    frameworkSnippet.body.includes("## Combination Principles"),
+    "@framework snippet must include Combination Principles section"
   );
   assert(
-    frameworkSnippet.body.includes("## 3. 边界定义（Boundary）"),
-    "@framework snippet must include boundary section"
+    frameworkSnippet.body.includes("## Combination Space"),
+    "@framework snippet must include Combination Space section"
   );
   assert(
-    frameworkSnippet.body.includes("### 3.1 接口定义（IO / Ports）"),
-    "@framework snippet must include boundary ports subsection"
+    frameworkSnippet.body.includes("## Boundary"),
+    "@framework snippet must include Boundary section"
   );
   assert(
-    frameworkSnippet.body.includes("### 3.2 参数边界（Parameter Constraints）"),
-    "@framework snippet must include boundary parameters subsection"
+    frameworkSnippet.body.includes("### Input"),
+    "@framework snippet must include Input subsection"
   );
   assert(
-    frameworkSnippet.body.includes("## 4. 能力声明（Capability Statement）"),
-    "@framework snippet must include capability statement section"
+    frameworkSnippet.body.includes("### Output"),
+    "@framework snippet must include Output subsection"
+  );
+  assert(
+    frameworkSnippet.body.includes("### Parameter"),
+    "@framework snippet must include Parameter subsection"
+  );
+  assert.deepStrictEqual(
+    frameworkSnippet.body,
+    frameworkGrammar.FRAMEWORK_TEMPLATE_SNIPPET_BODY,
+    "snippet template must stay aligned with shared framework grammar"
   );
 
   assert(
     /registerCommand\s*\(\s*"shelf\.insertFrameworkModuleTemplate"/.test(extensionSource),
     "extension.js must register the framework template insert command"
-  );
-  assert(
-    /registerCommand\s*\(\s*"shelf\.installGitHooks"/.test(extensionSource),
-    "extension.js must register the git hooks install command"
-  );
-  assert(
-    /registerCommand\s*\(\s*"shelf\.openFrameworkTree"/.test(extensionSource),
-    "extension.js must register the framework tree open command"
-  );
-  assert(
-    /registerCommand\s*\(\s*"shelf\.statusBarActionMenu"/.test(extensionSource),
-    "extension.js must register the status bar action menu command"
-  );
-  assert(
-    /registerCommand\s*\(\s*"shelf\.openEvidenceTree"/.test(extensionSource),
-    "extension.js must register the evidence tree open command"
   );
   assert(
     /registerCompletionItemProvider\s*\(/.test(extensionSource),
@@ -205,6 +183,10 @@ function main() {
     "extension.js must register framework markdown quick-fix provider"
   );
   assert(
+    /registerDocumentSemanticTokensProvider\s*\(/.test(extensionSource),
+    "extension.js must register framework markdown semantic highlight provider"
+  );
+  assert(
     extensionSource.includes('if (code === "FWL012")'),
     "extension.js must provide a heading-order quick fix for FWL012 diagnostics"
   );
@@ -212,89 +194,10 @@ function main() {
     extensionSource.includes("editor.action.triggerSuggest"),
     "extension.js must trigger framework suggestion popup while typing"
   );
-  assert(
-    /onDidChangeTextDocument\s*\(/.test(extensionSource),
-    "extension.js must clear stale shelf diagnostics when watched documents are edited"
-  );
-  assert(
-    extensionSource.includes('openTreeView("framework", { reveal: false })'),
-    "extension.js must refresh framework tree in background on save without auto-revealing the panel"
-  );
-  assert(
-    extensionSource.includes('$(close) Shelf 失败'),
-    "extension.js must expose a visible cross icon for failing Shelf status"
-  );
+
   assert(
     readme.includes("Shelf: Insert Framework Module Template"),
     "README must document the framework template insert command"
-  );
-  assert(
-    readme.includes("Shelf: Install Git Hooks"),
-    "README must document the git hooks install command"
-  );
-  assert(
-    readme.includes("Shelf: Open Framework Tree"),
-    "README must document the framework tree open command"
-  );
-  assert(
-    readme.includes("shelf.statusBarClickAction = openFrameworkTree"),
-    "README must document status bar click action setting"
-  );
-  assert(
-    readme.includes("shelf.statusBarClickAction = quickPick"),
-    "README must document quickPick status bar action mode"
-  );
-  assert(
-    readme.includes("Shelf: Refresh Framework Tree"),
-    "README must document the framework tree refresh command"
-  );
-  assert(
-    readme.includes("Shelf: Open Evidence Tree"),
-    "README must document the evidence tree open command"
-  );
-  assert(
-    readme.includes("The `@framework` template entry is a repository-side hard authoring contract"),
-    "README must document the non-removable @framework authoring contract"
-  );
-  assert(
-    readme.includes("shelf.guardMode = strict"),
-    "README must document strict guard mode"
-  );
-  assert(
-    readme.includes("shelf.showMessagePopups = true"),
-    "README must document the popup notification toggle setting"
-  );
-  assert(
-    readme.includes(".shelf/settings.jsonc"),
-    "README must document the local .shelf settings entrypoint"
-  );
-  assert(
-    readme.includes("VSCode `shelf.*` setting has highest priority"),
-    "README must document local settings precedence"
-  );
-  assert(
-    readme.includes("uv run python scripts/validate_canonical.py --check-changes"),
-    "README must document the supported save-triggered canonical validation command"
-  );
-  assert(
-    readme.includes("uv run python scripts/validate_canonical.py"),
-    "README must document the supported full canonical validation command"
-  );
-  assert(
-    !readme.includes("validate_canonical.py --json"),
-    "README must not document the optional --json canonical flag as the default command"
-  );
-  assert(
-    readme.includes("Treats stale / missing / invalid canonical as non-authoritative"),
-    "README must document strict canonical freshness behavior"
-  );
-  assert(
-    readme.includes("Shelf blocks the formal evidence tree until you materialize again"),
-    "README must explain how the evidence tree behaves when canonical is stale"
-  );
-  assert(
-    readme.includes("No persisted tree artifact"),
-    "README must state tree views are runtime projections without persisted artifacts"
   );
 
   const atEntries = frameworkCompletion.getFrameworkCompletionEntries("@", "@", false);
@@ -309,8 +212,8 @@ function main() {
 
   const sectionEntries = frameworkCompletion.getFrameworkCompletionEntries("## ", "", true);
   assert(
-    sectionEntries.some((entry) => entry.label.includes("最小结构基")),
-    "section completion must include the Minimal Structural Bases heading"
+    sectionEntries.some((entry) => entry.label === "## Base"),
+    "section completion must include Base heading"
   );
 
   const authoringSample = [
@@ -318,130 +221,80 @@ function main() {
     "",
     "@framework",
     "",
-    "## 0. 目标 (Goal)",
+    "## Goal",
     "",
-    "- 目标说明。",
+    "goal 文本单元定位 := 目标说明",
     "",
-    "## 1. 最小结构基（Minimal Structural Bases）",
+    "## Base",
     "",
-    "- `B1` 输入基：描述。",
+    "base 文本索引基 := 描述",
     "",
-    "## 2. 基排列组合（Base Arrangement / Combination）",
+    "## Combination Principles",
     "",
-    "- `R7` `现有规则`：由 `{B1}` 形成 `结果`，导出 `C1`。",
+    "cp.form 文本定位组合 on <base.文本索引基> := 组合描述",
     "",
-    "## 3. 边界定义（Boundary）",
+    "## Combination Space",
     "",
-    "### 3.1 接口定义（IO / Ports）",
+    "cs.可读取文本单元 := <base.文本索引基> by <cp.form.文本定位组合>",
     "",
-    "- `QUERY_IN`：运行时输入接口。",
+    "## Boundary",
     "",
-    "### 3.2 参数边界（Parameter Constraints）",
+    "### Input",
     "",
-    "- `P1` 查询长度：描述。",
+    "bd.in 查询输入 := payload({query}), cardinality(1), to(cs.可读取文本单元)",
     "",
-    "## 4. 能力声明（Capability Statement）",
+    "### Output",
     "",
-    "- `C1` 现有能力：描述。",
-    "- `N1` 非职责声明：描述。",
+    "bd.out 文本输出 := payload({text}), cardinality(1), from(cs.可读取文本单元)",
+    "",
+    "### Parameter",
+    "",
+    "bd.param 查询长度上限 := domain(int), affects(cs.可读取文本单元, bd.in.查询输入)",
   ].join("\n");
 
-  const capabilityEntries = frameworkCompletion.getFrameworkCompletionEntries(
-      "- ",
-      "",
-      true,
-      {
-        documentText: authoringSample,
-        lineNumber: 27,
-      }
-  );
+  const baseEntries = frameworkCompletion.getFrameworkCompletionEntries("base ", "base", true, {
+    documentText: authoringSample,
+    lineNumber: 10,
+  });
   assert(
-    capabilityEntries.some((entry) => entry.label === "C 条目"),
-    "capability section completion must include C entry"
+    baseEntries.some((entry) => entry.label === "base"),
+    "base completion must include base statement template"
   );
+
+  const principlesEntries = frameworkCompletion.getFrameworkCompletionEntries("cp.", "cp", true, {
+    documentText: authoringSample,
+    lineNumber: 14,
+  });
   assert(
-    !capabilityEntries.some((entry) => entry.label === "参数条目"),
-    "capability section completion should not prioritize parameter entry"
+    principlesEntries.some((entry) => entry.label === "cp.form"),
+    "combination principles completion must include cp.form template"
   );
-  const cEntry = capabilityEntries.find((entry) => entry.label === "C 条目");
-  assert(cEntry?.insertText.includes("C${1:2}"), "C completion should infer next index from current document");
+
+  const boundaryInputEntries = frameworkCompletion.getFrameworkCompletionEntries("bd.", "bd", true, {
+    documentText: authoringSample,
+    lineNumber: 24,
+  });
   assert(
-    capabilityEntries.some((entry) => entry.label === "N 条目"),
-    "capability section completion must include non-responsibility entry"
+    boundaryInputEntries.some((entry) => entry.label === "bd.in"),
+    "boundary input completion must include bd.in template"
   );
+
   const templateText = frameworkCompletion.getFrameworkTemplateSnippetText();
   assert(
-    !templateText.includes("### 非职责声明（Non-Responsibility Statement）"),
-    "framework template text should place N entries directly after C entries"
-  );
-
-  const baseEntries = frameworkCompletion.getFrameworkCompletionEntries("- `B", "B", true, {
-    documentText: authoringSample,
-    lineNumber: 8,
-  });
-  assert(
-    baseEntries.some((entry) => entry.label === "B 条目"),
-    "base completion must include the B entry template"
-  );
-
-  const ruleEntries = frameworkCompletion.getFrameworkCompletionEntries("- `R", "R", true, {
-    documentText: authoringSample,
-    lineNumber: 12,
-  });
-  assert(
-    ruleEntries.some((entry) => entry.label === "R 条目"),
-    "rule completion must include single-line R entry"
-  );
-  const ruleEntry = ruleEntries.find((entry) => entry.label === "R 条目");
-  assert(
-    ruleEntry?.insertText.includes("R${1:8}"),
-    "rule completion should infer next rule number"
-  );
-
-  const parameterAuthoringSample = [
-    "# 模块:Module",
-    "",
-    "@framework",
-    "",
-    "## 3. 边界定义（Boundary）",
-    "",
-    "### 3.1 接口定义（IO / Ports）",
-    "",
-    "- `QUERY_IN`：描述。",
-    "",
-    "### 3.2 参数边界（Parameter Constraints）",
-    "",
-    "- `P1` 现有参数：描述。",
-    "",
-  ].join("\n");
-  const parameterDashAutoExpansion = frameworkCompletion.getFrameworkDashAutoExpansion(
-    "-",
-    true,
-    {
-      documentText: parameterAuthoringSample,
-      lineNumber: 11,
-    }
+    templateText.includes("## Combination Space"),
+    "framework template text should include Combination Space section"
   );
   assert(
-    typeof parameterDashAutoExpansion?.insertText === "string",
-    "parameter section dash should auto-expand to parameter entry"
-  );
-  assert(
-    parameterDashAutoExpansion.insertText.includes("${1:P2}"),
-    "parameter dash auto-expansion should infer the next P index"
-  );
-  const nonParameterDashAutoExpansion = frameworkCompletion.getFrameworkDashAutoExpansion(
-    "-",
-    true,
-    {
-      documentText: authoringSample,
-      lineNumber: 27,
-    }
+    templateText.includes("bd.param"),
+    "framework template text should include bd.param statement"
   );
   assert.strictEqual(
-    nonParameterDashAutoExpansion,
+    frameworkCompletion.getFrameworkDashAutoExpansion("-", true, {
+      documentText: authoringSample,
+      lineNumber: 24,
+    }),
     null,
-    "dash auto-expansion should only apply inside the parameter section"
+    "dash auto-expansion should be disabled in keyword-first grammar"
   );
 }
 

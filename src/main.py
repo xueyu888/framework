@@ -10,7 +10,6 @@ import uvicorn
 from project_runtime import DEFAULT_PROJECT_FILE, materialize_project_runtime
 from project_runtime.app_factory import PROJECT_FILE_ENV, build_project_app
 
-
 SRC_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SRC_DIR.parent
 DEFAULT_HOST = "127.0.0.1"
@@ -45,7 +44,10 @@ def _normalize_argv(argv: list[str]) -> list[str]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Shelf repository entrypoint. Default behavior loads the configured project runtime and serves it."
+        description=(
+            "Shelf repository entrypoint. Default behavior loads the configured project runtime "
+            "and serves it."
+        )
     )
     subparsers = parser.add_subparsers(dest="command")
     serve_parser = subparsers.add_parser("serve", help="load the selected project runtime and start the demo server")
@@ -56,7 +58,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--host", default=DEFAULT_HOST, help=f"bind host (default: {DEFAULT_HOST})")
     serve_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"bind port (default: {DEFAULT_PORT})")
-    serve_parser.add_argument("--reload", action="store_true", help="enable uvicorn reload mode and pre-materialize generated artifacts")
+    serve_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="enable uvicorn reload mode and pre-materialize generated artifacts",
+    )
     return parser
 
 

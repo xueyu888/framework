@@ -26,6 +26,7 @@ Authoring-term note:
 - Runs canonical validation and optionally `mypy` from the extension.
 - Adds project-independent framework markdown syntax diagnostics (Problems 波浪线) while typing/saving.
 - Adds context-aware framework markdown completion (section-aware + auto-number defaults) and lint Quick Fix actions.
+- Adds an experimental `.sf` language preview (`shelf-framework`) with its own semantic highlight, lint, and completion, without replacing formal `framework/*.md` author sources.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
 - Keeps ordinary implementation saves unblocked; repository-side validation/hook checks remain the main enforcement boundary.
 
@@ -82,6 +83,7 @@ Local workspace overlay file:
 - `shelf.generatedEventSuppressionMs = 2500`
 - `shelf.manualValidationRestartThresholdMs = 15000`
 - `shelf.validationDebounceMs = 250`
+- `shelf.frameworkLintOnlyOnFrameworkChanges = true`
 - `shelf.frameworkLintEnabled = true`
 - `shelf.frameworkLintOnType = true`
 - `shelf.frameworkLintDebounceMs = 300`
@@ -91,6 +93,21 @@ Local workspace overlay file:
 
 Changing tree webview settings will re-render the currently open tree panel automatically. If no tree panel is open, the next open/refresh will use the new values. Validation timing settings take effect on the next scheduled or manual validation run without requiring reload. Framework lint/completion/quick-fix settings take effect immediately for currently opened framework markdown files.
 
+Framework lint execution scope:
+
+- Shelf lints every Markdown file under `framework/**` and `framework_drafts/**`.
+- Shelf also lints any Markdown file whose content contains `@framework`, even outside those directories.
+- Shelf also lints standalone `.sf` files as an editor-only preview language (`shelf-framework`); those files do not participate in canonical, materialize, or publish flows.
+- Inside `framework/**` / `framework_drafts/**`, only Markdown attachments that are directly referenced by a framework module are treated as valid authoring files; orphan Markdown files are reported as errors.
+- Framework modules may only directly reference Markdown files inside the same controlled framework domain.
+
+Framework-only automation setting:
+
+- `shelf.frameworkLintOnlyOnFrameworkChanges = true`:
+  when a framework-controlled Markdown file changes, Shelf only updates framework lint diagnostics.
+  save-triggered canonical validation, auto-materialization, and mypy do not run for those framework changes.
+  manual `Shelf: Validate Canonical Now` and `Shelf: Run Codegen Preflight` keep their normal full-chain behavior.
+
 Notification popup behavior:
 
 - `shelf.showMessagePopups = true`: keep Shelf right-corner popup messages enabled.
@@ -99,7 +116,8 @@ Notification popup behavior:
 Framework tree behavior settings:
 
 - `shelf.frameworkTreeAutoRefreshOnSave = true`:
-  after framework markdown is saved, Shelf runs save-time change validation/materialization first, then refreshes an open framework tree.
+  after framework markdown is saved, Shelf refreshes an open framework tree in the background.
+  if `shelf.frameworkLintOnlyOnFrameworkChanges = false`, Shelf first runs the save-time change validation/materialization pipeline and then refreshes the tree.
   save-time refresh is background-only and will not auto-pop or force-focus the framework tree panel.
   when full materialization fails and the materialize command uses `scripts/materialize_project.py`, Shelf enables `--allow-framework-only-fallback` to refresh `canonical.framework` snapshot first.
 - `shelf.statusBarClickAction = openFrameworkTree`:
@@ -122,7 +140,7 @@ When the repository currently has no `projects/*/project.toml`, `validate_canoni
 
 `Shelf: Run Codegen Preflight` materializes all discovered `projects/*/project.toml` files, then runs full validation. If no project config exists yet, the command reports bootstrap / framework-authoring mode instead of failing.
 
-Framework markdown lint is independent from project selection: syntax diagnostics are computed directly from the current `framework/**` or `framework_drafts/**` document and rendered as standard VSCode Problems diagnostics.
+Framework markdown lint is independent from project selection: syntax diagnostics are computed directly from framework-controlled Markdown and rendered as standard VSCode Problems diagnostics.
 The same diagnostics expose Quick Fix actions (lightbulb) for common formatting mistakes, including list marker normalization, missing `@framework`, missing standard sections, and invalid C/P/B/R/V entry formatting.
 
 The `@framework` template entry is a repository-side hard authoring contract and must not be removed without an equally direct replacement.

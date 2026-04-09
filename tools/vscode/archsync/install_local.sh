@@ -2,14 +2,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-TARGET_SCRIPT="${REPO_ROOT}/tools/vscode/shelf-ai/install_local.sh"
+VSIX_PATH="$(find "${SCRIPT_DIR}/releases" -maxdepth 1 -type f -name 'archsync-*.vsix' | sort -V | tail -n 1)"
 
-if [[ ! -f "${TARGET_SCRIPT}" ]]; then
-  echo "Maintained Shelf AI installer not found: ${TARGET_SCRIPT}" >&2
+if [[ -z "${VSIX_PATH}" ]]; then
+  echo "No VSIX package found under ${SCRIPT_DIR}/releases" >&2
   exit 1
 fi
 
-echo "ArchSync has been renamed to Shelf AI."
-echo "Delegating local update to ${TARGET_SCRIPT}..."
-exec bash "${TARGET_SCRIPT}"
+# Clean up existing installs so the remote host doesn't keep multiple stale versions around.
+code --uninstall-extension local.archsync >/dev/null 2>&1 || true
+code --uninstall-extension rdshr.archsync >/dev/null 2>&1 || true
+code --install-extension "${VSIX_PATH}" --force
+echo "Installed ${VSIX_PATH}"
