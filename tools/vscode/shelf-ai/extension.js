@@ -101,7 +101,7 @@ const FRAMEWORK_RULE_HINTS = {
   SFL006: "Principles block 语句格式必须合法",
   SFL007: "Spaces block 语句格式必须合法",
   SFL008: "Boundary block 语句格式必须合法",
-  SFL009: ".sf 缩进层级必须固定为 4 空格步长",
+  SFL009: ".sf 声明头必须位于 8 空格层级；若右值续行，续行必须缩进到声明头之下",
   SFL010: ".sf 中的引用必须指向当前文件内已定义符号"
 };
 

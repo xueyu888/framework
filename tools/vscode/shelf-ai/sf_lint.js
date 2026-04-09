@@ -165,13 +165,41 @@ function validateFlatBlock({
     return;
   }
 
+  const statements = [];
+  let currentStatement = null;
+
   for (const item of blockLines) {
-    const trimmed = sfGrammar.trimLine(item.text);
-    if (sfGrammar.getIndent(item.text) !== 8) {
+    const indent = sfGrammar.getIndent(item.text);
+    if (indent === 8) {
+      currentStatement = {
+        head: item,
+        lines: [item],
+      };
+      statements.push(currentStatement);
+      continue;
+    }
+    if (indent > 8 && currentStatement) {
+      currentStatement.lines.push(item);
+      continue;
+    }
+    issues.push(
+      createIssue({
+        file,
+        line: item.line,
+        column: 1,
+        code: "SFL009",
+        message: "`.sf` 声明缩进必须使用 4 空格层级；若右值续行，续行必须缩进到声明头之下。",
+      })
+    );
+  }
+
+  for (const statement of statements) {
+    const trimmed = sfGrammar.trimLine(statement.head.text);
+    if (sfGrammar.getIndent(statement.head.text) !== 8) {
       issues.push(
         createIssue({
           file,
-          line: item.line,
+          line: statement.head.line,
           column: 1,
           code: "SFL009",
           message: "`.sf` 声明缩进必须使用 4 空格层级。",
@@ -185,8 +213,8 @@ function validateFlatBlock({
       issues.push(
         createIssue({
           file,
-          line: item.line,
-          column: markerColumn(item.text),
+          line: statement.head.line,
+          column: markerColumn(statement.head.text),
           code,
           message: invalidMessage,
         })
@@ -198,8 +226,10 @@ function validateFlatBlock({
     if (name) {
       definitions.add(`${definitionPathPrefix}.${name}`);
     }
-    for (const ref of collectRefs(trimmed)) {
-      references.push({ ref, line: item.line, column: markerColumn(item.text), file });
+    for (const lineItem of statement.lines) {
+      for (const ref of collectRefs(sfGrammar.trimLine(lineItem.text))) {
+        references.push({ ref, line: lineItem.line, column: markerColumn(lineItem.text), file });
+      }
     }
   }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.27 - 2026-04-09
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.26..shelf-ai-v0.1.27`.
+- Reworked the `.sf` protocol docs and README entry so the experimental language now documents direct `Base.xxx` boundary bindings, multi-line right-hand values, ordered-collection notation, and the current `t(i)` time-point writing convention in one coherent authoring path.
+- Updated the extension-side `.sf` lint/test path to accept declaration heads with indented continuation lines and to surface a more precise `SFL009` message when continuation indentation is wrong.
+- Synced the plugin evidence snapshot and the accompanying back_zrx draft docs so the “first completion” example now distinguishes historical completion facts from the current trigger event instead of mixing the two concepts.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.27`.
+
 ## 0.1.26 - 2026-04-08
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.25..shelf-ai-v0.1.26`.

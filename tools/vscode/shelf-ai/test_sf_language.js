@@ -51,6 +51,29 @@ const VALID_SAMPLE = [
   "        param<range> 最大嵌套层数 := \"[0:2]\"",
 ].join("\n");
 
+const MULTILINE_ORDERED_COLLECTION_SAMPLE = [
+  "MODULE 子任务提交处理逻辑:SubtaskSubmissionHandler:",
+  "    Goal := \"根据已有记录、传入状态和历史完成标记决定处理动作。\"",
+  "",
+  "    Base:",
+  "        set 记录存在状态 := {recorded, unrecorded}",
+  "        set 传入完成状态 := {finished, unfinished}",
+  "        set 首次完成标记 := {yes, no}",
+  "",
+  "    Principles:",
+  "        sat 子任务不可回退 := 已完成的子任务不可回退为未完成。",
+  "",
+  "    Spaces:",
+  "        seq 情况总表 := <  <recorded, finished, yes>,",
+  "                        <recorded, unfinished, no>,",
+  "                        <unrecorded, finished, no>>",
+  "",
+  "    Boundary:",
+  "        in<enum> 记录存在状态 := Base.记录存在状态",
+  "        in<enum> 传入完成状态 := Base.传入完成状态",
+  "        out<enum> 首次完成标记 := Base.首次完成标记",
+].join("\n");
+
 function main() {
   const packageJson = readJson("package.json");
   const extensionSource = readText("extension.js");
@@ -91,6 +114,16 @@ function main() {
     text: VALID_SAMPLE,
   });
   assert.strictEqual(issues.length, 0, "valid .sf sample should pass lint");
+
+  const multilineIssues = sfLint.lintShelfFrameworkFile({
+    filePath: "/tmp/multiline.sf",
+    text: MULTILINE_ORDERED_COLLECTION_SAMPLE,
+  });
+  assert.strictEqual(
+    multilineIssues.length,
+    0,
+    "multi-line ordered collection values should pass lint when the declaration head is valid"
+  );
 
   const invalidBoundarySample = VALID_SAMPLE.replace("param<range> 最大嵌套层数", "param 最大嵌套层数");
   const invalidBoundaryIssues = sfLint.lintShelfFrameworkFile({
