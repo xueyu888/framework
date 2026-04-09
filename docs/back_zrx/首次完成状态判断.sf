@@ -1,4 +1,4 @@
-MODULE 任务首次完成触发判断器:TaskFirstCompletionTrigger:
+MODULE 首次完成状态判断器:FirstCompletionStatusJudge:
     Goal := "以 t(0) / t(1) 两个时间位点表达状态演进，判断完成状态是否在 t(1) 首次触发"
 
     Base:

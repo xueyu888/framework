@@ -32,13 +32,22 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     completionDetail: "插入 Base.elem 声明",
   },
   {
-    id: "relation",
+    id: "seq-base",
     sectionId: "base",
-    keyword: "relation",
-    pattern: /^relation(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "relation[2:1] ${1:关系基} := \"${2:关系说明}\"",
-    completionLabel: "relation[2:1]",
-    completionDetail: "插入 Base.relation 声明",
+    keyword: "seq",
+    pattern: /^seq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "seq ${1:有序结构基} := \"${2:有序结构说明}\"",
+    completionLabel: "seq",
+    completionDetail: "插入 Base.seq 声明",
+  },
+  {
+    id: "operator",
+    sectionId: "base",
+    keyword: "operator",
+    pattern: /^operator(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "operator[2:1] ${1:操作子} := \"${2:操作子说明}\"",
+    completionLabel: "operator[2:1]",
+    completionDetail: "插入 Base.operator 声明",
   },
   {
     id: "sat",
@@ -57,6 +66,15 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     template: "eq ${1:判同原则} := \"${2:说明何时归入同一结果类}\"",
     completionLabel: "eq",
     completionDetail: "插入 Principles.eq 声明",
+  },
+  {
+    id: "set-spaces",
+    sectionId: "spaces",
+    keyword: "set",
+    pattern: /^set\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "set ${1:结果集合} := \"${2:结果集合说明}\"",
+    completionLabel: "set",
+    completionDetail: "插入 Spaces.set 声明",
   },
   {
     id: "comb",
@@ -82,8 +100,8 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     keyword: "in",
     subtypeRequired: true,
     pattern: /^in<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "in<view> ${1:输入边界} := \"${2:输入约束}\"",
-    completionLabel: "in<schema>",
+    template: "in<subtype> ${1:输入边界} := \"${2:输入约束}\"",
+    completionLabel: "in<subtype>",
     completionDetail: "插入 Boundary.in 声明",
   },
   {
@@ -92,8 +110,8 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     keyword: "out",
     subtypeRequired: true,
     pattern: /^out<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "out<view> ${1:输出边界} := \"${2:输出约束}\"",
-    completionLabel: "out<schema>",
+    template: "out<subtype> ${1:输出边界} := \"${2:输出约束}\"",
+    completionLabel: "out<subtype>",
     completionDetail: "插入 Boundary.out 声明",
   },
   {
@@ -170,24 +188,27 @@ const SF_TEMPLATE_SNIPPET_BODY = Object.freeze([
   "    Base:",
   "        set ${4:集合基} := \"${5:集合说明}\"",
   "        elem ${6:结构基} := \"${7:结构说明}\"",
-  "        relation[2:1] ${8:关系基} := \"${9:关系说明}\"",
+  "        seq ${8:有序结构基} := \"${9:有序结构说明}\"",
+  "        operator[2:1] ${10:操作子} := \"${11:操作子说明}\"",
   "",
   "    Principles:",
-  "        sat ${10:成立原则} := \"${11:说明成立条件}\"",
-  "        eq ${12:判同原则} := \"${13:说明何时归入同一结果类}\"",
+  "        sat ${12:成立原则} := \"${13:说明成立条件}\"",
+  "        eq ${14:判同原则} := \"${15:说明何时归入同一结果类}\"",
   "",
   "    Spaces:",
-  "        comb ${14:组合分类} := \"${15:说明这一类组合如何得到}\"",
+  "        set ${16:结果集合} := \"${17:结果集合说明}\"",
+  "        comb ${18:组合分类} := \"${19:说明这一类组合如何得到}\"",
+  "        seq ${20:候选序列} := \"${21:说明这一组候选}\"",
   "",
   "    Boundary:",
-  "        param<enum> ${16:变量边界} := \"${17:{x, y, z}}\"",
-  "        param<enum> ${18:变量取值边界} := \"${19:{0, 1}}\"",
-  "        param<range> ${20:最大嵌套层数} := \"${21:[0:2]}\"",
+  "        param<enum> ${22:变量边界} := \"${23:{x, y, z}}\"",
+  "        param<enum> ${24:变量取值边界} := \"${25:{0, 1}}\"",
+  "        param<range> ${26:最大嵌套层数} := \"${27:[0:2]}\"",
 ]);
 
 const SF_REFERENCE_PATTERN = /\b(?:Base|Principles|Spaces|Boundary)\.[^,\s，。；;:：<>(){}[\]"']+/gu;
 const SF_CLAUSE_PATTERN = /$^/gu;
-const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|relation|sat|eq|comb|seq|in|out|param)(?<subtype>(?:\[[^\]]+\]|<[^>]+>))?\s/u;
+const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|seq|operator|sat|eq|comb|in|out|param)(?<subtype>(?:\[[^\]]+\]|<[^>]+>))?\s/u;
 
 const SEMANTIC_TOKEN_TYPES = Object.freeze({
   block: "type",

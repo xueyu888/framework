@@ -26,7 +26,7 @@ Authoring-term note:
 - Runs canonical validation and optionally `mypy` from the extension.
 - Adds project-independent framework markdown syntax diagnostics (Problems 波浪线) while typing/saving.
 - Adds context-aware framework markdown completion (section-aware + auto-number defaults) and lint Quick Fix actions.
-- Adds an experimental `.sf` language preview (`shelf-framework`) with its own semantic highlight, lint, and completion, without replacing formal `framework/*.md` author sources.
+- Adds an experimental `.sf` language preview (`shelf-framework`) with its own semantic highlight, lint, and completion, using the current `set / seq / elem / operator / sat / eq / comb / in / out / param` statement family without replacing formal `framework/*.md` author sources.
 - Supports publishing the active `framework_drafts/...` file into the formal `framework/...` tree.
 - Keeps ordinary implementation saves unblocked; repository-side validation/hook checks remain the main enforcement boundary.
 
