@@ -35,6 +35,8 @@ Authoring-term note:
 - 插件后续设计与实现的正式契约文档：
   `tools/vscode/shelf-ai/插件设计与实现契约.md`
 - 后续凡是插件相关代码变更，都应同步检查并在需要时更新该文档。
+- `.sf` 实验语言当前作者规范文档：
+  `tools/vscode/shelf-ai/keyword-first-grammar-协议.md`
 
 ## Install (Local)
 
