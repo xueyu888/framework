@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.28 - 2026-04-09
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.27..shelf-ai-v0.1.28`.
+- Tightened the `.sf` preview into a more stable editor path: the extension now activates directly on `.sf` open, ships a generated TextMate fallback grammar, and enables semantic highlighting by default for the `shelf-framework` language id.
+- Refined `.sf` semantic rendering and grammar boundaries: declaration names now receive their own token class, `[shape]` and `<subtype>` are highlighted separately, and `Boundary` now accepts only `in / out / param` instead of a parallel `Boundary.op[...]` form.
+- Synced the packaged README, the `.sf` authoring spec, tests, evidence snapshot, and the boolean-logic / XY-star-graph drafts to the current `set / elem / struct / seq / op` plus `Boundary = in/out/param` authoring model.
+- The same repository-wide commit range also contains ongoing `framework/**` and `docs/back_zrx/**` authoring work outside the VSIX payload; those files are part of the audited range for this release but are not bundled as extension assets.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.28`.
+
 ## 0.1.27 - 2026-04-09
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.26..shelf-ai-v0.1.27`.
