@@ -1,465 +1,492 @@
-# Keyword-First Framework Language Reference
+# `.sf` 实验语言规范（Shelf Framework Preview）
 
-## 1. Overview
+## 0. 文档定位
 
-本文件只定义这门 framework 作者语言的表面语法。
+本文档用于把 Shelf AI 当前 `.sf` 语言预览的作者规则写清楚，供人阅读、评审和对照实现。
 
-目标是把下面三层区分清楚：
+它只覆盖当前插件里的实验性 `.sf` / `shelf-framework` 语言预览，不覆盖正式 `framework/*.md` 作者源。
 
-- `Goal`、`Base`、`Principles`、`Spaces`、`Boundary` 是模块级 block，首字母大写。
-- `elem`、`rel`、`attr`、`form`、`sat`、`id`、`norm`、`comb`、`seq`、`in`、`out`、`param` 是 block 内声明 kind，保持小写。
-- `schema`、`range`、`enum` 是声明的子类型，只挂在声明 kind 后面，例如 `in<schema>`、`param<range>`，不挂在 block 名上。
+职责边界如下：
 
-因此：
+- 本文档负责把当前 `.sf` 的写法、限制、编辑器行为与 lint 规则说明清楚。
+- 编辑器里的直接机器规则仍以共享 grammar 实现为准：
+  - `tools/vscode/shelf-ai/sf_grammar.js`
+  - `tools/vscode/shelf-ai/sf_completion.js`
+  - `tools/vscode/shelf-ai/sf_lint.js`
+  - `tools/vscode/shelf-ai/extension.js`
+- `.sf` 仅用于编辑器预览，不进入 canonical / materialize / publish 主链，不替代正式 `framework/*.md` 作者源。
 
-- `Principles<Form>` 不是目标语法。
-- `Boundary<Type>` 不是目标语法。
-- `form ...`、`sat ...` 应直接写在 `Principles:` 下面。
-- `in<schema> ...`、`out<schema> ...`、`param<range> ...` 应直接写在 `Boundary:` 下面。
+如果本文档与上述实现不一致，应优先修正文档或实现，不能长期容忍“双份规则各写一套”。
 
-## 2. Canonical Shape
+## 1. 适用范围
 
-```
-module 中文模块名:EnglishModuleName:
-    Goal := "..."
+当前 `.sf` 语言的正式适用范围是：
+
+- 独立的 `.sf` 文件
+- VS Code language id：`shelf-framework`
+- 插件提供的语义高亮、实时 lint、上下文补全
+
+当前 `.sf` 语言的明确非目标是：
+
+- 作为 `framework/*.md` 的替代输入
+- 参与 canonical 生成
+- 参与 materialize / validate / publish 正式链路
+- 在编辑器外声明仓库机器真相
+
+## 2. 总体文件形状
+
+一个 `.sf` 文件当前按“单文件单模块”处理，标准形状如下：
+
+```sf
+MODULE 中文模块名:EnglishName:
+    Goal := "模块目标"
 
     Base:
-        elem 名称 := ...
-        rel 名称 := ...
-        attr 名称 := ...
+        set 名称 := "..."
+        elem 名称 := "..."
+        relation[2:1] 名称 := "..."
 
     Principles:
-        form 名称 := ...
-        sat 名称 := ...
-        id 名称 := ...
-        norm 名称 := ...
+        sat 名称 := "..."
+        eq 名称 := "..."
 
     Spaces:
-        comb 名称 := ...
-        seq 名称 := ...
+        comb 名称 := "..."
+        seq 名称 := "..."
 
     Boundary:
-        in<schema> 名称 := ...
-        out<schema> 名称 := ...
-        param<range> 名称 := ...
-        param<enum> 名称 := ...
+        in<view> 名称 := "..."
+        out<view> 名称 := "..."
+        param<enum> 名称 := "..."
+        param<range> 名称 := "..."
 ```
 
-这门语言的核心约束是：
+当前强制的顶层顺序固定为：
 
-- block 名负责命名空间；
-- kind 负责声明类别；
-- subtype 负责值形状；
-- 引用路径只看 `block.kind.name`，不把 subtype 算进命名空间。
+1. `MODULE`
+2. `Goal`
+3. `Base`
+4. `Principles`
+5. `Spaces`
+6. `Boundary`
+
+其中 `Goal / Base / Principles / Spaces / Boundary` 都是必需块，不允许缺省或调序。
+
+## 3. 强制结构规则
+
+### 3.1 模块头
+
+模块头必须写成：
+
+```sf
+MODULE 中文模块名:EnglishName:
+```
+
+当前实现要求：
+
+- 关键字必须是全大写 `MODULE`
+- 中文模块名部分不能包含 `:`
+- 英文名必须匹配标识符形式：首字符为字母或 `_`，后续允许字母、数字、`_`
+- 行尾必须保留最后一个 `:`
+
+不允许写成：
+
+- `module 中文模块名:EnglishName:`
+- `MODULE 中文模块名:English-Name:`
+- `MODULE 中文模块名:123Name:`
+
+### 3.2 顶层块
+
+模块体内固定存在以下顶层块：
+
+- `Goal := "..."`
+- `Base:`
+- `Principles:`
+- `Spaces:`
+- `Boundary:`
+
+当前 lint 会同时检查：
+
+- 是否缺少顶层块
+- 顶层块是否按固定顺序出现
+
+### 3.3 缩进
+
+当前 `.sf` 使用固定的 4 空格层级：
+
+```text
+0 空格   MODULE ...
+4 空格   Goal / Base / Principles / Spaces / Boundary
+8 空格   block 内声明
+```
+
+当前强制规则：
+
+- 禁止使用 tab
+- 声明层必须是 8 空格缩进
+- 顶层块应使用 4 空格缩进
+
+## 4. 各块允许的语句
+
+### 4.1 Goal
+
+`Goal` 必须是单行声明：
+
+```sf
+Goal := "模块目标"
+```
+
+当前实现把 `Goal` 视为模块级单例，不支持多行 clause 语法，也不支持 `goal xxx := ...` 这类额外 kind。
+
+### 4.2 Base
+
+`Base:` 下当前只允许以下三类语句：
+
+```sf
+set 名称 := 内容
+elem 名称 := 内容
+relation[shape] 名称 := 内容
+```
+
+说明：
+
+- `set` 用于集合基
+- `elem` 用于结构基
+- `relation[shape]` 用于关系基
+- `relation` 当前实现允许省略 `[shape]`，但标准示例建议显式写出，如 `relation[2:1]`
+- `Base` 至少需要一个声明
+
+当前不再接受旧原型里的：
+
+- `rel`
+- `attr`
+
+### 4.3 Principles
+
+`Principles:` 下当前只允许：
+
+```sf
+sat 名称 := 内容
+eq 名称 := 内容
+```
+
+说明：
+
+- `sat` 表示成立/满足类原则
+- `eq` 表示判同/归并类原则
+- `Principles` 至少需要一个声明
+
+当前不再接受旧原型里的：
+
+- `form`
+- `id`
+- `norm`
+
+### 4.4 Spaces
+
+`Spaces:` 下当前只允许：
+
+```sf
+comb 名称 := 内容
+seq 名称 := 内容
+```
+
+说明：
+
+- `comb` 表示组合分类或组合结果
+- `seq` 表示序列、候选行或枚举条目
+- `Spaces` 至少需要一个声明
+
+### 4.5 Boundary
+
+`Boundary:` 下当前只允许：
+
+```sf
+in<subtype> 名称 := 内容
+out<subtype> 名称 := 内容
+param<enum> 名称 := 内容
+param<range> 名称 := 内容
+```
+
+说明：
+
+- `in` 与 `out` 当前必须显式带 subtype
+- `param` 当前只有 `enum` 与 `range` 两种正式写法
+- `Boundary` 至少需要一个边界声明
+
+标准示例如下：
+
+```sf
+in<view> 输入边界 := "..."
+out<view> 输出边界 := "..."
+in<enum> 输入状态 := Base.状态集合
+out<enum> 输出状态 := Base.状态集合
+param<enum> 状态集合 := "{pending, success, failed}"
+param<range> 最大层数 := "[0:2]"
+```
+
+补充约定：
+
+- `Boundary` 右值可以直接写字面内容
+- 也可以直接绑定到已定义的 `Base.xxx` 符号
 
 例如：
 
-- `Principles.form.失败传播`
-- `Spaces.comb.父任务失败闭包`
-- `Boundary.in.子任务记录输入`
-- `Boundary.param.传播窗口`
-
-这里的 `schema`、`range`、`enum` 只说明声明的值类型，不进入引用路径。
-
-## 3. Blocks
-
-### 3.1 Module
-
-模块头声明整个文件的唯一模块名。
-
-```
-module 中文模块名:EnglishModuleName:
+```sf
+in<enum> 是否完成过 := Base.是否完成过
+out<enum> 是否第一次完成 := Base.是否第一次完成
 ```
 
-其中：
+## 5. 右侧内容与引用规则
 
-- 前半段是中文作者名；
-- 后半段是英文稳定符号名；
-- 末尾的 `:` 打开一个缩进块。
+### 5.1 右侧内容
 
-### 3.2 Goal
+当前 `.sf` 的 `:=` 右侧内容仍按“作者文本”处理，插件只要求它是非空内容。
 
-`Goal` 是模块级单例声明，不再使用额外的 `goal` kind。
+也就是说，当前 lint 不继续解析右侧为更细 AST。
 
-```
-Goal := "记录父任务及其子任务的状态，并在子任务状态变化后同步更新父任务状态"
-```
+声明头本身仍然必须出现在首行，但右侧内容现在允许两种写法：
 
-一个模块当前只允许一个 `Goal`。
+- 单行写完
+- 在首行给出声明头与右值起始片段，后续以更深缩进继续续写
 
-### 3.3 Base
+下面这些写法在当前实现里都属于可接受的右侧内容：
 
-`Base` 用来声明最小结构基。
-
-```
-Base:
-    elem 名称 := ...
-    rel 名称 := ...
-    attr 名称 := ...
+```sf
+set 变量集合 := "记作 V"
+sat 条件同一 := "若在全部赋值下结果一致，则归入同一结果类"
+seq 深度零行 := "{深度零, {0, 1, x, y, z}, 通过}"
+in<enum> 输入状态 := Base.状态集合
+param<range> 最大层数 := "[0:2]"
 ```
 
-当前最小必要 kind：
+例如，下面这种多行续写现在也是允许的：
 
-- `elem`：结构中的独立单元
-- `rel`：结构单元之间的关系
-- `attr`：挂在某个结构单元上的结构位置或结构属性
-
-`Base` 里不放 `enum`、`range`、`schema`。这些不是结构基，而是边界值类型。
-
-### 3.4 Principles
-
-`Principles` 用来声明组合原则。这里不再引入统一的 `rule` 壳层，而是直接用原则类型本身作为 kind。
-
-```
-Principles:
-    form 名称 := ...
-    sat 名称 := ...
-    id 名称 := ...
-    norm 名称 := ...
+```sf
+seq 情况总表 := <  <recorded, finished, yes>,
+                <recorded, unfinished, no>,
+                <unrecorded, finished, no>>
 ```
 
-各 kind 的职责：
+因此，当前 `.sf` 采用的是“单行声明头 + 自由右值文本（可续行）”的预览模型，而不是旧版 clause 结构模型。
 
-- `form`：说明一个组合如何成立
-- `sat`：说明一个已形成组合需要满足什么约束
-- `id`：说明“什么算同一个”
-- `norm`：说明组合结果如何归一化或稳定化
+### 5.2 引用语法
 
-### 3.5 Spaces
+当前实现识别的引用路径是：
 
-`Spaces` 用来声明结果组合空间。
+- `Base.名称`
+- `Principles.名称`
+- `Spaces.名称`
+- `Boundary.名称`
 
-```
-Spaces:
-    comb 名称 := ...
-    seq 名称 := ...
-```
+例如：
 
-各 kind 的职责：
-
-- `comb`：无序组合结果
-- `seq`：有序组合结果
-
-### 3.6 Boundary
-
-`Boundary` 用来声明输入、输出、参数边界。
-
-```
-Boundary:
-    in<schema> 名称 := ...
-    out<schema> 名称 := ...
-    param<range> 名称 := ...
-    param<enum> 名称 := ...
+```sf
+sat 允许提交 := "只有当 Base.父任务记录 与 Boundary.状态输入 同时存在时才成立"
+comb 合法组合 := "按 Principles.允许提交 把 Spaces.候选行 归入同一类"
 ```
 
-这里的主 kind 只有三种：
+重要说明：
 
-- `in`
-- `out`
-- `param`
-
-子类型挂在 kind 后面：
-
-- `schema`：结构化载荷
-- `range`：区间值域
-- `enum`：枚举值域
+- 当前引用路径不带 statement kind
+- 当前引用路径也不带 subtype
 
 因此：
 
-- `enum` 不是 `Base`
-- `enum` 也不是新的 block
-- `enum` 是 `Boundary` 声明的 subtype
+- `Principles.条件同一` 是当前合法引用形式
+- `Principles.eq.条件同一` 不是当前引用形式
+- `Boundary.变量边界` 是当前合法引用形式
+- `Boundary.param<enum>.变量边界` 不是当前引用形式
 
-## 4. Statement Forms
+### 5.3 括号与集合约定
 
-### 4.1 Base Statements
+当前 `.sf` 对右值文本采用以下约定：
 
-```
-elem 名称 := 值
-rel 名称 := 值
-attr 名称 := 值
-```
+- `{...}` 表示集合内容，或枚举值域内容
+- `<...>` 表示有序集合，或有顺序约束的条目序列
+- `t(i)` 表示时间位点；常见约定里，`t(0)` 表示进入当前判断前的历史位点，`t(1)` 表示本次输入或触发所在位点
 
-右侧的 `值` 可以是：
+例如：
 
-- 一个文档链接
-- 一个已有符号引用
-- 一段简短自然语言说明
-
-### 4.2 Principle Statements
-
-```
-form 名称 := on(<引用列表>), body("说明")
-sat 名称 := on(<引用列表>), body("说明")
-id 名称 := on(<引用列表>), body("说明")
-norm 名称 := on(<引用列表>), body("说明")
+```sf
+set 状态集合 := {finished, unfinished}
+param<enum> 状态边界 := {finished, unfinished}
+seq 情况总表 := < <recorded, finished, yes>, <recorded, unfinished, no> >
+sat 首次完成触发 := "仅当 t(0)=unfinished 且 t(1)=finish 时，判定为 yes"
 ```
 
-说明：
+这两个符号约定当前主要用于作者表达与团队约定；lint 不会进一步校验花括号或尖括号内部的细粒度结构，但规范层面应按此语义理解。
 
-- `on(...)` 说明该原则作用在哪些结构或空间上；
-- `body("...")` 说明该原则的自然语言内容；
-- `form/sat/id/norm` 本身就是声明类型，所以不再额外写 `rule`。
+### 5.4 引用校验范围
 
-### 4.3 Space Statements
+当前 lint 只校验：
 
-```
-comb 名称 := from(<引用列表>), by(<原则引用列表>)
-seq 名称 := from(<引用列表>), by(<原则引用列表>)
-```
+- 引用是否指向当前文件内已定义的符号
 
-说明：
+当前 lint 不做：
 
-- `from(...)` 说明该空间由哪些结构基出发；
-- `by(...)` 说明该空间受哪些原则约束；
-- `comb` 与 `seq` 直接表示结果空间的形态。
+- 跨文件引用解析
+- canonical 级别对象追踪
+- statement body 的深层语义验证
 
-### 4.4 Boundary Statements
+### 5.5 名称建议
 
-输入边界：
+虽然当前声明名在解析上可以写较宽松的自然语言，但引用解析按连续 token 工作。为保证引用、补全与高亮稳定，建议声明名遵守以下约束：
 
-```
-in<schema> 名称 := payload(值), card(基数), to(目标引用)
-```
+- 尽量不包含空格
+- 尽量不包含括号、引号、尖括号、花括号等标点
+- 优先使用中文连续词或稳定英文标识符
+- 若要表达时间位点，建议把 `t(0)`、`t(1)` 等时间符号写在 `:=` 右侧内容中，而不是直接写进可引用的声明名；当前引用 token 不建议包含括号
 
-输出边界：
+## 6. 强制规则与推荐排版的边界
 
-```
-out<schema> 名称 := payload(值), card(基数), from(来源引用)
-```
+为了让作者知道“哪些会直接报错，哪些只是推荐写法”，当前约定分为两层：
 
-参数边界：
+### 6.1 当前 lint 强制的规则
 
-```
-param<range> 名称 := domain(值域), affects(<引用列表>)
-param<enum> 名称 := domain(值域), affects(<引用列表>)
-param<schema> 名称 := domain(值域), affects(<引用列表>)
-```
+当前插件会直接报错的规则只有这些：
 
-说明：
+- 首行必须是 `MODULE 中文模块名:EnglishName:`
+- 禁止 tab
+- 顶层 `Goal / Base / Principles / Spaces / Boundary` 必须全部存在且顺序固定
+- `Goal` 必须是 `Goal := "..."` 单行
+- `Base` 里只能写 `set / elem / relation[...]`
+- `Principles` 里只能写 `sat / eq`
+- `Spaces` 里只能写 `comb / seq`
+- `Boundary` 里只能写 `in<...> / out<...> / param<enum|range>`
+- 声明缩进必须使用固定 4 空格层级
+- 引用必须命中当前文件内已定义符号
 
-- `in` 必须写 `payload`、`card`、`to`
-- `out` 必须写 `payload`、`card`、`from`
-- `param` 必须写 `domain`、`affects`
+### 6.2 当前推荐但尚未 lint 强制的排版
 
-也就是说，`Boundary` 的统一性来自“声明头形式统一”，而不是“所有字段完全相同”。
+以下属于当前推荐写法，但不是 lint 的额外独立强制项：
 
-## 5. References
+- 相邻顶层块之间保留一个空行
+- `relation` 显式写出 `[shape]`
+- `in` / `out` 使用稳定的 subtype 名称，如 `view`
+- `:=` 右侧优先使用清晰的引号文本或结构化字面量
+- 若右值续行，续行应缩进到声明头之下，不要回退到 8 空格声明层
+- `{}` 优先用于集合/枚举值域，`<>` 优先用于有序条目序列
 
-引用路径统一使用点路径：
+## 7. 编辑器行为
 
-```
-Base.名称
-Principles.form.名称
-Principles.sat.名称
-Principles.id.名称
-Principles.norm.名称
-Spaces.comb.名称
-Spaces.seq.名称
-Boundary.in.名称
-Boundary.out.名称
-Boundary.param.名称
-```
+当前 `.sf` 的语义高亮、补全与 lint 共用同一套 grammar 入口。
 
-注意：
+### 7.1 语义高亮
 
-- `Boundary.in.状态输入` 是合法引用；
-- `Boundary.in<schema>.状态输入` 不是引用路径；
-- subtype 只在声明处出现，不在引用处出现。
+当前会做语义高亮的内容包括：
 
-## 6. Full Grammar
+- `MODULE`
+- `Goal`
+- `Base:` / `Principles:` / `Spaces:` / `Boundary:`
+- `set / elem / relation / sat / eq / comb / seq / in / out / param`
+- `[2:1]`、`<enum>`、`<range>`、`<view>` 这类 subtype / shape 片段
+- `Base.xxx` / `Principles.xxx` / `Spaces.xxx` / `Boundary.xxx` 形式的引用
 
-本节定义逻辑语法，不直接规定物理换行。
+### 7.2 上下文补全
 
-也就是说：
+当前补全按位置工作：
 
-- `form/sat/id/norm`
-- `comb/seq`
-- `in/out/param`
+- 空文件或模块头位置：
+  - 给完整 `.sf` 模板
+  - 给 `MODULE`
+  - 给 `Goal` 与各个 block
+- 进入某个 block 且位于声明层：
+  - `Base` 下给 `set / elem / relation[...]`
+  - `Principles` 下给 `sat / eq`
+  - `Spaces` 下给 `comb / seq`
+  - `Boundary` 下给 `in<...> / out<...> / param<enum> / param<range>`
 
-这些声明在语义上仍是单个 statement；
-是否换成多行，由第 7 节的 canonical formatting 决定。
+### 7.3 触发字符
 
-```
-module_file        := module_decl NL INDENT module_body DEDENT
-module_decl        := "module" WS module_name ":"
-module_name        := natural_name ":" english_identifier
+当前 `.sf` 自动触发补全的字符集合为：
 
-module_body        := goal_stmt NL NL
-                      base_block NL NL
-                      principles_block NL NL
-                      spaces_block NL NL
-                      boundary_block
-
-goal_stmt          := "Goal" WS ":=" WS string_literal
-
-base_block         := "Base:" NL INDENT base_stmt+ DEDENT
-base_stmt          := base_kind WS natural_name WS ":=" WS base_value NL
-base_kind          := "elem" | "rel" | "attr"
-
-principles_block   := "Principles:" NL INDENT principle_stmt+ DEDENT
-principle_stmt     := principle_kind WS natural_name WS ":=" WS principle_value NL
-principle_kind     := "form" | "sat" | "id" | "norm"
-principle_value    := "on(" ref_list ")" "," WS "body(" string_literal ")"
-
-spaces_block       := "Spaces:" NL INDENT space_stmt+ DEDENT
-space_stmt         := space_kind WS natural_name WS ":=" WS space_value NL
-space_kind         := "comb" | "seq"
-space_value        := "from(" ref_list ")" "," WS "by(" ref_list ")"
-
-boundary_block     := "Boundary:" NL INDENT boundary_stmt+ DEDENT
-boundary_stmt      := in_stmt | out_stmt | param_stmt
-
-in_stmt            := "in" subtype_opt WS natural_name WS ":=" WS in_value NL
-out_stmt           := "out" subtype_opt WS natural_name WS ":=" WS out_value NL
-param_stmt         := "param" subtype_opt WS natural_name WS ":=" WS param_value NL
-
-subtype_opt        := "" | "<" boundary_subtype ">"
-boundary_subtype   := "schema" | "range" | "enum"
-
-in_value           := "payload(" expr ")" "," WS "card(" cardinality ")" "," WS "to(" ref ")"
-out_value          := "payload(" expr ")" "," WS "card(" cardinality ")" "," WS "from(" ref ")"
-param_value        := "domain(" expr ")" "," WS "affects(" ref_list ")"
-
-ref_list           := "<" ref ("," WS ref)* ">"
-ref                := base_ref | principle_ref | space_ref | boundary_ref
-base_ref           := "Base." natural_name
-principle_ref      := "Principles." principle_kind "." natural_name
-space_ref          := "Spaces." space_kind "." natural_name
-boundary_ref       := "Boundary." boundary_kind "." natural_name
-boundary_kind      := "in" | "out" | "param"
-
-base_value         := link_literal | ref | natural_text
-expr               := ref | literal | natural_text
-literal            := string_literal | collection_literal | scalar_literal
-cardinality        := integer | integer ".." integer_or_star
-integer_or_star    := integer | "*"
+```text
+M G B P S e r s q c i o p < [ : . 空格
 ```
 
-## 7. Canonical Formatting
+## 8. 当前 lint 诊断码
 
-### 7.1 Indentation
+当前 `.sf` 使用以下诊断码：
 
-缩进规则固定如下：
+- `SFL001`：文件必须以 `MODULE 中文模块名:EnglishName:` 起始
+- `SFL002`：禁止使用 tab
+- `SFL003`：顶层块缺失或顺序不合法
+- `SFL004`：`Goal` 不是合法单行格式
+- `SFL005`：`Base` block 语句格式不合法
+- `SFL006`：`Principles` block 语句格式不合法
+- `SFL007`：`Spaces` block 语句格式不合法
+- `SFL008`：`Boundary` block 语句格式不合法
+- `SFL009`：缩进层级不是固定 4 空格步长
+- `SFL010`：引用了当前文件内未定义符号
 
-- 缩进单位固定为 `4` 个空格。
-- 禁止使用 tab。
-- `module` 体内缩进一级。
-- `Base`、`Principles`、`Spaces`、`Boundary` 内的声明再缩进一级。
-- 多行声明的续行，相对于声明头再多缩进一级。
+## 9. 禁止继续沿用的旧原型写法
 
-因此标准层级是：
+为避免旧文档和新实现混杂，下面这些写法不应再作为当前 `.sf` 规范传播：
 
-```
-0 空格   module ...
-4 空格   Goal / Base / Principles / Spaces / Boundary
-8 空格   elem / form / comb / in<schema> / ...
-12 空格  on(...) / body(...) / payload(...) / ...
-```
+- 小写 `module`
+- `rel / attr`
+- `form / id / norm`
+- `Boundary.in.名称` 之外再带 kind 或 subtype 的旧引用路径
+- `on(...) / body(...) / from(...) / by(...) / payload(...) / card(...) / affects(...)` 这类 clause-first 多行值语法，作为当前 `.sf` 的正式结构要求
 
-### 7.2 Line Breaking
+这些写法可能出现在历史讨论或旧草稿里，但不代表当前插件实现。
 
-换行规则固定如下：
+## 10. 标准示例
 
-- `Goal` 必须单行书写。
-- `Base` 中的 `elem / rel / attr` 必须单行书写。
-- `Principles` 中的 `form / sat / id / norm` 必须在 `:=` 后换行。
-- `Spaces` 中的 `comb / seq` 必须在 `:=` 后换行。
-- `Boundary` 中的 `in / out / param` 必须在 `:=` 后换行。
+下面给出一份与当前实现一致的标准示例：
 
-标准形式如下：
-
-```
-form 名称 :=
-    on(<...>),
-    body("...")
-
-comb 名称 :=
-    from(<...>),
-    by(<...>)
-
-in<schema> 名称 :=
-    payload(...),
-    card(...),
-    to(...)
-```
-
-### 7.3 Clause Layout
-
-多行声明内部的 clause 布局固定如下：
-
-- 每一行只允许一个 clause。
-- 非最后一个 clause 末尾必须带 `,`。
-- 最后一个 clause 末尾不得带 `,`。
-- clause 名与左括号之间不留空格，例如 `on(...)`、`payload(...)`。
-- `:=` 后面不得继续写同一行内容，必须直接换行。
-
-### 7.4 Blank Lines
-
-空行规则固定如下：
-
-- `Goal` 与 `Base` 之间保留一个空行。
-- 相邻 block 之间保留一个空行。
-- `Base`、`Principles`、`Spaces` 内部声明之间不插入空行。
-- `Boundary` 内部相邻声明之间保留一个空行。
-
-这里把 `Boundary` 单独拉开，是因为它直接构成模块对外表面，视觉上需要更强分隔。
-
-### 7.5 Formatter Contract
-
-formatter 和 lint 必须共同遵守下面这组规则：
-
-- 语法是否成立，按第 6 节判定。
-- 物理排版是否规范，按第 7 节判定。
-- 对于 `principle_value / space_value / in_value / out_value / param_value`，换行只影响排版，不改变 AST。
-
-## 8. Canonical Example
-
-```
-module 父子任务状态记录模块:TaskStateRecorder:
-    Goal := "记录父任务及其子任务的状态，并在子任务状态变化后同步更新父任务状态"
+```sf
+MODULE 布尔逻辑模块:BooleanLogicModule:
+    Goal := "定义由 0、1、And、Or、Not 生成的布尔表达式系统；在给定边界下，把全部合法组合按层数与可导出的定律进行分类。"
 
     Base:
-        elem 父任务提交处理逻辑 := [父任务提交处理逻辑](../../docs/back_zrx/父任务提交处理逻辑.md)
-        elem 子任务提交处理逻辑 := [子任务提交处理逻辑](../../docs/back_zrx/子任务提交处理逻辑.md)
-        attr 父任务状态记录表 := [父任务状态记录表](../../docs/back_zrx/父任务状态记录表.md)
-        attr 子任务状态记录表 := [子任务状态记录表](../../docs/back_zrx/子任务状态记录表.md)
+        set 变量集合 := "记作 V；元素写作 x、y、z 等。"
+        set 常元集合 := "元素写作 0、1。"
+        relation[2:1] And := "记作 And(e, f)；二元连接子。"
 
     Principles:
-        form 子任务提交 :=
-            on(<Base.子任务提交处理逻辑, Base.子任务状态记录表, Base.父任务状态记录表>),
-            body("接收子任务记录并同步更新父任务状态")
-        sat 子任务提交 :=
-            on(<Spaces.comb.子任务提交>),
-            body("父任务记录必须先存在，子任务提交后父任务状态必须同步更新")
+        sat And成立 := "对任意 e、f 与赋值 α，And(e, f) 成立当且仅当两者同时成立。"
+        eq 条件同一 := "若对全部赋值结果一致，则归入同一结果类。"
 
     Spaces:
-        comb 子任务提交 :=
-            from(<Base.子任务提交处理逻辑, Base.子任务状态记录表, Base.父任务状态记录表>),
-            by(<Principles.form.子任务提交, Principles.sat.子任务提交>)
+        comb 组合分类总表 := "列名固定为 {组合类型, 组合方式, 对应原则, 是否通过, 归类结果}。"
+        seq 深度零行 := "{深度零, {0, 1, x, y, z}, 通过}"
 
     Boundary:
-        in<schema> 子任务记录输入 :=
-            payload({子任务id, 父任务id, 子任务状态, 是否初次完成, 子任务附加信息}),
-            card(1),
-            to(Spaces.comb.子任务提交)
-
-        out<schema> 父任务记录输出 :=
-            payload({父任务id, 子任务总数, 已完成子任务数, 父任务状态, 父任务附加信息}),
-            card(0..1),
-            from(Spaces.comb.子任务提交)
-
-        param<enum> 子任务状态集合 :=
-            domain({pending, running, success, failed}),
-            affects(<Boundary.in.子任务记录输入, Spaces.comb.子任务提交>)
+        param<enum> 变量边界 := "{x, y, z}"
+        param<enum> 变量取值边界 := "{0, 1}"
+        param<range> 最大嵌套层数 := "[0:2]"
 ```
 
-## 9. Design Notes
+完整可运行示例见：
 
-这版语法刻意固定了三件事：
+- `tools/vscode/shelf-ai/examples/合取模块.sf`
+- `tools/vscode/shelf-ai/examples/父子任务状态记录模块.sf`
 
-- `Principles` 下直接写 `form/sat/id/norm`，不用 `rule` 再包一层；
-- `Boundary` 下直接写 `in/out/param`，subtype 挂在 kind 后面；
-- `enum/range/schema` 不再和 `Base` 混在一起，而是作为边界值类型出现。
+## 11. 实现对应
 
-这样后面的 parser、lint、completion、highlight 才能稳定围绕同一棵 AST 工作。
+为了让作者知道“规则写在哪”，当前 `.sf` 语言相关实现分布如下：
+
+- 语法定义、语义高亮 token、补全触发字符：
+  - `tools/vscode/shelf-ai/sf_grammar.js`
+- 补全条目与上下文判定：
+  - `tools/vscode/shelf-ai/sf_completion.js`
+- 实时 lint 规则：
+  - `tools/vscode/shelf-ai/sf_lint.js`
+- VS Code provider 注册、diagnostics 文案、language 接线：
+  - `tools/vscode/shelf-ai/extension.js`
+- `.sf` 语言注册与括号/自动闭合配置：
+  - `tools/vscode/shelf-ai/package.json`
+  - `tools/vscode/shelf-ai/languages/shelf-framework.json`
+- 回归测试：
+  - `tools/vscode/shelf-ai/test_sf_language.js`
+
+后续若 `.sf` 语法继续演进，应优先同时更新：
+
+1. `sf_grammar.js`
+2. `sf_completion.js`
+3. `sf_lint.js`
+4. 本文档
+
+不能只改其中一处，导致别人读到的规范与编辑器实际行为再次分叉。

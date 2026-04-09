@@ -50,6 +50,7 @@ const SF_SEMANTIC_TOKEN_TYPES = Object.freeze([
   sfGrammar.SEMANTIC_TOKEN_TYPES.block,
   sfGrammar.SEMANTIC_TOKEN_TYPES.statementKeyword,
   sfGrammar.SEMANTIC_TOKEN_TYPES.reference,
+  sfGrammar.SEMANTIC_TOKEN_TYPES.subtype,
 ]);
 const SF_SEMANTIC_TOKENS_LEGEND = new vscode.SemanticTokensLegend(
   SF_SEMANTIC_TOKEN_TYPES
@@ -92,7 +93,7 @@ const FRAMEWORK_RULE_HINTS = {
   FWL016: "带 @framework 的模块文件必须使用受控 module 路径",
   FWL017: "framework 模块只允许引用同域受控 Markdown",
   FWL018: "framework 受控目录中的附属 Markdown 必须被模块直接引用",
-  SFL001: ".sf 文件必须以 module 中文模块名:EnglishName: 起始",
+  SFL001: ".sf 文件必须以 MODULE 中文模块名:EnglishName: 起始",
   SFL002: ".sf 缩进必须使用 4 个空格，禁止 tab",
   SFL003: ".sf 顶层块顺序必须固定为 Goal / Base / Principles / Spaces / Boundary",
   SFL004: "Goal 必须使用单行 Goal := \"...\"",
@@ -100,7 +101,7 @@ const FRAMEWORK_RULE_HINTS = {
   SFL006: "Principles block 语句格式必须合法",
   SFL007: "Spaces block 语句格式必须合法",
   SFL008: "Boundary block 语句格式必须合法",
-  SFL009: ".sf 缩进层级必须固定为 4 空格步长",
+  SFL009: ".sf 声明头必须位于 8 空格层级；若右值续行，续行必须缩进到声明头之下",
   SFL010: ".sf 中的引用必须指向当前文件内已定义符号"
 };
 

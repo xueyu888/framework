@@ -1,7 +1,7 @@
 const SF_LANGUAGE_ID = "shelf-framework";
 const SF_FILE_EXTENSION = ".sf";
 
-const SF_MODULE_DECL_PATTERN = /^module\s+(?<cn>[^:]+):(?<en>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/u;
+const SF_MODULE_DECL_PATTERN = /^MODULE\s+(?<cn>[^:]+):(?<en>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/u;
 const SF_GOAL_PATTERN = /^Goal\s*:=\s*"(?<body>.+)"$/u;
 
 const SF_BLOCK_DEFINITIONS = Object.freeze([
@@ -14,94 +14,56 @@ const SF_BLOCK_DEFINITIONS = Object.freeze([
 
 const SF_STATEMENT_DEFINITIONS = Object.freeze([
   {
+    id: "set",
+    sectionId: "base",
+    keyword: "set",
+    pattern: /^set\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "set ${1:集合基} := \"${2:集合说明}\"",
+    completionLabel: "set",
+    completionDetail: "插入 Base.set 声明",
+  },
+  {
     id: "elem",
     sectionId: "base",
     keyword: "elem",
     pattern: /^elem\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "elem ${1:结构基} := ${2:[说明](../path.md)}",
+    template: "elem ${1:结构基} := \"${2:结构说明}\"",
     completionLabel: "elem",
     completionDetail: "插入 Base.elem 声明",
   },
   {
-    id: "rel",
+    id: "relation",
     sectionId: "base",
-    keyword: "rel",
-    pattern: /^rel\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "rel ${1:关系基} := ${2:关系说明}",
-    completionLabel: "rel",
-    completionDetail: "插入 Base.rel 声明",
-  },
-  {
-    id: "attr",
-    sectionId: "base",
-    keyword: "attr",
-    pattern: /^attr\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "attr ${1:属性基} := ${2:属性说明}",
-    completionLabel: "attr",
-    completionDetail: "插入 Base.attr 声明",
-  },
-  {
-    id: "form",
-    sectionId: "principles",
-    keyword: "form",
-    clauseOrder: Object.freeze(["on", "body"]),
-    template: [
-      "form ${1:形成原则} :=",
-      "    on(<${2:Base.结构基}>),",
-      "    body(\"${3:说明组合如何形成}\")",
-    ].join("\n"),
-    completionLabel: "form",
-    completionDetail: "插入 Principles.form 声明",
+    keyword: "relation",
+    pattern: /^relation(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "relation[2:1] ${1:关系基} := \"${2:关系说明}\"",
+    completionLabel: "relation[2:1]",
+    completionDetail: "插入 Base.relation 声明",
   },
   {
     id: "sat",
     sectionId: "principles",
     keyword: "sat",
-    clauseOrder: Object.freeze(["on", "body"]),
-    template: [
-      "sat ${1:成立原则} :=",
-      "    on(<${2:Spaces.comb.结果空间}>),",
-      "    body(\"${3:说明满足条件}\")",
-    ].join("\n"),
+    pattern: /^sat\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "sat ${1:成立原则} := \"${2:说明成立条件}\"",
     completionLabel: "sat",
     completionDetail: "插入 Principles.sat 声明",
   },
   {
-    id: "id",
+    id: "eq",
     sectionId: "principles",
-    keyword: "id",
-    clauseOrder: Object.freeze(["on", "body"]),
-    template: [
-      "id ${1:判同原则} :=",
-      "    on(<${2:Spaces.comb.结果空间}>),",
-      "    body(\"${3:说明什么算同一个}\")",
-    ].join("\n"),
-    completionLabel: "id",
-    completionDetail: "插入 Principles.id 声明",
-  },
-  {
-    id: "norm",
-    sectionId: "principles",
-    keyword: "norm",
-    clauseOrder: Object.freeze(["on", "body"]),
-    template: [
-      "norm ${1:规范化原则} :=",
-      "    on(<${2:Spaces.comb.结果空间}>),",
-      "    body(\"${3:说明标准写法}\")",
-    ].join("\n"),
-    completionLabel: "norm",
-    completionDetail: "插入 Principles.norm 声明",
+    keyword: "eq",
+    pattern: /^eq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "eq ${1:判同原则} := \"${2:说明何时归入同一结果类}\"",
+    completionLabel: "eq",
+    completionDetail: "插入 Principles.eq 声明",
   },
   {
     id: "comb",
     sectionId: "spaces",
     keyword: "comb",
-    clauseOrder: Object.freeze(["from", "by"]),
-    template: [
-      "comb ${1:结果组合} :=",
-      "    from(<${2:Base.结构基}>),",
-      "    by(<${3:Principles.form.形成原则}>)",
-    ].join("\n"),
+    pattern: /^comb\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "comb ${1:组合分类} := \"${2:说明这一类组合如何得到}\"",
     completionLabel: "comb",
     completionDetail: "插入 Spaces.comb 声明",
   },
@@ -109,12 +71,8 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     id: "seq",
     sectionId: "spaces",
     keyword: "seq",
-    clauseOrder: Object.freeze(["from", "by"]),
-    template: [
-      "seq ${1:有序结果} :=",
-      "    from(<${2:Base.结构基}>),",
-      "    by(<${3:Principles.form.形成原则}>)",
-    ].join("\n"),
+    pattern: /^seq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "seq ${1:候选序列} := \"${2:说明这一组候选}\"",
     completionLabel: "seq",
     completionDetail: "插入 Spaces.seq 声明",
   },
@@ -123,13 +81,8 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     sectionId: "boundary",
     keyword: "in",
     subtypeRequired: true,
-    clauseOrder: Object.freeze(["payload", "card", "to"]),
-    template: [
-      "in<schema> ${1:输入边界} :=",
-      "    payload(${2:{...}}),",
-      "    card(${3:1}),",
-      "    to(${4:Spaces.comb.结果组合})",
-    ].join("\n"),
+    pattern: /^in<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "in<view> ${1:输入边界} := \"${2:输入约束}\"",
     completionLabel: "in<schema>",
     completionDetail: "插入 Boundary.in 声明",
   },
@@ -138,39 +91,40 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     sectionId: "boundary",
     keyword: "out",
     subtypeRequired: true,
-    clauseOrder: Object.freeze(["payload", "card", "from"]),
-    template: [
-      "out<schema> ${1:输出边界} :=",
-      "    payload(${2:{...}}),",
-      "    card(${3:1}),",
-      "    from(${4:Spaces.comb.结果组合})",
-    ].join("\n"),
+    pattern: /^out<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "out<view> ${1:输出边界} := \"${2:输出约束}\"",
     completionLabel: "out<schema>",
     completionDetail: "插入 Boundary.out 声明",
   },
   {
-    id: "param",
+    id: "param-enum",
     sectionId: "boundary",
     keyword: "param",
     subtypeRequired: true,
-    clauseOrder: Object.freeze(["domain", "affects"]),
-    template: [
-      "param<enum> ${1:参数边界} :=",
-      "    domain(${2:{a, b}}),",
-      "    affects(<${3:Boundary.in.输入边界, Spaces.comb.结果组合}>)",
-    ].join("\n"),
+    pattern: /^param<enum>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "param<enum> ${1:参数边界} := \"${2:{a, b}}\"",
     completionLabel: "param<enum>",
     completionDetail: "插入 Boundary.param 声明",
+  },
+  {
+    id: "param-range",
+    sectionId: "boundary",
+    keyword: "param",
+    subtypeRequired: true,
+    pattern: /^param<range>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "param<range> ${1:范围边界} := \"${2:[0:2]}\"",
+    completionLabel: "param<range>",
+    completionDetail: "插入 Boundary.param 范围声明",
   },
 ]);
 
 const SF_TOP_LEVEL_TEMPLATES = Object.freeze([
   {
     id: "module",
-    label: "module 中文模块名:EnglishName:",
+    label: "MODULE 中文模块名:EnglishName:",
     detail: "插入模块声明",
-    documentation: "独立 .sf 文件以 module 声明起始。",
-    insertText: "module ${1:中文模块名}:${2:EnglishName}:",
+    documentation: "独立 .sf 文件以 MODULE 声明起始。",
+    insertText: "MODULE ${1:中文模块名}:${2:EnglishName}:",
   },
   {
     id: "goal",
@@ -210,41 +164,30 @@ const SF_TOP_LEVEL_TEMPLATES = Object.freeze([
 ]);
 
 const SF_TEMPLATE_SNIPPET_BODY = Object.freeze([
-  "module ${1:中文模块名}:${2:EnglishName}:",
+  "MODULE ${1:中文模块名}:${2:EnglishName}:",
   "    Goal := \"${3:模块目标}\"",
   "",
   "    Base:",
-  "        elem ${4:结构基} := ${5:[说明](../path.md)}",
+  "        set ${4:集合基} := \"${5:集合说明}\"",
+  "        elem ${6:结构基} := \"${7:结构说明}\"",
+  "        relation[2:1] ${8:关系基} := \"${9:关系说明}\"",
   "",
   "    Principles:",
-  "        form ${6:形成原则} :=",
-  "            on(<${7:Base.结构基}>),",
-  "            body(\"${8:说明组合如何形成}\")",
+  "        sat ${10:成立原则} := \"${11:说明成立条件}\"",
+  "        eq ${12:判同原则} := \"${13:说明何时归入同一结果类}\"",
   "",
   "    Spaces:",
-  "        comb ${9:结果组合} :=",
-  "            from(<${10:Base.结构基}>),",
-  "            by(<${11:Principles.form.形成原则}>)",
+  "        comb ${14:组合分类} := \"${15:说明这一类组合如何得到}\"",
   "",
   "    Boundary:",
-  "        in<schema> ${12:输入边界} :=",
-  "            payload(${13:{...}}),",
-  "            card(${14:1}),",
-  "            to(${15:Spaces.comb.结果组合})",
-  "",
-  "        out<schema> ${16:输出边界} :=",
-  "            payload(${17:{...}}),",
-  "            card(${18:1}),",
-  "            from(${19:Spaces.comb.结果组合})",
-  "",
-  "        param<enum> ${20:参数边界} :=",
-  "            domain(${21:{a, b}}),",
-  "            affects(<${22:Boundary.in.输入边界, Spaces.comb.结果组合}>)",
+  "        param<enum> ${16:变量边界} := \"${17:{x, y, z}}\"",
+  "        param<enum> ${18:变量取值边界} := \"${19:{0, 1}}\"",
+  "        param<range> ${20:最大嵌套层数} := \"${21:[0:2]}\"",
 ]);
 
-const SF_REFERENCE_PATTERN = /\b(?:Base|Principles\.(?:form|sat|id|norm)|Spaces\.(?:comb|seq)|Boundary\.(?:in|out|param))\.[^,\s<>(){}[\]]+/gu;
-const SF_CLAUSE_PATTERN = /\b(?:on|body|from|by|payload|card|to|from|domain|affects)\b/gu;
-const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>elem|rel|attr|form|sat|id|norm|comb|seq|in|out|param)(?<subtype><(?:schema|range|enum)>)?\s/u;
+const SF_REFERENCE_PATTERN = /\b(?:Base|Principles|Spaces|Boundary)\.[^,\s，。；;:：<>(){}[\]"']+/gu;
+const SF_CLAUSE_PATTERN = /$^/gu;
+const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|relation|sat|eq|comb|seq|in|out|param)(?<subtype>(?:\[[^\]]+\]|<[^>]+>))?\s/u;
 
 const SEMANTIC_TOKEN_TYPES = Object.freeze({
   block: "type",
@@ -331,7 +274,7 @@ function collectShelfFrameworkSemanticTokens(text) {
       tokens.push({
         line: lineIndex,
         startChar: 0,
-        length: "module".length,
+        length: "MODULE".length,
         tokenType: SEMANTIC_TOKEN_TYPES.statementKeyword,
       });
     }
@@ -403,7 +346,7 @@ function collectShelfFrameworkSemanticTokens(text) {
 }
 
 function getShelfFrameworkCompletionTriggerChars() {
-  return ["m", "G", "B", "P", "S", "i", "o", "p", "<", ":", ".", " "];
+  return ["M", "G", "B", "P", "S", "e", "r", "s", "q", "c", "i", "o", "p", "<", "[", ":", ".", " "];
 }
 
 module.exports = {

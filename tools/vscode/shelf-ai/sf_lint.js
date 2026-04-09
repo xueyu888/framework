@@ -85,7 +85,7 @@ function validateTopLevelStructure({ file, lines, issues }) {
         line: firstNonEmptyIndex >= 0 ? firstNonEmptyIndex + 1 : 1,
         column: 1,
         code: "SFL001",
-        message: "`.sf` 文件必须以 `module 中文模块名:EnglishName:` 起始。",
+        message: "`.sf` 文件必须以 `MODULE 中文模块名:EnglishName:` 起始。",
       })
     );
   }
@@ -138,28 +138,68 @@ function validateTopLevelStructure({ file, lines, issues }) {
   return entries;
 }
 
-function validateBaseBlock({ file, entries, lines, issues, definitions, references }) {
-  const blockLines = sliceBlockLines(lines, entries, "base").filter((item) => sfGrammar.trimLine(item.text));
+function validateFlatBlock({
+  file,
+  entries,
+  lines,
+  issues,
+  definitions,
+  references,
+  sectionId,
+  code,
+  definitionPathPrefix,
+  emptyMessage,
+  invalidMessage,
+}) {
+  const blockLines = sliceBlockLines(lines, entries, sectionId).filter((item) => sfGrammar.trimLine(item.text));
   if (!blockLines.length) {
     issues.push(
       createIssue({
         file,
-        line: findEntry(entries, "base")?.line || 1,
+        line: findEntry(entries, sectionId)?.line || 1,
         column: 1,
-        code: "SFL005",
-        message: "`Base` block 至少需要一个 `elem/rel/attr` 声明。",
+        code,
+        message: emptyMessage,
       })
     );
     return;
   }
 
+  const statements = [];
+  let currentStatement = null;
+
   for (const item of blockLines) {
-    const trimmed = sfGrammar.trimLine(item.text);
-    if (sfGrammar.getIndent(item.text) !== 8) {
+    const indent = sfGrammar.getIndent(item.text);
+    if (indent === 8) {
+      currentStatement = {
+        head: item,
+        lines: [item],
+      };
+      statements.push(currentStatement);
+      continue;
+    }
+    if (indent > 8 && currentStatement) {
+      currentStatement.lines.push(item);
+      continue;
+    }
+    issues.push(
+      createIssue({
+        file,
+        line: item.line,
+        column: 1,
+        code: "SFL009",
+        message: "`.sf` 声明缩进必须使用 4 空格层级；若右值续行，续行必须缩进到声明头之下。",
+      })
+    );
+  }
+
+  for (const statement of statements) {
+    const trimmed = sfGrammar.trimLine(statement.head.text);
+    if (sfGrammar.getIndent(statement.head.text) !== 8) {
       issues.push(
         createIssue({
           file,
-          line: item.line,
+          line: statement.head.line,
           column: 1,
           code: "SFL009",
           message: "`.sf` 声明缩进必须使用 4 空格层级。",
@@ -167,16 +207,16 @@ function validateBaseBlock({ file, entries, lines, issues, definitions, referenc
       );
       continue;
     }
-    const matchedDefinition = sfGrammar.getStatementDefinitionsForSection("base")
+    const matchedDefinition = sfGrammar.getStatementDefinitionsForSection(sectionId)
       .find((definition) => definition.pattern.test(trimmed));
     if (!matchedDefinition) {
       issues.push(
         createIssue({
           file,
-          line: item.line,
-          column: markerColumn(item.text),
-          code: "SFL005",
-          message: "`Base` 内只允许 `elem/rel/attr 名称 := 值`。",
+          line: statement.head.line,
+          column: markerColumn(statement.head.text),
+          code,
+          message: invalidMessage,
         })
       );
       continue;
@@ -184,163 +224,13 @@ function validateBaseBlock({ file, entries, lines, issues, definitions, referenc
     const match = trimmed.match(matchedDefinition.pattern);
     const name = String(match?.groups?.name || "").trim();
     if (name) {
-      definitions.add(`Base.${name}`);
+      definitions.add(`${definitionPathPrefix}.${name}`);
     }
-    for (const ref of collectRefs(trimmed)) {
-      references.push({ ref, line: item.line, column: markerColumn(item.text), file });
-    }
-  }
-}
-
-function validateStructuredBlock({
-  file,
-  entries,
-  lines,
-  sectionId,
-  issues,
-  definitions,
-  references,
-  code,
-  allowedKinds,
-  clauseOrderByKind,
-  definitionPathPrefix,
-}) {
-  const blockLines = sliceBlockLines(lines, entries, sectionId);
-  const nonEmptyLines = blockLines.filter((item) => sfGrammar.trimLine(item.text));
-  if (!nonEmptyLines.length) {
-    issues.push(
-      createIssue({
-        file,
-        line: findEntry(entries, sectionId)?.line || 1,
-        column: 1,
-        code,
-        message: `\`${definitionPathPrefix}\` block 不能为空。`,
-      })
-    );
-    return;
-  }
-
-  let index = 0;
-  let parsedCount = 0;
-
-  while (index < nonEmptyLines.length) {
-    const head = nonEmptyLines[index];
-    const headTrimmed = sfGrammar.trimLine(head.text);
-    if (sfGrammar.getIndent(head.text) !== 8) {
-      issues.push(
-        createIssue({
-          file,
-          line: head.line,
-          column: 1,
-          code: "SFL009",
-          message: "`.sf` 声明头必须位于 8 空格缩进层。",
-        })
-      );
-      index += 1;
-      continue;
-    }
-
-    const headMatch = headTrimmed.match(
-      /^(?<kind>[a-z]+)(?<subtype><(?:schema|range|enum)>)?\s+(?<name>[^:=]+?)\s*:=\s*$/u
-    );
-    if (!headMatch) {
-      issues.push(
-        createIssue({
-          file,
-          line: head.line,
-          column: markerColumn(head.text),
-          code,
-          message: `\`${definitionPathPrefix}\` 声明头格式不合法。`,
-        })
-      );
-      index += 1;
-      continue;
-    }
-
-    const kind = String(headMatch.groups?.kind || "");
-    const subtype = String(headMatch.groups?.subtype || "");
-    const name = String(headMatch.groups?.name || "").trim();
-    if (!allowedKinds.has(kind)) {
-      issues.push(
-        createIssue({
-          file,
-          line: head.line,
-          column: markerColumn(head.text),
-          code,
-          message: `\`${definitionPathPrefix}\` 不允许 kind \`${kind}\`。`,
-        })
-      );
-      index += 1;
-      continue;
-    }
-    if (sectionId === "boundary" && !subtype) {
-      issues.push(
-        createIssue({
-          file,
-          line: head.line,
-          column: markerColumn(head.text),
-          code,
-          message: "`Boundary` 声明必须显式写子类型，如 `in<schema>`、`param<enum>`。",
-        })
-      );
-    }
-
-    definitions.add(`${definitionPathPrefix}.${kind}.${name}`);
-    parsedCount += 1;
-
-    const expectedClauses = clauseOrderByKind[kind] || [];
-    for (let clauseIndex = 0; clauseIndex < expectedClauses.length; clauseIndex += 1) {
-      index += 1;
-      const clauseLine = nonEmptyLines[index];
-      if (!clauseLine) {
-        issues.push(
-          createIssue({
-            file,
-            line: head.line,
-            column: markerColumn(head.text),
-            code,
-            message: `\`${kind} ${name}\` 缺少 clause：${expectedClauses[clauseIndex]}(...)`,
-          })
-        );
-        break;
-      }
-      const clauseTrimmed = sfGrammar.trimLine(clauseLine.text);
-      const clauseIndent = sfGrammar.getIndent(clauseLine.text);
-      const isLastClause = clauseIndex === expectedClauses.length - 1;
-      const expectedPattern = new RegExp(
-        `^${expectedClauses[clauseIndex]}\\(.+\\)${isLastClause ? "" : ","}$`,
-        "u"
-      );
-
-      if (clauseIndent !== 12 || !expectedPattern.test(clauseTrimmed)) {
-        issues.push(
-          createIssue({
-            file,
-            line: clauseLine.line,
-            column: markerColumn(clauseLine.text),
-            code,
-            message: `\`${kind} ${name}\` 的 clause 必须按固定顺序书写：${expectedClauses.join(" / ")}。`,
-          })
-        );
-      }
-      for (const ref of collectRefs(clauseTrimmed)) {
-        references.push({ ref, line: clauseLine.line, column: markerColumn(clauseLine.text), file });
+    for (const lineItem of statement.lines) {
+      for (const ref of collectRefs(sfGrammar.trimLine(lineItem.text))) {
+        references.push({ ref, line: lineItem.line, column: markerColumn(lineItem.text), file });
       }
     }
-
-    index += 1;
-  }
-
-  if (!parsedCount) {
-    issues.push(
-      createIssue({
-        file,
-        line: findEntry(entries, sectionId)?.line || 1,
-        column: 1,
-        code,
-        message: `\`${definitionPathPrefix}\` block 中没有可解析声明。`,
-      })
-    );
   }
 }
 
@@ -366,8 +256,20 @@ function lintShelfFrameworkFile({ filePath, text }) {
   }
 
   const entries = validateTopLevelStructure({ file, lines, issues });
-  validateBaseBlock({ file, entries, lines, issues, definitions, references });
-  validateStructuredBlock({
+  validateFlatBlock({
+    file,
+    entries,
+    lines,
+    issues,
+    definitions,
+    references,
+    sectionId: "base",
+    code: "SFL005",
+    definitionPathPrefix: "Base",
+    emptyMessage: "`Base` block 至少需要一个 `set/elem/relation` 声明。",
+    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`elem 名称 := 值` 或 `relation[shape] 名称 := 值`。",
+  });
+  validateFlatBlock({
     file,
     entries,
     lines,
@@ -376,16 +278,11 @@ function lintShelfFrameworkFile({ filePath, text }) {
     definitions,
     references,
     code: "SFL006",
-    allowedKinds: new Set(["form", "sat", "id", "norm"]),
-    clauseOrderByKind: {
-      form: ["on", "body"],
-      sat: ["on", "body"],
-      id: ["on", "body"],
-      norm: ["on", "body"],
-    },
     definitionPathPrefix: "Principles",
+    emptyMessage: "`Principles` block 至少需要一个 `sat/eq` 声明。",
+    invalidMessage: "`Principles` 内只允许 `sat 名称 := 值` 或 `eq 名称 := 值`。",
   });
-  validateStructuredBlock({
+  validateFlatBlock({
     file,
     entries,
     lines,
@@ -394,14 +291,11 @@ function lintShelfFrameworkFile({ filePath, text }) {
     definitions,
     references,
     code: "SFL007",
-    allowedKinds: new Set(["comb", "seq"]),
-    clauseOrderByKind: {
-      comb: ["from", "by"],
-      seq: ["from", "by"],
-    },
     definitionPathPrefix: "Spaces",
+    emptyMessage: "`Spaces` block 至少需要一个 `comb/seq` 声明。",
+    invalidMessage: "`Spaces` 内只允许 `comb 名称 := 值` 或 `seq 名称 := 值`。",
   });
-  validateStructuredBlock({
+  validateFlatBlock({
     file,
     entries,
     lines,
@@ -410,13 +304,9 @@ function lintShelfFrameworkFile({ filePath, text }) {
     definitions,
     references,
     code: "SFL008",
-    allowedKinds: new Set(["in", "out", "param"]),
-    clauseOrderByKind: {
-      in: ["payload", "card", "to"],
-      out: ["payload", "card", "from"],
-      param: ["domain", "affects"],
-    },
     definitionPathPrefix: "Boundary",
+    emptyMessage: "`Boundary` block 至少需要一个 `param<...>` 声明。",
+    invalidMessage: "`Boundary` 内只允许 `param<子类型> 名称 := 值`、`in<子类型> 名称 := 值` 或 `out<子类型> 名称 := 值`。",
   });
 
   for (const reference of references) {

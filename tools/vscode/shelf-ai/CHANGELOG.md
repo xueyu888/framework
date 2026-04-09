@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.27 - 2026-04-09
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.26..shelf-ai-v0.1.27`.
+- Reworked the `.sf` protocol docs and README entry so the experimental language now documents direct `Base.xxx` boundary bindings, multi-line right-hand values, ordered-collection notation, and the current `t(i)` time-point writing convention in one coherent authoring path.
+- Updated the extension-side `.sf` lint/test path to accept declaration heads with indented continuation lines and to surface a more precise `SFL009` message when continuation indentation is wrong.
+- Synced the plugin evidence snapshot and the accompanying back_zrx draft docs so the “first completion” example now distinguishes historical completion facts from the current trigger event instead of mixing the two concepts.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.27`.
+
+## 0.1.26 - 2026-04-08
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.25..shelf-ai-v0.1.26`.
+- Added a keyword-first `.sf` authoring preview backed by shared grammar/completion/lint/highlight rules, including the current `MODULE` header, `set/elem/relation[...]`, `sat/eq`, `comb/seq`, and `param<enum|range>` statement shapes.
+- Synced the extension-side `.sf` diagnostics, completion context detection, semantic token legend, examples, and tests to the new single-line authoring style instead of the earlier clause-based prototype.
+- Restored the release validation chain by fixing Chunk_Tagging module-scoped `P15` config paths and static contract bundle discovery, so `validate_canonical.py --check-changes` passes again before packaging and push.
+- Revalidated repository/plugin checks, then repackaged and reinstalled the local VSIX from the validated `0.1.26` workspace.
+
 ## 0.1.25 - 2026-04-03
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.24..shelf-ai-v0.1.25`.
