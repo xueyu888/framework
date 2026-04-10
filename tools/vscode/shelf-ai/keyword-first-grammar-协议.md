@@ -49,7 +49,7 @@ MODULE 中文模块名:EnglishName:
         op[2:1] 名称 := "..."
 
     Principles:
-        sat 名称 := "..."
+         名称 := "..."
         eq 名称 := "..."
 
     Spaces:
