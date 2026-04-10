@@ -67,7 +67,7 @@
       ]
     },
     "block": {
-      "match": "^(\\s{4})(Base:|Principles:|Spaces:|Boundary:)$",
+      "match": "^(\\s{4})(Base:|Principle:|Space:|Boundary:)$",
       "captures": {
         "2": {
           "name": "entity.name.section.shelf-framework"
@@ -127,7 +127,7 @@
       ]
     },
     "declarationPlain": {
-      "begin": "^(\\s{8})(set|elem|struct|seq|sat|eq|comb)(\\s+)([^:=]+?)(\\s*:=\\s*)",
+      "begin": "^(\\s{8})(set|elem|struct|seq|map|sat|eq|comb)(\\s+)([^:=]+?)(\\s*:=\\s*)",
       "beginCaptures": {
         "2": {
           "name": "keyword.control.shelf-framework"
@@ -165,7 +165,7 @@
     },
     "reference": {
       "name": "entity.name.namespace.shelf-framework",
-      "match": "\\b(?:Base|Principles|Spaces|Boundary)\\.[^,\\s，。；;:：<>(){}[\\]\"']+"
+      "match": "\\b(?:Base|Principle|Space|Boundary)\\.[^,\\s，、。；;:：<>(){}[\\]\"']+"
     }
   }
 }

@@ -17,6 +17,10 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(extensionRoot, relativePath), "utf8");
 }
 
+function lineIndexOf(text, marker) {
+  return String(text || "").split("\n").findIndex((line) => line.includes(marker));
+}
+
 const VALID_SAMPLE = [
   "MODULE 布尔逻辑模块:BooleanLogicModule:",
   "    Goal := \"定义由 0、1、And、Or、Not 生成的布尔表达式系统；在给定边界下，把全部合法组合按层数与可导出的定律进行分类。\"",
@@ -26,6 +30,7 @@ const VALID_SAMPLE = [
   "        set 常元集合 := \"元素写作 0、1；0 表示恒假，1 表示恒真。\"",
   "        struct 表达式树 := \"记作 Tree；它表示由常元、变量与连接子递归生成的复合结构。\"",
   "        seq 变元序列 := \"记作 <x, y, z>；表示变量的一个有序排列。\"",
+  "        map 等价类索引 := \"记作 ClassOf；它把表达式映射到按 Principle.条件同一 划分的结果类。\"",
   "        op[2:1] And := \"记作 And(e, f)；二元连接子，表示 e 与 f 同时取 1。\"",
   "        op[2:1] Or := \"记作 Or(e, f)；二元连接子，表示 e 与 f 至少一侧取 1。\"",
   "        op[1:1] Not := \"记作 Not(e)；一元连接子，表示把 e 的 0/1 取值翻转。\"",
@@ -33,7 +38,7 @@ const VALID_SAMPLE = [
   "        op[1:1] 赋值函数 := \"记作 α；它只对变量赋值，即 α: V -> {0, 1}。\"",
   "        set 赋值全体 := \"记作 Ω；它由全部赋值函数 α 构成，即 Ω = { α | α: V -> {0, 1} }。\"",
   "",
-  "    Principles:",
+  "    Principle:",
   "        sat 成立记号 := \"Sat(e, α) 表示表达式 e 在赋值 α 下的值为 1。\"",
   "        eq 同一记号 := \"e ≈ f 表示 e 与 f 属于同一个结果类；符号 ≈ 读作 等价。\"",
   "        sat 常元成立 := \"对任意 α ∈ Ω，Sat(1, α) 恒成立，Sat(0, α) 恒不成立。\"",
@@ -42,12 +47,13 @@ const VALID_SAMPLE = [
   "        sat Or成立 := \"对任意 e、f ∈ T 与任意 α ∈ Ω，Sat(Or(e, f), α) 成立，当且仅当 Sat(e, α) 与 Sat(f, α) 至少有一者成立。\"",
   "        sat Not成立 := \"对任意 e ∈ T 与任意 α ∈ Ω，Sat(Not(e), α) 成立，当且仅当 Sat(e, α) 不成立。\"",
   "        eq 条件同一 := \"对任意 e、f ∈ T，若对所有 α ∈ Ω，Sat(e, α) 与 Sat(f, α) 的结果完全一致，则 e ≈ f。\"",
+  "        map 结果归并 := \"把满足 Principle.条件同一 的表达式映射到同一个 Base.等价类索引 项。\"",
   "",
-  "    Spaces:",
+  "    Space:",
   "        set 定律候选集合 := \"记作 R；表示待判定的候选结果集合。\"",
   "        comb 深度零组合 := \"在 Boundary.变量边界 与常元 0、1 下得到的全部 0 层合法组合：(0, 1, x, y, z)。\"",
   "        comb 交换律候选 := \"深度一组合 与 深度二组合 中，一切形如 (And(a, b), And(b, a)) 与 (Or(a, b), Or(b, a)) 的组合。\"",
-  "        comb 定律结果分类 := \"对以上各候选分别应用 Principles.条件同一；凡成立条件完全一致者，归入同一结果类。\"",
+  "        comb 定律结果分类 := \"对以上各候选分别应用 Principle.条件同一；凡成立条件完全一致者，归入同一结果类。\"",
   "",
   "    Boundary:",
   "        in<enum> 输入变量 := Base.变量集合",
@@ -66,10 +72,10 @@ const MULTILINE_ORDERED_COLLECTION_SAMPLE = [
   "        set 传入完成状态 := {finished, unfinished}",
   "        set 首次完成标记 := {yes, no}",
   "",
-  "    Principles:",
+  "    Principle:",
   "        sat 子任务不可回退 := 已完成的子任务不可回退为未完成。",
   "",
-  "    Spaces:",
+  "    Space:",
   "        seq 情况总表 := <  <recorded, finished, yes>,",
   "                        <recorded, unfinished, no>,",
   "                        <unrecorded, finished, no>>",
@@ -91,10 +97,10 @@ const BASE_SEQ_AND_SPACES_SET_SAMPLE = [
   "        op[2:1] 精确匹配算子 := \"记作 M(s, p)；输入为一对 Base.字符串，输出为 Base.匹配状态。\"",
   "        set 匹配状态 := {yes, no}",
   "",
-  "    Principles:",
+  "    Principle:",
   "        sat 匹配状态定义 := \"对任意 s, p ∈ Base.字符串，M(s, p) = yes <=> s = p；M(s, p) = no <=> s != p。\"",
   "",
-  "    Spaces:",
+  "    Space:",
   "        set 结果空间 := {<s, p, yes> | s ∈ Base.字符串, p ∈ Base.字符串, s = p} ∪ {<s, p, no> | s ∈ Base.字符串, p ∈ Base.字符串, s != p}",
   "",
   "    Boundary:",
@@ -194,7 +200,28 @@ function main() {
   assert.strictEqual(
     crossBlockKindIssues.length,
     0,
-    "Base.struct, Base.seq, Base.op, Spaces.set, and Boundary in/out should pass lint"
+    "Base.struct, Base.seq, Base.op, Space.set, and Boundary in/out should pass lint"
+  );
+
+  const taskRecorderExampleIssues = sfLint.lintShelfFrameworkFile({
+    filePath: path.join(extensionRoot, "examples", "父子任务状态记录模块.sf"),
+    text: readText("examples/父子任务状态记录模块.sf"),
+  });
+  assert.strictEqual(
+    taskRecorderExampleIssues.length,
+    0,
+    "the task-recorder example should stay aligned with the current .sf grammar, including map references separated by Chinese punctuation"
+  );
+
+  const pluralHeadingIssues = sfLint.lintShelfFrameworkFile({
+    filePath: "/tmp/plural-headings.sf",
+    text: VALID_SAMPLE
+      .replace("    Principle:", "    Principles:")
+      .replace("    Space:", "    Spaces:"),
+  });
+  assert(
+    pluralHeadingIssues.some((issue) => issue.code === "SFL003"),
+    "plural Principle/Space headings should be rejected now that the grammar uses singular block names"
   );
 
   const invalidBoundarySample = VALID_SAMPLE.replace("param<range> 最大嵌套层数", "param 最大嵌套层数");
@@ -248,7 +275,7 @@ function main() {
 
   const baseEntries = sfCompletion.getShelfFrameworkCompletionEntries("        ", "", {
     documentText: VALID_SAMPLE,
-    lineNumber: 4,
+    lineNumber: lineIndexOf(VALID_SAMPLE, "Base:") + 1,
   });
   assert(
     baseEntries.some((entry) => entry.label === "op[2:1]"),
@@ -266,23 +293,40 @@ function main() {
     baseEntries.some((entry) => entry.label === "seq"),
     "base context must offer seq"
   );
+  assert(
+    baseEntries.some((entry) => entry.label === "map"),
+    "base context must offer map"
+  );
+
+  const principlesEntries = sfCompletion.getShelfFrameworkCompletionEntries("        ", "", {
+    documentText: VALID_SAMPLE,
+    lineNumber: lineIndexOf(VALID_SAMPLE, "Principle:") + 1,
+  });
+  assert(
+    principlesEntries.some((entry) => entry.label === "map"),
+    "principle context must offer map"
+  );
+  assert(
+    !principlesEntries.some((entry) => entry.label === "op[2:1]"),
+    "principle context must not offer op[2:1]"
+  );
 
   const spacesEntries = sfCompletion.getShelfFrameworkCompletionEntries("        ", "", {
     documentText: VALID_SAMPLE,
-    lineNumber: 25,
+    lineNumber: lineIndexOf(VALID_SAMPLE, "Space:") + 1,
   });
   assert(
     spacesEntries.some((entry) => entry.label === "set"),
-    "spaces context must offer set"
+    "space context must offer set"
   );
   assert(
     spacesEntries.some((entry) => entry.label === "comb"),
-    "spaces context must offer comb"
+    "space context must offer comb"
   );
 
   const boundaryEntries = sfCompletion.getShelfFrameworkCompletionEntries("        ", "", {
     documentText: VALID_SAMPLE,
-    lineNumber: 31,
+    lineNumber: lineIndexOf(VALID_SAMPLE, "Boundary:") + 1,
   });
   assert(
     !boundaryEntries.some((entry) => entry.label === "op[2:1]"),

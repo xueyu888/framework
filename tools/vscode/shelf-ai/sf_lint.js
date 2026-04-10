@@ -58,7 +58,7 @@ function sliceBlockLines(lines, entries, sectionId) {
     return [];
   }
   const startIndex = start.line;
-  const order = ["goal", "base", "principles", "spaces", "boundary"];
+  const order = ["goal", "base", "principle", "space", "boundary"];
   const currentOrderIndex = order.indexOf(sectionId);
   let endIndex = lines.length;
   for (let index = currentOrderIndex + 1; index < order.length; index += 1) {
@@ -90,7 +90,7 @@ function validateTopLevelStructure({ file, lines, issues }) {
     );
   }
 
-  const expectedOrder = ["goal", "base", "principles", "spaces", "boundary"];
+  const expectedOrder = ["goal", "base", "principle", "space", "boundary"];
   let cursor = 0;
   for (const expected of expectedOrder) {
     const entry = findEntry(entries, expected);
@@ -114,7 +114,7 @@ function validateTopLevelStructure({ file, lines, issues }) {
           line: entry.line,
           column: markerColumn(entry.raw),
           code: "SFL003",
-          message: "顶层块顺序必须固定为 Goal / Base / Principles / Spaces / Boundary。",
+          message: "顶层块顺序必须固定为 Goal / Base / Principle / Space / Boundary。",
         })
       );
     } else {
@@ -266,34 +266,34 @@ function lintShelfFrameworkFile({ filePath, text }) {
     sectionId: "base",
     code: "SFL005",
     definitionPathPrefix: "Base",
-    emptyMessage: "`Base` block 至少需要一个 `set/elem/struct/seq/op` 声明。",
-    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`elem 名称 := 值`、`struct 名称 := 值`、`seq 名称 := 值` 或 `op[shape] 名称 := 值`。",
+    emptyMessage: "`Base` block 至少需要一个 `set/elem/struct/seq/map/op` 声明。",
+    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`elem 名称 := 值`、`struct 名称 := 值`、`seq 名称 := 值`、`map 名称 := 值` 或 `op[shape] 名称 := 值`。",
   });
   validateFlatBlock({
     file,
     entries,
     lines,
-    sectionId: "principles",
+    sectionId: "principle",
     issues,
     definitions,
     references,
     code: "SFL006",
-    definitionPathPrefix: "Principles",
-    emptyMessage: "`Principles` block 至少需要一个 `sat/eq` 声明。",
-    invalidMessage: "`Principles` 内只允许 `sat 名称 := 值` 或 `eq 名称 := 值`。",
+    definitionPathPrefix: "Principle",
+    emptyMessage: "`Principle` block 至少需要一个 `sat/eq/map` 声明。",
+    invalidMessage: "`Principle` 内只允许 `sat 名称 := 值`、`eq 名称 := 值` 或 `map 名称 := 值`。",
   });
   validateFlatBlock({
     file,
     entries,
     lines,
-    sectionId: "spaces",
+    sectionId: "space",
     issues,
     definitions,
     references,
     code: "SFL007",
-    definitionPathPrefix: "Spaces",
-    emptyMessage: "`Spaces` block 至少需要一个 `set/comb/seq` 声明。",
-    invalidMessage: "`Spaces` 内只允许 `set 名称 := 值`、`comb 名称 := 值` 或 `seq 名称 := 值`。",
+    definitionPathPrefix: "Space",
+    emptyMessage: "`Space` block 至少需要一个 `set/comb/seq` 声明。",
+    invalidMessage: "`Space` 内只允许 `set 名称 := 值`、`comb 名称 := 值` 或 `seq 名称 := 值`。",
   });
   validateFlatBlock({
     file,

@@ -7,8 +7,8 @@ const SF_GOAL_PATTERN = /^Goal\s*:=\s*"(?<body>.+)"$/u;
 const SF_BLOCK_DEFINITIONS = Object.freeze([
   { id: "goal", label: "Goal", heading: "Goal" },
   { id: "base", label: "Base", heading: "Base:" },
-  { id: "principles", label: "Principles", heading: "Principles:" },
-  { id: "spaces", label: "Spaces", heading: "Spaces:" },
+  { id: "principle", label: "Principle", heading: "Principle:" },
+  { id: "space", label: "Space", heading: "Space:" },
   { id: "boundary", label: "Boundary", heading: "Boundary:" },
 ]);
 
@@ -50,6 +50,15 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     completionDetail: "插入 Base.seq 声明",
   },
   {
+    id: "map-base",
+    sectionId: "base",
+    keyword: "map",
+    pattern: /^map\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "map ${1:映射基} := \"${2:映射说明}\"",
+    completionLabel: "map",
+    completionDetail: "插入 Base.map 声明",
+  },
+  {
     id: "op-base",
     sectionId: "base",
     keyword: "op",
@@ -61,48 +70,57 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
   },
   {
     id: "sat",
-    sectionId: "principles",
+    sectionId: "principle",
     keyword: "sat",
     pattern: /^sat\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "sat ${1:成立原则} := \"${2:说明成立条件}\"",
     completionLabel: "sat",
-    completionDetail: "插入 Principles.sat 声明",
+    completionDetail: "插入 Principle.sat 声明",
   },
   {
     id: "eq",
-    sectionId: "principles",
+    sectionId: "principle",
     keyword: "eq",
     pattern: /^eq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "eq ${1:判同原则} := \"${2:说明何时归入同一结果类}\"",
     completionLabel: "eq",
-    completionDetail: "插入 Principles.eq 声明",
+    completionDetail: "插入 Principle.eq 声明",
+  },
+  {
+    id: "map-principles",
+    sectionId: "principle",
+    keyword: "map",
+    pattern: /^map\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "map ${1:映射原则} := \"${2:说明如何把输入映射到输出}\"",
+    completionLabel: "map",
+    completionDetail: "插入 Principle.map 声明",
   },
   {
     id: "set-spaces",
-    sectionId: "spaces",
+    sectionId: "space",
     keyword: "set",
     pattern: /^set\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "set ${1:结果集合} := \"${2:结果集合说明}\"",
     completionLabel: "set",
-    completionDetail: "插入 Spaces.set 声明",
+    completionDetail: "插入 Space.set 声明",
   },
   {
     id: "comb",
-    sectionId: "spaces",
+    sectionId: "space",
     keyword: "comb",
     pattern: /^comb\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "comb ${1:组合分类} := \"${2:说明这一类组合如何得到}\"",
     completionLabel: "comb",
-    completionDetail: "插入 Spaces.comb 声明",
+    completionDetail: "插入 Space.comb 声明",
   },
   {
     id: "seq",
-    sectionId: "spaces",
+    sectionId: "space",
     keyword: "seq",
     pattern: /^seq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "seq ${1:候选序列} := \"${2:说明这一组候选}\"",
     completionLabel: "seq",
-    completionDetail: "插入 Spaces.seq 声明",
+    completionDetail: "插入 Space.seq 声明",
   },
   {
     id: "in",
@@ -173,18 +191,18 @@ const SF_TOP_LEVEL_TEMPLATES = Object.freeze([
     insertText: "Base:",
   },
   {
-    id: "principles-block",
-    label: "Principles:",
-    detail: "插入 Principles block",
-    documentation: "Principles block 定义组合原则。",
-    insertText: "Principles:",
+    id: "principle-block",
+    label: "Principle:",
+    detail: "插入 Principle block",
+    documentation: "Principle block 定义组合原则。",
+    insertText: "Principle:",
   },
   {
-    id: "spaces-block",
-    label: "Spaces:",
-    detail: "插入 Spaces block",
-    documentation: "Spaces block 定义结果组合空间。",
-    insertText: "Spaces:",
+    id: "space-block",
+    label: "Space:",
+    detail: "插入 Space block",
+    documentation: "Space block 定义结果组合空间。",
+    insertText: "Space:",
   },
   {
     id: "boundary-block",
@@ -204,27 +222,29 @@ const SF_TEMPLATE_SNIPPET_BODY = Object.freeze([
   "        elem ${6:结构基} := \"${7:结构说明}\"",
   "        struct ${8:复合结构} := \"${9:结构说明}\"",
   "        seq ${10:有序结构基} := \"${11:有序结构说明}\"",
-  "        op[2:1] ${12:操作子} := \"${13:操作子说明}\"",
+  "        map ${12:映射基} := \"${13:映射说明}\"",
+  "        op[2:1] ${14:操作子} := \"${15:操作子说明}\"",
   "",
-  "    Principles:",
-  "        sat ${14:成立原则} := \"${15:说明成立条件}\"",
-  "        eq ${16:判同原则} := \"${17:说明何时归入同一结果类}\"",
+  "    Principle:",
+  "        sat ${16:成立原则} := \"${17:说明成立条件}\"",
+  "        eq ${18:判同原则} := \"${19:说明何时归入同一结果类}\"",
+  "        map ${20:映射原则} := \"${21:说明如何把输入映射到输出}\"",
   "",
-  "    Spaces:",
-  "        set ${18:结果集合} := \"${19:结果集合说明}\"",
-  "        comb ${20:组合分类} := \"${21:说明这一类组合如何得到}\"",
-  "        seq ${22:候选序列} := \"${23:说明这一组候选}\"",
+  "    Space:",
+  "        set ${22:结果集合} := \"${23:结果集合说明}\"",
+  "        comb ${24:组合分类} := \"${25:说明这一类组合如何得到}\"",
+  "        seq ${26:候选序列} := \"${27:说明这一组候选}\"",
   "",
   "    Boundary:",
-  "        in<subtype> ${24:输入边界} := \"${25:输入约束}\"",
-  "        out<subtype> ${26:输出边界} := \"${27:输出约束}\"",
-  "        param<enum> ${28:变量边界} := \"${29:{x, y, z}}\"",
-  "        param<range> ${30:最大嵌套层数} := \"${31:[0:2]}\"",
+  "        in<subtype> ${28:输入边界} := \"${29:输入约束}\"",
+  "        out<subtype> ${30:输出边界} := \"${31:输出约束}\"",
+  "        param<enum> ${32:变量边界} := \"${33:{x, y, z}}\"",
+  "        param<range> ${34:最大嵌套层数} := \"${35:[0:2]}\"",
 ]);
 
-const SF_REFERENCE_PATTERN = /\b(?:Base|Principles|Spaces|Boundary)\.[^,\s，。；;:：<>(){}[\]"']+/gu;
+const SF_REFERENCE_PATTERN = /\b(?:Base|Principle|Space|Boundary)\.[^,\s，、。；;:：<>(){}[\]"']+/gu;
 const SF_CLAUSE_PATTERN = /$^/gu;
-const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|struct|seq|op|sat|eq|comb|in|out|param)(?<annotation>(?:\[(?<shape>[^\]]+)\]|<(?<subtype>[^>]+)>))?(?<gap>\s+)(?<name>[^:=]+?)\s*:=\s/u;
+const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|struct|seq|map|op|sat|eq|comb|in|out|param)(?<annotation>(?:\[(?<shape>[^\]]+)\]|<(?<subtype>[^>]+)>))?(?<gap>\s+)(?<name>[^:=]+?)\s*:=\s/u;
 
 const SEMANTIC_TOKEN_TYPES = Object.freeze({
   block: "type",
@@ -258,11 +278,11 @@ function detectShelfFrameworkSectionId(lineText) {
   if (trimmed === "Base:") {
     return "base";
   }
-  if (trimmed === "Principles:") {
-    return "principles";
+  if (trimmed === "Principle:") {
+    return "principle";
   }
-  if (trimmed === "Spaces:") {
-    return "spaces";
+  if (trimmed === "Space:") {
+    return "space";
   }
   if (trimmed === "Boundary:") {
     return "boundary";
@@ -398,7 +418,7 @@ function collectShelfFrameworkSemanticTokens(text) {
 }
 
 function getShelfFrameworkCompletionTriggerChars() {
-  return ["M", "G", "B", "P", "S", "e", "r", "s", "q", "c", "i", "o", "p", "<", "[", ":", ".", " "];
+  return ["M", "G", "B", "P", "S", "e", "m", "r", "s", "q", "c", "i", "o", "p", "<", "[", ":", ".", " "];
 }
 
 module.exports = {

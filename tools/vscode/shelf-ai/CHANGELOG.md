@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.29 - 2026-04-10
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.28..shelf-ai-v0.1.29`.
+- Unified the `.sf` top-level block vocabulary into singular form: the preview language now uses `Goal / Base / Principle / Space / Boundary`, and the old `Principles / Spaces` spellings are no longer accepted by lint, completion, or highlighting.
+- Promoted `map` into a formal shared-grammar statement kind while keeping it distinct from `op[...]`: `map` now models explicit mappings/resources in `Base` and mapping rules in `Principle`, while `op[...]` remains the shaped operator form in `Base`.
+- Tightened `.sf` reference parsing and examples around the new vocabulary, including support for Chinese punctuation-separated references and updated example files, README, protocol spec, evidence snapshot, and plugin contract text.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.29`.
+
 ## 0.1.28 - 2026-04-09
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.27..shelf-ai-v0.1.28`.
