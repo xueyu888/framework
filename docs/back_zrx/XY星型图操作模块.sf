@@ -27,7 +27,7 @@ MODULE XY星型图操作模块:XYStarGraphOpsModule:
                 输入星型图 G、侧别 s 与点 v；
                 输出点 v 当前对应的对侧点集 U。"
 
-    Principles:
+    Principle:
         sat 对侧连接定义 := "对任意 G = <V_X, V_Y, E>：
                 若 s = X，则 Opp(G, s, v) = { y ∈ V_Y | <v, y> ∈ E }；
                 若 s = Y，则 Opp(G, s, v) = { x ∈ V_X | <x, v> ∈ E }。"
@@ -37,13 +37,13 @@ MODULE XY星型图操作模块:XYStarGraphOpsModule:
                 且 U 落在侧 s 的对侧；
                 且在 G' 中，点 v 被加入到侧 s，且其对侧连接恰为 U；
                 且 G 中其余已有点的对侧连接保持不变；
-                且 G' 仍属于 Base.星型图"
+                且 G' 仍属于 Base.星型图。"
 
         sat 删点原则 := "Remove(G, s, v) = G' 当且仅当：
                 v 属于 G 中侧 s 的点集；
                 且在 G' 中，点 v 被删除；
                 且所有与 v 相关的对侧连接一并删除；
-                且 G' 是从 G 删除 v 后仍属于 Base.星型图的最大剩余结果。"
+                且 G' 是从 G 删除 v 后仍属于 Base.星型图，且满足最大剩余结果要求。"
 
         sat 改对应原则 := "Update(G, s, v, U) = G' 当且仅当：
                 v 属于 G 中侧 s 的点集；
@@ -55,7 +55,7 @@ MODULE XY星型图操作模块:XYStarGraphOpsModule:
         sat 查询原则 := "查对侧算子只读不改写：
                 对任意 G、s、v，Opp(G, s, v) 返回点 v 在 G 中的当前对侧点集。"
 
-    Spaces:
+    Space:
         set 图空间 := "{ G | G ∈ Base.星型图 }"
 
         set 增点作用空间 := "{ <Base.增点, G, s, v, U, G'> |
@@ -63,37 +63,37 @@ MODULE XY星型图操作模块:XYStarGraphOpsModule:
                 G' ∈ Base.星型图,
                 s ∈ Base.侧别集合,
                 v ∈ Base.点,
-                U ∈ Base.点集，
-                且满足 Principles.增点原则 }"
+                U ∈ Base.点集,
+                且满足 Principle.增点原则 }"
 
         set 删点作用空间 := "{ <Base.删点, G, s, v, G'> |
                 G ∈ Base.星型图,
                 G' ∈ Base.星型图,
                 s ∈ Base.侧别集合,
-                v ∈ Base.点，
-                且满足 Principles.删点原则 }"
+                v ∈ Base.点,
+                且满足 Principle.删点原则 }"
 
         set 改对应作用空间 := "{ <Base.改对应, G, s, v, U, G'> |
                 G ∈ Base.星型图,
                 G' ∈ Base.星型图,
                 s ∈ Base.侧别集合,
                 v ∈ Base.点,
-                U ∈ Base.点集，
-                且满足 Principles.改对应原则 }"
+                U ∈ Base.点集,
+                且满足 Principle.改对应原则 }"
 
         set 查询作用空间 := "{ <Base.查对侧, G, s, v, U> |
                 G ∈ Base.星型图,
                 s ∈ Base.侧别集合,
                 v ∈ Base.点,
-                U ∈ Base.点集，
-                且满足 Principles.查询原则 }"
+                U ∈ Base.点集,
+                且满足 Principle.查询原则 }"
 
     Boundary:
-        in<graph> 输入星型图 := Base.星型图
-        in<enum> 输入侧别 := Base.侧别集合
+        in<struct> 输入星型图 := Base.星型图
+        in<set> 输入侧别 := Base.侧别集合
         in<point> 输入点 := Base.点
         in<set> 输入对侧点集 := Base.点集
-        out<graph> 增点输出图 := Base.星型图
-        out<graph> 删点输出图 := Base.星型图
-        out<graph> 改对应输出图 := Base.星型图
+        out<struct> 增点输出图 := Base.星型图
+        out<struct> 删点输出图 := Base.星型图
+        out<struct> 改对应输出图 := Base.星型图
         out<set> 查对侧输出点集 := Base.点集

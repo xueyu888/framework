@@ -18,4 +18,4 @@ MODULE 父子任务状态记录模块:TaskStateRecorder:
     Boundary:
         in<view> 子任务记录输入 := Base.任务状态索引
         out<view> 父任务记录输出 := Base.任务状态索引
-        param<enum> 子任务状态集合 := {pending, running, success, failed}
+        param<set> 子任务状态集合 := {pending, running, success, failed}

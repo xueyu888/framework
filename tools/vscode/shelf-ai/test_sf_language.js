@@ -56,10 +56,10 @@ const VALID_SAMPLE = [
   "        comb 定律结果分类 := \"对以上各候选分别应用 Principle.条件同一；凡成立条件完全一致者，归入同一结果类。\"",
   "",
   "    Boundary:",
-  "        in<enum> 输入变量 := Base.变量集合",
-  "        out<enum> 输出取值 := Boundary.变量取值边界",
-  "        param<enum> 变量边界 := \"{x, y, z}\"",
-  "        param<enum> 变量取值边界 := \"{0, 1}\"",
+  "        in<set> 输入变量 := Base.变量集合",
+  "        out<set> 输出取值 := Boundary.变量取值边界",
+  "        param<set> 变量边界 := \"{x, y, z}\"",
+  "        param<set> 变量取值边界 := \"{0, 1}\"",
   "        param<range> 最大嵌套层数 := \"[0:2]\"",
 ].join("\n");
 
@@ -81,9 +81,9 @@ const MULTILINE_ORDERED_COLLECTION_SAMPLE = [
   "                        <unrecorded, finished, no>>",
   "",
   "    Boundary:",
-  "        in<enum> 记录存在状态 := Base.记录存在状态",
-  "        in<enum> 传入完成状态 := Base.传入完成状态",
-  "        out<enum> 首次完成标记 := Base.首次完成标记",
+  "        in<set> 记录存在状态 := Base.记录存在状态",
+  "        in<set> 传入完成状态 := Base.传入完成状态",
+  "        out<set> 首次完成标记 := Base.首次完成标记",
 ].join("\n");
 
 const BASE_SEQ_AND_SPACES_SET_SAMPLE = [
@@ -106,7 +106,7 @@ const BASE_SEQ_AND_SPACES_SET_SAMPLE = [
   "    Boundary:",
   "        in<string> 输入字符串 := Base.字符串",
   "        in<string> 目标字符串 := Base.字符串",
-  "        out<enum> 匹配状态 := Base.匹配状态",
+  "        out<set> 匹配状态 := Base.匹配状态",
 ].join("\n");
 
 function main() {
@@ -233,7 +233,7 @@ function main() {
     invalidBoundaryIssues.some((issue) => issue.code === "SFL008"),
     "boundary declarations without subtype should be rejected"
   );
-  const invalidBoundaryOpSample = VALID_SAMPLE.replace("in<enum> 输入变量 := Base.变量集合", "op[2:1] 输入边界 := \"<x> -> y\"");
+  const invalidBoundaryOpSample = VALID_SAMPLE.replace("in<set> 输入变量 := Base.变量集合", "op[2:1] 输入边界 := \"<x> -> y\"");
   const invalidBoundaryOpIssues = sfLint.lintShelfFrameworkFile({
     filePath: "/tmp/demo.sf",
     text: invalidBoundaryOpSample,
@@ -341,8 +341,8 @@ function main() {
     "boundary context must offer out<subtype>"
   );
   assert(
-    boundaryEntries.some((entry) => entry.label === "param<enum>"),
-    "boundary context must offer param<enum>"
+    boundaryEntries.some((entry) => entry.label === "param<set>"),
+    "boundary context must offer param<set>"
   );
   assert(
     boundaryEntries.some((entry) => entry.label === "param<range>"),

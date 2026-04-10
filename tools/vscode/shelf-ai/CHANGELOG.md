@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.30 - 2026-04-10
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.29..shelf-ai-v0.1.30`.
+- Normalized the `.sf` finite-domain parameter vocabulary from `enum` to `set`: the shared grammar, completions, template snippet, tests, shipped examples, protocol spec, evidence snapshot, and chapter 13 contract text now all use `param<set>` as the formal spelling while keeping `param<range>` unchanged.
+- Aligned every repository `.sf` file to the current preview-lint baseline, including the back_zrx drafts that were still mixing older block names, `graph`/`enum` boundary subtypes, and non-conforming declaration shapes.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, repository-wide `.sf` lint, and local VSIX packaging/install verification before tagging `0.1.30`.
+
 ## 0.1.29 - 2026-04-10
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.28..shelf-ai-v0.1.29`.

@@ -145,14 +145,14 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     completionDetail: "插入 Boundary.out 声明",
   },
   {
-    id: "param-enum",
+    id: "param-set",
     sectionId: "boundary",
     keyword: "param",
     annotationKind: "subtype",
     subtypeRequired: true,
-    pattern: /^param<enum>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "param<enum> ${1:参数边界} := \"${2:{a, b}}\"",
-    completionLabel: "param<enum>",
+    pattern: /^param<set>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "param<set> ${1:参数边界} := \"${2:{a, b}}\"",
+    completionLabel: "param<set>",
     completionDetail: "插入 Boundary.param 声明",
   },
   {
@@ -238,7 +238,7 @@ const SF_TEMPLATE_SNIPPET_BODY = Object.freeze([
   "    Boundary:",
   "        in<subtype> ${28:输入边界} := \"${29:输入约束}\"",
   "        out<subtype> ${30:输出边界} := \"${31:输出约束}\"",
-  "        param<enum> ${32:变量边界} := \"${33:{x, y, z}}\"",
+  "        param<set> ${32:变量边界} := \"${33:{x, y, z}}\"",
   "        param<range> ${34:最大嵌套层数} := \"${35:[0:2]}\"",
 ]);
 
