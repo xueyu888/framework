@@ -1,0 +1,23 @@
+MODULE 字符串精确匹配判断器 : StringExactMatchJudge:
+    Goal := "判断输入字符串与目标字符串是否完全一致，并输出匹配状态"
+
+    Base:
+        elem 字符 := "记作 c，表示一个基本字符。"
+        seq 字符串 := "记作 x = <c1, c2, ..., cn>；其中 n >= 0，且对任意 i ∈ {1, 2, ..., n}，都有 ci ∈ Base.字符。"
+
+    Principles:
+        sat 匹配定义 M(s, p) := "对任意 s, p ∈ Base.字符串，
+                记 M(s, p) 为匹配状态；
+                当且仅当 |s| = |p|，且对任意 i ∈ {1, 2, ..., |s|}，都有 s_i = p_i 时，M(s, p) = yes；
+                否则，M(s, p) = no。"
+
+    Spaces:
+        seq 结果空间 := {
+                <{s, p, M(s, p)> |
+                s ∈ Base.字符串, p ∈ Base.字符串
+            }
+
+    Boundary:
+        in<seq> 输入字符串 := Base.字符串
+        in<seq> 目标字符串 := Base.字符串
+        out<enum> 匹配状态 := {yes, no}

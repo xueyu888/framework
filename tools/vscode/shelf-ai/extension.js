@@ -49,7 +49,9 @@ const FRAMEWORK_SEMANTIC_TOKENS_LEGEND = new vscode.SemanticTokensLegend(
 const SF_SEMANTIC_TOKEN_TYPES = Object.freeze([
   sfGrammar.SEMANTIC_TOKEN_TYPES.block,
   sfGrammar.SEMANTIC_TOKEN_TYPES.statementKeyword,
+  sfGrammar.SEMANTIC_TOKEN_TYPES.declarationName,
   sfGrammar.SEMANTIC_TOKEN_TYPES.reference,
+  sfGrammar.SEMANTIC_TOKEN_TYPES.shape,
   sfGrammar.SEMANTIC_TOKEN_TYPES.subtype,
 ]);
 const SF_SEMANTIC_TOKENS_LEGEND = new vscode.SemanticTokensLegend(
