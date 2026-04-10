@@ -11,9 +11,12 @@ MODULE 字符串匹配模块:StringMatchModule:
         sat 匹配输出 := "当且仅当 Principles.长度先验 与 Principles.逐位匹配 同时成立时，输出 true；否则输出 false。"
     
     Spaces:
-        set 匹配结果集合 := "{true, false}"
-        comb 匹配判断组合 := "包含输入字符串基与待匹配字符串基两个参与基；二者按 Principles.长度先验 与 Principles.逐位匹配 进行组合判断；若满足匹配条件则返回 true，否则返回 false。"
-        seq 匹配结果项 := "<输入字符串基, 待匹配字符串基, 匹配结果>"
+            seq 匹配结果序列 := 以 输入字符串, 待匹配字符串, 长度先验, 逐位匹配, OUTPUT 的顺序
+            (
+                <s, p, 0, 0, false>      // 长度不一致，直接不匹配
+                <s, p, 1, 0, false>      // 长度一致，但存在至少一位字符不相同
+                <s, p, 1, 1, true>       // 长度一致，且逐位字符完全相同
+            )
 
     Boundary:
         in<view> 输入字符串 := "按 Base.字符串 给出主输入；字符串元素来自 Base.字符。"
