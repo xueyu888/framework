@@ -1,5 +1,5 @@
 MODULE 任务集合完成状态判断模块:TaskCompletionStatusJudgeModule :
-    Goal := "传入任务集合, 并传入某一任务ID, 判断该任务状态是否更新, 以及任务集合状态是否更新。最终返回更新后的任务集合状态。若中间出现非法情况则返回错误"
+    Goal := "传入任务集合, 并传入某一任务ID, 判断该任务状态是否更新, 以及任务集合状态是否更新。"
 
     Base:
         struct 任务状态集合 := {{任务1, 任务1状态}, 任务2,  ...}写作: TG
@@ -12,12 +12,12 @@ MODULE 任务集合完成状态判断模块:TaskCompletionStatusJudgeModule :
         
     Principles:
 
-        sat 任务存在判断 := E1 = 1[b ∈ Children(A)]
-        sat 任务原状态判断 := E2 = 1[status(b) != STA_2] || ~E1   //   0是存在且finish，1是不存在或者unfinish
+        sat 任务存在判断 := E1 = 1[t ∈ Children(TG)]
+        sat 任务原状态判断 := E2 = 1[status(t) != STA_2] || ~E1   //   0是存在且finish，1是不存在或者unfinish
         sat 任务原状态为已完成判断 := E3 = E1 & ~E2
         sat 任务状态更新判断 := E4 = E1 & E2
-        sat 任务集合状态更新判断 := E5 = 1[∀ c ∈ Children(A) \ {目标任务}, status(c) = STA_2] & (E3 || E4)
-                                     = 1[∀ c ∈ Children(A) \ {目标任务}, status(c) = STA_2] & E1 (化简)
+        sat 任务集合状态更新判断 := E5 = 1[∀ c ∈ Children(TG) \ t, status(c) = STA_2] & (E3 || E4)
+                                     = 1[∀ c ∈ Children(TG) \ t, status(c) = STA_2] & E1 (化简)
 
         sat 错误码计算函数 := ERR_CODE = (
             ERR_1 | default,
@@ -30,13 +30,13 @@ MODULE 任务集合完成状态判断模块:TaskCompletionStatusJudgeModule :
     Spaces:
 
         seq S := 以E1, E2, E3, E4, E5, OUTPUT的顺序
-        <
+        (
             <0, 1, 0, 0, 0, <"任务不存在", 0, 0>>              // 输入任务ID不存在于任务集合中
             <1, 0, 1, 0, 0, <"任务原状态为已完成", 0, 0>>       // 任务原状态为已完成，且其他任务未完成，此时不更新任务状态，不更新任务集合状态
             <1, 0, 1, 0, 1, <"任务原状态为已完成", 0, 1>>      // 任务原状态为已完成，且其他任务同样完成，此时不更新任务状态，更新任务集合状态
             <1, 1, 0, 1, 0, <"None", 1, 0>>                   // 任务原状态为未完成，且其他任务未完成，此时更新任务状态，不更新任务集合状态
             <1, 1, 0, 1, 1, <"None", 1, 1>>                  // 任务原状态为未完成，且其他任务已完成，此时更新任务状态，更新任务集合状态
-        > 
+        )
 
     Boundary:
         in<struct> 任务集合 := Base.任务集合
