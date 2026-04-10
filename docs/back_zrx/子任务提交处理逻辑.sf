@@ -3,7 +3,7 @@ MODULE 任务初次完成判断器:TaskFisrt :
 
     Base:
         set 是否完成过 := {finished, unfinished}
-        set 传入的任务完成状态 := {finish，unfinish}
+        set 传入的任务完成状态 := {finish, A1unfinish}
         set 是否第一次完成 := {yes, no}
 
     Principles:
