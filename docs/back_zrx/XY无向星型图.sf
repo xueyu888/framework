@@ -1,20 +1,29 @@
-MODULE XY无向星型图:XYUndirectedStarGraph:
-    Goal := "定义一种由 X 类点、Y 类点和无向边构成的星型结构，其中每个 Y 类点的度恰好为 1。"
+MODULE 星型图:Graph:
+    Goal := "以 X/Y 两侧二分顶点和无向边为基，组合出标准星型图"
 
     Base:
-        elem 点 := "记作 v，表示图中的一个基本点。"
-        set X类点集 := "记作 V_X；其元素均为 Base.点。"
-        set Y类点集 := "记作 V_Y；其元素均为 Base.点。"
-        set 无向边集 := "记作 E；其元素为无序二元组 {u, v}，表示点 u 与点 v 之间的一条无向边。"
+        set 顶点集 := "记作 V；元素写作 v，表示图中的基本顶点。"
+        set 边集 := "记作 E；元素写作 {u, v}，表示顶点 u 与顶点 v 之间的一条无向边。"
+        struct 图 := "记作 G = <V, E>；其中 V 为顶点全集，E 为无向边集。"
 
     Principle:
-        sat 合法结构定义 := "对任意 G = <V_X, V_Y, E>，Valid(G) 当且仅当：V_X ∩ V_Y = ∅；E ⊆ {{x, y} | x ∈ V_X, y ∈ V_Y}；且对任意 y ∈ V_Y，都有 deg(y) = 1。"
+        sat 顶点集二分 := "V = Vx ∪ Vy。"
+        sat 两侧互不相交 := "Vx ∩ Vy = ∅。"
+        sat 跨侧连接约束 := "E ⊆ { {x, y} | x ∈ Vx, y ∈ Vy }；不允许 X-X 或 Y-Y 直接连边。"
+        sat Y侧度一 := "对任意 y ∈ Vy，都有 deg(y) = 1。"
+        sat X侧完全连接 := "E = { {x, y} | x ∈ Vx, y ∈ Vy }。"
+        sat X侧唯一中心 := "|Vx| = 1。"
+        sat 无孤立点 := "对任意 v ∈ V，都有 deg(v) >= 1。"
 
     Space:
-        set 结果空间 := "{G | G = <V_X, V_Y, E> 且 Valid(G)}"
+        comb 星型图 := { G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.X侧完全连接、Principle.X侧唯一中心}
+        comb 单边图 := "在 Space.星型图 上附加 |Vy|=1，得到最小非空星型图(单边图)K_{1,1}"
+        comb 二叶路径图 := "在 Space.星型图 上附加 |Vy|=2，得到路径图 P3 = K_{1,2}。"
+        comb n叶星型图 := "在 Space.星型图 上附加 |Vy|=n 且 n>=1，得到一般的 n 叶星型图 K_{1,n}。"
+        comb 星型森林 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.无孤立点}
+
+        comb 二分图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束}
+        comb 完全二分图 := "在 Space.二分图 上附加 Principle.X侧完全连接，得到完全二分图 K_{m,n}。"
+
 
     Boundary:
-        in<view> X类点输入 := "按 Base.X类点集 给出一组 X 类点。"
-        in<view> Y类点输入 := "按 Base.Y类点集 给出一组 Y 类点。"
-        out<view> 星型图输出 := "输出满足 Principle.合法结构定义 的 G = <V_X, V_Y, E>。"
-        param<range> 图规模边界 := "[0:N]"
