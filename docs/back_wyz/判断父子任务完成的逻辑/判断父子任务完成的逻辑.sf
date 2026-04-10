@@ -13,9 +13,9 @@ MODULE 任务集合完成状态判断模块:TaskCompletionStatusJudgeModule :
     Principles:
 
         sat 任务存在判断 := E1 = 1[t ∈ Children(TG)]
-        sat 任务原状态判断 := E2 = 1[status(t) != STA_2] || ~E1   //   0是存在且finish，1是不存在或者unfinish
-        sat 任务原状态为已完成判断 := E3 = E1 & ~E2
-        sat 任务状态更新判断 := E4 = E1 & E2
+        sat 任务原状态判断 := E2 = E1 & 1[status(t) = STA_2]     //   1是存在且finish，0是不存在或者unfinish
+        sat 任务原状态为已完成判断 := E3 = E1 & E2
+        sat 任务状态更新判断 := E4 = E1 & ~E2
         sat 任务集合状态更新判断 := E5 = 1[∀ c ∈ Children(TG) \ t, status(c) = STA_2] & (E3 || E4)
                                      = 1[∀ c ∈ Children(TG) \ t, status(c) = STA_2] & E1 (化简)
 
