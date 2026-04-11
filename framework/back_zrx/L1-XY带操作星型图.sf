@@ -2,8 +2,8 @@ MODULE XY带操作星型图:XYStarGraphOpsModule:
     Goal := "基于星型图提供增删改查能力。"
 
     Base:
-        set 星型图 := L0.XY无向星型图
-        elem 
+        elem 星型图 := L0.XY无向星型图.Spaces.单星型图
+        elem 顶点内容
 
     Principle:
         sat 对侧连接定义 := "对任意 G = <V_X, V_Y, E>：
