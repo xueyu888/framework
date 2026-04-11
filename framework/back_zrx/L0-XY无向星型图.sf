@@ -1,0 +1,85 @@
+Base:
+    set 顶点集 := "记作 V；元素写作 v，表示图中的基本顶点。"
+
+    set X顶点集 := "记作 Vx, Vx ⊆ V"
+    set Y顶点集 := "记作 Vy, Vy ⊆ V"
+    
+    set 边集 := "记作 E；元素写作 {u, v}，表示顶点 u 与顶点 v 之间的一条无向边。"
+
+    op 增加顶点 := "记作 addV(v)，得到V'，V' = V ∪ {v}。"
+    op 增加边 := "记作 addE(u, v)，得到E'，E' = E ∪ {u, v}。"
+
+    op 删除边 := "记作 delE(u, v)，得到E'，E' = E \ {u, v}。"
+    op 删除顶点 := "记作 delV(v)，得到V'，V' = V \ {v}。"
+
+    op 查询邻点 := "记作 Query(v)，得到顶点集Q(v) = {u | {u, v} ∈ E}。"
+
+    set 内容域 := "记作 C；其元素记作 c。C 为所有合法内容所成的集合；每个 c ∈ C 表示一个可能的顶点内容。"
+    op 顶点-内容映射 := "记作 val : V → C；它给出顶点集 V 到内容域 C 的一个映射，其中每个顶点 v ∈ V 对应唯一内容 val(v) ∈ C。"
+    
+    op 内容新增 := "记作 addVal(c)，得到 C' , C'= C ∪ {c}。"
+    op 内容修改 := "记作 setVal(c, c')，得到 C' , C'= C \ {c} ∪  {c'}。"
+    op 内容删除 := "记作 delVal(c)，得到 C' , C'= C \ {c}。"
+
+Principles:
+
+    sat 顶点的度 := "deg(v) = ∣{e ∈ E ∣ v ∈ e}∣；一个点连着多少条边，就说这个点的度；"
+    sat 无孤立点 := "对任意 v ∈ V，都有 deg(v) >= 1。"
+
+
+    sat 顶点集二分 := "V = Vx ∪ Vy。"
+    sat 两侧互不相交 := "Vx ∩ Vy = ∅。"
+    sat 跨侧连接约束 := "E ⊆ { {x, y} | x ∈ Vx, y ∈ Vy }；不允许 X-X 或 Y-Y 直接连边。"
+    sat Y侧度一 := "对任意 y ∈ Vy，都有 deg(y) = 1。"
+    sat X侧完全连接 := "E = { {x, y} | x ∈ Vx, y ∈ Vy }。"
+    sat X侧唯一中心 := "|Vx| = 1。"
+
+    sat 增点成立 := addV(v),其中v ∉ Vy。
+    sat 增边成立 := addE(u, v),其中u, v ∈ V。
+    sat 删边成立 := delE(u, v),其中u, v ∈ E。
+    sat 删点成立 := delV(v),其中v ∈ V。
+
+    sat 增内容成立 := addVal(c),其中c ∉ C。
+    sat 修改内容成立 := setVal(c, c'),其中c ∈ C, c' ∉ C。
+    sat 删内容成立 := delVal(c),其中c ∈ C。
+
+    sat 查询成立 := Query(v),其中v ∈ V。
+
+Spaces:
+    comb 图 :=  {G | G = <V, E>,其中 V 为顶点全集，E 为无向边集。}
+
+    comb 二分图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束}
+
+    comb 多星型图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.无孤立点}
+
+    comb 单星型图 := { G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.X侧完全连接、Principle.X侧唯一中心}
+
+    comb 带业务操作星型图 := { 
+        使用的基为 Base.顶点-内容映射与 Spaces.单星型图的基
+
+        增:
+            Spaces.单星型图 + Principles.增点成立 + Principles.增边成立 + Principles.增内容成立
+        删:
+            Spaces.单星型图 + Principles.删点成立 + Principles.删边成立 + Principles.删内容成立
+        改:
+            Spaces.单星型图 + Principles.修改内容成立
+        查:
+            Spaces.单星型图 + Principles.查询成立
+        }
+
+Boundary:
+    param<view> 内容字段 := Base.顶点内容域 中的元素 c 的格式
+    param<set> 侧别 := {中心, 叶子}
+
+    <!-- 带业务的操作: -->
+    in<view> 业务增 := {c | c 是新增的内容}
+    in<view> 业务删 := {c | c 是删除的内容}
+    in<view> 业务改 := {c | c 是待修改的内容}
+    in<view> 业务查 := {x| x为 c 中的身份标识(id), c ∈ C}
+
+    <!-- 纯粹的星型图结构操作 -->
+    in<set> 顶点集 := Base.顶点集
+    in<set> 边集 := Base.边集
+
+    out<set> 顶点集 := Base.顶点集
+    out<set> 边集 := Base.边集
