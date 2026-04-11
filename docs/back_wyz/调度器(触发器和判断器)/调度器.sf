@@ -1,45 +1,78 @@
 MODULE 调度器:Scheduler:
-    Goal := "接收任务请求，并按照预定义的任务请求表，把该请求一对一调度到对应的目标模块。调度器只负责识别请求并转发内容，不负责具体业务处理。"
+    Goal := "接收任务请求, 并按照预定义的任务请求表, 把该请求一对一调度到对应的目标模块。调度器只负责识别请求并转发内容, 不负责具体业务处理。"
 
     Base:
-        set 输入请求Tag集合 := 记做错TAG_IN
-        set 输出触发事件Tag集合 := 记做TAG_OUT
+        set 输入请求Tag集合 := 记作 TAG_IN
+        set 输出触发事件Tag集合 := 记作 TAG_OUT
 
-        set 调用对象集合 := 记做TARGET_MODULE
+        set 调用对象集合 := 记作 TARGET_MODULE
 
-        relation[1:1] 事件映射 := 根据输入请求的Tag映射到输出请求。
-        relation[|触发事件Tag|:|调用对象|] 触发事件-调用对象映射 := 触发事件-调用对象映射
+        relation[1:1] 事件映射 := "根据输入请求的 Tag 映射到输出请求的 Tag"
+        relation[|输出触发事件Tag集合|:|调用对象集合|] 触发事件-调用对象映射 := "触发事件与调用对象的映射关系"
 
-        set 输入请求 := <tag_in, content>
-        set 输出请求 := <tag_out, content, module>
+        struct 输入请求 := <tag_in, content_in>
+        struct 输出请求 := <tag_out, content_out, module>
 
     Principles:
 
-        sat 事件映射约束 := "对任意输入请求 i = Base.输入请求, 若 tag_in ∈ Base.输入请求Tag集合
-                则可根据 <tag_in, tag_out> ∈ Base.事件映射。得到tag_out"
+        sat 映射表完备性前提 := "对任意 tag_in ∈ Base.输入请求Tag集合, 
+                                存在且仅存在一个 tag_out ∈ Base.输出触发事件Tag集合, 
+                                使得 <tag_in, tag_out> ∈ Base.事件映射。"
 
-        sat 调用对象约束 := "对任意输出请求 o = Base.输出请求, 若 tag_out ∈ Base.触发事件Tag集合
-                则可根据 <tag_out, target_module> ∈ Base.触发事件-调用对象映射，得到 target_module。"
+        sat 调用对象映射完备性前提 := "对任意 tag_out ∈ Base.输出触发事件Tag集合, 
+                                    存在且仅存在一个 module ∈ Base.调用对象集合, 
+                                    使得 <tag_out, module> ∈ Base.触发事件-调用对象映射。"
 
-        sat 内容透传约束 := "对任意输入请求 i = <tag_in, content_in> 与输出请求 o = <tag_out, content_out>，
-                若 i 与 o 属于同一次合法调度，
-                则 content_in = content_out。"
+
+        sat 事件映射约束 := "对任意 i: Base.输入请求, 记 i = <tag_in, content_in>, 
+                            若 tag_in ∈ Base.输入请求Tag集合, 
+                            则存在且仅存在一个 tag_out ∈ Base.输出触发事件Tag集合, 
+                            使得 <tag_in, tag_out> ∈ Base.事件映射。"
+
+        sat 调用对象约束 := "对任意 o: Base.输出请求, 记 o = <tag_out, content_out, module>, 
+                            若 tag_out ∈ Base.输出触发事件Tag集合, 
+                            则存在且仅存在一个 module' ∈ Base.调用对象集合, 
+                            使得 <tag_out, module'> ∈ Base.触发事件-调用对象映射, 
+                            且 module = module'。"
+
+        sat 内容透传约束 := "对任意 i: Base.输入请求, 记 i = <tag_in, content_in>; 
+                            对任意 o: Base.输出请求, 记 o = <tag_out, content_out, module>, 
+                            若 <tag_in, tag_out> ∈ Base.事件映射, 
+                            且 <tag_out, module> ∈ Base.触发事件-调用对象映射, 
+                            则 content_out = content_in。"
+
+        sat 非法输入处理约束 := "对任意 i: Base.输入请求, 记 i = <tag_in, content_in>, 
+                                若 tag_in ∉ Base.输入请求Tag集合, 
+                                则该输入请求不可被调度, 且调度器返回非法输入错误信息。"
+
 
     Spaces:
-        set 合法调度空间 := "{ <i, o, m> |
-                i ∈ Base.输入请求,
-                o ∈ Base.输出请求,
-                m ∈ Base.调用对象集合,
-                且满足 Principle.事件映射约束、
-                    Principle.调用对象约束、
-                    Principle.内容透传约束 }"
-
-                    
-
+        set 合法调度空间 := "{ <i, o> |
+                                i = <tag_in, content_in> ∈ Base.输入请求,
+                                o = <tag_out, content_out, module> ∈ Base.输出请求,
+                                <tag_in, tag_out> ∈ Base.事件映射,
+                                <tag_out, module> ∈ Base.触发事件-调用对象映射,
+                                content_out = content_in }"
 
     Boundary:
-        in<struct> 输入请求 := Base.请求
-        out<struct> 输出请求 := Base.请求
-        param<set> 输入请求Tag := "{"子任务状态更新", "子任务状态更新完成", "父任务查找完成", "输出星型图", "父任务状态更新"}"
-        param<set> 触发事件Tag := "{"子任务状态更新", "父任务查找", "星型图查找", "父任务判断", "父任务状态更新"}"
+        in<struct> 输入请求 := Base.输入请求
+        out<struct> 输出请求 := Base.输出请求
+
+        param<set> 输入请求Tag集合 := {"子任务状态更新", "子任务状态更新完成", "父任务查找完成", "输出星型图", "父任务状态更新"}
+        param<set> 输出触发事件Tag集合 := {"子任务状态更新", "父任务查找", "星型图查找", "父任务判断", "父任务状态更新"}
         param<set> 调用对象集合 := {"星型图", "父任务完成状态判断器"}
+        param<relation> 事件映射 := {
+            <"子任务状态更新", "子任务状态更新">,
+            <"子任务状态更新完成", "父任务查找">,
+            <"父任务查找完成", "星型图查找">,
+            <"输出星型图", "父任务判断">,
+            <"父任务状态更新", "父任务状态更新">
+        }
+
+        param<relation> 触发事件-调用对象映射 := {
+            <"子任务状态更新", "星型图">,
+            <"父任务查找", "星型图">,
+            <"星型图查找", "星型图">,
+            <"父任务判断", "父任务完成状态判断器">,
+            <"父任务状态更新", "星型图">
+}
