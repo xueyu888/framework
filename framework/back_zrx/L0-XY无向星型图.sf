@@ -1,29 +1,52 @@
-MODULE 图:Graph:
-    Goal := "以 X/Y 两侧二分顶点和无向边为基，组合出标准星型图"
+Base:
+    set 顶点集 := "记作 V；元素写作 v，表示图中的基本顶点。"
 
-    Base:
-        set 顶点集 := "记作 V；元素写作 v，表示图中的基本顶点。"
-        set 边集 := "记作 E；元素写作 {u, v}，表示顶点 u 与顶点 v 之间的一条无向边。"
+    set X顶点集 := "记作 Vx, Vx ⊆ V"
+    set Y顶点集 := "记作 Vy, Vy ⊆ V"
+    
+    set 边集 := "记作 E；元素写作 {u, v}，表示顶点 u 与顶点 v 之间的一条无向边。"
 
-    Principles:
+    op 增加顶点 := "记作 addV(v)，得到V'，V' = V ∪ {v}。"
+    op 增加边 := "记作 addE(u, v)，得到E'，E' = E ∪ {u, v}。"
 
-        sat 顶点的度 := "deg(v) = ∣{e ∈ E ∣ v ∈ e}∣；一个点连着多少条边，就说这个点的度；"
+    op 删除边 := "记作 delE(u, v)，得到E'，E' = E \ {u, v}。"
+    op 删除顶点 := "记作 delV(v)，得到V'，V' = V \ {v}。"
 
-        sat 无孤立点 := "对任意 v ∈ V，都有 deg(v) >= 1。"
+    op 查询邻点 := "记作 Query(v)，得到顶点集Q(v) = {u | {u, v} ∈ E}。"
+Principles:
 
-        <-- 二分条件 -->
-        sat 顶点集二分 := "V = Vx ∪ Vy。"
-        sat 两侧互不相交 := "Vx ∩ Vy = ∅。"
-        sat 跨侧连接约束 := "E ⊆ { {x, y} | x ∈ Vx, y ∈ Vy }；不允许 X-X 或 Y-Y 直接连边。"
-        sat Y侧度一 := "对任意 y ∈ Vy，都有 deg(y) = 1。"
-        sat X侧完全连接 := "E = { {x, y} | x ∈ Vx, y ∈ Vy }。"
-        sat X侧唯一中心 := "|Vx| = 1。"
+    sat 顶点的度 := "deg(v) = ∣{e ∈ E ∣ v ∈ e}∣；一个点连着多少条边，就说这个点的度；"
+    sat 无孤立点 := "对任意 v ∈ V，都有 deg(v) >= 1。"
 
-    Spaces:
-        comb 图 :=  {G | G = <V, E>,其中 V 为顶点全集，E 为无向边集。}
 
-        comb 二分图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束}
+    sat 顶点集二分 := "V = Vx ∪ Vy。"
+    sat 两侧互不相交 := "Vx ∩ Vy = ∅。"
+    sat 跨侧连接约束 := "E ⊆ { {x, y} | x ∈ Vx, y ∈ Vy }；不允许 X-X 或 Y-Y 直接连边。"
+    sat Y侧度一 := "对任意 y ∈ Vy，都有 deg(y) = 1。"
+    sat X侧完全连接 := "E = { {x, y} | x ∈ Vx, y ∈ Vy }。"
+    sat X侧唯一中心 := "|Vx| = 1。"
 
-        comb 多星型图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.无孤立点}
+    sat 增点成立 := addV(v),其中v ∉ Vy。
+    sat 增边成立 := addE(u, v),其中u, v ∈ V。
+    sat 删边成立 := delE(u, v),其中u, v ∈ E。
+    sat 删点成立 := delV(v),其中v ∈ V。
 
-        comb 单星型图 := { G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.X侧完全连接、Principle.X侧唯一中心}
+    sat 查询成立 := Query(v),其中v ∈ V。
+Spaces:
+    comb 图 :=  {G | G = <V, E>,其中 V 为顶点全集，E 为无向边集。}
+
+    comb 二分图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束}
+
+    comb 多星型图 := {G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.无孤立点}
+
+    comb 单星型图 := { G | G = <Vx, Vy, E>, 其中 Vx, Vy, E 满足 Principle.顶点集二分、Principle.两侧互不相交、Principle.跨侧连接约束、Principle.Y侧度一、Principle.X侧完全连接、Principle.X侧唯一中心}
+
+Boundary:
+
+    param<set> 侧别 := {X侧,Y侧}
+
+    in<set> 顶点集 := Base.顶点集
+    in<set> 边集 := Base.边集
+
+    out<set> 顶点集 := Base.顶点集
+    out<set> 边集 := Base.边集
