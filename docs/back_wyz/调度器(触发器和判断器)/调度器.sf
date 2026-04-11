@@ -1,0 +1,45 @@
+MODULE 调度器:Scheduler:
+    Goal := "接收"
+
+    Base:
+        struct 任务状态集合 := {{任务1, 任务1状态}, 任务2,  ...}写作: TG
+        elem 任务ID := ID, 写作: t
+        
+        set 状态集合 := {unfinish, finish}写作: STA
+
+        set 错误集合 := {"None", "任务不存在", "任务原状态为已完成" } 写作: ERR
+
+        
+    Principles:
+
+        sat 任务存在判断 := E1 = 1[t ∈ Children(TG)]
+        sat 任务原状态判断 := E2 = E1 & 1[status(t) = STA_2]     //   1是存在且finish，0是不存在或者unfinish
+        sat 任务原状态为已完成判断 := E3 = E1 & E2
+        sat 任务状态更新判断 := E4 = E1 & ~E2
+        sat 任务集合状态更新判断 := E5 = 1[∀ c ∈ Children(TG) \ t, status(c) = STA_2] & (E3 || E4)
+                                     = 1[∀ c ∈ Children(TG) \ t, status(c) = STA_2] & E1 (化简)
+
+        sat 错误码计算函数 := ERR_CODE = (
+            ERR_1 | default,
+            ERR_2 | ~E1,
+            ERR_3 | E3
+        )
+
+        sat 总输出集合 := OUTPUT =<ERR_CODE, E4, E5>
+
+    Spaces:
+
+        seq S := 以E1, E2, E3, E4, E5, OUTPUT的顺序
+        (
+            <0, 1, 0, 0, 0, <"任务不存在", 0, 0>>              // 输入任务ID不存在于任务集合中
+            <1, 0, 1, 0, 0, <"任务原状态为已完成", 0, 0>>       // 任务原状态为已完成，且其他任务未完成，此时不更新任务状态，不更新任务集合状态
+            <1, 0, 1, 0, 1, <"任务原状态为已完成", 0, 1>>      // 任务原状态为已完成，且其他任务同样完成，此时不更新任务状态，更新任务集合状态
+            <1, 1, 0, 1, 0, <"None", 1, 0>>                   // 任务原状态为未完成，且其他任务未完成，此时更新任务状态，不更新任务集合状态
+            <1, 1, 0, 1, 1, <"None", 1, 1>>                  // 任务原状态为未完成，且其他任务已完成，此时更新任务状态，更新任务集合状态
+        )
+
+    Boundary:
+        in<struct> 任务集合 := Base.任务集合
+        in<elem> 任务ID := Base.任务ID 
+        out<set> 输出 := Principles.总输出集合
+

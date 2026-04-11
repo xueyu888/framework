@@ -1,0 +1,89 @@
+MODULE 调度器与判断器:TaskJudgeScheduler:
+    Goal := "接收 Tag + Content 结构的输入事件；识别 Tag 后，把具体内容转发到唯一对应的目标模块。其中一类目标模块为占位判断器“父任务状态判断”。"
+
+    Base:
+        elem Tag := TAG
+        elem Content := CT
+
+        set 输入标签集合 := {
+            Sub_Task_Update,
+            Parent_Task_Judge
+        } 写作: IN_TAG
+
+        set 输出目标集合 := {
+            子任务状态更新操作,
+            父任务状态判断
+        } 写作: TARGET
+
+        set 状态集合 := {unfinish, finish} 写作: STA
+        set 父任务输出集合 := {parent_unfinish, parent_finish} 写作: PSTA
+
+        elem 子任务ID := ID, 写作: st
+
+        struct 子任务状态更新内容 := <子任务ID, 子任务状态> 写作: SUB_UPDATE_CT
+        struct 子任务状态集合 := {{子任务ID, 子任务状态}, ...} 写作: SUB_TASKS
+        struct 输入事件 := <Tag, Content> 写作: EV
+
+        rel 输入到输出映射 := {
+            <IN_TAG_1, TARGET_1>,
+            <IN_TAG_2, TARGET_2>
+        } 写作: MAP
+
+        ref 占位判断器 := 父任务状态判断
+
+        set 错误集合 := {
+            "None",
+            "输入Tag不存在",
+            "输入Tag无对应目标",
+            "Tag与Content结构不匹配"
+        } 写作: ERR
+
+    Principles:
+        sat Tag识别 := E1 = 1[tag(EV) ∈ IN_TAG]
+
+        sat 映射命中判断 := E2 = 1[∃ tg ∈ TARGET, <tag(EV), tg> ∈ MAP]
+
+        sat Sub_Task_Update内容匹配 :=
+            E3 = 1[tag(EV) = IN_TAG_1 -> content(EV) ∈ SUB_UPDATE_CT]
+
+        sat Parent_Task_Judge内容匹配 :=
+            E4 = 1[tag(EV) = IN_TAG_2 -> content(EV) ∈ SUB_TASKS]
+
+        sat 输入结构合法 :=
+            E5 = E1 & E2 & E3 & E4
+
+        sat 转发目标计算函数 := TARGET_OUT = (
+            TARGET_1 | tag(EV) = IN_TAG_1,
+            TARGET_2 | tag(EV) = IN_TAG_2
+        )
+
+        sat 转发内容计算函数 := CONTENT_OUT = content(EV)
+
+        sat 判断器占位输出 :=
+            JUDGE_OUT = 占位判断器(CONTENT_OUT) |
+            tag(EV) = IN_TAG_2
+
+        sat 父任务状态判断语义占位 :=
+            "父任务状态判断接收一系列子任务及其状态；若集合中的每一个子任务状态都为 finish，则输出 parent_finish，否则输出 parent_unfinish。"
+
+        sat 错误码计算函数 := ERR_CODE = (
+            ERR_1 | default,
+            ERR_2 | ~E1,
+            ERR_3 | E1 & ~E2,
+            ERR_4 | E1 & E2 & ~(E3 & E4)
+        )
+
+        sat 总输出集合 := OUTPUT = <ERR_CODE, TARGET_OUT, CONTENT_OUT, JUDGE_OUT, E5>
+
+    Spaces:
+        seq S := 以EV, E1, E2, E5, TARGET_OUT, CONTENT_OUT, JUDGE_OUT, OUTPUT的顺序
+        (
+            <<Sub_Task_Update, <st, finish>>, 1, 1, 1, 子任务状态更新操作, <st, finish>, None, <"None", 子任务状态更新操作, <st, finish>, None, 1>>,
+            <<Parent_Task_Judge, {{st_1, finish}, {st_2, finish}}>, 1, 1, 1, 父任务状态判断, {{st_1, finish}, {st_2, finish}}, parent_finish, <"None", 父任务状态判断, {{st_1, finish}, {st_2, finish}}, parent_finish, 1>>,
+            <<Parent_Task_Judge, {{st_1, finish}, {st_2, unfinish}}>, 1, 1, 1, 父任务状态判断, {{st_1, finish}, {st_2, unfinish}}, parent_unfinish, <"None", 父任务状态判断, {{st_1, finish}, {st_2, unfinish}}, parent_unfinish, 1>>,
+            <<Unknown_Tag, any_content>, 0, 0, 0, None, None, None, <"输入Tag不存在", None, None, None, 0>>
+        )
+
+    Boundary:
+        in<struct> 输入事件 := Base.输入事件
+        out<set> 输出 := Principles.总输出集合
