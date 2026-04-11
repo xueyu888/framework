@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.30 - 2026-04-10
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.29..shelf-ai-v0.1.30`.
+- Normalized the `.sf` finite-domain parameter vocabulary from `enum` to `set`: the shared grammar, completions, template snippet, tests, shipped examples, protocol spec, evidence snapshot, and chapter 13 contract text now all use `param<set>` as the formal spelling while keeping `param<range>` unchanged.
+- Aligned every repository `.sf` file to the current preview-lint baseline, including the back_zrx drafts that were still mixing older block names, `graph`/`enum` boundary subtypes, and non-conforming declaration shapes.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, repository-wide `.sf` lint, and local VSIX packaging/install verification before tagging `0.1.30`.
+
+## 0.1.29 - 2026-04-10
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.28..shelf-ai-v0.1.29`.
+- Unified the `.sf` top-level block vocabulary into singular form: the preview language now uses `Goal / Base / Principle / Space / Boundary`, and the old `Principles / Spaces` spellings are no longer accepted by lint, completion, or highlighting.
+- Promoted `map` into a formal shared-grammar statement kind while keeping it distinct from `op[...]`: `map` now models explicit mappings/resources in `Base` and mapping rules in `Principle`, while `op[...]` remains the shaped operator form in `Base`.
+- Tightened `.sf` reference parsing and examples around the new vocabulary, including support for Chinese punctuation-separated references and updated example files, README, protocol spec, evidence snapshot, and plugin contract text.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.29`.
+
+## 0.1.28 - 2026-04-09
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.27..shelf-ai-v0.1.28`.
+- Tightened the `.sf` preview into a more stable editor path: the extension now activates directly on `.sf` open, ships a generated TextMate fallback grammar, and enables semantic highlighting by default for the `shelf-framework` language id.
+- Refined `.sf` semantic rendering and grammar boundaries: declaration names now receive their own token class, `[shape]` and `<subtype>` are highlighted separately, and `Boundary` now accepts only `in / out / param` instead of a parallel `Boundary.op[...]` form.
+- Synced the packaged README, the `.sf` authoring spec, tests, evidence snapshot, and the boolean-logic / XY-star-graph drafts to the current `set / elem / struct / seq / op` plus `Boundary = in/out/param` authoring model.
+- The same repository-wide commit range also contains ongoing `framework/**` and `docs/back_zrx/**` authoring work outside the VSIX payload; those files are part of the audited range for this release but are not bundled as extension assets.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.28`.
+
+## 0.1.27 - 2026-04-09
+
+- Release summary is based on the full commit range `shelf-ai-v0.1.26..shelf-ai-v0.1.27`.
+- Reworked the `.sf` protocol docs and README entry so the experimental language now documents direct `Base.xxx` boundary bindings, multi-line right-hand values, ordered-collection notation, and the current `t(i)` time-point writing convention in one coherent authoring path.
+- Updated the extension-side `.sf` lint/test path to accept declaration heads with indented continuation lines and to surface a more precise `SFL009` message when continuation indentation is wrong.
+- Synced the plugin evidence snapshot and the accompanying back_zrx draft docs so the “first completion” example now distinguishes historical completion facts from the current trigger event instead of mixing the two concepts.
+- Revalidated the extension tests, webview type checks, repository `mypy`, hardcode guard, canonical validation, `validate_canonical.py --check-changes`, and local VSIX packaging/install verification before tagging `0.1.27`.
+
 ## 0.1.26 - 2026-04-08
 
 - Release summary is based on the full commit range `shelf-ai-v0.1.25..shelf-ai-v0.1.26`.

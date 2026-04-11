@@ -58,7 +58,7 @@ function sliceBlockLines(lines, entries, sectionId) {
     return [];
   }
   const startIndex = start.line;
-  const order = ["goal", "base", "principles", "spaces", "boundary"];
+  const order = ["goal", "base", "principle", "space", "boundary"];
   const currentOrderIndex = order.indexOf(sectionId);
   let endIndex = lines.length;
   for (let index = currentOrderIndex + 1; index < order.length; index += 1) {
@@ -90,7 +90,7 @@ function validateTopLevelStructure({ file, lines, issues }) {
     );
   }
 
-  const expectedOrder = ["goal", "base", "principles", "spaces", "boundary"];
+  const expectedOrder = ["goal", "base", "principle", "space", "boundary"];
   let cursor = 0;
   for (const expected of expectedOrder) {
     const entry = findEntry(entries, expected);
@@ -114,7 +114,7 @@ function validateTopLevelStructure({ file, lines, issues }) {
           line: entry.line,
           column: markerColumn(entry.raw),
           code: "SFL003",
-          message: "顶层块顺序必须固定为 Goal / Base / Principles / Spaces / Boundary。",
+          message: "顶层块顺序必须固定为 Goal / Base / Principle / Space / Boundary。",
         })
       );
     } else {
@@ -165,13 +165,41 @@ function validateFlatBlock({
     return;
   }
 
+  const statements = [];
+  let currentStatement = null;
+
   for (const item of blockLines) {
-    const trimmed = sfGrammar.trimLine(item.text);
-    if (sfGrammar.getIndent(item.text) !== 8) {
+    const indent = sfGrammar.getIndent(item.text);
+    if (indent === 8) {
+      currentStatement = {
+        head: item,
+        lines: [item],
+      };
+      statements.push(currentStatement);
+      continue;
+    }
+    if (indent > 8 && currentStatement) {
+      currentStatement.lines.push(item);
+      continue;
+    }
+    issues.push(
+      createIssue({
+        file,
+        line: item.line,
+        column: 1,
+        code: "SFL009",
+        message: "`.sf` 声明缩进必须使用 4 空格层级；若右值续行，续行必须缩进到声明头之下。",
+      })
+    );
+  }
+
+  for (const statement of statements) {
+    const trimmed = sfGrammar.trimLine(statement.head.text);
+    if (sfGrammar.getIndent(statement.head.text) !== 8) {
       issues.push(
         createIssue({
           file,
-          line: item.line,
+          line: statement.head.line,
           column: 1,
           code: "SFL009",
           message: "`.sf` 声明缩进必须使用 4 空格层级。",
@@ -185,8 +213,8 @@ function validateFlatBlock({
       issues.push(
         createIssue({
           file,
-          line: item.line,
-          column: markerColumn(item.text),
+          line: statement.head.line,
+          column: markerColumn(statement.head.text),
           code,
           message: invalidMessage,
         })
@@ -198,8 +226,10 @@ function validateFlatBlock({
     if (name) {
       definitions.add(`${definitionPathPrefix}.${name}`);
     }
-    for (const ref of collectRefs(trimmed)) {
-      references.push({ ref, line: item.line, column: markerColumn(item.text), file });
+    for (const lineItem of statement.lines) {
+      for (const ref of collectRefs(sfGrammar.trimLine(lineItem.text))) {
+        references.push({ ref, line: lineItem.line, column: markerColumn(lineItem.text), file });
+      }
     }
   }
 }
@@ -236,34 +266,34 @@ function lintShelfFrameworkFile({ filePath, text }) {
     sectionId: "base",
     code: "SFL005",
     definitionPathPrefix: "Base",
-    emptyMessage: "`Base` block 至少需要一个 `set/elem/relation` 声明。",
-    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`elem 名称 := 值` 或 `relation[shape] 名称 := 值`。",
+    emptyMessage: "`Base` block 至少需要一个 `set/elem/struct/seq/map/op` 声明。",
+    invalidMessage: "`Base` 内只允许 `set 名称 := 值`、`elem 名称 := 值`、`struct 名称 := 值`、`seq 名称 := 值`、`map 名称 := 值` 或 `op[shape] 名称 := 值`。",
   });
   validateFlatBlock({
     file,
     entries,
     lines,
-    sectionId: "principles",
+    sectionId: "principle",
     issues,
     definitions,
     references,
     code: "SFL006",
-    definitionPathPrefix: "Principles",
-    emptyMessage: "`Principles` block 至少需要一个 `sat/eq` 声明。",
-    invalidMessage: "`Principles` 内只允许 `sat 名称 := 值` 或 `eq 名称 := 值`。",
+    definitionPathPrefix: "Principle",
+    emptyMessage: "`Principle` block 至少需要一个 `sat/eq/map` 声明。",
+    invalidMessage: "`Principle` 内只允许 `sat 名称 := 值`、`eq 名称 := 值` 或 `map 名称 := 值`。",
   });
   validateFlatBlock({
     file,
     entries,
     lines,
-    sectionId: "spaces",
+    sectionId: "space",
     issues,
     definitions,
     references,
     code: "SFL007",
-    definitionPathPrefix: "Spaces",
-    emptyMessage: "`Spaces` block 至少需要一个 `comb/seq` 声明。",
-    invalidMessage: "`Spaces` 内只允许 `comb 名称 := 值` 或 `seq 名称 := 值`。",
+    definitionPathPrefix: "Space",
+    emptyMessage: "`Space` block 至少需要一个 `set/comb/seq` 声明。",
+    invalidMessage: "`Space` 内只允许 `set 名称 := 值`、`comb 名称 := 值` 或 `seq 名称 := 值`。",
   });
   validateFlatBlock({
     file,
@@ -275,7 +305,7 @@ function lintShelfFrameworkFile({ filePath, text }) {
     references,
     code: "SFL008",
     definitionPathPrefix: "Boundary",
-    emptyMessage: "`Boundary` block 至少需要一个 `param<...>` 声明。",
+    emptyMessage: "`Boundary` block 至少需要一个 `param/in/out` 声明。",
     invalidMessage: "`Boundary` 内只允许 `param<子类型> 名称 := 值`、`in<子类型> 名称 := 值` 或 `out<子类型> 名称 := 值`。",
   });
 

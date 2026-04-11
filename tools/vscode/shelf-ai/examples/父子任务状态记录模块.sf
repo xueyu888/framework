@@ -1,38 +1,21 @@
-module 父子任务状态记录模块:TaskStateRecorder:
-    Goal := "记录父任务及其子任务的状态，并在子任务状态变化后同步更新父任务状态"
+MODULE 父子任务状态记录模块:TaskStateRecorder:
+    Goal := "记录子任务状态变化，并把处理结果同步到父任务状态记录。"
 
     Base:
-        graph 父子任务依赖 := file("../../docs/back_zrx/父子任务关系.md")
+        struct 父子任务依赖 := file("../../docs/back_zrx/父子任务关系.md")
         map 任务状态索引 := file("../../docs/back_zrx/任务状态记录表.md")
-        map 子任务提交到父任务更新映射 := file("../../docs/back_zrx/子任务提交处理逻辑.md")
+        map 子任务提交更新映射 := file("../../docs/back_zrx/子任务提交处理逻辑.md")
+        op[1:1] 子任务状态聚合 := "输入为一条子任务状态变化记录，输出为对应的父任务状态更新结果。"
 
-    Principles:     
-        sat 父任务先验存在 :=
-            on(<Spaces.子任务状态同步>),
-            body("父任务记录必须先存在")
+    Principle:
+        sat 父任务先验存在 := "只有父任务记录已存在时，Space.子任务状态同步 才成立。"
+        eq 父任务状态一致 := "同步完成后，父任务状态必须与全部子任务聚合结果一致。"
+        map 状态传播 := "根据 Base.父子任务依赖、Base.任务状态索引 与 Base.子任务提交更新映射，把子任务状态变化映射为父任务状态更新。"
 
-        eq 父任务状态一致 :=
-            on(<Spaces.子任务状态同步>),
-            body("同步后父任务状态与子任务聚合结果一致")
-
-        map 状态传播 :=
-            on(<Base.父子任务依赖, Base.任务状态索引>),
-            body("子任务状态变化映射为父任务状态更新")
-
-    Spaces:
-        comb 子任务状态同步 :=
-            from(<Base.父子任务依赖, Base.任务状态索引, Base.子任务提交到父任务更新映射>),
-            by(<Principles.父任务先验存在, Principles.父任务状态一致, Principles.状态传播>)
+    Space:
+        comb 子任务状态同步 := "从 Base.父子任务依赖、Base.任务状态索引、Base.子任务提交更新映射 出发，应用 Principle.父任务先验存在、Principle.父任务状态一致 与 Principle.状态传播，得到父任务更新组合。"
 
     Boundary:
-        in<view> 子任务记录输入 :=
-            of(Base.任务状态索引),
-            pick({子任务id, 父任务id, 子任务状态, 是否初次完成, 子任务附加信息}),
-            to(Spaces.子任务状态同步)
-
-        out<view> 父任务记录输出 :=
-            of(Base.任务状态索引),
-            pick({父任务id, 子任务总数, 已完成子任务数, 父任务状态, 父任务附加信息}),
-            from(Spaces.子任务状态同步)
-
-        param<enum> 子任务状态集合 := {pending, running, success, failed}
+        in<view> 子任务记录输入 := Base.任务状态索引
+        out<view> 父任务记录输出 := Base.任务状态索引
+        param<set> 子任务状态集合 := {pending, running, success, failed}

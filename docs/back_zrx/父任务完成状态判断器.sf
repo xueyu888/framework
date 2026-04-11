@@ -1,0 +1,19 @@
+MODULE 父任务完成状态判断器:ParentCompletionStatusJudge:
+    Goal := "根据全部子任务的完成状态，判断父任务是否完成。"
+
+    Base:
+        set 子任务完成状态 := {finish, unfinish}
+        seq 子任务完成状态序列 := "记作 x = <s1, s2, ..., sn>；其中每个 si ∈ Base.子任务完成状态。"
+        set 父任务完成状态 := {finish, unfinish}
+
+    Principle:
+        sat 判定定义 := "对任意 x ∈ Base.子任务完成状态序列，
+                     F(x) = finish，当且仅当 ∀i, x_i = finish；
+                     否则 F(x) = unfinish。"
+
+    Space:
+        set 结果空间 := "{<x, F(x)> | x ∈ Base.子任务完成状态序列}"
+
+    Boundary:
+        in<seq> 子任务完成状态序列 := Base.子任务完成状态序列
+        out<set> 父任务完成状态 := Base.父任务完成状态

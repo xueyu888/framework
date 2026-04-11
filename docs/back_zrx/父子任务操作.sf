@@ -1,0 +1,33 @@
+MODULE 父子任务操作:ParentChild:
+    Goal := "支持父子任务关系的记录、更新、查询与删除，并保持父子任务关系满足星型结构约束。"
+
+    Base:
+        set 父任务集合 := "记作 V_parent；其中每个元素表示一个父任务。"
+        set 子任务集合 := "记作 V_child；其中每个元素表示一个子任务。"
+        struct 父子任务星型图 := "记作 G = <V_parent, V_child, E>；其中 V_parent ∩ V_child = ∅，E ⊆ V_parent × V_child，且每个子任务最多属于一个父任务。"
+        op[1:1] 子任务更新 := "输入一条子任务更新记录，输出更新后的子任务记录。"
+        op[1:1] 子任务新增 := "输入父任务 id、子任务 id 与子任务附加字段，输出插入关系后的星型图。"
+        op[1:1] 父任务新增或更新 := "输入父任务记录，输出更新后的父任务记录。"
+        op[1:1] 按父任务查询或删除 := "输入父任务 id，输出对应父任务及其子任务视图，或执行删除。"
+        op[1:1] 按子任务查询或删除 := "输入子任务 id，输出对应父任务 id，或执行删除。"
+
+    Principle:
+        sat 星型关系约束 := "父子任务关系始终满足 Base.父子任务星型图 的结构要求：父集合与子集合不重叠，边只连接父子两侧，且每个子任务最多连接一个父任务。"
+        sat 更新保持结构 := "无论执行 Base.子任务更新、Base.子任务新增、Base.父任务新增或更新、Base.按父任务查询或删除 还是 Base.按子任务查询或删除，结果都不能破坏 Principle.星型关系约束。"
+
+    Space:
+        comb 父子任务操作空间 := "把 Base.子任务更新、Base.子任务新增、Base.父任务新增或更新、Base.按父任务查询或删除 与 Base.按子任务查询或删除 归入同一操作空间，并统一要求满足 Principle.星型关系约束 与 Principle.更新保持结构。"
+
+    Boundary:
+        param<set> 子顶点字段 := "{child_id, child_other_fields}"
+        param<set> 父顶点字段 := "{parent_id, parent_other_fields}"
+        param<set> 边字段 := "{parent_id, child_id}"
+        in<view> 子任务更新 := "{child_id, child_other_fields}"
+        out<view> 子任务更新输出 := "{child_id, child_other_fields}"
+        in<view> 子任务新增 := "{parent_id, child_id, child_other_fields}"
+        in<view> 父任务新增或更新 := "{parent_id, parent_other_fields}"
+        out<view> 父任务更新输出 := "{parent_id, parent_other_fields}"
+        in<range> 父任务id查询或删除 := "[0:N]"
+        out<view> 星型图输出 := "{parent_id, parent_other_fields, [child_id, child_other_fields]}"
+        in<range> 子任务id查询或删除 := "[0:N]"
+        out<range> 父任务id输出 := "[0:N]"

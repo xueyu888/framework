@@ -1,0 +1,171 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Shelf Framework",
+  "scopeName": "source.shelf-framework",
+  "fileTypes": [
+    "sf"
+  ],
+  "patterns": [
+    {
+      "include": "#module"
+    },
+    {
+      "include": "#goal"
+    },
+    {
+      "include": "#block"
+    },
+    {
+      "include": "#declaration-shape"
+    },
+    {
+      "include": "#declaration-subtype"
+    },
+    {
+      "include": "#declaration-plain"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#reference"
+    }
+  ],
+  "repository": {
+    "module": {
+      "match": "^(MODULE)(\\s+)([^:]+)(:)([A-Za-z_][A-Za-z0-9_]*)(\\s*:\\s*)$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.shelf-framework"
+        },
+        "3": {
+          "name": "entity.name.section.shelf-framework"
+        },
+        "5": {
+          "name": "entity.name.type.shelf-framework"
+        }
+      }
+    },
+    "goal": {
+      "begin": "^(\\s{4})(Goal)(\\s*:=\\s*)",
+      "beginCaptures": {
+        "2": {
+          "name": "entity.name.section.shelf-framework"
+        },
+        "3": {
+          "name": "keyword.operator.assignment.shelf-framework"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#reference"
+        }
+      ]
+    },
+    "block": {
+      "match": "^(\\s{4})(Base:|Principle:|Space:|Boundary:)$",
+      "captures": {
+        "2": {
+          "name": "entity.name.section.shelf-framework"
+        }
+      }
+    },
+    "declarationShape": {
+      "begin": "^(\\s{8})(op)(\\[[^\\]]+\\])?(\\s+)([^:=]+?)(\\s*:=\\s*)",
+      "beginCaptures": {
+        "2": {
+          "name": "keyword.control.shelf-framework"
+        },
+        "3": {
+          "name": "keyword.operator.shelf-framework"
+        },
+        "5": {
+          "name": "variable.other.shelf-framework"
+        },
+        "6": {
+          "name": "keyword.operator.assignment.shelf-framework"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#reference"
+        }
+      ]
+    },
+    "declarationSubtype": {
+      "begin": "^(\\s{8})(in|out|param)(<[^>]+>)(\\s+)([^:=]+?)(\\s*:=\\s*)",
+      "beginCaptures": {
+        "2": {
+          "name": "keyword.control.shelf-framework"
+        },
+        "3": {
+          "name": "storage.type.annotation.shelf-framework"
+        },
+        "5": {
+          "name": "variable.other.shelf-framework"
+        },
+        "6": {
+          "name": "keyword.operator.assignment.shelf-framework"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#reference"
+        }
+      ]
+    },
+    "declarationPlain": {
+      "begin": "^(\\s{8})(set|elem|struct|seq|map|sat|eq|comb)(\\s+)([^:=]+?)(\\s*:=\\s*)",
+      "beginCaptures": {
+        "2": {
+          "name": "keyword.control.shelf-framework"
+        },
+        "4": {
+          "name": "variable.other.shelf-framework"
+        },
+        "5": {
+          "name": "keyword.operator.assignment.shelf-framework"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#reference"
+        }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.shelf-framework",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.shelf-framework"
+        },
+        {
+          "include": "#reference"
+        }
+      ]
+    },
+    "reference": {
+      "name": "entity.name.namespace.shelf-framework",
+      "match": "\\b(?:Base|Principle|Space|Boundary)\\.[^,\\s，、。；;:：<>(){}[\\]\"']+"
+    }
+  }
+}

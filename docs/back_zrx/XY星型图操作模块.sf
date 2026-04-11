@@ -1,0 +1,99 @@
+MODULE XY星型图操作模块:XYStarGraphOpsModule:
+    Goal := "定义一种 XY 对称的星型图，并给出其增删改查算子。"
+
+    Base:
+        elem 点 := "记作 v，表示一个基本点。"
+        set 点集 := "记作 U；其元素均为 Base.点。"
+        set 侧别集合 := {X, Y}
+
+        struct 星型图 := "记作 G = <V_X, V_Y, E>；
+                表示一种 XY 无向星型图；
+                其中 V_X 与 V_Y 分别表示 X/Y 两侧点集，E 表示两侧之间的连接关系；
+                星型图这一基自身已经包含：X/Y 两侧不重叠、连接只发生在两侧之间、且一侧作为叶侧并满足该侧每个点只连接一个对侧点。"
+
+        op[4:1] 增点 := "记作 Add(G, s, v, U)；
+                输入星型图 G、侧别 s、待加入点 v、以及对侧点集 U；
+                输出新星型图 G'。"
+
+        op[3:1] 删点 := "记作 Remove(G, s, v)；
+                输入星型图 G、侧别 s 与待删除点 v；
+                输出新星型图 G'。"
+
+        op[4:1] 改对应 := "记作 Update(G, s, v, U)；
+                输入星型图 G、侧别 s、已有点 v、以及新的对侧点集 U；
+                输出新星型图 G'。"
+
+        op[3:1] 查对侧 := "记作 Opp(G, s, v)；
+                输入星型图 G、侧别 s 与点 v；
+                输出点 v 当前对应的对侧点集 U。"
+
+    Principle:
+        sat 对侧连接定义 := "对任意 G = <V_X, V_Y, E>：
+                若 s = X，则 Opp(G, s, v) = { y ∈ V_Y | <v, y> ∈ E }；
+                若 s = Y，则 Opp(G, s, v) = { x ∈ V_X | <x, v> ∈ E }。"
+
+        sat 增点原则 := "Add(G, s, v, U) = G' 当且仅当：
+                v 不属于 G 的现有点集；
+                且 U 落在侧 s 的对侧；
+                且在 G' 中，点 v 被加入到侧 s，且其对侧连接恰为 U；
+                且 G 中其余已有点的对侧连接保持不变；
+                且 G' 仍属于 Base.星型图。"
+
+        sat 删点原则 := "Remove(G, s, v) = G' 当且仅当：
+                v 属于 G 中侧 s 的点集；
+                且在 G' 中，点 v 被删除；
+                且所有与 v 相关的对侧连接一并删除；
+                且 G' 是从 G 删除 v 后仍属于 Base.星型图，且满足最大剩余结果要求。"
+
+        sat 改对应原则 := "Update(G, s, v, U) = G' 当且仅当：
+                v 属于 G 中侧 s 的点集；
+                且 U 落在侧 s 的对侧；
+                且在 G' 中，点 v 的对侧连接被改为 U；
+                且除 v 之外，其余已有点的对侧连接保持不变；
+                且 G' 仍属于 Base.星型图。"
+
+        sat 查询原则 := "查对侧算子只读不改写：
+                对任意 G、s、v，Opp(G, s, v) 返回点 v 在 G 中的当前对侧点集。"
+
+    Space:
+        set 图空间 := "{ G | G ∈ Base.星型图 }"
+
+        set 增点作用空间 := "{ <Base.增点, G, s, v, U, G'> |
+                G ∈ Base.星型图,
+                G' ∈ Base.星型图,
+                s ∈ Base.侧别集合,
+                v ∈ Base.点,
+                U ∈ Base.点集,
+                且满足 Principle.增点原则 }"
+
+        set 删点作用空间 := "{ <Base.删点, G, s, v, G'> |
+                G ∈ Base.星型图,
+                G' ∈ Base.星型图,
+                s ∈ Base.侧别集合,
+                v ∈ Base.点,
+                且满足 Principle.删点原则 }"
+
+        set 改对应作用空间 := "{ <Base.改对应, G, s, v, U, G'> |
+                G ∈ Base.星型图,
+                G' ∈ Base.星型图,
+                s ∈ Base.侧别集合,
+                v ∈ Base.点,
+                U ∈ Base.点集,
+                且满足 Principle.改对应原则 }"
+
+        set 查询作用空间 := "{ <Base.查对侧, G, s, v, U> |
+                G ∈ Base.星型图,
+                s ∈ Base.侧别集合,
+                v ∈ Base.点,
+                U ∈ Base.点集,
+                且满足 Principle.查询原则 }"
+
+    Boundary:
+        in<struct> 输入星型图 := Base.星型图
+        in<set> 输入侧别 := Base.侧别集合
+        in<point> 输入点 := Base.点
+        in<set> 输入对侧点集 := Base.点集
+        out<struct> 增点输出图 := Base.星型图
+        out<struct> 删点输出图 := Base.星型图
+        out<struct> 改对应输出图 := Base.星型图
+        out<set> 查对侧输出点集 := Base.点集

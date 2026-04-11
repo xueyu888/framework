@@ -7,8 +7,8 @@ const SF_GOAL_PATTERN = /^Goal\s*:=\s*"(?<body>.+)"$/u;
 const SF_BLOCK_DEFINITIONS = Object.freeze([
   { id: "goal", label: "Goal", heading: "Goal" },
   { id: "base", label: "Base", heading: "Base:" },
-  { id: "principles", label: "Principles", heading: "Principles:" },
-  { id: "spaces", label: "Spaces", heading: "Spaces:" },
+  { id: "principle", label: "Principle", heading: "Principle:" },
+  { id: "space", label: "Space", heading: "Space:" },
   { id: "boundary", label: "Boundary", heading: "Boundary:" },
 ]);
 
@@ -32,84 +32,134 @@ const SF_STATEMENT_DEFINITIONS = Object.freeze([
     completionDetail: "插入 Base.elem 声明",
   },
   {
-    id: "relation",
+    id: "struct",
     sectionId: "base",
-    keyword: "relation",
-    pattern: /^relation(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "relation[2:1] ${1:关系基} := \"${2:关系说明}\"",
-    completionLabel: "relation[2:1]",
-    completionDetail: "插入 Base.relation 声明",
+    keyword: "struct",
+    pattern: /^struct\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "struct ${1:复合结构} := \"${2:结构说明}\"",
+    completionLabel: "struct",
+    completionDetail: "插入 Base.struct 声明",
+  },
+  {
+    id: "seq-base",
+    sectionId: "base",
+    keyword: "seq",
+    pattern: /^seq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "seq ${1:有序结构基} := \"${2:有序结构说明}\"",
+    completionLabel: "seq",
+    completionDetail: "插入 Base.seq 声明",
+  },
+  {
+    id: "map-base",
+    sectionId: "base",
+    keyword: "map",
+    pattern: /^map\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "map ${1:映射基} := \"${2:映射说明}\"",
+    completionLabel: "map",
+    completionDetail: "插入 Base.map 声明",
+  },
+  {
+    id: "op-base",
+    sectionId: "base",
+    keyword: "op",
+    annotationKind: "shape",
+    pattern: /^op(?:\[(?<shape>[^\]]+)\])?\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "op[2:1] ${1:操作子} := \"${2:操作子说明}\"",
+    completionLabel: "op[2:1]",
+    completionDetail: "插入 Base.op 声明",
   },
   {
     id: "sat",
-    sectionId: "principles",
+    sectionId: "principle",
     keyword: "sat",
     pattern: /^sat\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "sat ${1:成立原则} := \"${2:说明成立条件}\"",
     completionLabel: "sat",
-    completionDetail: "插入 Principles.sat 声明",
+    completionDetail: "插入 Principle.sat 声明",
   },
   {
     id: "eq",
-    sectionId: "principles",
+    sectionId: "principle",
     keyword: "eq",
     pattern: /^eq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "eq ${1:判同原则} := \"${2:说明何时归入同一结果类}\"",
     completionLabel: "eq",
-    completionDetail: "插入 Principles.eq 声明",
+    completionDetail: "插入 Principle.eq 声明",
+  },
+  {
+    id: "map-principles",
+    sectionId: "principle",
+    keyword: "map",
+    pattern: /^map\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "map ${1:映射原则} := \"${2:说明如何把输入映射到输出}\"",
+    completionLabel: "map",
+    completionDetail: "插入 Principle.map 声明",
+  },
+  {
+    id: "set-spaces",
+    sectionId: "space",
+    keyword: "set",
+    pattern: /^set\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "set ${1:结果集合} := \"${2:结果集合说明}\"",
+    completionLabel: "set",
+    completionDetail: "插入 Space.set 声明",
   },
   {
     id: "comb",
-    sectionId: "spaces",
+    sectionId: "space",
     keyword: "comb",
     pattern: /^comb\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "comb ${1:组合分类} := \"${2:说明这一类组合如何得到}\"",
     completionLabel: "comb",
-    completionDetail: "插入 Spaces.comb 声明",
+    completionDetail: "插入 Space.comb 声明",
   },
   {
     id: "seq",
-    sectionId: "spaces",
+    sectionId: "space",
     keyword: "seq",
     pattern: /^seq\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "seq ${1:候选序列} := \"${2:说明这一组候选}\"",
     completionLabel: "seq",
-    completionDetail: "插入 Spaces.seq 声明",
+    completionDetail: "插入 Space.seq 声明",
   },
   {
     id: "in",
     sectionId: "boundary",
     keyword: "in",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^in<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "in<view> ${1:输入边界} := \"${2:输入约束}\"",
-    completionLabel: "in<schema>",
+    template: "in<subtype> ${1:输入边界} := \"${2:输入约束}\"",
+    completionLabel: "in<subtype>",
     completionDetail: "插入 Boundary.in 声明",
   },
   {
     id: "out",
     sectionId: "boundary",
     keyword: "out",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^out<(?<subtype>[^>]+)>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "out<view> ${1:输出边界} := \"${2:输出约束}\"",
-    completionLabel: "out<schema>",
+    template: "out<subtype> ${1:输出边界} := \"${2:输出约束}\"",
+    completionLabel: "out<subtype>",
     completionDetail: "插入 Boundary.out 声明",
   },
   {
-    id: "param-enum",
+    id: "param-set",
     sectionId: "boundary",
     keyword: "param",
+    annotationKind: "subtype",
     subtypeRequired: true,
-    pattern: /^param<enum>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
-    template: "param<enum> ${1:参数边界} := \"${2:{a, b}}\"",
-    completionLabel: "param<enum>",
+    pattern: /^param<set>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
+    template: "param<set> ${1:参数边界} := \"${2:{a, b}}\"",
+    completionLabel: "param<set>",
     completionDetail: "插入 Boundary.param 声明",
   },
   {
     id: "param-range",
     sectionId: "boundary",
     keyword: "param",
+    annotationKind: "subtype",
     subtypeRequired: true,
     pattern: /^param<range>\s+(?<name>[^:=]+?)\s*:=\s*(?<body>.+)$/u,
     template: "param<range> ${1:范围边界} := \"${2:[0:2]}\"",
@@ -141,18 +191,18 @@ const SF_TOP_LEVEL_TEMPLATES = Object.freeze([
     insertText: "Base:",
   },
   {
-    id: "principles-block",
-    label: "Principles:",
-    detail: "插入 Principles block",
-    documentation: "Principles block 定义组合原则。",
-    insertText: "Principles:",
+    id: "principle-block",
+    label: "Principle:",
+    detail: "插入 Principle block",
+    documentation: "Principle block 定义组合原则。",
+    insertText: "Principle:",
   },
   {
-    id: "spaces-block",
-    label: "Spaces:",
-    detail: "插入 Spaces block",
-    documentation: "Spaces block 定义结果组合空间。",
-    insertText: "Spaces:",
+    id: "space-block",
+    label: "Space:",
+    detail: "插入 Space block",
+    documentation: "Space block 定义结果组合空间。",
+    insertText: "Space:",
   },
   {
     id: "boundary-block",
@@ -170,31 +220,40 @@ const SF_TEMPLATE_SNIPPET_BODY = Object.freeze([
   "    Base:",
   "        set ${4:集合基} := \"${5:集合说明}\"",
   "        elem ${6:结构基} := \"${7:结构说明}\"",
-  "        relation[2:1] ${8:关系基} := \"${9:关系说明}\"",
+  "        struct ${8:复合结构} := \"${9:结构说明}\"",
+  "        seq ${10:有序结构基} := \"${11:有序结构说明}\"",
+  "        map ${12:映射基} := \"${13:映射说明}\"",
+  "        op[2:1] ${14:操作子} := \"${15:操作子说明}\"",
   "",
-  "    Principles:",
-  "        sat ${10:成立原则} := \"${11:说明成立条件}\"",
-  "        eq ${12:判同原则} := \"${13:说明何时归入同一结果类}\"",
+  "    Principle:",
+  "        sat ${16:成立原则} := \"${17:说明成立条件}\"",
+  "        eq ${18:判同原则} := \"${19:说明何时归入同一结果类}\"",
+  "        map ${20:映射原则} := \"${21:说明如何把输入映射到输出}\"",
   "",
-  "    Spaces:",
-  "        comb ${14:组合分类} := \"${15:说明这一类组合如何得到}\"",
+  "    Space:",
+  "        set ${22:结果集合} := \"${23:结果集合说明}\"",
+  "        comb ${24:组合分类} := \"${25:说明这一类组合如何得到}\"",
+  "        seq ${26:候选序列} := \"${27:说明这一组候选}\"",
   "",
   "    Boundary:",
-  "        param<enum> ${16:变量边界} := \"${17:{x, y, z}}\"",
-  "        param<enum> ${18:变量取值边界} := \"${19:{0, 1}}\"",
-  "        param<range> ${20:最大嵌套层数} := \"${21:[0:2]}\"",
+  "        in<subtype> ${28:输入边界} := \"${29:输入约束}\"",
+  "        out<subtype> ${30:输出边界} := \"${31:输出约束}\"",
+  "        param<set> ${32:变量边界} := \"${33:{x, y, z}}\"",
+  "        param<range> ${34:最大嵌套层数} := \"${35:[0:2]}\"",
 ]);
 
-const SF_REFERENCE_PATTERN = /\b(?:Base|Principles|Spaces|Boundary)\.[^,\s，。；;:：<>(){}[\]"']+/gu;
+const SF_REFERENCE_PATTERN = /\b(?:Base|Principle|Space|Boundary)\.[^,\s，、。；;:：<>(){}[\]"']+/gu;
 const SF_CLAUSE_PATTERN = /$^/gu;
-const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|relation|sat|eq|comb|seq|in|out|param)(?<subtype>(?:\[[^\]]+\]|<[^>]+>))?\s/u;
+const SF_DECLARATION_HEAD_PATTERN = /^(?<keyword>set|elem|struct|seq|map|op|sat|eq|comb|in|out|param)(?<annotation>(?:\[(?<shape>[^\]]+)\]|<(?<subtype>[^>]+)>))?(?<gap>\s+)(?<name>[^:=]+?)\s*:=\s/u;
 
 const SEMANTIC_TOKEN_TYPES = Object.freeze({
   block: "type",
   statementKeyword: "keyword",
   reference: "namespace",
   clauseKeyword: "keyword",
-  subtype: "type",
+  declarationName: "variable",
+  shape: "operator",
+  subtype: "typeParameter",
 });
 
 function splitLines(text) {
@@ -219,11 +278,11 @@ function detectShelfFrameworkSectionId(lineText) {
   if (trimmed === "Base:") {
     return "base";
   }
-  if (trimmed === "Principles:") {
-    return "principles";
+  if (trimmed === "Principle:") {
+    return "principle";
   }
-  if (trimmed === "Spaces:") {
-    return "spaces";
+  if (trimmed === "Space:") {
+    return "space";
   }
   if (trimmed === "Boundary:") {
     return "boundary";
@@ -300,18 +359,31 @@ function collectShelfFrameworkSemanticTokens(text) {
     if (indent === 8) {
       const headMatch = trimmed.match(SF_DECLARATION_HEAD_PATTERN);
       if (headMatch?.groups?.keyword) {
+        const annotation = String(headMatch.groups.annotation || "");
+        const gap = String(headMatch.groups.gap || "");
+        const name = String(headMatch.groups.name || "");
         tokens.push({
           line: lineIndex,
           startChar: indent,
           length: headMatch.groups.keyword.length,
           tokenType: SEMANTIC_TOKEN_TYPES.statementKeyword,
         });
-        if (headMatch.groups.subtype) {
+        if (annotation) {
           tokens.push({
             line: lineIndex,
             startChar: indent + headMatch.groups.keyword.length,
-            length: headMatch.groups.subtype.length,
-            tokenType: SEMANTIC_TOKEN_TYPES.subtype,
+            length: annotation.length,
+            tokenType: headMatch.groups.shape
+              ? SEMANTIC_TOKEN_TYPES.shape
+              : SEMANTIC_TOKEN_TYPES.subtype,
+          });
+        }
+        if (name) {
+          tokens.push({
+            line: lineIndex,
+            startChar: indent + headMatch.groups.keyword.length + annotation.length + gap.length,
+            length: name.length,
+            tokenType: SEMANTIC_TOKEN_TYPES.declarationName,
           });
         }
       }
@@ -346,7 +418,7 @@ function collectShelfFrameworkSemanticTokens(text) {
 }
 
 function getShelfFrameworkCompletionTriggerChars() {
-  return ["M", "G", "B", "P", "S", "e", "r", "s", "q", "c", "i", "o", "p", "<", "[", ":", ".", " "];
+  return ["M", "G", "B", "P", "S", "e", "m", "r", "s", "q", "c", "i", "o", "p", "<", "[", ":", ".", " "];
 }
 
 module.exports = {

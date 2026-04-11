@@ -1,0 +1,23 @@
+MODULE 首次完成状态判断器:FirstCompletionStatusJudge:
+    Goal := "以 t(0) / t(1) 两个时间位点表达状态演进，判断完成状态是否在 t(1) 首次触发。"
+
+    Base:
+        elem 时间符号 := "t(i) 表示时间位点；t(0) 表示进入本次判断前的历史位点，t(1) 表示本次提交到达的当前位点。"
+        set 历史完成状态 := {finished, unfinished}
+        set 本次传入完成状态 := {finish, unfinish}
+        set 是否首次触发完成 := {yes, no}
+
+    Principle:
+        sat 时间位点约定 := "历史完成状态对应 t(0)，本次传入完成状态对应 t(1)。"
+        sat 首次完成触发判断 := "仅当 t(0)=unfinished 且 t(1)=finish 时，判定为 yes；其余情况判定为 no。"
+
+    Space:
+        seq 首次完成触发表 := <  <t(0)=finished, t(1)=finish, no>,
+                            <t(0)=finished, t(1)=unfinish, no>,
+                            <t(0)=unfinished, t(1)=finish, yes>,
+                            <t(0)=unfinished, t(1)=unfinish, no>>
+
+    Boundary:
+        in<set> 历史完成状态 := Base.历史完成状态
+        in<set> 本次传入完成状态 := Base.本次传入完成状态
+        out<set> 是否首次触发完成 := Base.是否首次触发完成
