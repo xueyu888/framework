@@ -1,0 +1,136 @@
+MODULE 父子任务状态调度器:ParentChildTaskStateScheduler:
+    Goal := "定义子任务状态输入所诱导的父子任务联动调度规则。"
+
+    Base:
+        set 父任务 := "记作 P。"
+        set 子任务 := "记作 C。"
+        set 状态 := "记作 S = {finish, unfinish}。"
+        set 返回状态 := "记作 R = {success, failure}。"
+
+        set 注册表 := "记作 REG ；
+                REG ：K : FUNC"
+
+        set 注册键 := "记作K，其中的元素为k"
+
+        set 函数集 := "记做FUNC，其中的元素为func"
+
+        op[1:1] 查找父 := "记作 "findparent" : fp；
+                其中 "findparent" ∈ K, fp ∈ FUNC"
+
+        op[1:1] 查找子 := "记作 "findchild" : fc；
+                其中 "findchild" ∈ K, fc ∈ FUNC"
+
+        op[2:1] 更新父 := "记作 "updateparent" : up；
+                其使用形态为 up(p, s)，
+                其中 "updateparent" ∈ K, s ∈ S，u ∈ FUNC"
+
+        op[2:1] 更新子 := "记作 "updatechild" : uc；
+                其使用形态为 uc(c, s)，
+                其中 "updatechild" ∈ K, s ∈ S，u ∈ FUNC"        
+
+        op[1:1] 判断 := "记作 "judge" : j；
+                j : 2^(C × S) -> S。
+                其中 "judge" ∈ K, j ∈ FUNC"
+
+        map 更新返回 := "记作 r_u；
+                r_u(uc(c, s)) ∈ R，
+                r_u(up(p, s)) ∈ R。"
+
+        map 查找返回 := "记作 r_f；
+                r_f(fp(c)) ∈ {failure} ∪ ({success} × P)，
+                r_f(fc(p)) ∈ {failure} ∪ ({success} × 2^(C × S))。"
+
+        set 主链动作序列 := "记作 L = <updatechild, findparent, findchild, judge, updateparent>。"
+
+        <!--
+        op[3:1] 注册 := "记作 reg；
+                reg(REG, k, func)"
+
+        map 注册返回 := "记作 r_reg；
+                r_reg(reg(REG, k, func)) ∈ R。"
+
+        map 解析 := "记作 res；
+                res(REG, k) ∈ FUNC ∪ {undefined}。"
+        -->
+
+    Principle:
+        sat 序内先后记号 := "对同一序列 q 中的动作 x, y，
+                        若 x 先于 y 出现，则记作 x ≺_q y。"
+
+        sat 查找语义 := "fp(c) 表示查找子任务 c 所属父任务；
+                        fc(p) 表示查找父任务 p 的全部子任务状态集。"
+
+        sat 更新语义 := "uc(c, s) 表示把子任务 c 更新为状态 s；
+                        up(p, s) 表示把父任务 p 更新为状态 s。"
+
+        sat 父状态判断 := "对任意 X ⊆ C × S，
+                        j(X) = finish
+                        当且仅当 X ≠ ∅ 且 ∀(c, s) ∈ X, s = finish；
+                        否则 j(X) = unfinish。"
+
+        sat 联动闭包约束 := "对任意 (c, s) ∈ C × S，
+                        若 q 为由输入 (c, s) 诱导的一轮合法调度序列，
+                        则存在 p ∈ P 与 X_p ⊆ C × S，使得：
+
+                        1. uc(c, s) ∈ q；
+
+                        2. fp(c) ∈ q
+                           当且仅当
+                           [ uc(c, s) ∈ q ∧ r_u(uc(c, s)) = success ]；
+
+                        3. fc(p) ∈ q
+                           当且仅当
+                           [ fp(c) ∈ q ∧ r_f(fp(c)) = (success, p) ]；
+
+                        4. j(X_p) ∈ q 且 u(p, j(X_p)) ∈ q
+                           当且仅当
+                           [ fc(p) ∈ q ∧ r_f(fc(p)) = (success, X_p) ]；
+
+                        5. 只要上述动作出现在 q 中，就必须满足Base.主链动作序列的顺序"
+
+        sat 主链相容 := "对任意排列 q，
+                        若 q 中动作按出现次序排列后，恰为 Base.主链动作序列的某个前缀，
+                        则称 q 与 Base.主链动作序列相容。" 
+
+    Space:
+        set 原子动作空间 := "对任意 c ∈ C, s ∈ S, p ∈ P, X_p ⊆ C × S，
+                记
+
+                t1 = uc(c, s),
+                t2 = fp(c),
+                t3 = fc(p),
+                t4 = j(X_p),
+                t5 = u(p, j(X_p))。
+
+                由此得到原子动作集合
+                T(c, s, p, X_p) = { t1, t2, t3, t4, t5 }。"
+
+        set 原始排列空间 := "对任意 c ∈ C, s ∈ S, p ∈ P, X_p ⊆ C × S，
+                记 A(c, s, p, X_p) 为 T(c, s, p, X_p) 的全部无重复有限排列；
+                即：
+
+                A1 = { <ti> | 1 ≤ i ≤ 5 }
+                A2 = { <ti, tj> | i ≠ j }
+                A3 = { <ti, tj, tk> | i, j, k 两两不同 }
+                A4 = { <ti, tj, tk, tl> | i, j, k, l 两两不同 }
+                A5 = { <ti, tj, tk, tl, tm> | i, j, k, l, m 两两不同且 {i,j,k,l,m} = {1,2,3,4,5} }
+
+                A(c, s, p, X_p) = A1 ∪ A2 ∪ A3 ∪ A4 ∪ A5。"
+
+        set 合法调度空间 := "记作 Q，为所有满足以下条件的排列所成之集：
+            对任意 q ∈ A(c, s, p, X_p)，
+            若 q 与 Base.主链动作序列相容，2
+            且满足 Principle.流程继续条件，
+            则 q ∈ Q。"
+
+    Boundary:
+        in<tuple> 子任务状态 := "(c, s)；其中 c ∈ C，s ∈ S"
+
+        in<elem> 子任务更新返回 := "success 或 failure"
+        in<tuple> 查父返回 := "failure 或 (success, p)；其中 p ∈ P"
+        in<tuple> 查子任务状态返回 := "failure 或 (success, X_p)；其中 X_p ⊆ C × S"
+
+        out<tuple> 子任务更新请求 := "(c, s)"
+        out<elem> 父任务查找请求 := "c"
+        out<elem> 子任务状态查找请求 := "p"
+        out<tuple> 父任务更新请求 := "(p, j(X_p))"
