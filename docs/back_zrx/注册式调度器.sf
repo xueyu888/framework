@@ -1,0 +1,51 @@
+MODULE 注册式调度器:RegisterBasedScheduler:
+    Goal := "定义一种基于算子注册、触发判定与注册顺序的通用调度框架。"
+
+    Base:
+        set 输入 := "记作 I。"
+        set 算子 := "记作 O。"
+        set 判定 := "记作 B = {yes, no}。"
+        set 动作 := "记作 A。"
+
+        seq 注册序列 := "记作 R ∈ O^(<ω>)。"
+        seq 动作序列 := "记作 Q ∈ A^(<ω>)。"
+
+        op[2:1] 注册 := "记作 reg；
+                reg : O^(<ω>) × O -> O^(<ω>)。"
+
+        op[2:1] 触发判定 := "记作 g；
+                g : O × I -> B。"
+
+        op[2:1] 动作生成 := "记作 m；
+                m : O × I -> A。"
+
+        op[2:1] 调度 := "记作 d；
+                d : O^(<ω>) × I -> A^(<ω>)。"
+
+    Principle:
+        sat 注册语义 := "对任意 R ∈ O^(<ω>) 与 o ∈ O，
+                        reg(R, o) 表示把算子 o 注册到序列 R 的末端。"
+
+        sat 调度语义 := "对任意 R = <o1, o2, ..., on> ∈ O^(<ω>) 与 x ∈ I，
+                        d(R, x) = < m(oi, x) | oi ∈ R 且 g(oi, x) = yes >，
+                        并保持 oi 在 R 中的先后顺序。"
+
+        sat 顺序约束 := "若 oi, oj ∈ R 且 i < j，
+                        则在 d(R, x) 中由 oi 生成的动作若出现，必不晚于由 oj 生成的动作。"
+
+    Space:
+        set 注册空间 := "O^(<ω>)。"
+
+        set 原始组合空间 := "⋃_{n≥0} O^n。"
+
+        set 合法调度空间 := "{ <R, x, d(R, x)> |
+                R ∈ Space.注册空间,
+                x ∈ I }"
+
+    Boundary:
+        in<elem> 输入 := "x ∈ I"
+        in<elem> 输入算子 := "o ∈ O"
+        in<seq> 输入注册序列 := "R ∈ O^(<ω>)"
+
+        out<seq> 输出注册序列 := "reg(R, o)"
+        out<seq> 输出动作序列 := "d(R, x)"
