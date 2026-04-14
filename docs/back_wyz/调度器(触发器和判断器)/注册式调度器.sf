@@ -1,0 +1,189 @@
+MODULE 动态键控有序注册表:DynamicKeyedOrderedRegistry:
+    Goal := "定义一种支持按注册键进行注册、删除、查询与枚举的动态有序注册结构。"
+
+    Base:
+        set 注册键 := "记作 K。"
+        set 算子 := "记作 O。"
+        set 下标 := "记作 N = {1, 2, 3, ...}。"
+        set 判定 := "记作 B = {yes, no}。"
+        set 空值 := "记作 ⊥。"
+
+        seq 内部注册键序列 := "记作 R ∈ K^(<ω>)；表示模块内部维护的当前注册键序列。"
+
+        relation[1:1] 键算子关联 := "记作 bind ⊆ K × O；
+                表示每个已注册键唯一关联一个算子。"
+
+        op[2:1] 注册 := "记作 reg；
+                reg : K × O -> B。"
+
+        op[1:1] 删除 := "记作 del；
+                del : K -> B。"
+
+        op[1:1] 存在性查询 := "记作 has；
+                has : K -> B。"
+
+        op[1:1] 按键解析算子 := "记作 resolve；
+                resolve : K -> O ∪ {⊥}。"
+
+        op[1:1] 按下标查询注册键 := "记作 idx；
+                idx : N -> K ∪ {⊥}。"
+
+        op[0:1] 枚举 := "记作 enum；
+                enum : ∅ -> K^(<ω>)。"
+
+    Principle:
+        sat 内部状态语义 := "R 与 bind 为模块内部维护的状态；
+                        外部调用各操作时，不直接输入 R 与 bind，而由各操作作用于当前内部状态。"
+
+        sat 键序列唯一性 := "对任意当前内部状态 R = <k1, k2, ..., kn>，
+                        若 i ≠ j，则 ki ≠ kj。"
+
+        sat 关联唯一性 := "对任意 k ∈ K 与 o1, o2 ∈ O，
+                        若 bind(k) = o1 且 bind(k) = o2，则 o1 = o2。"
+
+        sat 注册语义 := "对任意 k ∈ K 与 o ∈ O，
+                        reg(k, o) 表示尝试将注册键 k 及其对应算子 o 注册到当前内部状态中。"
+
+        sat 注册规则 := "对任意 k ∈ K 与 o ∈ O，
+                        若 k 不在当前内部状态 R 中，
+                        则 reg(k, o) = yes，
+                        且后状态满足 R' = R ⋅ <k>，bind' = bind ∪ {k ↦ o}；
+                        若 k 在当前内部状态 R 中，
+                        则 reg(k, o) = no，
+                        且后状态满足 R' = R，bind' = bind。"
+
+        sat 删除语义 := "对任意 k ∈ K，
+                        del(k) 表示尝试将注册键 k 及其关联算子从当前内部状态中删除。"
+
+        sat 删除规则 := "对任意 k ∈ K，
+                        若 k 在当前内部状态 R 中，
+                        则 del(k) = yes，
+                        且后状态满足：
+                        R' 为从 R 中移除 k 后所得序列，且其余注册键的相对先后顺序保持不变；
+                        bind' 为从 bind 中移除键 k 后所得关联关系；
+                        若 k 不在当前内部状态 R 中，
+                        则 del(k) = no，
+                        且后状态满足 R' = R，bind' = bind。"
+
+        sat 存在性查询语义 := "对任意 k ∈ K，
+                        has(k) = yes，当且仅当 k 出现在当前内部状态 R 中；
+                        否则 has(k) = no；
+                        且后状态满足 R' = R，bind' = bind。"
+
+        sat 解析语义 := "对任意 k ∈ K，
+                        若 k 在当前内部状态 R 中，则 resolve(k) = bind(k)；
+                        若 k 不在当前内部状态 R 中，则 resolve(k) = ⊥；
+                        且后状态满足 R' = R，bind' = bind。"
+
+        sat 下标查询语义 := "设当前内部状态 R = <k1, k2, ..., kn>。
+                        若 1 ≤ i ≤ n，则 idx(i) = ki；
+                        若 i > n，则 idx(i) = ⊥；
+                        且后状态满足 R' = R，bind' = bind。"
+
+        sat 枚举语义 := "enum() = R，
+                        且后状态满足 R' = R，bind' = bind。"
+
+        sat 枚举顺序保持 := "若当前内部状态 R = <k1, k2, ..., kn>，
+                        则 enum() 返回按注册先后顺序排列的注册键序列 <k1, k2, ..., kn>。"
+
+    Space:
+        set 合法键序列状态空间 := "{ <k1, k2, ..., kn> ∈ K^(<ω>) |
+                对任意 i, j，若 i ≠ j，则 ki ≠ kj }。"
+
+        set 合法关联状态空间 := "{ bind |
+                bind 为 K 到 O 的部分单值关联 }。"
+
+        set 合法注册组合空间 := "{ <R, bind, k, o, b, R', bind'> |
+                R ∈ Space.合法键序列状态空间,
+                bind ∈ Space.合法关联状态空间,
+                k ∈ K,
+                o ∈ O,
+                b ∈ B,
+                R' ∈ Space.合法键序列状态空间,
+                bind' ∈ Space.合法关联状态空间,
+                (
+                    ((k ∉ R) ∧ (b = yes) ∧ (R' = R ⋅ <k>) ∧ (bind' = bind ∪ {k ↦ o}))
+                    ∨
+                    ((k ∈ R) ∧ (b = no) ∧ (R' = R) ∧ (bind' = bind))
+                )
+            }"
+
+        set 合法删除组合空间 := "{ <R, bind, k, b, R', bind'> |
+                R ∈ Space.合法键序列状态空间,
+                bind ∈ Space.合法关联状态空间,
+                k ∈ K,
+                b ∈ B,
+                R' ∈ Space.合法键序列状态空间,
+                bind' ∈ Space.合法关联状态空间,
+                (
+                    ((k ∈ R) ∧ (b = yes) ∧ (R' = 从 R 中移除 k 后所得序列) ∧ (bind' = 从 bind 中移除键 k 后所得关联关系))
+                    ∨
+                    ((k ∉ R) ∧ (b = no) ∧ (R' = R) ∧ (bind' = bind))
+                )
+            }"
+
+        set 合法存在性查询组合空间 := "{ <R, bind, k, b, R', bind'> |
+                R ∈ Space.合法键序列状态空间,
+                bind ∈ Space.合法关联状态空间,
+                k ∈ K,
+                b ∈ B,
+                R' = R,
+                bind' = bind,
+                (
+                    ((k ∈ R) ∧ (b = yes))
+                    ∨
+                    ((k ∉ R) ∧ (b = no))
+                )
+            }"
+
+        set 合法解析组合空间 := "{ <R, bind, k, y, R', bind'> |
+                R ∈ Space.合法键序列状态空间,
+                bind ∈ Space.合法关联状态空间,
+                k ∈ K,
+                y ∈ O ∪ {⊥},
+                R' = R,
+                bind' = bind,
+                (
+                    ((k ∈ R) ∧ (y = bind(k)))
+                    ∨
+                    ((k ∉ R) ∧ (y = ⊥))
+                )
+            }"
+
+        set 合法下标查询组合空间 := "{ <R, bind, i, y, R', bind'> |
+                R = <k1, k2, ..., kn> ∈ Space.合法键序列状态空间,
+                bind ∈ Space.合法关联状态空间,
+                i ∈ N,
+                y ∈ K ∪ {⊥},
+                R' = R,
+                bind' = bind,
+                (
+                    ((1 ≤ i ≤ n) ∧ (y = ki))
+                    ∨
+                    ((i > n) ∧ (y = ⊥))
+                )
+            }"
+
+        set 合法枚举组合空间 := "{ <R, bind, y, R', bind'> |
+                R ∈ Space.合法键序列状态空间,
+                bind ∈ Space.合法关联状态空间,
+                y ∈ Space.合法键序列状态空间,
+                R' = R,
+                bind' = bind,
+                y = R
+            }"
+
+    Boundary:
+        in<struct> 注册输入 := "<k, o>，其中 k ∈ K，o ∈ O"
+        in<elem> 删除输入 := "k ∈ K"
+        in<elem> 存在性查询输入 := "k ∈ K"
+        in<elem> 解析输入 := "k ∈ K"
+        in<elem> 下标查询输入 := "i ∈ N"
+        in<void> 枚举输入 := "∅"
+
+        out<elem> 注册输出 := "yes 或 no"
+        out<elem> 删除输出 := "yes 或 no"
+        out<elem> 存在性查询输出 := "yes 或 no"
+        out<elem> 解析输出 := "o ∈ O 或 ⊥"
+        out<elem> 下标查询输出 := "k ∈ K 或 ⊥"
+        out<seq> 枚举输出 := "R ∈ K^(<ω>)"
