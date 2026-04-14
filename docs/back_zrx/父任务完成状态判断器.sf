@@ -16,4 +16,6 @@ MODULE 父任务完成状态判断器:ParentCompletionStatusJudge:
 
     Boundary:
         in<seq> 子任务完成状态序列 := Base.子任务完成状态序列
-        out<set> 父任务完成状态 := Base.父任务完成状态
+        out<set> 父任务完成状态 := Base.父任务完成状态、
+
+
