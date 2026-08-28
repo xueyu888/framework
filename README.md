@@ -1,3 +1,5 @@
+
+
 # Shelf
 
 Shelf 是一个面向 AI 编程的结构优先仓库。
@@ -26,6 +28,8 @@ Framework -> Config -> Code -> Evidence
 - 在创建新的 `projects/<project_id>/project.toml` 之前，`src/main.py serve` 不会自动获得默认项目
 
 ## 快速开始
+
+需要 Python >=3.11。
 
 ```bash
 uv sync
